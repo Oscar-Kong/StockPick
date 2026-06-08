@@ -9,6 +9,7 @@ interface DiagnosticsPanelProps {
   data: SymbolDiagnosticsResponse | null;
   loading: boolean;
   error: string | null;
+  onRetry?: () => void;
 }
 
 function interpretationLabel(
@@ -31,7 +32,7 @@ function interpretationLabel(
   return map[key] ?? key;
 }
 
-export function DiagnosticsPanel({ data, loading, error }: DiagnosticsPanelProps) {
+export function DiagnosticsPanel({ data, loading, error, onRetry }: DiagnosticsPanelProps) {
   const { t } = useTranslation();
 
   const state = loading ? "loading" : error ? "error" : !data ? "idle" : !data.sufficient_data ? "empty" : "ready";
@@ -42,6 +43,7 @@ export function DiagnosticsPanel({ data, loading, error }: DiagnosticsPanelProps
       loadingText={t.diagnostics.loading}
       errorText={error}
       emptyText={t.diagnostics.insufficientData}
+      onRetry={onRetry}
     >
       {data && (
         <div className="space-y-3 text-xs">
@@ -103,8 +105,8 @@ export function DiagnosticsPanel({ data, loading, error }: DiagnosticsPanelProps
               <dd className="font-semibold text-zinc-100">
                 {Boolean(data.adf?.available)
                   ? fmt(t.diagnostics.adfResult, {
-                      stat: fmtNum(data.adf.statistic as number | undefined, 2),
-                      p: fmtNum(data.adf.pvalue as number | undefined, 3),
+                      stat: fmtNum(data.adf.statistic, 2),
+                      p: fmtNum(data.adf.pvalue, 3),
                     })
                   : t.diagnostics.adfUnavailable}
               </dd>
@@ -114,7 +116,7 @@ export function DiagnosticsPanel({ data, loading, error }: DiagnosticsPanelProps
           {Boolean(data.jarque_bera?.available) && (
             <p className="text-zinc-500">
               {fmt(t.diagnostics.jarqueBera, {
-                p: fmtNum(data.jarque_bera.pvalue as number | undefined, 3),
+                p: fmtNum(data.jarque_bera.pvalue, 3),
               })}
             </p>
           )}

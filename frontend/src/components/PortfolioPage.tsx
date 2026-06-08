@@ -61,6 +61,7 @@ export function PortfolioPage() {
   const [policyResult, setPolicyResult] = useState<PortfolioPolicyBacktestResponse | null>(null);
   const [institutional, setInstitutional] = useState(false);
   const [exposureResult, setExposureResult] = useState<FactorExposureResponse | null>(null);
+  const [exposureResultKey, setExposureResultKey] = useState<string | null>(null);
   const [exposureLoading, setExposureLoading] = useState(false);
   const [exposureError, setExposureError] = useState<string | null>(null);
   const exposureCacheRef = useRef<{ key: string; data: FactorExposureResponse } | null>(null);
@@ -78,8 +79,8 @@ export function PortfolioPage() {
   );
   const exposureStale =
     exposureResult != null &&
-    exposureCacheRef.current != null &&
-    exposureCacheRef.current.key !== exposureKey;
+    exposureResultKey != null &&
+    exposureResultKey !== exposureKey;
 
   const loadWatchlist = useCallback(() => {
     if (watchlistSyms.length) setSymbolInput(watchlistSyms.join(", "));
@@ -92,6 +93,7 @@ export function PortfolioPage() {
     }
     if (exposureCacheRef.current?.key === exposureKey) {
       setExposureResult(exposureCacheRef.current.data);
+      setExposureResultKey(exposureKey);
       setExposureError(null);
       return;
     }
@@ -105,8 +107,10 @@ export function PortfolioPage() {
       });
       exposureCacheRef.current = { key: exposureKey, data: res };
       setExposureResult(res);
+      setExposureResultKey(exposureKey);
     } catch (err) {
       setExposureResult(null);
+      setExposureResultKey(null);
       setExposureError(err instanceof Error ? err.message : t.portfolio.exposureFailed);
     } finally {
       setExposureLoading(false);
@@ -117,6 +121,7 @@ export function PortfolioPage() {
     if (panel !== "exposure" || symbols.length < 2) return;
     if (exposureCacheRef.current?.key === exposureKey) {
       setExposureResult(exposureCacheRef.current.data);
+      setExposureResultKey(exposureKey);
       return;
     }
     void runExposure();

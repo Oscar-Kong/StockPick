@@ -14,6 +14,10 @@ from config import (
     PENNY_PRICE_MAX,
     PENNY_PRICE_MIN,
 )
+from models.schemas import Bucket
+
+OTC_SUFFIXES = (".PK", ".OB", ".FQ", ".YY")
+OTC_EXCHANGE_KEYWORDS = ("otc", "pink", "grey", "gray", "otc markets")
 
 
 @dataclass

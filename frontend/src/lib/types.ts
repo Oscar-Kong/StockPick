@@ -51,6 +51,37 @@ export interface ScanStatusResponse {
   message: string;
   results: StockResult[];
   completed_at: string | null;
+  scoring_engine_used?: boolean | null;
+  parity_summary?: ScanParitySummary | null;
+}
+
+export interface ScanParityRecord {
+  symbol: string;
+  sleeve: string;
+  legacy_score: number;
+  engine_score: number;
+  parity_delta: number;
+  scoring_engine_used: boolean;
+  legacy_recommendation_bucket?: string;
+  engine_recommendation_bucket?: string;
+  recommendation_bucket_differs?: boolean;
+  top_factor_contributions?: {
+    factor_id: string;
+    display_name: string;
+    contribution: number;
+    norm_score?: number;
+    weight?: number;
+  }[];
+}
+
+export interface ScanParitySummary {
+  scoring_engine_used?: boolean;
+  symbol_count?: number;
+  average_delta?: number;
+  max_delta?: number;
+  symbols_delta_gt_10?: number;
+  recommendation_bucket_diffs?: number;
+  records?: ScanParityRecord[];
 }
 
 export interface ScanOptions {
@@ -95,6 +126,8 @@ export interface LatestScanResponse {
   results: StockResult[];
   completed_at: string | null;
   strategy_version?: string | null;
+  scoring_engine_used?: boolean | null;
+  parity_summary?: ScanParitySummary | null;
 }
 
 export interface SavedScanItem {
@@ -633,6 +666,18 @@ export interface VolatilityRiskV2 {
   alpha?: number;
 }
 
+export interface JarqueBeraResult {
+  available: boolean;
+  statistic?: number | null;
+  pvalue?: number | null;
+}
+
+export interface AdfResult {
+  available: boolean;
+  statistic?: number | null;
+  pvalue?: number | null;
+}
+
 export interface SymbolDiagnosticsResponse {
   symbol: string;
   lookback: number;
@@ -645,8 +690,8 @@ export interface SymbolDiagnosticsResponse {
   annualized_volatility: number | null;
   skewness: number | null;
   excess_kurtosis: number | null;
-  jarque_bera: Record<string, unknown>;
-  adf: Record<string, unknown>;
+  jarque_bera: JarqueBeraResult;
+  adf: AdfResult;
   autocorrelation: {
     lags?: number[];
     acf?: number[];

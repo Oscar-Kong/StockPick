@@ -366,6 +366,8 @@ export const zh: Messages = {
     statusRunning: "运行中",
     statusCompleted: "已完成",
     statusFailed: "失败",
+    paritySummary: "Parity 均差 {avg} · 最大 {max} · {diffs} 档差异",
+    parityHint: "上次引擎路径扫描中 Legacy 与 ScoringEngine 的分数对比。",
   },
   analysis: {
     loading: "加载 {symbol}…",

@@ -7,7 +7,8 @@
     "build": "next build --webpack",
     "start": "next start --hostname 127.0.0.1 --port 18730",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "clsx": "^2.1.1",

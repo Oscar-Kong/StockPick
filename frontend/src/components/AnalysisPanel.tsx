@@ -145,7 +145,9 @@ export function AnalysisPanel({
   const [unifiedRisk, setUnifiedRisk] = useState<UnifiedRiskV2 | null>(null);
   const [riskLoading, setRiskLoading] = useState(false);
   const [riskError, setRiskError] = useState<string | null>(null);
-  const insightsFetchedRef = useRef<{ symbol: string; bucket: string } | null>(null);
+  const diagnosticsOkRef = useRef<string | null>(null);
+  const riskOkRef = useRef<string | null>(null);
+  const [insightsRetryTick, setInsightsRetryTick] = useState(0);
   const loadGenRef = useRef(0);
 
   useEffect(() => {
@@ -174,7 +176,9 @@ export function AnalysisPanel({
     setDiagnosticsError(null);
     setUnifiedRisk(null);
     setRiskError(null);
-    insightsFetchedRef.current = null;
+    diagnosticsOkRef.current = null;
+    riskOkRef.current = null;
+    setInsightsRetryTick(0);
 
     void (async () => {
       try {
@@ -259,58 +263,69 @@ export function AnalysisPanel({
     return () => ac.abort();
   }, [data, symbol, bucket, t]);
 
+  const retryDiagnostics = useCallback(() => {
+    diagnosticsOkRef.current = null;
+    setInsightsRetryTick((n) => n + 1);
+  }, []);
+
+  const retryUnifiedRisk = useCallback(() => {
+    riskOkRef.current = null;
+    setInsightsRetryTick((n) => n + 1);
+  }, []);
+
   useEffect(() => {
     if (tab !== "insights" || !data || data.symbol !== symbol) return;
     const b = (bucket ?? data.assigned_bucket) as Bucket;
     const cacheKey = `${symbol}:${b}`;
-    if (
-      insightsFetchedRef.current?.symbol === symbol &&
-      insightsFetchedRef.current?.bucket === b
-    ) {
-      return;
-    }
+    const needDiagnostics = diagnosticsOkRef.current !== cacheKey;
+    const needRisk = riskOkRef.current !== cacheKey;
+    if (!needDiagnostics && !needRisk) return;
 
     const ac = new AbortController();
-    setDiagnosticsLoading(true);
-    setRiskLoading(true);
-    setDiagnosticsError(null);
-    setRiskError(null);
 
-    void (async () => {
-      try {
-        const diag = await getSymbolDiagnostics(symbol, 252, { signal: ac.signal });
-        if (!ac.signal.aborted) setDiagnostics(diag);
-      } catch (err) {
-        if (!ac.signal.aborted) {
+    if (needDiagnostics) {
+      setDiagnosticsLoading(true);
+      setDiagnosticsError(null);
+      void getSymbolDiagnostics(symbol, 252, { signal: ac.signal })
+        .then((diag) => {
+          if (ac.signal.aborted) return;
+          setDiagnostics(diag);
+          diagnosticsOkRef.current = cacheKey;
+        })
+        .catch((err) => {
+          if (ac.signal.aborted) return;
           setDiagnosticsError(err instanceof Error ? err.message : t.analysis.failed);
-        }
-      } finally {
-        if (!ac.signal.aborted) setDiagnosticsLoading(false);
-      }
+        })
+        .finally(() => {
+          if (!ac.signal.aborted) setDiagnosticsLoading(false);
+        });
+    }
 
-      try {
-        const risk = await getV2UnifiedRisk(symbol, b, { signal: ac.signal });
-        if (!ac.signal.aborted) setUnifiedRisk(risk);
-      } catch (err) {
-        if (!ac.signal.aborted) {
+    if (needRisk) {
+      setRiskLoading(true);
+      setRiskError(null);
+      void getV2UnifiedRisk(symbol, b, { signal: ac.signal })
+        .then((risk) => {
+          if (ac.signal.aborted) return;
+          setUnifiedRisk(risk);
+          riskOkRef.current = cacheKey;
+        })
+        .catch((err) => {
+          if (ac.signal.aborted) return;
           const msg = err instanceof Error ? err.message : t.analysis.failed;
           setRiskError(
             msg.includes("503") || msg.toLowerCase().includes("score_engine")
               ? t.riskPanel.v2Disabled
               : msg
           );
-        }
-      } finally {
-        if (!ac.signal.aborted) setRiskLoading(false);
-      }
-
-      if (!ac.signal.aborted) {
-        insightsFetchedRef.current = { symbol, bucket: b };
-      }
-    })();
+        })
+        .finally(() => {
+          if (!ac.signal.aborted) setRiskLoading(false);
+        });
+    }
 
     return () => ac.abort();
-  }, [tab, data, symbol, bucket, t]);
+  }, [tab, data, symbol, bucket, t, insightsRetryTick]);
 
   useEffect(() => {
     if (tab !== "data" || !data || data.symbol !== symbol) return;
@@ -613,7 +628,12 @@ export function AnalysisPanel({
                   {t.riskPanel.sectionTitle}
                 </summary>
                 <div className="mt-3">
-                  <UnifiedRiskPanel data={unifiedRisk} loading={riskLoading} error={riskError} />
+                  <UnifiedRiskPanel
+                    data={unifiedRisk}
+                    loading={riskLoading}
+                    error={riskError}
+                    onRetry={riskError ? retryUnifiedRisk : undefined}
+                  />
                 </div>
               </details>
 
@@ -626,6 +646,7 @@ export function AnalysisPanel({
                     data={diagnostics}
                     loading={diagnosticsLoading}
                     error={diagnosticsError}
+                    onRetry={diagnosticsError ? retryDiagnostics : undefined}
                   />
                 </div>
               </details>

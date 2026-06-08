@@ -3,12 +3,13 @@
 import { useTranslation } from "@/lib/i18n";
 import type { UnifiedRiskV2 } from "@/lib/types";
 import clsx from "clsx";
-import { AsyncSection, fmtNum, fmtPct } from "./AsyncSection";
+import { AsyncSection, fmtPct } from "./AsyncSection";
 
 interface UnifiedRiskPanelProps {
   data: UnifiedRiskV2 | null;
   loading: boolean;
   error: string | null;
+  onRetry?: () => void;
 }
 
 function liquidityLines(data: UnifiedRiskV2): string[] {
@@ -21,7 +22,7 @@ function liquidityLines(data: UnifiedRiskV2): string[] {
   return [...fromCompany, ...fromDeductions];
 }
 
-export function UnifiedRiskPanel({ data, loading, error }: UnifiedRiskPanelProps) {
+export function UnifiedRiskPanel({ data, loading, error, onRetry }: UnifiedRiskPanelProps) {
   const { t } = useTranslation();
   const state = loading ? "loading" : error ? "error" : !data ? "idle" : "ready";
   const vol = data?.volatility;
@@ -33,6 +34,7 @@ export function UnifiedRiskPanel({ data, loading, error }: UnifiedRiskPanelProps
       loadingText={t.riskPanel.loading}
       errorText={error}
       emptyText={t.riskPanel.unavailable}
+      onRetry={onRetry}
     >
       {data && (
         <div className="space-y-3 text-xs">

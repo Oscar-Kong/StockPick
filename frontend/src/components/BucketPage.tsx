@@ -13,12 +13,13 @@ import {
 } from "@/lib/api";
 import { getBucketMeta } from "@/lib/buckets";
 import { fmt, useTranslation } from "@/lib/i18n";
-import type { Bucket, SavedScanItem, ScanOptions, StockDetail, StockResult } from "@/lib/types";
+import type { Bucket, SavedScanItem, ScanOptions, ScanParitySummary, StockDetail, StockResult } from "@/lib/types";
 import { formatDateTime } from "@/lib/datetime";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ScanControls } from "./ScanControls";
 import { ScanProgress } from "./ScanProgress";
+import { ScanScoreMeta } from "./ScanScoreMeta";
 import { StockDetailDrawer } from "./StockDetailDrawer";
 import { StockTable } from "./StockTable";
 import { StrategyVersionBadge } from "./DataQualityBadge";
@@ -50,6 +51,8 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
   const [detailLoading, setDetailLoading] = useState(false);
   const [lastScanAt, setLastScanAt] = useState<string | null>(null);
   const [strategyVersion, setStrategyVersion] = useState<string | null>(null);
+  const [scoringEngineUsed, setScoringEngineUsed] = useState<boolean | null>(null);
+  const [paritySummary, setParitySummary] = useState<ScanParitySummary | null>(null);
   const [savedScans, setSavedScans] = useState<SavedScanItem[]>([]);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [saveMsgSuccess, setSaveMsgSuccess] = useState(false);
@@ -74,6 +77,8 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
       setResults(data.results);
       setLastScanAt(data.completed_at);
       setStrategyVersion(data.strategy_version ?? null);
+      setScoringEngineUsed(data.scoring_engine_used ?? null);
+      setParitySummary(data.parity_summary ?? null);
       setStatus("completed");
       setMessage(fmt(t.scan.loadedResults, { count: data.results.length }));
     } catch {
@@ -124,6 +129,8 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
         if (data.status === "completed") {
           setResults(data.results);
           setLastScanAt(data.completed_at ?? new Date().toISOString());
+          setScoringEngineUsed(data.scoring_engine_used ?? null);
+          setParitySummary(data.parity_summary ?? null);
           setScanning(false);
           clearInterval(interval);
         } else if (data.status === "failed") {
@@ -151,6 +158,8 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
     setMessage(t.scan.startingScan);
     setSelected(null);
     setDetail(null);
+    setScoringEngineUsed(null);
+    setParitySummary(null);
     try {
       const job = await startScan(bucket, options);
       await pollScan(job.job_id);
@@ -227,6 +236,8 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
     setResults(row.results);
     setLastScanAt(row.completed_at ?? row.created_at);
     setStrategyVersion(row.strategy_version ?? null);
+    setScoringEngineUsed(null);
+    setParitySummary(null);
     setStatus("completed");
     setMessage(fmt(t.scan.loadedSavedScan, { name: row.name }));
   };
@@ -268,6 +279,10 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
           </span>
         )}
         <StrategyVersionBadge version={strategyVersion} />
+        <ScanScoreMeta
+          scoringEngineUsed={scoringEngineUsed}
+          paritySummary={paritySummary}
+        />
         <button
           type="button"
           onClick={loadLatestScan}

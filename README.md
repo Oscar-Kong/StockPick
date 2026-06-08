@@ -293,6 +293,7 @@ For production-grade models, offline training pipelines still need to be operate
 | [Quant Integration Plan](docs/QUANT_INTEGRATION_PLAN.md) | Roadmap + implementation status |
 | [Institutional Quant Architecture](docs/INSTITUTIONAL_QUANT_ARCHITECTURE.md) | Target v2 engines, formulas, schema, roadmap |
 | [Scan ScoringEngine migration](docs/SCAN_SCORING_ENGINE_MIGRATION.md) | Enable engine path in staging; parity logs & metadata |
+| [Scan engine v2 staging report](docs/SCAN_ENGINE_V2_STAGING_REPORT.md) | Local parity rollout results & commands |
 
 ## Common Commands
 
@@ -303,8 +304,10 @@ python -m py_compile backend/main.py
 # before git push — scan for leaked secrets
 ./scripts/check-secrets.sh
 
-# frontend lint
+# frontend lint / test / typecheck
 cd frontend && npm run lint
+cd frontend && npm test
+cd frontend && npm run typecheck
 ```
 
 ## Disclaimer

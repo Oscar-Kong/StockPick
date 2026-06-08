@@ -369,6 +369,8 @@ export const en = {
     statusRunning: "running",
     statusCompleted: "completed",
     statusFailed: "failed",
+    paritySummary: "Parity avg {avg} · max {max} · {diffs} rec diffs",
+    parityHint: "Legacy vs ScoringEngine score comparison from the last engine-path scan.",
   },
   analysis: {
     loading: "Loading {symbol}…",
