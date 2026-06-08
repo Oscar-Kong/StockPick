@@ -1,0 +1,24 @@
+version: "3.9"
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "18731:18731"
+    volumes:
+      - ./backend:/app
+      - ./.env:/app/../.env
+    command: uvicorn main:app --host 0.0.0.0 --port 18731 --reload
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "18730:18730"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://127.0.0.1:18731
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --hostname 0.0.0.0 --port 18730
+    depends_on:
+      - backend

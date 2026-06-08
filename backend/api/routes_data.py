@@ -1,0 +1,113 @@
+"""Data quality, strategy version, and scheduler status API routes."""
+from __future__ import annotations
+
+from fastapi import APIRouter, HTTPException
+
+from config import QUANDL_API_KEY
+from data.historical_store import HistoricalStore
+from data.quandl_client import QuandlClient
+from data.reconciler import DataReconciler
+from data.strategy_registry import StrategyRegistry
+from models.schemas import (
+    DataQualityResponse,
+    JobLogEntry,
+    OpenBBRiskResponse,
+    ReconcileResponse,
+    SchedulerStatusResponse,
+    StrategyVersionResponse,
+)
+from services.scheduler import refresh_fundamentals, refresh_universe_quotes, run_daily_pipeline
+
+router = APIRouter(prefix="/data", tags=["data"])
+
+
+@router.get("/openbb/risk/{symbol}", response_model=OpenBBRiskResponse)
+def openbb_risk(symbol: str):
+    """SEC / insider governance snapshot (requires OPENBB_ENABLED=true)."""
+    from data.openbb_client import get_risk_snapshot, is_available
+
+    sym = symbol.upper()
+    if not is_available():
+        return OpenBBRiskResponse(
+            symbol=sym,
+            governance_score=0.0,
+            warnings=["OpenBB not enabled — set OPENBB_ENABLED=true and install requirements-openbb.txt"],
+            openbb_available=False,
+        )
+    snap = get_risk_snapshot(sym, allow_fetch=True, use_cache=True)
+    return OpenBBRiskResponse(
+        symbol=sym,
+        governance_score=snap.governance_score,
+        warnings=snap.warnings,
+        flags=snap.flags,
+        insider_sell_ratio=snap.insider_sell_ratio,
+        recent_filings=snap.recent_filings[:5],
+        openbb_available=True,
+    )
+
+
+@router.get("/reconcile/{symbol}", response_model=ReconcileResponse)
+def reconcile_symbol(symbol: str):
+    result = DataReconciler().reconcile(symbol.upper())
+    return ReconcileResponse(**result.to_dict())
+
+
+@router.get("/quality/{symbol}", response_model=DataQualityResponse)
+def get_data_quality(symbol: str):
+    store = HistoricalStore()
+    flags = store.get_quality_flags(symbol.upper())
+    rec = DataReconciler().reconcile(symbol.upper())
+    return DataQualityResponse(
+        symbol=symbol.upper(),
+        quality_score=rec.quality_score,
+        flags=flags + [{"flag_type": "reconcile", "message": f, "created_at": None} for f in rec.flags],
+        reconcile=rec.to_dict(),
+    )
+
+
+@router.get("/strategy/{bucket}", response_model=StrategyVersionResponse)
+def get_strategy_version(bucket: str):
+    if bucket not in ("penny", "medium", "compounder"):
+        raise HTTPException(status_code=400, detail="Invalid bucket")
+    cfg = StrategyRegistry().get_active(bucket)
+    return StrategyVersionResponse(
+        version_id=cfg.version_id,
+        bucket=bucket,
+        config=cfg.config,
+    )
+
+
+@router.get("/strategy", response_model=list[StrategyVersionResponse])
+def list_strategies(bucket: str | None = None):
+    rows = StrategyRegistry().list_versions(bucket)
+    return [
+        StrategyVersionResponse(version_id=r["version_id"], bucket=r["bucket"], config=r["config"])
+        for r in rows
+    ]
+
+
+@router.get("/scheduler/status", response_model=SchedulerStatusResponse)
+def scheduler_status():
+    store = HistoricalStore()
+    logs = store.get_recent_job_logs(10)
+    return SchedulerStatusResponse(
+        enabled=True,
+        recent_jobs=[JobLogEntry(**j) for j in logs],
+        quandl_configured=bool(QUANDL_API_KEY),
+    )
+
+
+@router.post("/scheduler/run")
+def trigger_daily_pipeline():
+    result = run_daily_pipeline()
+    return result
+
+
+@router.post("/scheduler/refresh-quotes")
+def trigger_quote_refresh():
+    return refresh_universe_quotes()
+
+
+@router.post("/scheduler/refresh-fundamentals")
+def trigger_fundamentals_refresh():
+    return refresh_fundamentals()

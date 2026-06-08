@@ -1,0 +1,171 @@
+"""DB-first price history using external provider fallback."""
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+import pandas as pd
+
+from data.historical_store import HistoricalStore
+from data.market_data_client import MarketDataClient
+
+logger = logging.getLogger(__name__)
+
+# Minimum trading days required per period (approx)
+PERIOD_MIN_BARS: dict[str, int] = {
+    "5d": 3,
+    "1mo": 15,
+    "3mo": 50,
+    "6mo": 100,
+    "1y": 200,
+    "2y": 400,
+    "3y": 600,
+    "5y": 1000,
+}
+
+PERIOD_LIMIT: dict[str, int] = {
+    "5d": 10,
+    "1mo": 30,
+    "3mo": 80,
+    "6mo": 160,
+    "1y": 280,
+    "2y": 560,
+    "3y": 800,
+    "5y": 1400,
+}
+
+
+def _rows_to_dataframe(rows: list[dict]) -> pd.DataFrame:
+    if not rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows)
+    df["date"] = pd.to_datetime(df["date"])
+    return df[["date", "open", "high", "low", "close", "volume"]].dropna()
+
+
+def avg_volume_from_history(df: pd.DataFrame | None, lookback: int = 20) -> float:
+    if df is None or df.empty:
+        return 0.0
+    tail = df["volume"].tail(min(lookback, len(df)))
+    return float(tail.mean()) if len(tail) else 0.0
+
+
+def avg_dollar_volume_from_history(df: pd.DataFrame | None, lookback: int = 20) -> float:
+    """Average daily dollar volume (close × volume) over lookback window."""
+    if df is None or df.empty:
+        return 0.0
+    tail = df.tail(min(lookback, len(df)))
+    if tail.empty:
+        return 0.0
+    return float((tail["close"] * tail["volume"]).mean())
+
+
+class PriceService:
+    """Local DB -> provider fallback, always persisting fresh fetches."""
+
+    def __init__(
+        self,
+        store: HistoricalStore | None = None,
+        market: MarketDataClient | None = None,
+    ):
+        self.store = store or HistoricalStore()
+        self.market = market or MarketDataClient()
+
+    def get_history(self, symbol: str, period: str = "1y") -> pd.DataFrame:
+        sym = symbol.upper()
+        min_bars = PERIOD_MIN_BARS.get(period, 200)
+        limit = PERIOD_LIMIT.get(period, 500)
+
+        rows = self.store.get_quotes(sym, limit=limit)
+        df = _rows_to_dataframe(rows)
+        if len(df) >= min_bars:
+            return self._trim_period(df, period)
+
+        df = self.market.get_history(sym, period=period)
+        if not df.empty:
+            self._persist(sym, df)
+        return df
+
+    def get_spy_history(self, period: str = "1y") -> pd.DataFrame:
+        return self.get_history("SPY", period=period)
+
+    def download_batch(
+        self,
+        symbols: list[str],
+        period: str = "6mo",
+        chunk_size: int = 50,
+        *,
+        max_runtime_seconds: int = 45,
+    ) -> dict[str, pd.DataFrame]:
+        """Load from DB where sufficient; fetch only missing symbols."""
+        unique = list(dict.fromkeys(s.upper() for s in symbols if s))
+        min_bars = PERIOD_MIN_BARS.get(period, 100)
+        result: dict[str, pd.DataFrame] = {}
+        missing: list[str] = []
+
+        for sym in unique:
+            rows = self.store.get_quotes(sym, limit=PERIOD_LIMIT.get(period, 500))
+            df = _rows_to_dataframe(rows)
+            if len(df) >= min_bars:
+                result[sym] = self._trim_period(df, period)
+            else:
+                missing.append(sym)
+
+        if missing:
+            logger.info(
+                "PriceService: fetching %s/%s symbols from provider fallback (%s)",
+                len(missing),
+                len(unique),
+                period,
+            )
+            fetched = self.market.download_batch(
+                missing,
+                period=period,
+                chunk_size=chunk_size,
+                use_alpha_vantage_fallback=False,
+                max_runtime_seconds=max_runtime_seconds,
+                alpha_vantage_probe_symbols=5,
+            )
+            for sym, df in fetched.items():
+                if not df.empty:
+                    self._persist(sym, df)
+                    result[sym.upper()] = df
+
+        return result
+
+    def _persist(self, symbol: str, df: pd.DataFrame) -> None:
+        rows = [
+            {
+                "date": r["date"].isoformat() if hasattr(r["date"], "isoformat") else str(r["date"])[:10],
+                "open": float(r["open"]),
+                "high": float(r["high"]),
+                "low": float(r["low"]),
+                "close": float(r["close"]),
+                "volume": float(r["volume"]),
+            }
+            for _, r in df.iterrows()
+        ]
+        try:
+            self.store.upsert_quotes(symbol, rows)
+        except Exception as exc:
+            logger.warning("Failed to persist quotes for %s: %s", symbol, exc)
+
+    @staticmethod
+    def _trim_period(df: pd.DataFrame, period: str) -> pd.DataFrame:
+        bars = PERIOD_LIMIT.get(period)
+        if bars and len(df) > bars:
+            return df.iloc[-bars:].copy().reset_index(drop=True)
+        return df.copy().reset_index(drop=True)
+
+    def quote_from_history(self, symbol: str, hist: pd.DataFrame | None = None) -> dict[str, Any]:
+        if hist is None or hist.empty:
+            hist = self.get_history(symbol, period="1mo")
+        if hist.empty:
+            return {}
+        price = float(hist["close"].iloc[-1])
+        avg_vol = avg_volume_from_history(hist)
+        return {
+            "symbol": symbol.upper(),
+            "currentPrice": price,
+            "averageVolume": avg_vol,
+        }

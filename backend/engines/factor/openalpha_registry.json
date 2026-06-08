@@ -1,0 +1,70 @@
+{
+  "formulas": [
+    {
+      "id": "oa_penny_vwap_gap",
+      "sleeve": "penny",
+      "display_name": "VWAP–close gap (5d)",
+      "openalpha_ref": "5000001",
+      "expression": "ts_mean(vwap - close, 5)",
+      "factor_key": "vwap_close_gap",
+      "weight": 0.08,
+      "tier": "experimental",
+      "enabled_live": true
+    },
+    {
+      "id": "oa_penny_ols_residual",
+      "sleeve": "penny",
+      "display_name": "Price OLS residual",
+      "openalpha_ref": "5000006",
+      "expression": "-ts_ols(close, ret1, 10)[2]",
+      "factor_key": "ols_price_residual",
+      "weight": 0.07,
+      "tier": "experimental",
+      "enabled_live": true
+    },
+    {
+      "id": "oa_penny_vol_ret_corr",
+      "sleeve": "penny",
+      "display_name": "Volume–return corr",
+      "openalpha_ref": "5000010",
+      "expression": "ts_correlation(cs_rank(volume), cs_rank(ret1), 5)",
+      "factor_key": "vol_ret_corr",
+      "weight": 0.05,
+      "tier": "experimental",
+      "enabled_live": true
+    },
+    {
+      "id": "oa_medium_spy_corr",
+      "sleeve": "medium",
+      "display_name": "SPY return correlation (20d)",
+      "openalpha_ref": "5000012",
+      "expression": "ts_correlation(ret1, spy_ret1, 20)",
+      "factor_key": "spy_corr_20d",
+      "weight": 0.06,
+      "tier": "experimental",
+      "enabled_live": true
+    },
+    {
+      "id": "oa_medium_ret_autocorr",
+      "sleeve": "medium",
+      "display_name": "Return autocorrelation",
+      "openalpha_ref": "5000014",
+      "expression": "ts_ols(ret1, ts_delay(ret1,1), 20)[0]",
+      "factor_key": "ret_autocorr",
+      "weight": 0.05,
+      "tier": "experimental",
+      "enabled_live": true
+    },
+    {
+      "id": "oa_medium_vol_asymmetry",
+      "sleeve": "medium",
+      "display_name": "Vol asymmetry (low vs high)",
+      "openalpha_ref": "5000024",
+      "expression": "ts_std(low/close-1,100) - ts_std(high/close-1,100)",
+      "factor_key": "vol_asymmetry",
+      "weight": 0.05,
+      "tier": "experimental",
+      "enabled_live": true
+    }
+  ]
+}

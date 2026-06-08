@@ -1,0 +1,56 @@
+# --- Secrets (never commit real keys) ---
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env.local
+# Allow committed templates only:
+!.env.example
+!frontend/.env.local.example
+
+# --- Python ---
+backend/.venv/
+quant/.venv/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Node / Next.js ---
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.vercel/
+
+# --- Local databases & runtime data (may contain watchlists, trades, API cache) ---
+backend/data_store/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# --- Logs & dev runtime (logs may echo API keys in error URLs) ---
+storage/
+*.log
+*.pid
+.dev-up.pids
+
+# --- OS / IDE ---
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# --- Optional large local clones ---
+OpenBB/
+
+# --- Research exports (can be large; regenerate locally) ---
+backend/data_store/research/
+*.parquet

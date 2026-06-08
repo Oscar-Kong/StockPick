@@ -1,0 +1,14 @@
+# Optional quant stack dependencies (install in a dedicated quant environment).
+#
+# Recommended:
+#   python3.12 -m venv quant/.venv
+#   source quant/.venv/bin/activate
+#   pip install -r backend/requirements.txt -r backend/requirements-quant.txt
+
+vectorbt>=0.27.3
+PyPortfolioOpt>=1.5.5
+bt>=0.2.9
+
+# Planned phases (enable as integrations land):
+# qlib>=0.9.6
+# finrl-trading>=0.3.2

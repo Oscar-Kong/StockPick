@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stock-picker.local/schemas/ai_research_report_v2.json",
+  "title": "AIResearchReportV2",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "symbol",
+    "sleeve",
+    "as_of",
+    "final_rating",
+    "executive_summary",
+    "investment_thesis",
+    "key_catalysts",
+    "risks",
+    "quantitative_analysis",
+    "fundamental_analysis",
+    "technical_analysis",
+    "valuation_analysis",
+    "position_sizing",
+    "metadata"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "2.0.0" },
+    "symbol": { "type": "string", "pattern": "^[A-Z][A-Z0-9.\\-]{0,9}$" },
+    "sleeve": { "enum": ["penny", "medium", "compounder"] },
+    "as_of": { "type": "string", "format": "date-time" },
+    "final_rating": {
+      "type": "object",
+      "required": ["action", "conviction", "composite_score", "horizon"],
+      "properties": {
+        "action": { "enum": ["strong_buy", "buy", "hold", "reduce", "avoid"] },
+        "conviction": { "type": "number", "minimum": 0, "maximum": 100 },
+        "composite_score": { "type": "number", "minimum": 0, "maximum": 100 },
+        "horizon": { "type": "string" }
+      }
+    },
+    "executive_summary": { "type": "string", "maxLength": 2000 },
+    "investment_thesis": {
+      "type": "object",
+      "required": ["bull_case", "bear_case", "edge"],
+      "properties": {
+        "bull_case": { "type": "string" },
+        "bear_case": { "type": "string" },
+        "edge": { "type": "string" }
+      }
+    },
+    "key_catalysts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["event", "timing", "impact"],
+        "properties": {
+          "event": { "type": "string" },
+          "timing": { "type": "string" },
+          "impact": { "enum": ["high", "medium", "low"] }
+        }
+      }
+    },
+    "risks": {
+      "type": "object",
+      "required": ["risk_score", "macro", "company", "events"],
+      "properties": {
+        "risk_score": { "type": "number", "minimum": 0, "maximum": 100 },
+        "macro": { "type": "array", "items": { "type": "string" } },
+        "company": { "type": "array", "items": { "type": "string" } },
+        "events": { "type": "array", "items": { "type": "string" } },
+        "score_deductions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "category": { "type": "string" },
+              "points": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "quantitative_analysis": {
+      "type": "object",
+      "required": ["composite_score", "factor_contributions", "regime"],
+      "properties": {
+        "composite_score": { "type": "number" },
+        "raw_score": { "type": "number" },
+        "data_quality_score": { "type": "number" },
+        "regime": { "type": "string" },
+        "factor_contributions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["factor_id", "value", "weight", "contribution"],
+            "properties": {
+              "factor_id": { "type": "string" },
+              "value": { "type": "number" },
+              "weight": { "type": "number" },
+              "contribution": { "type": "number" },
+              "ic_30d": { "type": ["number", "null"] },
+              "status": { "enum": ["active", "watch", "retired"] }
+            }
+          }
+        }
+      }
+    },
+    "fundamental_analysis": {
+      "type": "object",
+      "properties": {
+        "revenue_growth_ttm": { "type": ["number", "null"] },
+        "eps_growth_ttm": { "type": ["number", "null"] },
+        "roic": { "type": ["number", "null"] },
+        "fcf_yield": { "type": ["number", "null"] },
+        "debt_to_equity": { "type": ["number", "null"] },
+        "adjusted_earnings_flag": { "type": "boolean" },
+        "industry_percentile_summary": { "type": "string" }
+      }
+    },
+    "technical_analysis": {
+      "type": "object",
+      "properties": {
+        "trend_score": { "type": ["number", "null"] },
+        "breakout_score": { "type": ["number", "null"] },
+        "rs_vs_spy": { "type": ["number", "null"] },
+        "pct_from_52w_high": { "type": ["number", "null"] },
+        "structure": { "type": "string" }
+      }
+    },
+    "valuation_analysis": {
+      "type": "object",
+      "properties": {
+        "pe_percentile_5y": { "type": ["number", "null"] },
+        "pb_percentile_5y": { "type": ["number", "null"] },
+        "ps_percentile_5y": { "type": ["number", "null"] },
+        "vs_industry": { "type": "string" },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "position_sizing": {
+      "type": "object",
+      "required": [
+        "recommended_weight_pct",
+        "max_weight_pct",
+        "stop_loss_pct",
+        "portfolio_allocation_pct"
+      ],
+      "properties": {
+        "recommended_weight_pct": { "type": "number", "minimum": 0, "maximum": 100 },
+        "max_weight_pct": { "type": "number", "minimum": 0, "maximum": 100 },
+        "stop_loss_pct": { "type": "number", "minimum": 0 },
+        "portfolio_allocation_pct": { "type": "number", "minimum": 0, "maximum": 100 },
+        "rationale": { "type": "string" },
+        "kelly_fraction": { "type": ["number", "null"] }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "model_version": { "type": "string" },
+        "strategy_version": { "type": "string" },
+        "data_sources": { "type": "array", "items": { "type": "string" } },
+        "llm_model": { "type": ["string", "null"] },
+        "disclaimer": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,57 @@
+---
+description: 
+alwaysApply: true
+---
+
+# Automatically Update Documentation
+
+After **every** code change, update affected docs in the **same task** — do not leave documentation for a follow-up.
+
+## Workflow
+
+1. **Identify impact** — What changed? (API, UI route, env flag, scoring, schema, ops, backlog item)
+2. **Pick docs** — Use the map below; update only what is affected
+3. **Edit docs** — Match existing tone, tables, and cross-links
+4. **Verify** — Before finishing, confirm docs reflect the new behavior (not the old)
+
+## Doc map
+
+| Change type | Update |
+|----|-----|
+| New/changed HTTP endpoint or response shape | `docs/API_REFERENCE.md` |
+| Module layout, data flow, or extension points | `docs/ARCHITECTURE.md` |
+| User-facing routes, features, or setup steps | `README.md`, `docs/PROJECT_INVENTORY.md` |
+| Env vars, feature flags, start/troubleshoot steps | `docs/RUNBOOK.md`, `.env.example` |
+| Analyze UI tabs, scores, or investor-facing copy | `docs/ANALYZE_PANEL.md` |
+| Analyze APIs, sector report, v2 hooks | `docs/ANALYZE_SECTOR_REPORT.md` |
+| Quant engines, v2 scoring, PIT, backtests | `docs/INSTITUTIONAL_QUANT_ARCHITECTURE.md` (+ see `quant-stock-picker.mdc`) |
+| Quant runtime / integration status | `docs/QUANT_STACK.md`, `docs/QUANT_INTEGRATION_PLAN.md` |
+| OpenBB usage or config | `docs/OPENBB.md` |
+| Shipped backlog item or new gap | `docs/ROUND2_REMAINING_WORK.md` (status symbols ✅/🟡/❌) |
+
+Full index: `README.md` → Documentation Index.
+
+## Examples
+
+```markdown
+# ❌ BAD — code-only PR
+Added GET /api/v2/factors/performance; docs unchanged.
+
+# ✅ GOOD — same task
+Added endpoint + updated API_REFERENCE.md table + RUNBOOK.md flag note.
+```
+
+```markdown
+# ❌ BAD — stale inventory
+New /research route shipped; PROJECT_INVENTORY.md still says "API-only".
+
+# ✅ GOOD
+Updated PROJECT_INVENTORY.md route table and README product map.
+```
+
+## Rules
+
+- Prefer **small, targeted edits** over new doc files unless the user asks
+- Do **not** edit `quant/.venv/` or `backend/.venv/` paths
+- When behavior version bumps (`FACTOR_MODEL_VERSION`, `STRATEGY_VERSION`), note it in architecture/API docs
+- If no doc update is needed, state **why** briefly (e.g. internal refactor, no public surface change)

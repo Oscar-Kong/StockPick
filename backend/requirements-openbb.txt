@@ -1,0 +1,12 @@
+# Optional OpenBB Platform integration (install on top of requirements.txt)
+# Usage:
+#   pip install -r requirements.txt -r requirements-openbb.txt
+#
+# Minimal install (matches your existing FMP/FRED key setup):
+openbb>=4.7.0
+
+# Optional extras — uncomment as needed:
+# openbb-alpha-vantage>=1.6.0
+# openbb-sec>=1.6.0
+# openbb-technical>=1.6.0
+# openbb-nasdaq>=1.6.0

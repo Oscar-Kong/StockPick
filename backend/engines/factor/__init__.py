@@ -1,0 +1,1 @@
+"""Factor registry and computation."""

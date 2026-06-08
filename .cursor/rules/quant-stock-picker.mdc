@@ -1,0 +1,59 @@
+---
+description: Quant stock picker accuracy rules — prediction/valuation separation, PIT data, backtest discipline
+globs:
+  - backend/engines/**
+  - backend/services/quant*.py
+  - backend/scoring/**
+  - backend/api/routes_v2.py
+alwaysApply: false
+---
+
+# Quant Stock Picker Accuracy Rules
+
+For every change to the stock analysis system:
+
+1. Preserve separation between:
+   - prediction score (alpha / factors)
+   - valuation score (DCF, multiples, reverse DCF)
+   - catalyst score (earnings, events)
+   - risk score and penalties
+   - position sizing
+   - data confidence
+
+2. Any new stock signal must include:
+   - clear definition
+   - data source
+   - as-of date handling (`feature_provenance` table)
+   - missing-data behavior
+   - historical evaluation plan (IC or similar-signal backtest)
+
+3. Any recommendation feature must store a `prediction_snapshots` row when `PREDICTION_SNAPSHOTS_ENABLED=true`.
+
+4. Any scoring change must update:
+   - factor attribution (`score_attribution`, pillar scores)
+   - IC panel / factor performance if weights change
+   - documentation (`docs/API_REFERENCE.md`, `docs/INSTITUTIONAL_QUANT_ARCHITECTURE.md`)
+   - `FACTOR_MODEL_VERSION` or `STRATEGY_VERSION` when behavior changes
+
+5. Never use future data in historical tests. Use `universe_pit`, `feature_provenance`, and dated snapshots only.
+
+6. Backtests must include:
+   - transaction costs (`engines/backtest/cost_model.py`)
+   - slippage assumptions
+   - benchmark comparison vs SPY
+   - sector-relative comparison
+   - max drawdown
+   - turnover
+
+7. Every stock report must include:
+   - bull case and bear case
+   - valuation verdict
+   - risk summary
+   - confidence score
+   - reason the recommendation could fail
+
+8. Strong recommendations require `data_confidence >= 70`; Strong Buy requires `>= 80` plus alpha > 75 and acceptable valuation/risk.
+
+9. LLM agents extract structured signals only — final scores come from the quant engine (`engines/recommendation/engine.py`).
+
+10. Primary evaluation horizons for medium sleeve: 20, 60, 90 trading days (not 1-day noise).

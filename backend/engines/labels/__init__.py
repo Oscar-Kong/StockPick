@@ -1,0 +1,1 @@
+"""Forward return label store."""
