@@ -39,6 +39,7 @@ class ScanJob:
     results: list[StockResult] = field(default_factory=list)
     completed_at: datetime | None = None
     error: str | None = None
+    parity_summary: dict | None = None
 
 
 class ScanManager:
@@ -124,6 +125,7 @@ class ScanManager:
             stage_b_symbols = stage_a[:STAGE_B_TOP_N]
             total = len(stage_b_symbols)
             job.message = f"Stage B: deep scoring top {total} candidates"
+            parity_records: list = []
 
             for idx, symbol in enumerate(stage_b_symbols):
                 job.progress = 25.0 + round((idx / max(total, 1)) * 70, 1)
@@ -243,8 +245,18 @@ class ScanManager:
 
                     result = screener.to_result(ctx, round(score, 1), signals, risk, summary, metrics)
                     candidates.append(result)
+                    if outcome.parity_record is not None:
+                        parity_records.append(outcome.parity_record)
                 except Exception as exc:
                     logger.warning("Failed %s in %s scan: %s", symbol, job.bucket, exc)
+
+            from config import USE_SCORING_ENGINE_IN_SCAN
+            from services.scan_parity import aggregate_scan_parity_summary, log_scan_parity_summary
+
+            parity_summary_obj = aggregate_scan_parity_summary(parity_records)
+            if parity_summary_obj is not None:
+                job.parity_summary = parity_summary_obj.to_dict()
+                log_scan_parity_summary(parity_summary_obj, bucket=job.bucket.value)
 
             candidates.sort(key=lambda r: r.score, reverse=True)
             if not candidates and fallback_candidates:
@@ -257,9 +269,21 @@ class ScanManager:
                 job.message = (
                     f"Found {len(job.results)} candidates (partial-data fallback; provider-limited)"
                 )
+            elif parity_summary_obj is not None:
+                job.message = (
+                    f"Found {len(job.results)} candidates "
+                    f"(ScoringEngine; avg parity delta {parity_summary_obj.average_delta:.1f})"
+                )
             else:
                 job.message = f"Found {len(job.results)} candidates"
             job.completed_at = datetime.utcnow()
+
+            scan_metadata: dict | None = None
+            if job.parity_summary is not None:
+                scan_metadata = {
+                    "scoring_engine_used": USE_SCORING_ENGINE_IN_SCAN,
+                    "parity_summary": job.parity_summary,
+                }
 
             cache_module.save_scan_results(
                 job.bucket.value,
@@ -267,6 +291,7 @@ class ScanManager:
                 job.completed_at.isoformat(),
                 SCAN_RESULT_TTL,
                 strategy_version=strategy.version_id,
+                metadata=scan_metadata,
             )
             cache_module.save_scan_snapshot(
                 bucket=job.bucket.value,

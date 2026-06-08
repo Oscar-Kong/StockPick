@@ -2,20 +2,23 @@
 "use client";
 
 import {
+  getPortfolioFactorExposure,
   getWatchlist,
   optimizePortfolio,
   runPortfolioPolicyBacktest,
   runV2PortfolioBacktest,
 } from "@/lib/api";
 import type {
+  FactorExposureResponse,
   PortfolioOptimizeResponse,
   PortfolioPolicyBacktestResponse,
 } from "@/lib/types";
 import { fmt, useTranslation } from "@/lib/i18n";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppTabBar, AppTabButton } from "./AppTabs";
 import { ChartMount } from "./ChartMount";
 import { DarkChartTooltip, darkTooltipCursor } from "./DarkChartTooltip";
+import { PortfolioFactorExposurePanel } from "./PortfolioFactorExposurePanel";
 import {
   CartesianGrid,
   Line,
@@ -26,7 +29,7 @@ import {
   YAxis,
 } from "recharts";
 
-type PanelTab = "optimize" | "policy";
+type PanelTab = "optimize" | "policy" | "exposure";
 
 function parseSymbols(raw: string): string[] {
   return [...new Set(raw.split(/[\s,]+/).map((s) => s.trim().toUpperCase()).filter(Boolean))];
@@ -57,6 +60,10 @@ export function PortfolioPage() {
   const [initialCapital, setInitialCapital] = useState("100000");
   const [policyResult, setPolicyResult] = useState<PortfolioPolicyBacktestResponse | null>(null);
   const [institutional, setInstitutional] = useState(false);
+  const [exposureResult, setExposureResult] = useState<FactorExposureResponse | null>(null);
+  const [exposureLoading, setExposureLoading] = useState(false);
+  const [exposureError, setExposureError] = useState<string | null>(null);
+  const exposureCacheRef = useRef<{ key: string; data: FactorExposureResponse } | null>(null);
 
   useEffect(() => {
     getWatchlist()
@@ -65,10 +72,55 @@ export function PortfolioPage() {
   }, []);
 
   const symbols = useMemo(() => parseSymbols(symbolInput), [symbolInput]);
+  const exposureKey = useMemo(
+    () => [...symbols].sort().join(","),
+    [symbols]
+  );
+  const exposureStale =
+    exposureResult != null &&
+    exposureCacheRef.current != null &&
+    exposureCacheRef.current.key !== exposureKey;
 
   const loadWatchlist = useCallback(() => {
     if (watchlistSyms.length) setSymbolInput(watchlistSyms.join(", "));
   }, [watchlistSyms]);
+
+  const runExposure = useCallback(async () => {
+    if (symbols.length < 2) {
+      setExposureError(t.portfolio.needTwoSymbols);
+      return;
+    }
+    if (exposureCacheRef.current?.key === exposureKey) {
+      setExposureResult(exposureCacheRef.current.data);
+      setExposureError(null);
+      return;
+    }
+    setExposureLoading(true);
+    setExposureError(null);
+    try {
+      const res = await getPortfolioFactorExposure({
+        symbols,
+        benchmark: "SPY",
+        lookback_period: lookback,
+      });
+      exposureCacheRef.current = { key: exposureKey, data: res };
+      setExposureResult(res);
+    } catch (err) {
+      setExposureResult(null);
+      setExposureError(err instanceof Error ? err.message : t.portfolio.exposureFailed);
+    } finally {
+      setExposureLoading(false);
+    }
+  }, [symbols, exposureKey, lookback, t]);
+
+  useEffect(() => {
+    if (panel !== "exposure" || symbols.length < 2) return;
+    if (exposureCacheRef.current?.key === exposureKey) {
+      setExposureResult(exposureCacheRef.current.data);
+      return;
+    }
+    void runExposure();
+  }, [panel, exposureKey, symbols.length, runExposure]);
 
   const runOptimize = async () => {
     if (symbols.length < 2) {
@@ -149,6 +201,9 @@ export function PortfolioPage() {
           </AppTabButton>
           <AppTabButton active={panel === "policy"} onClick={() => setPanel("policy")}>
             {t.portfolio.tabPolicy}
+          </AppTabButton>
+          <AppTabButton active={panel === "exposure"} onClick={() => setPanel("exposure")}>
+            {t.portfolio.tabExposure}
           </AppTabButton>
         </AppTabBar>
       </header>
@@ -559,6 +614,36 @@ export function PortfolioPage() {
               )}
             </>
           )}
+        </div>
+      )}
+
+      {panel === "exposure" && (
+        <div className="space-y-4">
+          <details className="surface-card p-4" open>
+            <summary className="cursor-pointer text-sm font-medium text-zinc-200">
+              {t.portfolio.tabExposure}
+            </summary>
+            <p className="mt-2 text-xs text-zinc-500">{t.portfolio.exposureHint}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void runExposure()}
+                disabled={exposureLoading || symbols.length < 2}
+                className="btn-primary px-4 py-2 text-sm disabled:opacity-50"
+              >
+                {exposureLoading ? t.common.running : t.portfolio.exposureRun}
+              </button>
+            </div>
+            <div className="mt-4">
+              <PortfolioFactorExposurePanel
+                data={exposureResult}
+                loading={exposureLoading}
+                error={exposureError}
+                symbolsKey={exposureKey}
+                stale={exposureStale}
+              />
+            </div>
+          </details>
         </div>
       )}
 

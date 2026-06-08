@@ -54,6 +54,11 @@ def _base_label(final_score: float) -> str:
     return "avoid"
 
 
+def recommendation_label_from_score(final_score: float) -> str:
+    """Score-tier label used for scan parity and recommendation gating."""
+    return _base_label(final_score)
+
+
 def build_recommendation(
     *,
     symbol: str,

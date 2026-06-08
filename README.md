@@ -13,7 +13,7 @@ It combines rule-based screening, data reconciliation, optional OpenBB governanc
 From one UI, you can:
 
 1. **Scan** a bucket and rank candidates (`/scan`)
-2. **Workspace** — watchlist, single-symbol analyze, compare peers, trade journal (`/workspace`)
+2. **Workspace** — watchlist, single-symbol analyze (primary score from `/api/v2/score` when enabled), compare peers, trade journal (`/workspace`)
 3. **Library** — saved scans, research reports, analyze snapshots (`/library`)
 4. **Portfolio** — basket weight optimization and rebalance policy backtests (`/portfolio`)
 5. **Trader Intel** — style presets and bucket tilts (`/trader-intel`)
@@ -163,7 +163,7 @@ Optional LLM profile tuning:
 | `FINRL_ENABLED` | `false` | FinRL allocation workflow flag |
 | `LEAN_EXPORT_ENABLED` | `false` | LEAN handoff workflow flag |
 | `SCORE_ENGINE_V2_ENABLED` | `true` | v2 score API (`/api/v2/score`) |
-| `USE_SCORING_ENGINE_IN_SCAN` | `false` | Route scan Stage B through `ScoringEngine` (legacy path when false) |
+| `USE_SCORING_ENGINE_IN_SCAN` | `false` | Route scan Stage B through `ScoringEngine` (legacy path when false). Staging guide: [SCAN_SCORING_ENGINE_MIGRATION.md](docs/SCAN_SCORING_ENGINE_MIGRATION.md) |
 | `PERSIST_SCORE_ATTRIBUTION` | `true` | Persist factor attribution rows on v2/scan scores |
 | `PREDICTION_SNAPSHOTS_ENABLED` | `true` | Store every v2 score as a prediction snapshot |
 | `VALUATION_ENGINE_ENABLED` | `true` | DCF + peer + reverse DCF on v2 score |
@@ -215,7 +215,8 @@ Optional LLM profile tuning:
 
 - `GET /stock/{symbol}`
 - `GET /analyze/{symbol}` — optional `bucket`, `refresh`, `include_bucket_fit`
-- `GET /analyze/{symbol}/diagnostics?lookback=252` — log-return time-series stats + interpretation
+- `GET /analyze/{symbol}/diagnostics?lookback=252` — log-return time-series stats (Workspace → Insights)
+- `GET /api/v2/risk/{symbol}` — unified risk + volatility (Workspace → Insights)
 - `GET /analyze/{symbol}/bucket-fit`
 - `GET /analyze/{symbol}/report`
 - `GET /analyze/watchlist` — workspace matrix rows + alerts
@@ -240,7 +241,7 @@ Optional LLM profile tuning:
 
 - `POST /portfolio/optimize`
 - `POST /portfolio/policy-backtest`
-- `POST /portfolio/factor-exposure` — betas vs SPY, rolling correlation, PCA loadings (diagnostics only)
+- `POST /portfolio/factor-exposure` — betas vs SPY, rolling correlation, PCA loadings (Portfolio → Factor exposure tab)
 - `GET /ml/alpha/latest`
 - `POST /ml/alpha/ingest`
 - `GET /allocation/recommendation/{bucket}`
@@ -291,6 +292,7 @@ For production-grade models, offline training pipelines still need to be operate
 | [Quant Stack](docs/QUANT_STACK.md) | Quant runtime split |
 | [Quant Integration Plan](docs/QUANT_INTEGRATION_PLAN.md) | Roadmap + implementation status |
 | [Institutional Quant Architecture](docs/INSTITUTIONAL_QUANT_ARCHITECTURE.md) | Target v2 engines, formulas, schema, roadmap |
+| [Scan ScoringEngine migration](docs/SCAN_SCORING_ENGINE_MIGRATION.md) | Enable engine path in staging; parity logs & metadata |
 
 ## Common Commands
 

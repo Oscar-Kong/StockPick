@@ -2,14 +2,18 @@
 "use client";
 
 import { fmt, useTranslation } from "@/lib/i18n";
-import type { AnalyzeSymbolResponse, Bucket, Signal } from "@/lib/types";
+import type { AnalyzeSymbolResponse, Bucket, Signal, V2ScoreResponse } from "@/lib/types";
+import type { AnalysisDisplay } from "@/lib/v2Score";
 import clsx from "clsx";
+import { ScoreSourceBadge } from "./ScoreSourceBadge";
 import { ValuationBadges } from "./ValuationBadges";
 
 interface AnalysisSidebarProps {
   data: AnalyzeSymbolResponse;
   bucketFit: AnalyzeSymbolResponse["bucket_fit"];
   bucketFitLoading?: boolean;
+  display?: AnalysisDisplay;
+  v2Score?: V2ScoreResponse | null;
 }
 
 function StatCell({ label, value }: { label: string; value: React.ReactNode }) {
@@ -98,11 +102,15 @@ export function AnalysisSidebar({
   data,
   bucketFit,
   bucketFitLoading,
+  display,
+  v2Score,
 }: AnalysisSidebarProps) {
   const { t } = useTranslation();
   const tech = data.technicals;
   const fund = data.fundamentals ?? {};
   const scores = bucketFit?.scores ?? {};
+  const primarySignals = display?.signals ?? data.signals;
+  const scoreSource = display?.scoreSource ?? (v2Score ? "scoring_engine_v2" : "legacy_screener");
 
   const fundEntries: { label: string; value: string }[] = [];
   const labelsUsed = new Set<string>();
@@ -124,7 +132,10 @@ export function AnalysisSidebar({
 
   return (
     <div className="space-y-3 p-3">
-      <p className="text-[10px] text-zinc-600">{t.analysis.sidebarInsightsHint}</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-[10px] text-zinc-600">{t.analysis.sidebarInsightsHint}</p>
+        <ScoreSourceBadge source={scoreSource} />
+      </div>
 
       <section>
         <h3 className="label-caps mb-2">{t.analysis.technicals}</h3>
@@ -181,8 +192,10 @@ export function AnalysisSidebar({
       </section>
 
       <section>
-        <h3 className="label-caps mb-2">{t.analysis.signalWeights}</h3>
-        <SignalsList signals={data.signals} />
+        <h3 className="label-caps mb-2">
+          {scoreSource === "scoring_engine_v2" ? t.analysis.factorAttribution : t.analysis.signalWeights}
+        </h3>
+        <SignalsList signals={primarySignals} />
       </section>
 
       {fundEntries.length > 0 && (

@@ -49,6 +49,8 @@ def get_latest_scan(bucket: Bucket):
         results=results,
         completed_at=datetime.fromisoformat(completed) if completed else None,
         strategy_version=data.get("strategy_version"),
+        parity_summary=data.get("parity_summary"),
+        scoring_engine_used=data.get("scoring_engine_used"),
     )
 
 
@@ -80,4 +82,6 @@ def get_scan_status(job_id: str):
         message=job.message if job.status != "failed" else (job.error or job.message),
         results=job.results,
         completed_at=job.completed_at,
+        parity_summary=job.parity_summary,
+        scoring_engine_used=job.parity_summary.get("scoring_engine_used") if job.parity_summary else None,
     )

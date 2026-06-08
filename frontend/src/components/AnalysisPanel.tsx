@@ -6,8 +6,10 @@ import {
   getAnalyzeBucketFit,
   getAnalyzeSymbol,
   getDataQuality,
+  getSymbolDiagnostics,
   getV2PositionSizing,
   getV2Score,
+  getV2UnifiedRisk,
   getResearchReport,
   listSavedReports,
   saveReportSnapshot,
@@ -15,7 +17,7 @@ import {
 } from "@/lib/api";
 import { getBucketMeta } from "@/lib/buckets";
 import { useTranslation } from "@/lib/i18n";
-import type { AnalyzeSymbolResponse, Bucket, PositionSizingV2, StockResearchReport, V2ScoreResponse } from "@/lib/types";
+import type { AnalyzeSymbolResponse, Bucket, PositionSizingV2, StockResearchReport, SymbolDiagnosticsResponse, UnifiedRiskV2, V2ScoreResponse } from "@/lib/types";
 import clsx from "clsx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppTabBar, AppTabButton } from "./AppTabs";
@@ -23,11 +25,22 @@ import { AnalysisAlerts } from "./AnalysisAlerts";
 import { AnalysisSidebar } from "./AnalysisSidebar";
 import { BacktestPanel } from "./BacktestPanel";
 import { DataQualityBadge } from "./DataQualityBadge";
+import { DiagnosticsPanel } from "./DiagnosticsPanel";
 import { PositionSizingBlock } from "./PositionSizingBlock";
 import { PriceChart } from "./PriceChart";
 import { ResearchReport } from "./ResearchReport";
 import { Round2Panel } from "./Round2Panel";
 import { ScoreBreakdown } from "./ScoreBreakdown";
+import { ScoreSourceBadge } from "./ScoreSourceBadge";
+import { UnifiedRiskPanel } from "./UnifiedRiskPanel";
+import { V2FallbackBanner } from "./V2FallbackBanner";
+import { V2QuantPanel } from "./V2QuantPanel";
+import {
+  parseV2FetchError,
+  resolveAnalysisDisplay,
+  scoreSourcesDiffer,
+  type V2UnavailableReason,
+} from "@/lib/v2Score";
 
 const TABS = ["overview", "insights", "quant", "data", "chart", "backtest", "report"] as const;
 type Tab = (typeof TABS)[number];
@@ -125,6 +138,14 @@ export function AnalysisPanel({
   const [sizingError, setSizingError] = useState<string | null>(null);
   const [v2Score, setV2Score] = useState<V2ScoreResponse | null>(null);
   const [v2Loading, setV2Loading] = useState(false);
+  const [v2UnavailableReason, setV2UnavailableReason] = useState<V2UnavailableReason | null>(null);
+  const [diagnostics, setDiagnostics] = useState<SymbolDiagnosticsResponse | null>(null);
+  const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
+  const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null);
+  const [unifiedRisk, setUnifiedRisk] = useState<UnifiedRiskV2 | null>(null);
+  const [riskLoading, setRiskLoading] = useState(false);
+  const [riskError, setRiskError] = useState<string | null>(null);
+  const insightsFetchedRef = useRef<{ symbol: string; bucket: string } | null>(null);
   const loadGenRef = useRef(0);
 
   useEffect(() => {
@@ -147,6 +168,13 @@ export function AnalysisPanel({
     setReportMsg(null);
     setPositionSizing(null);
     setSizingError(null);
+    setV2Score(null);
+    setV2UnavailableReason(null);
+    setDiagnostics(null);
+    setDiagnosticsError(null);
+    setUnifiedRisk(null);
+    setRiskError(null);
+    insightsFetchedRef.current = null;
 
     void (async () => {
       try {
@@ -193,10 +221,12 @@ export function AnalysisPanel({
     setV2Loading(true);
     setSizingLoading(true);
     setSizingError(null);
+    setV2UnavailableReason(null);
     void getV2Score(symbol, b, { signal: ac.signal })
       .then((s) => {
         if (ac.signal.aborted) return;
         setV2Score(s);
+        setV2UnavailableReason(null);
         if (s.position_sizing) {
           setPositionSizing(s.position_sizing);
           setSizingLoading(false);
@@ -216,8 +246,11 @@ export function AnalysisPanel({
             });
         }
       })
-      .catch(() => {
-        if (!ac.signal.aborted) setV2Score(null);
+      .catch((err) => {
+        if (!ac.signal.aborted) {
+          setV2Score(null);
+          setV2UnavailableReason(parseV2FetchError(err));
+        }
         setSizingLoading(false);
       })
       .finally(() => {
@@ -225,6 +258,59 @@ export function AnalysisPanel({
       });
     return () => ac.abort();
   }, [data, symbol, bucket, t]);
+
+  useEffect(() => {
+    if (tab !== "insights" || !data || data.symbol !== symbol) return;
+    const b = (bucket ?? data.assigned_bucket) as Bucket;
+    const cacheKey = `${symbol}:${b}`;
+    if (
+      insightsFetchedRef.current?.symbol === symbol &&
+      insightsFetchedRef.current?.bucket === b
+    ) {
+      return;
+    }
+
+    const ac = new AbortController();
+    setDiagnosticsLoading(true);
+    setRiskLoading(true);
+    setDiagnosticsError(null);
+    setRiskError(null);
+
+    void (async () => {
+      try {
+        const diag = await getSymbolDiagnostics(symbol, 252, { signal: ac.signal });
+        if (!ac.signal.aborted) setDiagnostics(diag);
+      } catch (err) {
+        if (!ac.signal.aborted) {
+          setDiagnosticsError(err instanceof Error ? err.message : t.analysis.failed);
+        }
+      } finally {
+        if (!ac.signal.aborted) setDiagnosticsLoading(false);
+      }
+
+      try {
+        const risk = await getV2UnifiedRisk(symbol, b, { signal: ac.signal });
+        if (!ac.signal.aborted) setUnifiedRisk(risk);
+      } catch (err) {
+        if (!ac.signal.aborted) {
+          const msg = err instanceof Error ? err.message : t.analysis.failed;
+          setRiskError(
+            msg.includes("503") || msg.toLowerCase().includes("score_engine")
+              ? t.riskPanel.v2Disabled
+              : msg
+          );
+        }
+      } finally {
+        if (!ac.signal.aborted) setRiskLoading(false);
+      }
+
+      if (!ac.signal.aborted) {
+        insightsFetchedRef.current = { symbol, bucket: b };
+      }
+    })();
+
+    return () => ac.abort();
+  }, [tab, data, symbol, bucket, t]);
 
   useEffect(() => {
     if (tab !== "data" || !data || data.symbol !== symbol) return;
@@ -375,6 +461,8 @@ export function AnalysisPanel({
 
   const activeBucketFit = bucketFit ?? data.bucket_fit;
   const bucketScores = activeBucketFit?.scores ?? {};
+  const display = resolveAnalysisDisplay(data, v2Score);
+  const showLegacyDiff = display.hasV2 && scoreSourcesDiffer(display);
   const shellClass = embedded
     ? "flex h-full min-h-0 flex-1 flex-col overflow-hidden"
     : "analysis-shell flex flex-col min-h-[70vh]";
@@ -398,18 +486,24 @@ export function AnalysisPanel({
             <span className="chip px-1.5 py-0.5 capitalize">
               {bucketMeta[data.assigned_bucket as Bucket]?.label ?? data.assigned_bucket}
             </span>
-            <span className="chip px-1.5 py-0.5">
-              {t.analysis.scoreChip} {data.score.toFixed(1)}
+            <span className="chip px-1.5 py-0.5 tabular-nums">
+              {t.analysis.scoreChip} {display.score.toFixed(1)}
             </span>
+            <ScoreSourceBadge source={display.scoreSource} />
+            {showLegacyDiff && (
+              <span className="chip px-1.5 py-0.5 tabular-nums text-zinc-500" title={t.analysis.legacyScoreHint}>
+                {t.analysis.legacyScoreShort} {display.legacyScore.toFixed(1)}
+              </span>
+            )}
             <span
               className={clsx(
                 "chip px-1.5 py-0.5 capitalize",
-                data.risk_level === "high" && "text-red-300",
-                data.risk_level === "medium" && "text-amber-300",
-                data.risk_level === "low" && "text-[#7dff8e]"
+                display.riskLevel === "high" && "text-red-300",
+                display.riskLevel === "medium" && "text-amber-300",
+                display.riskLevel === "low" && "text-[#7dff8e]"
               )}
             >
-              {riskLabel(data.risk_level)}
+              {riskLabel(String(display.riskLevel))}
             </span>
           </div>
         </div>
@@ -445,7 +539,7 @@ export function AnalysisPanel({
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
                   {t.analysis.summary}
                 </h3>
-                <p className="text-sm leading-relaxed text-zinc-300">{data.summary}</p>
+                <p className="text-sm leading-relaxed text-zinc-300">{display.summary}</p>
               </div>
               <div className="analysis-block">
                 <label className="text-xs font-medium text-zinc-500">{t.analysis.yourNotes}</label>
@@ -492,10 +586,14 @@ export function AnalysisPanel({
               {v2Loading && (
                 <p className="text-xs text-zinc-500">{t.analysis.loadingQuantV2}</p>
               )}
+              {!v2Loading && !v2Score && v2UnavailableReason && (
+                <V2FallbackBanner reason={v2UnavailableReason} />
+              )}
               {v2Score ? (
                 <Round2Panel score={v2Score} />
               ) : (
-                !v2Loading && (
+                !v2Loading &&
+                !v2UnavailableReason && (
                   <p className="text-sm text-zinc-500">{t.analysis.insightsUnavailable}</p>
                 )
               )}
@@ -509,12 +607,66 @@ export function AnalysisPanel({
                   />
                 </div>
               )}
+
+              <details className="analysis-block group" open>
+                <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  {t.riskPanel.sectionTitle}
+                </summary>
+                <div className="mt-3">
+                  <UnifiedRiskPanel data={unifiedRisk} loading={riskLoading} error={riskError} />
+                </div>
+              </details>
+
+              <details className="analysis-block group">
+                <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  {t.diagnostics.sectionTitle}
+                </summary>
+                <div className="mt-3">
+                  <DiagnosticsPanel
+                    data={diagnostics}
+                    loading={diagnosticsLoading}
+                    error={diagnosticsError}
+                  />
+                </div>
+              </details>
             </div>
           )}
 
           {tab === "quant" && (
             <div className="space-y-4">
-              <ScoreBreakdown signals={data.signals} className="analysis-chart-box h-80 w-full p-3" />
+              {v2Loading && (
+                <p className="text-xs text-zinc-500">{t.analysis.loadingQuantV2}</p>
+              )}
+              {!v2Loading && !v2Score && v2UnavailableReason && (
+                <V2FallbackBanner reason={v2UnavailableReason} />
+              )}
+              {v2Score ? (
+                <V2QuantPanel score={v2Score} />
+              ) : (
+                !v2Loading && (
+                  <div className="analysis-block">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <h3 className="label-caps">{t.analysis.legacyAnalysis}</h3>
+                      <ScoreSourceBadge source="legacy_screener" />
+                    </div>
+                    <ScoreBreakdown signals={data.signals} className="analysis-chart-box h-80 w-full p-3" />
+                  </div>
+                )
+              )}
+              {v2Score && (
+                <details className="analysis-block">
+                  <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                    {t.analysis.legacyAnalysis}
+                  </summary>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <ScoreSourceBadge source="legacy_screener" />
+                    <span className="text-xs tabular-nums text-zinc-400">
+                      {t.analysis.scoreChip} {data.score.toFixed(1)}
+                    </span>
+                  </div>
+                  <ScoreBreakdown signals={data.signals} className="analysis-chart-box mt-3 h-64 w-full p-3" />
+                </details>
+              )}
               <div className="analysis-block lg:hidden">
                 <h4 className="mb-2 text-sm font-semibold text-zinc-200">{t.analysis.bucketFit}</h4>
                 {bucketFitLoading ? (
@@ -613,6 +765,8 @@ export function AnalysisPanel({
             data={data}
             bucketFit={activeBucketFit}
             bucketFitLoading={bucketFitLoading}
+            display={display}
+            v2Score={v2Score}
           />
         </aside>
       </div>

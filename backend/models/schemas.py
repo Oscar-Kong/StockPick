@@ -62,6 +62,8 @@ class ScanStatusResponse(BaseModel):
     message: str = ""
     results: list[StockResult] = []
     completed_at: datetime | None = None
+    parity_summary: dict[str, Any] | None = None
+    scoring_engine_used: bool | None = None
 
 
 class ScanOptions(BaseModel):
@@ -123,6 +125,8 @@ class LatestScanResponse(BaseModel):
     results: list[StockResult] = []
     completed_at: datetime | None = None
     strategy_version: str | None = None
+    parity_summary: dict[str, Any] | None = None
+    scoring_engine_used: bool | None = None
 
 
 class SavedScanCreateRequest(BaseModel):

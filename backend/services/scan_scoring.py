@@ -11,6 +11,7 @@ from models.schemas import Bucket, RiskLevel
 from scoring.data_quality import adjust_score_for_data_quality
 from screeners.base import BaseScreener, CandidateContext, WeightedSignal
 from services.market_context import enrich_metrics
+from services.scan_parity import StageBParityRecord, build_stage_b_parity_record, log_stage_b_parity
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ class ScanScoreOutcome:
     legacy_score: float
     parity_delta: float | None = None
     scoring_engine_used: bool = False
+    parity_record: StageBParityRecord | None = None
 
 
 def _apply_openbb_adjustment(score: float, metrics: dict[str, Any]) -> float:
@@ -124,18 +126,19 @@ def log_score_parity(
     sleeve: str,
     legacy_score: float,
     engine_score: float,
-) -> float:
-    """Log legacy vs ScoringEngine delta; return absolute parity delta."""
-    delta = round(abs(legacy_score - engine_score), 2)
-    logger.info(
-        "Scan score parity %s/%s legacy=%.1f engine=%.1f delta=%.1f",
-        symbol,
-        sleeve,
-        legacy_score,
-        engine_score,
-        delta,
+    factors: list[Any] | None = None,
+) -> StageBParityRecord:
+    """Build structured parity record and log legacy vs ScoringEngine delta."""
+    record = build_stage_b_parity_record(
+        symbol=symbol,
+        sleeve=sleeve,
+        legacy_score=legacy_score,
+        engine_score=engine_score,
+        factors=factors or [],
+        scoring_engine_used=True,
     )
-    return delta
+    log_stage_b_parity(record)
+    return record
 
 
 def score_stage_b_candidate(
@@ -194,11 +197,12 @@ def score_stage_b_candidate(
         apply_openbb=True,
         metrics=metrics,
     )
-    parity_delta = log_score_parity(
+    parity_record = log_score_parity(
         symbol=symbol,
         sleeve=sleeve,
         legacy_score=legacy_final,
         engine_score=scoring.final_score,
+        factors=scoring.factors,
     )
     _persist_engine_attribution(scoring, symbol=symbol, sleeve=sleeve)
 
@@ -211,7 +215,8 @@ def score_stage_b_candidate(
     merged_metrics["legacy_score"] = legacy_final
     merged_metrics["score_adjusted_for_data_quality"] = scoring.final_score != scoring.raw_score
     merged_metrics["scoring_engine"] = True
-    merged_metrics["parity_delta"] = parity_delta
+    merged_metrics["parity_delta"] = parity_record.parity_delta
+    merged_metrics["parity"] = parity_record.to_dict()
     merged_metrics["scoring_engine_attribution"] = {
         "regime_mult": scoring.regime_mult,
         "sector_tilt": scoring.sector_tilt,
@@ -230,6 +235,7 @@ def score_stage_b_candidate(
         metrics=merged_metrics,
         raw_score=scoring.raw_score,
         legacy_score=legacy_final,
-        parity_delta=parity_delta,
+        parity_delta=parity_record.parity_delta,
         scoring_engine_used=True,
+        parity_record=parity_record,
     )

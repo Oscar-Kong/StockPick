@@ -283,11 +283,14 @@ def save_scan_results(
     completed_at: str,
     ttl: float,
     strategy_version: str | None = None,
+    metadata: dict | None = None,
 ) -> None:
     cache = Cache()
     payload: dict = {"results": results, "completed_at": completed_at}
     if strategy_version:
         payload["strategy_version"] = strategy_version
+    if metadata:
+        payload.update(metadata)
     cache.set(f"scan:latest:{bucket}", payload, ttl)
 
 

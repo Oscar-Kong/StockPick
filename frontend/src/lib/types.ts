@@ -615,6 +615,90 @@ export interface UnifiedRiskV2 {
   score_deductions: { category: string; points: number }[];
   alerts: AnalyzeAlert[];
   breakdown: Record<string, unknown>[];
+  volatility?: VolatilityRiskV2 | null;
+}
+
+export interface VolatilityRiskV2 {
+  sufficient_data?: boolean;
+  observations?: number;
+  realized_volatility?: number | null;
+  ewma_volatility?: number | null;
+  downside_volatility?: number | null;
+  historical_var?: number | null;
+  historical_es?: number | null;
+  volatility_regime?: string;
+  tail_risk?: boolean;
+  risk_penalty_pts?: number;
+  window?: number;
+  alpha?: number;
+}
+
+export interface SymbolDiagnosticsResponse {
+  symbol: string;
+  lookback: number;
+  price_bars: number;
+  return_bars: number;
+  observations: number;
+  data_source: string;
+  sufficient_data: boolean;
+  mean: number | null;
+  annualized_volatility: number | null;
+  skewness: number | null;
+  excess_kurtosis: number | null;
+  jarque_bera: Record<string, unknown>;
+  adf: Record<string, unknown>;
+  autocorrelation: {
+    lags?: number[];
+    acf?: number[];
+    n?: number;
+    lag1?: number | null;
+  };
+  interpretation: string;
+  notes: string[];
+}
+
+export interface FactorExposureRequest {
+  symbols: string[];
+  benchmark?: string;
+  lookback_period?: "6mo" | "1y" | "2y" | "3y" | "5y";
+  correlation_window?: number;
+  n_components?: number | null;
+  pc1_concentration_threshold?: number;
+}
+
+export interface FactorExposureResponse {
+  diagnostic_only: boolean;
+  benchmark: string;
+  lookback_period: string;
+  symbols_requested: string[];
+  symbols_used: string[];
+  excluded: string[];
+  observation_count: number;
+  betas: Record<
+    string,
+    {
+      beta?: number | null;
+      alpha_daily?: number | null;
+      r_squared?: number | null;
+      observations?: number;
+      sufficient?: boolean;
+    }
+  >;
+  correlation: Record<string, unknown>;
+  pca: {
+    sufficient?: boolean;
+    observations?: number;
+    n_components?: number;
+    explained_variance_ratio?: number[];
+    cumulative_explained_variance?: number[];
+    symbol_loadings?: Record<string, string | number>[];
+    concentration_warning?: boolean;
+    pc1_variance_ratio?: number | null;
+    pc1_concentration_threshold?: number;
+    reason?: string;
+  };
+  concentration_warning: boolean;
+  notes: string[];
 }
 
 export interface PillarScoresV2 {
@@ -689,11 +773,39 @@ export interface PortfolioImpactV2 {
   holdings_used?: string[];
 }
 
+export interface FactorContributionV2 {
+  factor_id: string;
+  display_name: string;
+  norm_score: number;
+  weight: number;
+  contribution: number;
+  description?: string;
+}
+
+export interface ScoreAttributionV2 {
+  raw_score: number;
+  regime_mult: number;
+  sector_tilt: number;
+  dq_multiplier: number;
+  openbb_delta?: number;
+  score_after_regime: number;
+  score_after_dq: number;
+  risk_deduction: number;
+  final_score: number;
+}
+
+export interface RiskBreakdownV2 {
+  risk_score: number;
+  deduction_pts: number;
+  items: Record<string, unknown>[];
+}
+
 export interface V2ScoreResponse {
   symbol: string;
   sleeve: string;
   score: number;
   market_regime?: string | null;
+  dynamic_weights?: boolean;
   recommendation?: RecommendationV2 | null;
   valuation?: ValuationV2 | null;
   earnings_setup?: Record<string, unknown>;
@@ -703,6 +815,15 @@ export interface V2ScoreResponse {
   prediction_snapshot_id?: number | null;
   summary: string;
   risk_level: string;
+  factors: FactorContributionV2[];
+  attribution: ScoreAttributionV2;
+  risk: RiskBreakdownV2;
+  alerts?: { type?: string; severity?: string; message?: string }[];
+  strategy_version?: string;
+  factor_model_version?: string;
+  parity_delta?: number | null;
+  metrics?: Record<string, unknown>;
+  agents?: Record<string, unknown> | null;
 }
 
 export interface AnalyzeCompareEntry {
