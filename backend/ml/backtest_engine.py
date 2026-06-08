@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-import numpy as np
 import pandas as pd
+
+from engines.backtest.metrics import summarize_trade_backtest
 
 HORIZON_MAP = {
     "1y": 252,
@@ -36,54 +37,13 @@ def compute_metrics(
     hold_days: int,
     benchmark_return_pct: float = 0.0,
 ) -> dict[str, Any]:
-    if not trades:
-        return {
-            "total_return_pct": 0.0,
-            "gross_return_pct": 0.0,
-            "annualized_return_pct": 0.0,
-            "win_rate_pct": 0.0,
-            "max_drawdown_pct": 0.0,
-            "sharpe_ratio": 0.0,
-            "trade_count": 0,
-            "buy_hold_return_pct": benchmark_return_pct,
-            "costs_applied": any("gross_return_pct" in t for t in trades),
-        }
-
-    capital = equity_curve[-1] if equity_curve else initial_capital
-    total_return = (capital / initial_capital - 1) * 100
-    gross_capital = initial_capital
-    for t in trades:
-        gross_pct = t.get("gross_return_pct", t.get("return_pct", 0))
-        gross_capital *= 1 + float(gross_pct) / 100
-    gross_return = (gross_capital / initial_capital - 1) * 100
-    returns = np.array([t["return_pct"] / 100 for t in trades])
-    wins = (returns > 0).sum()
-
-    eq = np.array(equity_curve)
-    peak = np.maximum.accumulate(eq)
-    drawdown = (eq - peak) / peak
-    max_dd = float(drawdown.min() * 100) if len(drawdown) else 0.0
-
-    sharpe = 0.0
-    if len(returns) > 1 and returns.std() > 0:
-        sharpe = float((returns.mean() / returns.std()) * np.sqrt(252 / max(hold_days, 1)))
-
-    # Annualized return approximation
-    total_days = sum(max(1, t.get("days_held", hold_days)) for t in trades)
-    years = max(total_days / 252, 0.01)
-    ann_return = ((capital / initial_capital) ** (1 / years) - 1) * 100
-
-    return {
-        "total_return_pct": round(total_return, 2),
-        "gross_return_pct": round(gross_return, 2),
-        "annualized_return_pct": round(ann_return, 2),
-        "win_rate_pct": round(wins / len(trades) * 100, 1),
-        "max_drawdown_pct": round(max_dd, 2),
-        "sharpe_ratio": round(sharpe, 2),
-        "trade_count": len(trades),
-        "buy_hold_return_pct": round(benchmark_return_pct, 2),
-        "costs_applied": any("gross_return_pct" in t for t in trades),
-    }
+    return summarize_trade_backtest(
+        trades,
+        equity_curve,
+        initial_capital,
+        hold_days,
+        benchmark_return_pct,
+    )
 
 
 def run_simulation(

@@ -12,6 +12,7 @@ from config import (
     POSITION_SIZING_V2,
     PREDICTION_SNAPSHOTS_ENABLED,
     RISK_ENGINE_V2,
+    RISK_ENGINE_V2,
     SCORE_ENGINE_V2_ENABLED,
     STRATEGY_VERSION,
     VALUATION_ENGINE_ENABLED,
@@ -40,6 +41,7 @@ from screeners.medium import MediumScreener
 from screeners.penny import PennyScreener
 from services.market_context import enrich_metrics
 from services.watchlist_scanner import analyze_symbol
+from quant_core.returns import simple_returns
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +101,11 @@ def build_v2_score(
         metrics=metrics,
     )
 
+    rets = None
+    if RISK_ENGINE_V2 and ctx.history is not None and not getattr(ctx.history, "empty", True):
+        if "close" in ctx.history.columns:
+            rets = simple_returns(ctx.history["close"])
+
     risk_assess = RiskEngine.assess(
         sym,
         sleeve,
@@ -111,6 +118,7 @@ def build_v2_score(
         openbb_risk_flags=metrics.get("openbb_risk_flags"),
         openbb_governance_score=metrics.get("openbb_governance_score"),
         apply_deduction=RISK_ENGINE_V2,
+        returns=rets,
     )
 
     final = RiskEngine.apply_deduction(scoring.final_score, risk_assess)

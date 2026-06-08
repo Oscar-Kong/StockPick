@@ -18,6 +18,7 @@ class UnifiedRiskResult:
     score_deductions: list[dict[str, Any]] = field(default_factory=list)
     alerts: list[dict[str, str]] = field(default_factory=list)
     breakdown: list[dict[str, Any]] = field(default_factory=list)
+    volatility_risk: dict[str, Any] = field(default_factory=dict)
 
 
 def _check_deductions(
@@ -77,7 +78,17 @@ class UnifiedRiskEngine:
         openbb_risk_flags: list[str] | None = None,
         openbb_governance_score: float | None = None,
         metrics: dict[str, Any] | None = None,
+        returns: Any | None = None,
     ) -> UnifiedRiskResult:
+        vol_payload: dict[str, Any] = {}
+        if returns is not None:
+            try:
+                from engines.risk.volatility import assess_volatility_risk
+
+                vol_payload = assess_volatility_risk(returns)
+            except Exception:
+                vol_payload = {}
+
         base: RiskAssessment = RiskEngine.assess(
             symbol,
             sleeve,
@@ -90,7 +101,10 @@ class UnifiedRiskEngine:
             openbb_risk_flags=openbb_risk_flags,
             openbb_governance_score=openbb_governance_score,
             apply_deduction=RISK_ENGINE_V2,
+            volatility_risk=vol_payload,
         )
+        if not vol_payload and base.volatility_risk:
+            vol_payload = base.volatility_risk
 
         structured = _check_deductions(
             days_until_earnings=days_until_earnings,
@@ -120,6 +134,13 @@ class UnifiedRiskEngine:
         for h in m.get("news_red_flags") or []:
             events.append(str(h))
 
+        if vol_payload.get("sufficient_data"):
+            regime = vol_payload.get("volatility_regime")
+            if regime in ("elevated", "extreme"):
+                company.append(f"Realized volatility regime: {regime}")
+            if vol_payload.get("tail_risk"):
+                events.append("Historical tail risk elevated (deep expected shortfall)")
+
         return UnifiedRiskResult(
             risk_index=risk_index,
             safety_score=safety_score,
@@ -130,4 +151,5 @@ class UnifiedRiskEngine:
             score_deductions=structured,
             alerts=base.alerts,
             breakdown=base.breakdown + [{"layer": "structured", **d} for d in structured],
+            volatility_risk=vol_payload,
         )

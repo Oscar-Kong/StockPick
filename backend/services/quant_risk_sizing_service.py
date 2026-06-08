@@ -3,13 +3,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from config import DEFAULT_ACTIVE_POSITIONS, DEFAULT_PORTFOLIO_EXPOSURE, POSITION_SIZING_V2
+from config import DEFAULT_ACTIVE_POSITIONS, DEFAULT_PORTFOLIO_EXPOSURE, POSITION_SIZING_V2, RISK_ENGINE_V2
 from data.price_service import PriceService
 from data.reconciler import DataReconciler
 from engines.risk.unified import UnifiedRiskEngine
 from engines.sizing.engine import PositionSizingEngine
 from engines.store import persist_position_recommendation
-from models.schemas_v2 import PositionSizingV2, UnifiedRiskV2, V2ScoreResponse
+from models.schemas_v2 import PositionSizingV2, UnifiedRiskV2, VolatilityRiskV2, V2ScoreResponse
+from quant_core.returns import simple_returns
 
 
 def sizing_from_score_context(
@@ -93,6 +94,8 @@ def build_unified_risk(
 
     rec = DataReconciler().reconcile(symbol.upper())
     metrics = score_result.metrics or {}
+    hist = PriceService().get_history(symbol.upper(), period="1y")
+    rets = simple_returns(hist["close"]) if not hist.empty and "close" in hist.columns else None
     risk = UnifiedRiskEngine.assess(
         symbol.upper(),
         sleeve,
@@ -104,7 +107,11 @@ def build_unified_risk(
         openbb_risk_flags=metrics.get("openbb_risk_flags"),
         openbb_governance_score=metrics.get("openbb_governance_score"),
         metrics=metrics,
+        returns=rets if RISK_ENGINE_V2 else None,
     )
+
+    vol_payload = risk.volatility_risk or {}
+    volatility = VolatilityRiskV2(**vol_payload) if vol_payload else None
 
     return UnifiedRiskV2(
         symbol=symbol.upper(),
@@ -118,6 +125,7 @@ def build_unified_risk(
         score_deductions=risk.score_deductions,
         alerts=risk.alerts,
         breakdown=risk.breakdown,
+        volatility=volatility,
     )
 
 

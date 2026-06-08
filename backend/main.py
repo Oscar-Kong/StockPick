@@ -37,6 +37,7 @@ from api.routes_saved import router as saved_router
 from api.routes_stock import router as stock_router
 from api.routes_trades import router as trades_router
 from api.routes_trader_intel import router as trader_intel_router
+from api.routes_research import router as research_router
 from api.routes_settings import router as settings_router
 from api.routes_v2 import router as v2_router
 from api.routes_watchlist import router as watchlist_router
@@ -96,6 +97,7 @@ app.include_router(ml_router)
 app.include_router(allocation_router)
 app.include_router(lean_router)
 app.include_router(v2_router)
+app.include_router(research_router)
 app.include_router(settings_router)
 
 

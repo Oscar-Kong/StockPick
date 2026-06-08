@@ -17,12 +17,11 @@ from data.strategy_registry import StrategyRegistry
 from data.universe import get_universe
 from data.universe_builder import filter_universe_by_price
 from models.schemas import Bucket, RiskLevel, ScanOptions, ScanStatus, StockResult
-from scoring.data_quality import adjust_score_for_data_quality, should_exclude_low_quality
+from scoring.data_quality import should_exclude_low_quality
 from screeners.base import BaseScreener
 from screeners.compounder import CompounderScreener
 from screeners.medium import MediumScreener
 from screeners.penny import PennyScreener
-from services.market_context import enrich_metrics
 from services.scan_display import enrich_scan_display, refresh_results_return_metrics
 
 logger = logging.getLogger(__name__)
@@ -209,28 +208,23 @@ class ScanManager:
                         logger.debug("Quality filter rejected %s: %s", symbol, qf.reasons)
                         continue
 
-                    score, signals, risk, summary, metrics = screener.score(ctx)
-                    raw_score = score
-                    score = adjust_score_for_data_quality(score, quality_score)
-                    metrics = enrich_metrics(
-                        symbol,
-                        ctx.info,
-                        ctx.fundamentals,
-                        metrics,
-                        job.bucket,
-                        allow_openbb_fetch=False,
-                    )
-                    try:
-                        from services.openbb_integration import apply_openbb_score_adjustment
+                    from services.scan_scoring import score_stage_b_candidate
 
-                        score = apply_openbb_score_adjustment(score, metrics)
-                    except Exception:
-                        pass
-                    metrics["strategy_version"] = strategy.version_id
-                    metrics["quality_filter"] = qf.to_dict()
-                    metrics["data_quality_score"] = quality_score
-                    metrics["raw_score"] = round(raw_score, 1)
-                    metrics["score_adjusted_for_data_quality"] = score != raw_score
+                    outcome = score_stage_b_candidate(
+                        ctx=ctx,
+                        screener=screener,
+                        bucket=job.bucket,
+                        symbol=symbol,
+                        quality_score=quality_score,
+                        strategy_version=strategy.version_id,
+                        quality_filter=qf.to_dict(),
+                    )
+                    score = outcome.score
+                    signals = outcome.signals
+                    risk = outcome.risk
+                    summary = outcome.summary
+                    metrics = outcome.metrics
+                    raw_score = outcome.raw_score
 
                     HistoricalStore().save_factor_snapshot(
                         symbol,

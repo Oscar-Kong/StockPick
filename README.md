@@ -62,6 +62,7 @@ backend/
   scoring/               # signal and score utilities
   ml/                    # backtest engines
   quant/                 # shared quant contracts
+  quant_core/            # pure TS utilities (returns, labels, diagnostics)
   data_store/            # local sqlite + export artifacts
 docs/                    # architecture, runbook, API, integration docs
 ```
@@ -161,6 +162,9 @@ Optional LLM profile tuning:
 | `QLIB_ENABLED` | `false` | Qlib alpha workflow flag |
 | `FINRL_ENABLED` | `false` | FinRL allocation workflow flag |
 | `LEAN_EXPORT_ENABLED` | `false` | LEAN handoff workflow flag |
+| `SCORE_ENGINE_V2_ENABLED` | `true` | v2 score API (`/api/v2/score`) |
+| `USE_SCORING_ENGINE_IN_SCAN` | `false` | Route scan Stage B through `ScoringEngine` (legacy path when false) |
+| `PERSIST_SCORE_ATTRIBUTION` | `true` | Persist factor attribution rows on v2/scan scores |
 | `PREDICTION_SNAPSHOTS_ENABLED` | `true` | Store every v2 score as a prediction snapshot |
 | `VALUATION_ENGINE_ENABLED` | `true` | DCF + peer + reverse DCF on v2 score |
 | `MULTI_AGENT_PIPELINE_ENABLED` | `true` | Specialist agent pipeline on v2 score |
@@ -211,6 +215,7 @@ Optional LLM profile tuning:
 
 - `GET /stock/{symbol}`
 - `GET /analyze/{symbol}` — optional `bucket`, `refresh`, `include_bucket_fit`
+- `GET /analyze/{symbol}/diagnostics?lookback=252` — log-return time-series stats + interpretation
 - `GET /analyze/{symbol}/bucket-fit`
 - `GET /analyze/{symbol}/report`
 - `GET /analyze/watchlist` — workspace matrix rows + alerts
@@ -235,9 +240,17 @@ Optional LLM profile tuning:
 
 - `POST /portfolio/optimize`
 - `POST /portfolio/policy-backtest`
+- `POST /portfolio/factor-exposure` — betas vs SPY, rolling correlation, PCA loadings (diagnostics only)
 - `GET /ml/alpha/latest`
 - `POST /ml/alpha/ingest`
 - `GET /allocation/recommendation/{bucket}`
+
+### Walk-forward research (offline; does not update live weights)
+
+- `POST /research/walk-forward` — PIT universe, `ScoringEngine`-only scores, forward IC / quintile metrics
+- `GET /research/walk-forward/{run_id}` — persisted run JSON summary
+- `POST /research/pairs` — cointegration, hedge ratio, spread z-score (research only; not scan ranking)
+- CLI: `python scripts/run_walk_forward_research.py --sleeve medium --start-date 2023-01-01 --end-date 2024-12-31`
 
 ### LEAN Handoff
 

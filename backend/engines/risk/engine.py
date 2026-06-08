@@ -17,6 +17,7 @@ class RiskAssessment:
     deduction_pts: float
     breakdown: list[dict[str, Any]] = field(default_factory=list)
     alerts: list[dict[str, str]] = field(default_factory=list)
+    volatility_risk: dict[str, Any] = field(default_factory=dict)
 
 
 class RiskEngine:
@@ -34,6 +35,8 @@ class RiskEngine:
         openbb_risk_flags: list[str] | None = None,
         openbb_governance_score: float | None = None,
         apply_deduction: bool | None = None,
+        volatility_risk: dict[str, Any] | None = None,
+        returns: Any | None = None,
     ) -> RiskAssessment:
         alerts = compute_alerts(
             symbol,
@@ -63,16 +66,43 @@ class RiskEngine:
                 }
             )
         deduction = min(_MAX_DEDUCTION, deduction)
-        risk_score = round(max(0.0, min(100.0, 100.0 - deduction * 3.2)), 1)
+
+        vol_payload = dict(volatility_risk or {})
+        if not vol_payload and returns is not None:
+            try:
+                from engines.risk.volatility import assess_volatility_risk
+
+                vol_payload = assess_volatility_risk(returns)
+            except Exception:
+                vol_payload = {}
 
         if apply_deduction is None:
             apply_deduction = RISK_ENGINE_V2
+
+        if apply_deduction and vol_payload.get("sufficient_data"):
+            vpen = float(vol_payload.get("risk_penalty_pts") or 0.0)
+            if vpen > 0:
+                deduction = min(_MAX_DEDUCTION, deduction + vpen)
+                breakdown.append(
+                    {
+                        "type": "volatility",
+                        "severity": "medium" if vpen < 4 else "high",
+                        "message": (
+                            f"Vol regime {vol_payload.get('volatility_regime')}"
+                            f"{' with tail risk' if vol_payload.get('tail_risk') else ''}"
+                        ),
+                        "deduction_pts": vpen,
+                    }
+                )
+
+        risk_score = round(max(0.0, min(100.0, 100.0 - deduction * 3.2)), 1)
 
         return RiskAssessment(
             risk_score=risk_score,
             deduction_pts=deduction if apply_deduction else 0.0,
             breakdown=breakdown,
             alerts=alerts,
+            volatility_risk=vol_payload,
         )
 
     @staticmethod

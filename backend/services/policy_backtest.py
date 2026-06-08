@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from data.price_service import PriceService
+from engines.backtest.metrics import summarize_portfolio_backtest
 
 
 @dataclass
@@ -91,17 +92,6 @@ def _select_weights(
     return w
 
 
-def _max_drawdown_pct(equity: pd.Series) -> float:
-    peak = equity.cummax()
-    dd = (equity - peak) / peak.replace(0, np.nan)
-    return float(dd.min() * 100) if len(dd) else 0.0
-
-
-def _annualized_return_pct(total_return: float, periods: int) -> float:
-    years = max(periods / 252.0, 0.01)
-    return float(((1.0 + total_return) ** (1.0 / years) - 1.0) * 100.0)
-
-
 def run_policy_backtest(
     symbols: list[str],
     *,
@@ -162,11 +152,13 @@ def run_policy_backtest(
         equity_rows.append({"date": date.strftime("%Y-%m-%d"), "equity": round(equity, 2)})
 
     equity_series = pd.Series([row["equity"] for row in equity_rows], index=returns.index, dtype=float)
-    port_rets = equity_series.pct_change().dropna()
     total_return = equity / initial_capital - 1.0
-    ann_ret = _annualized_return_pct(total_return, len(returns))
-    vol = float(port_rets.std() * np.sqrt(252) * 100) if len(port_rets) > 1 else 0.0
-    sharpe = float((port_rets.mean() / port_rets.std()) * np.sqrt(252)) if len(port_rets) > 1 and port_rets.std() > 0 else 0.0
+    metrics = summarize_portfolio_backtest(
+        equity_series,
+        turnover_sum=turnover,
+        total_return=total_return,
+        periods=len(returns),
+    )
 
     ps = PriceService()
     spy = ps.get_spy_history(period=lookback_period)
@@ -183,12 +175,12 @@ def run_policy_backtest(
         initial_capital=round(initial_capital, 2),
         final_capital=round(equity, 2),
         total_return_pct=round(total_return * 100, 2),
-        annualized_return_pct=round(ann_ret, 2),
-        max_drawdown_pct=round(_max_drawdown_pct(equity_series), 2),
-        volatility_pct=round(vol, 2),
-        sharpe_ratio=round(sharpe, 2),
+        annualized_return_pct=metrics["annualized_return_pct"],
+        max_drawdown_pct=metrics["max_drawdown_pct"],
+        volatility_pct=metrics["volatility_pct"],
+        sharpe_ratio=metrics["sharpe_ratio"],
         benchmark_return_pct=round(benchmark, 2),
-        turnover_pct=round(turnover * 100, 2),
+        turnover_pct=metrics["turnover_pct"],
         rebalance_count=rebalance_count,
         equity_curve=equity_rows,
         weights_history=weights_rows,

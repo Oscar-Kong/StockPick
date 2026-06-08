@@ -4,6 +4,8 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from models.schemas import (
+    FactorExposureRequest,
+    FactorExposureResponse,
     PortfolioOptimizeItem,
     PortfolioOptimizeRequest,
     PortfolioOptimizeResponse,
@@ -12,6 +14,7 @@ from models.schemas import (
 )
 from services.portfolio_optimizer import optimize_portfolio
 from services.institutional_backtest_service import run_portfolio_backtest
+from services.factor_exposure_service import build_factor_exposure_report
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
@@ -72,4 +75,22 @@ def portfolio_policy_backtest(body: PortfolioPolicyBacktestRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Policy backtest failed: {exc}") from exc
+
+
+@router.post("/factor-exposure", response_model=FactorExposureResponse)
+def portfolio_factor_exposure(body: FactorExposureRequest):
+    """Portfolio diagnostics: betas, rolling correlation, PCA loadings (not trade advice)."""
+    try:
+        return build_factor_exposure_report(
+            body.symbols,
+            benchmark=body.benchmark,
+            lookback_period=body.lookback_period,
+            correlation_window=body.correlation_window,
+            n_components=body.n_components,
+            pc1_concentration_threshold=body.pc1_concentration_threshold,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Factor exposure analysis failed: {exc}") from exc
 

@@ -76,6 +76,21 @@ class V2ScoreResponse(BaseModel):
     agents: dict[str, Any] | None = None
 
 
+class VolatilityRiskV2(BaseModel):
+    sufficient_data: bool = False
+    observations: int = 0
+    realized_volatility: float | None = None
+    ewma_volatility: float | None = None
+    downside_volatility: float | None = None
+    historical_var: float | None = Field(default=None, description="Alpha-quantile return (loss if negative)")
+    historical_es: float | None = Field(default=None, description="Expected shortfall in left tail")
+    volatility_regime: str = "unknown"
+    tail_risk: bool = False
+    risk_penalty_pts: float = 0.0
+    window: int = 21
+    alpha: float = 0.05
+
+
 class UnifiedRiskV2(BaseModel):
     symbol: str
     sleeve: str
@@ -88,6 +103,7 @@ class UnifiedRiskV2(BaseModel):
     score_deductions: list[dict[str, Any]] = []
     alerts: list[dict[str, str]] = []
     breakdown: list[dict[str, Any]] = []
+    volatility: VolatilityRiskV2 | None = None
 
 
 class PositionSizingV2(BaseModel):
@@ -167,3 +183,85 @@ class PortfolioImpactV2(BaseModel):
     correlation_with_portfolio: float | None = None
     sector_exposure_after_pct: float | None = None
     portfolio_beta_impact: float | None = None
+
+
+class WalkForwardResearchRequest(BaseModel):
+    sleeve: str = Field(description="Strategy sleeve: penny | medium | compounder")
+    start_date: str = Field(description="ISO date YYYY-MM-DD")
+    end_date: str = Field(description="ISO date YYYY-MM-DD")
+    rebalance_frequency: str = Field(default="monthly", description="weekly | monthly | quarterly | N sessions")
+    forward_horizons: list[int] = Field(default_factory=lambda: [20])
+    max_symbols: int = Field(default=30, ge=5, le=200)
+    persist_snapshots: bool = True
+
+
+class WalkForwardResearchResponse(BaseModel):
+    run_id: str
+    status: str
+    sleeve: str
+    start_date: str
+    end_date: str
+    rebalance_frequency: str
+    forward_horizons: list[int]
+    rebalance_periods: int
+    periods_scored: int
+    snapshots_written: int
+    mean_turnover: float | None = None
+    aggregate_horizons: dict[str, Any] = Field(default_factory=dict)
+    periods: list[dict[str, Any]] = Field(default_factory=list)
+    strategy_version: str = ""
+    factor_model_version: str = ""
+    weights_updated: bool = False
+
+
+class WalkForwardRunDetailResponse(BaseModel):
+    run_id: str
+    run_type: str
+    config: dict[str, Any] = Field(default_factory=dict)
+    summary: dict[str, Any] = Field(default_factory=dict)
+    started_at: str | None = None
+    finished_at: str | None = None
+
+
+class PairsResearchRequest(BaseModel):
+    symbols: list[str] = Field(default_factory=list, min_length=2)
+    lookback_period: str = Field(default="1y", pattern="^(6mo|1y|2y|3y|5y)$")
+    zscore_window: int = Field(default=60, ge=10, le=252)
+    max_pairs: int | None = Field(default=100, ge=1, le=500)
+    p_value_threshold: float | None = Field(default=None, ge=0, le=1)
+
+
+class PairResearchItem(BaseModel):
+    pair: list[str]
+    symbol_y: str
+    symbol_x: str
+    hedge_ratio: float | None = None
+    intercept: float | None = None
+    p_value: float | None = None
+    cointegrated_5pct: bool = False
+    half_life_sessions: float | None = None
+    mean_reverting: bool | None = None
+    latest_z_score: float | None = None
+    zscore_window: int | None = None
+    spread_mean: float | None = None
+    spread_std: float | None = None
+    observations: int = 0
+    sufficient: bool = False
+    engine: str | None = None
+    warning: str | None = None
+
+
+class PairsResearchResponse(BaseModel):
+    research_only: bool = True
+    lookback_period: str
+    symbols_requested: list[str] = []
+    symbols_used: list[str] = []
+    excluded: list[str] = []
+    observation_count: int = 0
+    pairs_evaluated: int = 0
+    pairs_returned: int = 0
+    cointegrated_count: int = 0
+    insufficient_count: int = 0
+    statsmodels_available: bool = False
+    pairs: list[PairResearchItem] = []
+    notes: list[str] = []

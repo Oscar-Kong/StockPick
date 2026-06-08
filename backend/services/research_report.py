@@ -209,6 +209,7 @@ def _strategic_outlook(
     risks: list[str],
     warnings: list[str],
 ) -> dict:
+    """Summarize quant/system view — does not invent an independent trade recommendation."""
     top_risks = risks[:3]
     while len(top_risks) < 3:
         top_risks.append("Insufficient data — refresh after API keys configured.")
@@ -216,37 +217,25 @@ def _strategic_outlook(
     zone = zones.get("current_zone", "fair")
     weekly = structure.get("weekly_trend", "sideways")
 
-    if bucket == "compounder" and score >= 65 and zone != "overvalued":
-        conclusion = "long_term_accumulation"
-        strategy = (
-            "Favor accumulating on pullbacks toward major support / undervalued zone; "
-            "reduce adds if price enters overvalued zone."
-        )
-    elif bucket in ("medium", "penny") and score >= 60 and weekly == "bullish":
-        conclusion = "swing_hold"
-        strategy = (
-            "Swing-friendly structure — consider exposure between support and fair-value zone; "
-            "take profit into resistance / overvalued zone."
-        )
-    elif score < 45 or zone == "overvalued" or weekly == "bearish":
-        conclusion = "avoid"
-        strategy = (
-            "Weak quant + technical profile — wait for better structure or valuation; "
-            "no precise entry levels provided."
-        )
+    if score >= 65:
+        system_view = "quant_supportive"
+    elif score >= 45:
+        system_view = "quant_mixed"
     else:
-        conclusion = "swing_hold"
-        strategy = (
-            "Mixed profile — only size positions inside fair-value zone with tight risk "
-            "awareness around earnings and resistance."
-        )
+        system_view = "quant_weak"
 
     return {
         "top_risks": top_risks,
-        "conclusion": conclusion,
-        "strategy_guidance": strategy,
+        "conclusion": system_view,
+        "strategy_guidance": (
+            "Research-only outlook derived from quant score, valuation zones, and structure — "
+            "not an independent buy/sell call. See assigned bucket and quant_score for system view."
+        ),
         "assigned_bucket": bucket,
         "quant_score": score,
+        "valuation_zone": zone,
+        "weekly_structure": weekly,
+        "data_flags": warnings[:5],
     }
 
 
@@ -359,11 +348,41 @@ def build_research_report(symbol: str, bucket: Bucket | None = None) -> dict[str
         "8_risk_outlook": outlook,
         "alerts": alerts,
         "data_quality_score": rec.quality_score,
+        "data_quality_limitations": _data_quality_limitations(rec, warnings),
+        "what_would_change_my_mind": _what_would_change_mind(result.score, risk_pool, zones),
+        "disclaimer": (
+            "Not financial advice. This report summarizes quantitative and fundamental data for research "
+            "workflows only. It does not constitute a recommendation to buy, sell, or hold any security."
+        ),
         "alignment_notes": _alignment_checklist(),
     }
 
     Cache().set(f"report:{sym}", report, REPORT_CACHE_TTL)
     return report
+
+
+def _data_quality_limitations(rec, warnings: list[str]) -> list[str]:
+    items: list[str] = []
+    if rec and rec.quality_score < 70:
+        items.append(f"Reconcile quality score {rec.quality_score:.0f}/100 — limited cross-source verification.")
+    for flag in rec.flags if rec else []:
+        items.append(str(flag))
+    for w in warnings[:3]:
+        items.append(w)
+    if not items:
+        items.append("Standard provider snapshot; no additional reconcile flags.")
+    return items
+
+
+def _what_would_change_mind(score: float, risks: list[str], zones: dict) -> list[str]:
+    items = [
+        f"Quant score moves materially above/below current {score:.0f} on next scan.",
+        f"Valuation zone shifts from {zones.get('current_zone', 'unknown')}.",
+    ]
+    if risks:
+        items.append(f"Top risk clears: {risks[0]}")
+    items.append("Fresh earnings or guidance changes fundamental growth assumptions.")
+    return items
 
 
 def _alignment_checklist() -> dict[str, str]:
@@ -375,7 +394,7 @@ def _alignment_checklist() -> dict[str, str]:
         "5_institutional": "ownership signal from provider aggregate; 13F detail needs paid feed",
         "6_news": "headlines+earnings; analyst targets when available",
         "7_zones": "range-based zones — not exact entries",
-        "8_outlook": "zone-based guidance only",
+        "8_outlook": "quant-derived system view — not independent trade advice",
     }
 
 

@@ -10,11 +10,13 @@ from data.cache import Cache
 from data.price_service import PriceService
 from data.reconciler import DataReconciler
 from models.schemas import Bucket
-from scoring.structure_analysis import fair_value_zones, long_term_structure
+from scoring.structure_analysis import long_term_structure
 from scoring.technical import breakout_score, relative_strength_vs_spy, trend_score
 from scoring.valuation import valuation_warnings
 from services.quant_risk_sizing_service import build_position_sizing, build_unified_risk
 from services.quant_v2_service import build_v2_score
+from services.report_llm_context import build_quant_report_context, system_rating_from_score, _serialize
+from services.report_narrative import DISCLAIMER_FOOTER, generate_report_narrative
 
 logger = logging.getLogger(__name__)
 REPORT_V2_CACHE_TTL = 86400 * 2
@@ -22,18 +24,6 @@ REPORT_V2_CACHE_TTL = 86400 * 2
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-
-
-def _rating_from_score(score: float) -> tuple[str, float]:
-    if score >= 80:
-        return "strong_buy", score
-    if score >= 65:
-        return "buy", score
-    if score >= 45:
-        return "hold", score
-    if score >= 30:
-        return "reduce", score
-    return "avoid", score
 
 
 def _horizon_for_sleeve(sleeve: str) -> str:
@@ -45,6 +35,8 @@ def _horizon_for_sleeve(sleeve: str) -> str:
 def build_research_report_v2(
     symbol: str,
     sleeve: str | None = None,
+    *,
+    portfolio_symbols: list[str] | None = None,
 ) -> dict[str, Any]:
     if AI_REPORT_SCHEMA != "v2":
         return {"error": "AI_REPORT_SCHEMA is not v2", "schema_version": AI_REPORT_SCHEMA}
@@ -70,11 +62,9 @@ def build_research_report_v2(
     }
     warnings = valuation_warnings(info, fundamentals)
 
-    if score.recommendation:
-        action = score.recommendation.recommendation
-        conviction = score.recommendation.confidence
-    else:
-        action, conviction = _rating_from_score(score.score)
+    # Authoritative system rating — never from LLM
+    final_rating = system_rating_from_score(score, sleeve=sleeve_val)
+    final_rating["horizon"] = _horizon_for_sleeve(sleeve_val)
 
     risk_v2 = build_unified_risk(sym, sleeve_val, score_result=score)
     sizing_v2 = score.position_sizing if score.position_sizing else (
@@ -93,45 +83,32 @@ def build_research_report_v2(
         for f in score.factors
     ]
 
+    llm_context = build_quant_report_context(
+        score,
+        sleeve=sleeve_val,
+        reconcile=rec,
+        portfolio_symbols=portfolio_symbols,
+    )
+    narrative = generate_report_narrative(llm_context)
+
     report = {
         "schema_version": "2.0.0",
         "symbol": sym,
         "sleeve": sleeve_val,
         "as_of": _now_iso(),
         "final_rating": {
-            "action": action,
-            "conviction": conviction,
-            "composite_score": score.score,
-            "horizon": _horizon_for_sleeve(sleeve_val),
+            "action": final_rating["action"],
+            "conviction": final_rating["conviction"],
+            "composite_score": final_rating["composite_score"],
+            "horizon": final_rating["horizon"],
+            "system_label": final_rating.get("system_label"),
+            "gates": final_rating.get("gates", []),
         },
-        "executive_summary": (
-            f"{sym} ({sleeve_val} sleeve) scores {score.score:.0f}/100 with {action.replace('_', ' ')} "
-            f"rating. Market regime: {score.market_regime or 'neutral'}. "
-            f"{score.summary[:400]}"
-        ),
-        "investment_thesis": {
-            "bull_case": (
-                score.recommendation.bull_case
-                if score.recommendation
-                else f"Quant composite {score.score:.0f} with top factors: "
-                + ", ".join(f.display_name for f in score.factors[:3])
-            ),
-            "bear_case": (
-                score.recommendation.bear_case
-                if score.recommendation
-                else ("; ".join(risk_v2.company[:3]) if not isinstance(risk_v2, dict) else score.summary)
-            ),
-            "edge": (
-                f"Regime {score.market_regime}; data confidence "
-                f"{score.recommendation.data_confidence.data_confidence:.0f}%."
-                if score.recommendation and rec
-                else (
-                    f"Regime {score.market_regime}; data quality {rec.quality_score:.0f}%."
-                    if rec
-                    else "Edge from factor mix vs benchmark."
-                )
-            ),
-        },
+        "executive_summary": narrative["executive_summary"],
+        "investment_thesis": narrative["investment_thesis"],
+        "uncertainty": narrative.get("uncertainty", []),
+        "what_would_change_my_mind": narrative.get("what_would_change_my_mind", []),
+        "data_quality_limitations": narrative.get("data_quality_limitations", []),
         "key_catalysts": _catalysts(score.metrics, sleeve_val),
         "risks": {
             "risk_score": risk_v2.risk_index if not isinstance(risk_v2, dict) else score.risk.deduction_pts,
@@ -146,6 +123,7 @@ def build_research_report_v2(
             "data_quality_score": rec.quality_score if rec else None,
             "regime": score.market_regime or "neutral",
             "factor_contributions": factors,
+            "attribution": _serialize(score.attribution) or {},
         },
         "fundamental_analysis": {
             "revenue_growth_ttm": info.get("revenueGrowth"),
@@ -167,18 +145,23 @@ def build_research_report_v2(
             "ps_percentile_5y": fundamentals.get("ps_ratio"),
             "vs_industry": "heuristic band — enable FMP peers for industry ranks",
             "warnings": warnings,
-            **(score.valuation.model_dump() if score.valuation else {}),
+            **(_serialize(score.valuation) or {}),
         },
+        "diagnostics_summary": llm_context.get("diagnostics_summary"),
+        "backtest_summary": llm_context.get("backtest_summary"),
+        "factor_exposure_summary": llm_context.get("factor_exposure_summary"),
         "earnings_setup": score.earnings_setup or {},
-        "similar_signal_backtest": score.similar_signal.model_dump() if score.similar_signal else None,
-        "recommendation": score.recommendation.model_dump() if score.recommendation else None,
+        "similar_signal_backtest": _serialize(score.similar_signal),
+        "recommendation": _serialize(score.recommendation),
         "position_sizing": _sizing_dict(sizing_v2),
         "metadata": {
             "model_version": FACTOR_MODEL_VERSION,
             "strategy_version": STRATEGY_VERSION,
             "data_sources": ["quant_v2", "reconciled_fundamentals", "price_history"],
-            "llm_model": None,
-            "disclaimer": "Not investment advice. For research workflow only.",
+            "llm_model": narrative.get("llm_model"),
+            "narrative_source": narrative.get("source", "rules"),
+            "disclaimer": narrative.get("disclaimer") or DISCLAIMER_FOOTER,
+            "rating_source": final_rating.get("source"),
         },
         "legacy_bucket": sleeve_val,
         "v1_score": score.score,

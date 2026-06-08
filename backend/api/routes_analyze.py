@@ -7,6 +7,7 @@ from config import ANALYZE_ROUTE_TIMEOUT_SECONDS, COMPARE_ROUTE_TIMEOUT_SECONDS,
 from models.schemas import (
     AnalyzeCompareResponse,
     AnalyzeSymbolResponse,
+    AnalyzeTimeSeriesDiagnosticsResponse,
     AnalyzeWatchlistResponse,
     Bucket,
 )
@@ -58,6 +59,30 @@ def analyze_symbol_bucket_fit(symbol: str):
         return _run_with_timeout(score_all_buckets, sym, timeout_seconds=ANALYZE_ROUTE_TIMEOUT_SECONDS)
     except FuturesTimeout as exc:
         raise HTTPException(status_code=504, detail="Bucket fit timed out") from exc
+
+
+@router.get("/{symbol}/diagnostics", response_model=AnalyzeTimeSeriesDiagnosticsResponse)
+def analyze_symbol_diagnostics(
+    symbol: str,
+    lookback: int = Query(252, ge=5, le=1260, description="Trading days of history"),
+):
+    sym = symbol.upper()
+    if sym == "COMPARE":
+        raise HTTPException(status_code=404, detail="Invalid symbol")
+    from services.time_series_diagnostics_service import build_time_series_diagnostics
+
+    try:
+        data = _run_with_timeout(
+            build_time_series_diagnostics,
+            sym,
+            lookback,
+            timeout_seconds=ANALYZE_ROUTE_TIMEOUT_SECONDS,
+        )
+    except FuturesTimeout as exc:
+        raise HTTPException(status_code=504, detail="Diagnostics timed out") from exc
+    if data.get("price_bars", 0) == 0 and data.get("data_source") == "none":
+        raise HTTPException(status_code=404, detail=f"No price history for {sym}")
+    return AnalyzeTimeSeriesDiagnosticsResponse(**data)
 
 
 @router.get("/{symbol}/report")

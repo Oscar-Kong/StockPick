@@ -6,20 +6,17 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-import numpy as np
 import pandas as pd
 
 from config import BT_DELISTING_HAIRCUT, BT_PARTICIPATION_RATE
 from data.price_service import PriceService
 from engines.backtest.cost_model import trade_cost_usd
 from engines.backtest.liquidity import cap_rebalance_notional
-from engines.backtest.metrics import beta_alpha, calmar_ratio, sortino_ratio
+from engines.backtest.metrics import summarize_portfolio_backtest
 from engines.backtest.universe_pit import active_symbols_on_date, ensure_pit_seeded
 from services.policy_backtest import (
     PolicyBacktestResult,
-    _annualized_return_pct,
     _build_price_panel,
-    _max_drawdown_pct,
     _select_weights,
 )
 
@@ -165,27 +162,23 @@ def run_institutional_policy_backtest(
     equity_series = pd.Series([r["equity"] for r in equity_rows], dtype=float)
     if len(equity_rows) >= len(returns):
         equity_series.index = returns.index[: len(equity_rows)]
-    port_rets = equity_series.pct_change().dropna()
     total_return = equity / initial_capital - 1.0
-    ann_ret = _annualized_return_pct(total_return, len(returns))
-    max_dd = _max_drawdown_pct(equity_series)
-    vol = float(port_rets.std() * np.sqrt(252) * 100) if len(port_rets) > 1 else 0.0
-    sharpe = (
-        float((port_rets.mean() / port_rets.std()) * np.sqrt(252))
-        if len(port_rets) > 1 and port_rets.std() > 0
-        else 0.0
-    )
-    sortino = sortino_ratio(port_rets)
-    calmar = calmar_ratio(ann_ret, max_dd)
 
     spy = ps.get_spy_history(period=lookback_period)
     benchmark = 0.0
-    beta, alpha = 0.0, 0.0
+    spy_ret: pd.Series | None = None
     if not spy.empty and len(spy) > 2:
         benchmark = float((float(spy["close"].iloc[-1]) / float(spy["close"].iloc[0]) - 1.0) * 100)
         spy_ret = spy.set_index(pd.to_datetime(spy["date"]))["close"].pct_change().dropna()
-        if len(port_rets) >= 20 and len(spy_ret) >= 20:
-            beta, alpha = beta_alpha(port_rets, spy_ret.reindex(port_rets.index, method="ffill").dropna())
+
+    metrics = summarize_portfolio_backtest(
+        equity_series,
+        turnover_sum=turnover,
+        total_return=total_return,
+        periods=len(returns),
+        benchmark_returns=spy_ret,
+        include_extended=True,
+    )
 
     run_id = f"bt-{uuid.uuid4().hex[:12]}"
     notes = [
@@ -203,20 +196,20 @@ def run_institutional_policy_backtest(
         initial_capital=round(initial_capital, 2),
         final_capital=round(equity, 2),
         total_return_pct=round(total_return * 100, 2),
-        annualized_return_pct=round(ann_ret, 2),
-        max_drawdown_pct=round(max_dd, 2),
-        volatility_pct=round(vol, 2),
-        sharpe_ratio=round(sharpe, 2),
+        annualized_return_pct=metrics["annualized_return_pct"],
+        max_drawdown_pct=metrics["max_drawdown_pct"],
+        volatility_pct=metrics["volatility_pct"],
+        sharpe_ratio=metrics["sharpe_ratio"],
         benchmark_return_pct=round(benchmark, 2),
-        turnover_pct=round(turnover * 100, 2),
+        turnover_pct=metrics["turnover_pct"],
         rebalance_count=rebalance_count,
         equity_curve=equity_rows,
         weights_history=weights_rows,
         notes=notes,
-        sortino_ratio=round(sortino, 2),
-        calmar_ratio=round(calmar, 2),
-        beta=beta,
-        alpha_vs_spy_pct=alpha,
+        sortino_ratio=metrics.get("sortino_ratio", 0.0),
+        calmar_ratio=metrics.get("calmar_ratio", 0.0),
+        beta=metrics.get("beta", 0.0),
+        alpha_vs_spy_pct=metrics.get("alpha_vs_spy_pct", 0.0),
         total_cost_pct=round(total_cost / initial_capital * 100, 3),
         total_cost_usd=round(total_cost, 2),
         engine="institutional",

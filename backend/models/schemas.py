@@ -595,6 +595,30 @@ class PortfolioPolicyBacktestResponse(BaseModel):
     institutional: bool = False
 
 
+class FactorExposureRequest(BaseModel):
+    symbols: list[str] = Field(default_factory=list, min_length=2)
+    benchmark: str = Field(default="SPY", min_length=1, max_length=12)
+    lookback_period: str = Field(default="1y", pattern="^(6mo|1y|2y|3y|5y)$")
+    correlation_window: int = Field(default=60, ge=10, le=252)
+    n_components: int | None = Field(default=None, ge=1, le=20)
+    pc1_concentration_threshold: float = Field(default=0.45, gt=0, le=1)
+
+
+class FactorExposureResponse(BaseModel):
+    diagnostic_only: bool = True
+    benchmark: str
+    lookback_period: str
+    symbols_requested: list[str] = []
+    symbols_used: list[str] = []
+    excluded: list[str] = []
+    observation_count: int = 0
+    betas: dict[str, dict[str, Any]] = {}
+    correlation: dict[str, Any] = {}
+    pca: dict[str, Any] = {}
+    concentration_warning: bool = False
+    notes: list[str] = []
+
+
 class AlphaSignalItem(BaseModel):
     symbol: str
     alpha_score: float
@@ -885,3 +909,22 @@ class AnalyzeCompareResponse(BaseModel):
     symbols: list[str]
     entries: list[AnalyzeCompareEntry]
     highlights: dict[str, str | None] = {}
+
+
+class AnalyzeTimeSeriesDiagnosticsResponse(BaseModel):
+    symbol: str
+    lookback: int
+    price_bars: int = 0
+    return_bars: int = 0
+    observations: int = 0
+    data_source: str = "none"
+    sufficient_data: bool = False
+    mean: float | None = None
+    annualized_volatility: float | None = None
+    skewness: float | None = None
+    excess_kurtosis: float | None = None
+    jarque_bera: dict[str, Any] = {}
+    adf: dict[str, Any] = {}
+    autocorrelation: dict[str, Any] = {}
+    interpretation: str = "insufficient data"
+    notes: list[str] = []

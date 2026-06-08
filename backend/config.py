@@ -68,6 +68,7 @@ REGIME_OVERLAY_ENABLED = _env_bool("REGIME_OVERLAY_ENABLED", "true")
 
 # --- Institutional quant v2 (phased; see docs/INSTITUTIONAL_QUANT_ARCHITECTURE.md) ---
 SCORE_ENGINE_V2_ENABLED = _env_bool("SCORE_ENGINE_V2_ENABLED", "true")
+USE_SCORING_ENGINE_IN_SCAN = _env_bool("USE_SCORING_ENGINE_IN_SCAN", "false")
 PERSIST_SCORE_ATTRIBUTION = _env_bool("PERSIST_SCORE_ATTRIBUTION", "true")
 _default_model_version = (
     "quant-v2-round2" if os.getenv("SLEEVE_FACTORS_V3_ENABLED", "false").lower() in ("1", "true", "yes")

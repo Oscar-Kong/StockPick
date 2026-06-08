@@ -159,7 +159,10 @@ def _build_structured_payload(
     metrics: dict[str, Any],
     signals: list[dict] | None,
     valuation_warnings: list[str] | None,
+    quant_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    if quant_context:
+        return quant_context
     clean_metrics = {
         k: v
         for k, v in metrics.items()
@@ -362,9 +365,45 @@ def generate_explanation(
     signals: list[dict] | None = None,
     news_headlines: list[str] | None = None,
     valuation_warnings: list[str] | None = None,
+    quant_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return structured analysis with source tag and reasoning payload."""
-    payload = _build_structured_payload(symbol, bucket, score, metrics, signals, valuation_warnings)
+    payload = _build_structured_payload(
+        symbol, bucket, score, metrics, signals, valuation_warnings, quant_context=quant_context
+    )
+
+    # When full quant context is supplied, delegate to report narrative (no new rating).
+    if quant_context and quant_context.get("system_rating"):
+        from services.report_narrative import generate_report_narrative
+
+        narrative = generate_report_narrative(quant_context)
+        rating = quant_context["system_rating"]
+        text_parts = [
+            narrative["executive_summary"],
+            "",
+            "What would change my mind?",
+            *[f"- {x}" for x in narrative.get("what_would_change_my_mind", [])],
+            "",
+            "Data quality limitations",
+            *[f"- {x}" for x in narrative.get("data_quality_limitations", [])],
+            "",
+            narrative.get("disclaimer", ""),
+        ]
+        return {
+            "text": "\n".join(text_parts),
+            "source": narrative.get("source", "rules"),
+            "sections": {
+                "executive_summary": narrative["executive_summary"],
+                "what_would_change_my_mind": narrative.get("what_would_change_my_mind", []),
+                "data_quality_limitations": narrative.get("data_quality_limitations", []),
+                "final_summary": f"System rating: {rating.get('system_label')} ({rating.get('action')})",
+            },
+            "reasoning": {
+                "system_rating": rating,
+                "uncertainty": narrative.get("uncertainty", []),
+            },
+            "structured_input": payload,
+        }
 
     if not LLM_API_KEY or not LLM_ENABLED:
         return {
