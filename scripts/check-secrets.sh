@@ -36,7 +36,7 @@ done
 
 # --- If git exists, verify staged files ---
 if git rev-parse --git-dir >/dev/null 2>&1; then
-  if git diff --cached --name-only 2>/dev/null | grep -qE '^\.env$|backend/\.env|frontend/\.env'; then
+  if git diff --cached --name-only 2>/dev/null | grep -qE '^\.env$|^backend/\.env$|^frontend/\.env\.local$'; then
     echo -e "${RED}FAIL${NC}: .env file is staged for commit"
     fail=1
   fi
