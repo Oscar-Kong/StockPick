@@ -31,6 +31,9 @@ import type {
   StockResult,
   StockResearchReport,
   PositionSizingV2,
+  SymbolDiagnosticsResponse,
+  FactorExposureRequest,
+  FactorExposureResponse,
   UnifiedRiskV2,
   V2ScoreResponse,
   SavedReportCreateRequest,
@@ -42,12 +45,10 @@ import type {
   SavedScanItem,
   TradeCreateRequest,
   TraderPresetResponse,
-  TraderProfileItem,
   TraderProfileListResponse,
   TraderQuickCompareResponse,
   TradeItem,
   TradeStatsResponse,
-  TradeUpdateRequest,
   WatchlistImportRequest,
   WatchlistImportResponse,
   WatchlistItem,
@@ -157,11 +158,6 @@ export function getBacktest(
 
 export function listEntryVariants(bucket: Bucket): Promise<{ bucket: Bucket; variants: EntryVariantItem[] }> {
   return request(`/backtest/entry-variants/${bucket}`);
-}
-
-/** @deprecated Use getBacktest("medium", symbol) */
-export function getMediumBacktest(symbol: string): Promise<BacktestResult> {
-  return getBacktest("medium", symbol, "3y", false) as Promise<BacktestResult>;
 }
 
 export function runBacktestSweep(
@@ -405,10 +401,6 @@ export function listTraderIntelProfiles(): Promise<TraderProfileListResponse> {
   return request("/trader-intel");
 }
 
-export function getTraderIntelProfile(slug: string): Promise<TraderProfileItem> {
-  return request(`/trader-intel/${encodeURIComponent(slug)}`);
-}
-
 export function getTraderPreset(slug: string, bucket: Bucket): Promise<TraderPresetResponse> {
   return request(`/trader-intel/${encodeURIComponent(slug)}/preset/${bucket}`);
 }
@@ -454,19 +446,32 @@ export async function createTradeUpload(body: FormData): Promise<TradeItem> {
   return res.json() as Promise<TradeItem>;
 }
 
-export function updateTrade(tradeId: number, body: TradeUpdateRequest): Promise<TradeItem> {
-  return request(`/trades/${tradeId}`, {
-    method: "PATCH",
-    body: JSON.stringify(body),
-  });
-}
-
 export function deleteTrade(tradeId: number): Promise<{ ok: boolean }> {
   return request(`/trades/${tradeId}`, { method: "DELETE" });
 }
 
 export function getTradeStats(): Promise<TradeStatsResponse> {
   return request("/trades/stats/summary");
+}
+
+export function getSymbolDiagnostics(
+  symbol: string,
+  lookback = 252,
+  options?: { signal?: AbortSignal }
+): Promise<SymbolDiagnosticsResponse> {
+  const params = new URLSearchParams({ lookback: String(lookback) });
+  return request(`/analyze/${encodeURIComponent(symbol)}/diagnostics?${params}`, {
+    signal: options?.signal,
+  });
+}
+
+export function getPortfolioFactorExposure(
+  body: FactorExposureRequest
+): Promise<FactorExposureResponse> {
+  return request("/portfolio/factor-exposure", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 }
 
 export function getV2Score(
