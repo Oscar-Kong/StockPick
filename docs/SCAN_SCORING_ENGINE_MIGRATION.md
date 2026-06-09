@@ -16,7 +16,15 @@ When the engine path is active, **both** legacy and engine scores are computed f
 ## Enable in local / staging
 
 1. Copy env template if needed: `cp .env.example .env`
-2. Set in `.env`:
+2. **Recommended (does not edit `.env`):**
+
+```bash
+source scripts/staging-scan-engine.env
+./scripts/run-staging-scan-parity.sh --cached   # historical_store parity
+./scripts/run-staging-scan-parity.sh --full     # live ScanManager
+```
+
+3. Or set in `.env` manually:
 
 ```bash
 APP_ENV=staging
@@ -25,8 +33,8 @@ PERSIST_SCORE_ATTRIBUTION=true
 SCORE_ENGINE_V2_ENABLED=true
 ```
 
-3. Restart backend.
-4. Run a scan from the UI (`/scan?bucket=medium`) or API:
+4. Restart backend.
+5. Run a scan from the UI (`/scan?bucket=medium`) or API:
 
 ```bash
 curl -X POST http://localhost:8000/scan/medium

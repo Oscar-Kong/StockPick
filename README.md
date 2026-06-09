@@ -12,15 +12,18 @@ It combines rule-based screening, data reconciliation, optional OpenBB governanc
 
 From one UI, you can:
 
-1. **Scan** a bucket and rank candidates (`/scan`)
-2. **Workspace** — watchlist, single-symbol analyze (primary score from `/api/v2/score` when enabled), compare peers, trade journal (`/workspace`)
-3. **Library** — saved scans, research reports, analyze snapshots (`/library`)
+1. **Home** — system health, quick actions, resume links (`/`)
+2. **Scan** a bucket and rank candidates (`/scan`)
+3. **Workspace** — watchlist, single-symbol analyze (primary score from `/api/v2/score` when enabled), compare peers, trade journal (`/workspace`)
 4. **Portfolio** — basket weight optimization and rebalance policy backtests (`/portfolio`)
-5. **Trader Intel** — style presets and bucket tilts (`/trader-intel`)
-6. Run backtests and parameter sweeps inside Analyze
-7. Home hub with ticker jump and resume links (`/`)
+5. **Quant Lab** — advanced factor IC, walk-forward, prediction outcomes, pairs research, data ops (`/quant-lab`)
+6. **Library** — saved scans, research reports, analyze snapshots (`/library`)
+7. **Settings** — language, API providers, ops (`/settings`)
+8. **Trader Intel** — style presets and bucket tilts (`/trader-intel`, secondary nav link)
 
-**API-only today** (no dedicated UI yet): allocation recommendation, LEAN export, offline alpha ingest. See [Project Inventory](docs/PROJECT_INVENTORY.md).
+Top navigation: **Home · Scan · Workspace · Portfolio · Quant Lab · Library · Settings**. Compare and journal remain inside Workspace (`?tab=compare|journal`). Legacy routes (`/penny`, `/watchlist`, `/trades`, etc.) redirect.
+
+**Wiring in progress:** allocation recommendation, LEAN export, and full Quant Lab tab content. See [UI Feature Integration Audit](docs/UI_FEATURE_INTEGRATION_AUDIT.md).
 
 ## How It Works (End-to-End Flow)
 

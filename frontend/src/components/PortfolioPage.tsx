@@ -19,6 +19,7 @@ import { AppTabBar, AppTabButton } from "./AppTabs";
 import { ChartMount } from "./ChartMount";
 import { DarkChartTooltip, darkTooltipCursor } from "./DarkChartTooltip";
 import { PortfolioFactorExposurePanel } from "./PortfolioFactorExposurePanel";
+import { PortfolioAllocationPanel } from "./PortfolioAllocationPanel";
 import {
   CartesianGrid,
   Line,
@@ -29,7 +30,7 @@ import {
   YAxis,
 } from "recharts";
 
-type PanelTab = "optimize" | "policy" | "exposure";
+type PanelTab = "optimize" | "policy" | "exposure" | "allocation";
 
 function parseSymbols(raw: string): string[] {
   return [...new Set(raw.split(/[\s,]+/).map((s) => s.trim().toUpperCase()).filter(Boolean))];
@@ -209,6 +210,9 @@ export function PortfolioPage() {
           </AppTabButton>
           <AppTabButton active={panel === "exposure"} onClick={() => setPanel("exposure")}>
             {t.portfolio.tabExposure}
+          </AppTabButton>
+          <AppTabButton active={panel === "allocation"} onClick={() => setPanel("allocation")}>
+            {t.portfolio.tabAllocation}
           </AppTabButton>
         </AppTabBar>
       </header>
@@ -651,6 +655,8 @@ export function PortfolioPage() {
           </details>
         </div>
       )}
+
+      {panel === "allocation" && <PortfolioAllocationPanel symbols={symbols} />}
 
       <p className="text-xs text-zinc-600">{t.portfolio.quantHint}</p>
     </div>

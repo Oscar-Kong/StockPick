@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fmtNum, fmtPct } from "../components/AsyncSection";
+import { isStaleTimestamp, severityFromSections } from "./quantHealth";
 import type { SymbolDiagnosticsResponse } from "./types";
 
 describe("quant panel formatters", () => {
@@ -11,6 +12,29 @@ describe("quant panel formatters", () => {
   it("fmtNum handles null", () => {
     expect(fmtNum(undefined)).toBe("—");
     expect(fmtNum(1.2, 2)).toBe("1.20");
+  });
+});
+
+describe("quant health helpers", () => {
+  it("severityFromSections picks worst severity", () => {
+    expect(
+      severityFromSections([
+        { id: "a", label: "A", severity: "ok", message: "ok" },
+        { id: "b", label: "B", severity: "warning", message: "warn" },
+      ])
+    ).toBe("warning");
+    expect(
+      severityFromSections([
+        { id: "a", label: "A", severity: "warning", message: "warn" },
+        { id: "b", label: "B", severity: "error", message: "err" },
+      ])
+    ).toBe("error");
+  });
+
+  it("isStaleTimestamp detects old timestamps", () => {
+    const old = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
+    expect(isStaleTimestamp(old, 24 * 3600 * 1000)).toBe(true);
+    expect(isStaleTimestamp(null, 1000)).toBe(true);
   });
 });
 

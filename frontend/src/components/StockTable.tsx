@@ -1,6 +1,10 @@
 // Results table for scan outputs with selection and watchlist actions.
 "use client";
 
+import { RecommendationBadge } from "@/components/badges/RecommendationBadge";
+import { RiskBadge } from "@/components/badges/RiskBadge";
+import { ScoreBadge } from "@/components/badges/ScoreBadge";
+import { ScoreSourceBadge } from "@/components/ScoreSourceBadge";
 import { useTranslation } from "@/lib/i18n";
 import type { StockResult } from "@/lib/types";
 import clsx from "clsx";
@@ -12,15 +16,7 @@ interface StockTableProps {
   onAddWatchlist: (stock: StockResult) => void;
   watchlistAdded?: Set<string>;
   watchlistPending?: string | null;
-}
-
-function riskBadge(risk: string) {
-  return clsx(
-    "rounded-full px-2 py-0.5 text-xs font-medium",
-    risk === "high" && "bg-red-950/60 text-red-300",
-    risk === "medium" && "bg-amber-950/60 text-amber-300",
-    risk === "low" && "bg-emerald-950/70 text-emerald-300"
-  );
+  scoringEngineUsed?: boolean | null;
 }
 
 function changeCell(value: unknown): string {
@@ -39,20 +35,35 @@ function changeClass(value: unknown): string {
   return "text-zinc-400";
 }
 
+function topFactors(stock: StockResult, n: number) {
+  return [...stock.signals]
+    .filter((s) => s.contribution > 0)
+    .sort((a, b) => b.contribution - a.contribution)
+    .slice(0, n);
+}
+
+function topWarnings(stock: StockResult, n: number) {
+  return [...stock.signals]
+    .filter((s) => s.contribution < 0)
+    .sort((a, b) => a.contribution - b.contribution)
+    .slice(0, n);
+}
+
 export function StockTable({
   results,
   onSelect,
   onAddWatchlist,
   watchlistAdded,
   watchlistPending,
+  scoringEngineUsed,
 }: StockTableProps) {
   const { t } = useTranslation();
-
-  const riskLabel = (risk: string) => {
-    if (risk === "high") return t.risk.high;
-    if (risk === "low") return t.risk.low;
-    return t.risk.medium;
-  };
+  const scoreSource =
+    scoringEngineUsed === true
+      ? "scoring_engine_v2"
+      : scoringEngineUsed === false
+        ? "legacy_screener"
+        : null;
 
   if (results.length === 0) {
     return (
@@ -78,17 +89,13 @@ export function StockTable({
               <th className="px-3 py-3 text-left font-medium">{t.scan.symbol}</th>
               <th className="px-3 py-3 text-left font-medium">{t.scan.price}</th>
               <th className="px-3 py-3 text-left font-medium">{t.scan.score}</th>
+              <th className="hidden px-3 py-3 text-left font-medium lg:table-cell">{t.scanDrawer.source}</th>
               <th className="px-3 py-3 text-left font-medium">{t.scan.risk}</th>
+              <th className="hidden px-3 py-3 text-left font-medium xl:table-cell">{t.scanDrawer.topFactors}</th>
               <th className="px-3 py-3 text-center font-medium" title={t.scan.dayPct}>
                 {t.scan.dayPct}
               </th>
-              <th className="px-3 py-3 text-center font-medium" title={t.scan.weekPct}>
-                {t.scan.weekPct}
-              </th>
-              <th className="px-3 py-3 text-center font-medium" title={t.scan.monthPct}>
-                {t.scan.monthPct}
-              </th>
-              <th className="px-3 py-3 text-left font-medium w-[140px]">{t.scan.summary}</th>
+              <th className="px-3 py-3 text-left font-medium w-[120px]">{t.scan.summary}</th>
               <th className="px-3 py-3 text-left font-medium">{t.scan.watchlist}</th>
             </tr>
           </thead>
@@ -97,6 +104,9 @@ export function StockTable({
               const added = watchlistAdded?.has(stock.symbol);
               const pending = watchlistPending === stock.symbol;
               const m = stock.metrics ?? {};
+              const rec = m.recommendation as string | undefined;
+              const factors = topFactors(stock, 2);
+              const warnings = topWarnings(stock, 1);
 
               return (
                 <tr
@@ -105,24 +115,36 @@ export function StockTable({
                   onClick={() => onSelect(stock)}
                 >
                   <td className="px-3 py-3 text-zinc-500">{idx + 1}</td>
-                  <td className="px-3 py-3 font-semibold tracking-wide text-zinc-100">
-                    {stock.symbol}
-                  </td>
-                  <td className="px-3 py-3">${stock.price.toFixed(2)}</td>
                   <td className="px-3 py-3">
-                    <span className="font-medium">{stock.score.toFixed(1)}</span>
+                    <span className="font-semibold tracking-wide text-zinc-100">{stock.symbol}</span>
+                    {rec && (
+                      <div className="mt-1">
+                        <RecommendationBadge recommendation={rec} />
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-3 py-3 tabular-nums">${stock.price.toFixed(2)}</td>
+                  <td className="px-3 py-3">
+                    <ScoreBadge score={stock.score} />
+                  </td>
+                  <td className="hidden px-3 py-3 lg:table-cell">
+                    {scoreSource && <ScoreSourceBadge source={scoreSource} />}
                   </td>
                   <td className="px-3 py-3">
-                    <span className={riskBadge(stock.risk_level)}>{riskLabel(stock.risk_level)}</span>
+                    <RiskBadge level={stock.risk_level} />
+                  </td>
+                  <td className="hidden px-3 py-3 text-xs text-zinc-500 xl:table-cell">
+                    {factors.map((f) => (
+                      <div key={f.name}>{f.name}</div>
+                    ))}
+                    {warnings.map((f) => (
+                      <div key={f.name} className="text-amber-300/80">
+                        ⚠ {f.name}
+                      </div>
+                    ))}
                   </td>
                   <td className={clsx("px-3 py-3 text-center tabular-nums", changeClass(m.change_pct_1d))}>
                     {changeCell(m.change_pct_1d)}
-                  </td>
-                  <td className={clsx("px-3 py-3 text-center tabular-nums", changeClass(m.change_pct_1w))}>
-                    {changeCell(m.change_pct_1w)}
-                  </td>
-                  <td className={clsx("px-3 py-3 text-center tabular-nums", changeClass(m.change_pct_1m))}>
-                    {changeCell(m.change_pct_1m)}
                   </td>
                   <td className="px-3 py-3 align-top">
                     <ScanPickSummaryCell stock={stock} />

@@ -2,6 +2,8 @@
 
 import { ApiSettingsPanel } from "@/components/ApiSettingsPanel";
 import { LanguageSettingsPanel } from "@/components/LanguageSettingsPanel";
+import { QuantHealthCard } from "@/components/quant/QuantHealthCard";
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { useTranslation } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect } from "react";
@@ -42,7 +44,10 @@ export default function SettingsPage() {
         </button>
       </header>
       <LanguageSettingsPanel />
-      <h2 className="mb-3 text-sm font-semibold text-zinc-300">{t.settings.apiSection}</h2>
+      <CollapsibleSection title={t.settings.quantHealthSection} defaultOpen>
+        <QuantHealthCard />
+      </CollapsibleSection>
+      <h2 className="mb-3 mt-6 text-sm font-semibold text-zinc-300">{t.settings.apiSection}</h2>
       <ApiSettingsPanel />
     </div>
   );

@@ -1128,3 +1128,272 @@ export interface StockResearchReport {
   similar_signal_backtest?: SimilarSignalV2 | Record<string, unknown>;
   position_sizing?: PositionSizingV2;
 }
+
+// --- Quant v2 research & ops (aligned with backend/models/schemas_v2.py) ---
+
+export interface MarketRegimeV2 {
+  regime: string;
+  as_of_date: string;
+  features?: Record<string, unknown>;
+}
+
+export interface SleeveWeightsV2 {
+  sleeve: string;
+  regime: string;
+  dynamic_enabled: boolean;
+  weights: Record<string, number>;
+  weights_by_regime?: Record<string, Record<string, number>> | null;
+}
+
+export interface HardFilterRule {
+  filter_id: string;
+  action: string;
+  description: string;
+}
+
+export interface HardFiltersResponse {
+  sleeve: string;
+  rules: HardFilterRule[];
+}
+
+export interface FactorIcHorizonEntry {
+  factor_id: string;
+  sleeve: string;
+  horizon_days: number;
+  ic: number | null;
+  ir: number | null;
+  hit_rate: number | null;
+  sample_n: number;
+  deciles?: { decile: number; avg_forward_return_pct: number; sample_n: number }[];
+}
+
+export interface FactorPerformanceFactor {
+  factor_id: string;
+  sleeve: string | null;
+  horizons: Record<string, FactorIcHorizonEntry>;
+}
+
+export interface FactorPerformanceResponse {
+  as_of_date: string | null;
+  horizons: number[];
+  factors: FactorPerformanceFactor[];
+  by_horizon: Record<string, FactorIcHorizonEntry[]>;
+  by_regime: Record<string, unknown[]>;
+  by_sector: Record<string, unknown[]>;
+  market_regime?: { regime: string; as_of_date: string } | null;
+  summary?: Record<string, { mean_ic?: number; positive_ic_count?: number; factor_count?: number }>;
+}
+
+export interface PredictionOutcomeSnapshot {
+  return_20d?: number | null;
+  return_60d?: number | null;
+  excess_vs_spy_60d?: number | null;
+}
+
+export interface PredictionSnapshotItem {
+  id: number;
+  symbol: string;
+  sleeve: string;
+  source: string;
+  created_at: string;
+  price?: number | null;
+  recommendation?: string | null;
+  confidence?: number | null;
+  alpha_score?: number | null;
+  valuation_score?: number | null;
+  data_confidence?: number | null;
+  trade_id?: number | null;
+  outcome: PredictionOutcomeSnapshot | null;
+  /** Legacy fields — prefer alpha_score / outcome */
+  score?: number;
+  as_of_date?: string;
+  horizon_days?: number | null;
+  resolved?: boolean;
+  realized_return_pct?: number | null;
+  forecast_error_pct?: number | null;
+  resolved_at?: string | null;
+}
+
+export interface PredictionsListResponse {
+  predictions: PredictionSnapshotItem[];
+}
+
+export interface FeedbackOutcomeItem {
+  trade_id: number;
+  actual_return_pct?: number | null;
+  prediction_error_pct?: number | null;
+  closed_at?: string | null;
+}
+
+export interface FeedbackSummaryResponse {
+  outcomes_count: number;
+  snapshots_count: number;
+  mean_actual_return_pct?: number | null;
+  mean_prediction_error_pct?: number | null;
+  recent_outcomes: FeedbackOutcomeItem[];
+  recent_snapshots: PredictionSnapshotItem[];
+  /** Legacy / optional */
+  enabled?: boolean;
+  unresolved_count?: number;
+  resolved_count?: number;
+  by_horizon?: Record<string, { count?: number; avg_error_pct?: number; hit_rate?: number }>;
+  by_bucket?: Record<string, { count?: number; avg_error_pct?: number }>;
+  stale?: boolean;
+  last_resolved_at?: string | null;
+  notes?: string[];
+  [key: string]: unknown;
+}
+
+export interface WalkForwardResearchRequest {
+  sleeve: Bucket;
+  start_date: string;
+  end_date: string;
+  rebalance_frequency?: string;
+  forward_horizons?: number[];
+  max_symbols?: number;
+  persist_snapshots?: boolean;
+}
+
+export interface WalkForwardResearchResponse {
+  run_id: string;
+  status: string;
+  sleeve: string;
+  start_date: string;
+  end_date: string;
+  rebalance_frequency: string;
+  forward_horizons: number[];
+  rebalance_periods: number;
+  periods_scored: number;
+  snapshots_written: number;
+  mean_turnover?: number | null;
+  aggregate_horizons?: Record<string, unknown>;
+  periods?: Record<string, unknown>[];
+  strategy_version?: string;
+  factor_model_version?: string;
+  weights_updated?: boolean;
+}
+
+export interface WalkForwardRunDetailResponse {
+  run_id: string;
+  run_type: string;
+  config?: Record<string, unknown>;
+  summary?: Record<string, unknown>;
+  started_at?: string | null;
+  finished_at?: string | null;
+}
+
+export interface PairResearchItem {
+  pair: string[];
+  symbol_y: string;
+  symbol_x: string;
+  hedge_ratio?: number | null;
+  intercept?: number | null;
+  p_value?: number | null;
+  cointegrated_5pct?: boolean;
+  half_life_sessions?: number | null;
+  mean_reverting?: boolean | null;
+  latest_z_score?: number | null;
+  zscore_window?: number | null;
+  spread_mean?: number | null;
+  spread_std?: number | null;
+  observations?: number;
+  sufficient?: boolean;
+  engine?: string | null;
+  warning?: string | null;
+}
+
+export interface PairsResearchRequest {
+  symbols: string[];
+  lookback_period?: "6mo" | "1y" | "2y" | "3y" | "5y";
+  zscore_window?: number;
+  max_pairs?: number | null;
+  p_value_threshold?: number | null;
+}
+
+export interface PairsResearchResponse {
+  research_only: boolean;
+  lookback_period: string;
+  symbols_requested: string[];
+  symbols_used: string[];
+  excluded: string[];
+  observation_count: number;
+  pairs_evaluated: number;
+  pairs_returned: number;
+  cointegrated_count: number;
+  insufficient_count: number;
+  statsmodels_available: boolean;
+  pairs: PairResearchItem[];
+  notes: string[];
+}
+
+export interface JobLogEntry {
+  job_name: string;
+  status: string;
+  message?: string;
+  symbols_processed?: number;
+  errors?: number;
+  started_at?: string | null;
+  finished_at?: string | null;
+}
+
+export interface SchedulerStatusResponse {
+  enabled: boolean;
+  recent_jobs: JobLogEntry[];
+  quandl_configured?: boolean;
+}
+
+export interface V2VersionResponse {
+  strategy_version: string;
+  factor_model_version: string;
+  database_dialect?: string;
+  job_queue_backend?: string;
+  redis_connected?: boolean;
+  [key: string]: unknown;
+}
+
+export interface V2AuditEvent {
+  id?: number;
+  event_type?: string;
+  symbol?: string | null;
+  payload?: Record<string, unknown>;
+  created_at?: string;
+  [key: string]: unknown;
+}
+
+export interface V2AuditResponse {
+  events: V2AuditEvent[];
+}
+
+export interface V2JobsQueueResponse {
+  backend: string;
+  jobs: Record<string, unknown>[];
+}
+
+export interface SimilarSignalBacktestResponse extends SimilarSignalV2 {
+  symbol?: string;
+  sleeve?: string;
+  analogs?: Record<string, unknown>[];
+  notes?: string[];
+  research_only?: boolean;
+}
+
+export type QuantHealthSeverity = "ok" | "warning" | "error";
+
+export interface QuantHealthSection {
+  id: string;
+  label: string;
+  severity: QuantHealthSeverity;
+  message: string;
+  detail?: string | null;
+  as_of?: string | null;
+}
+
+export interface QuantHealthSummary {
+  overall: QuantHealthSeverity;
+  checked_at: string;
+  sections: QuantHealthSection[];
+  health?: HealthResponse | null;
+  latest_scans?: Partial<Record<Bucket, LatestScanResponse | null>>;
+  progress?: SavedProgressSummary | null;
+  factor_ic_as_of?: string | null;
+}

@@ -1,6 +1,11 @@
 // Home — retail pro hub with quick jump and resume.
 "use client";
 
+import { HomeQuickActions } from "@/components/dashboard/HomeQuickActions";
+import { HomeRegimeCard } from "@/components/dashboard/HomeRegimeCard";
+import { HomeScanSummary } from "@/components/dashboard/HomeScanSummary";
+import { HomePredictionCard } from "@/components/dashboard/HomePredictionCard";
+import { QuantHealthCard } from "@/components/quant/QuantHealthCard";
 import { getSavedProgressSummary } from "@/lib/api";
 import type { SavedProgressSummary } from "@/lib/types";
 import { formatDateTime } from "@/lib/datetime";
@@ -17,12 +22,12 @@ export function HomeDashboard() {
   const { t } = useTranslation();
   const router = useRouter();
   const routes = [
-    { href: "/workspace", title: t.nav.research, hint: t.home.routeResearchHint, accent: true },
-    { href: "/workspace?tab=compare", title: t.nav.compare, hint: t.home.routeCompareHint },
-    { href: "/workspace?tab=journal", title: t.nav.journal, hint: t.home.routeJournalHint },
-    { href: "/scan", title: t.nav.screen, hint: t.home.routeScreenHint },
+    { href: "/workspace", title: t.nav.workspace, hint: t.home.routeWorkspaceHint, accent: true },
+    { href: "/scan", title: t.nav.scan, hint: t.home.routeScanHint },
     { href: "/portfolio", title: t.nav.portfolio, hint: t.home.routePortfolioHint },
+    { href: "/quant-lab", title: t.nav.quantLab, hint: t.home.routeQuantLabHint },
     { href: "/library", title: t.nav.library, hint: t.home.routeLibraryHint },
+    { href: "/trader-intel", title: t.nav.traderIntel, hint: t.home.routeTraderIntelHint },
   ] as const;
   const [summary, setSummary] = useState<SavedProgressSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -90,6 +95,16 @@ export function HomeDashboard() {
       </div>
 
       {error && <p className="text-sm text-red-400">{error}</p>}
+
+      <HomeQuickActions />
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <QuantHealthCard />
+        <HomeRegimeCard />
+      </div>
+
+      <HomeScanSummary />
+      <HomePredictionCard />
 
       <div className={`home-bottom${hasResume && summary ? "" : " home-bottom--full"}`}>
       <div className="home-stats">

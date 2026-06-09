@@ -6,20 +6,21 @@ import {
   deleteSavedScan,
   getLatestScan,
   getScanStatus,
-  getStock,
   listSavedScans,
   saveScanSnapshot,
   startScan,
 } from "@/lib/api";
 import { getBucketMeta } from "@/lib/buckets";
 import { fmt, useTranslation } from "@/lib/i18n";
-import type { Bucket, SavedScanItem, ScanOptions, ScanParitySummary, StockDetail, StockResult } from "@/lib/types";
+import type { Bucket, SavedScanItem, ScanOptions, ScanParitySummary, StockResult } from "@/lib/types";
 import { formatDateTime } from "@/lib/datetime";
+import { isStaleTimestamp } from "@/lib/quantHealth";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ScanControls } from "./ScanControls";
 import { ScanProgress } from "./ScanProgress";
 import { ScanScoreMeta } from "./ScanScoreMeta";
+import { StaleDataBadge } from "./badges/StaleDataBadge";
 import { StockDetailDrawer } from "./StockDetailDrawer";
 import { StockTable } from "./StockTable";
 import { StrategyVersionBadge } from "./DataQualityBadge";
@@ -47,8 +48,6 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
   const [status, setStatus] = useState("idle");
   const [results, setResults] = useState<StockResult[]>([]);
   const [selected, setSelected] = useState<StockResult | null>(null);
-  const [detail, setDetail] = useState<StockDetail | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
   const [lastScanAt, setLastScanAt] = useState<string | null>(null);
   const [strategyVersion, setStrategyVersion] = useState<string | null>(null);
   const [scoringEngineUsed, setScoringEngineUsed] = useState<boolean | null>(null);
@@ -157,7 +156,6 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
     setProgress(0);
     setMessage(t.scan.startingScan);
     setSelected(null);
-    setDetail(null);
     setScoringEngineUsed(null);
     setParitySummary(null);
     try {
@@ -175,17 +173,7 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
     setMessage(t.scan.filtersReset);
   };
 
-  useEffect(() => {
-    if (!selected) {
-      setDetail(null);
-      return;
-    }
-    setDetailLoading(true);
-    getStock(selected.symbol, bucket, bucket === "medium")
-      .then(setDetail)
-      .catch(() => setDetail(null))
-      .finally(() => setDetailLoading(false));
-  }, [selected, bucket]);
+  const scanStale = isStaleTimestamp(lastScanAt, 24 * 60 * 60 * 1000);
 
   const handleWatchlist = async (stock: StockResult) => {
     const sym = stock.symbol.toUpperCase();
@@ -283,6 +271,7 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
           scoringEngineUsed={scoringEngineUsed}
           paritySummary={paritySummary}
         />
+        {scanStale && lastScanAt && <StaleDataBadge asOf={lastScanAt} />}
         <button
           type="button"
           onClick={loadLatestScan}
@@ -340,12 +329,13 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
         onAddWatchlist={handleWatchlist}
         watchlistAdded={watchlistAdded}
         watchlistPending={watchlistPending}
+        scoringEngineUsed={scoringEngineUsed}
       />
 
       <StockDetailDrawer
         stock={selected}
-        detail={detail}
-        loading={detailLoading}
+        bucket={bucket}
+        scoringEngineUsed={scoringEngineUsed}
         onClose={() => setSelected(null)}
       />
     </div>

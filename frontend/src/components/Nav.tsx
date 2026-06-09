@@ -6,14 +6,12 @@ import { CommandPalette, CommandPaletteTrigger } from "@/components/CommandPalet
 import { SettingsMenu } from "@/components/SettingsMenu";
 import { useTranslation } from "@/lib/i18n";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { usePathname } from "next/navigation";
 
 type NavLink = {
   href: string;
   label: string;
   match?: readonly string[];
-  workspaceTab?: "research" | "compare" | "journal";
 };
 
 function useNavLinks(): NavLink[] {
@@ -21,101 +19,33 @@ function useNavLinks(): NavLink[] {
   return [
     { href: "/", label: t.nav.home },
     {
+      href: "/scan",
+      label: t.nav.scan,
+      match: ["/scan", "/penny", "/medium", "/compounder"],
+    },
+    {
       href: "/workspace",
-      label: t.nav.research,
-      match: ["/workspace", "/watchlist", "/analyze"],
-      workspaceTab: "research",
+      label: t.nav.workspace,
+      match: ["/workspace", "/watchlist", "/analyze", "/trades"],
     },
-    {
-      href: "/workspace?tab=compare",
-      label: t.nav.compare,
-      match: ["/workspace"],
-      workspaceTab: "compare",
-    },
-    {
-      href: "/workspace?tab=journal",
-      label: t.nav.journal,
-      match: ["/workspace", "/trades"],
-      workspaceTab: "journal",
-    },
-    { href: "/scan", label: t.nav.screen, match: ["/scan", "/penny", "/medium", "/compounder"] },
     { href: "/portfolio", label: t.nav.portfolio },
+    { href: "/quant-lab", label: t.nav.quantLab, match: ["/quant-lab"] },
     { href: "/library", label: t.nav.library, match: ["/library", "/scans", "/reports"] },
+    { href: "/settings", label: t.nav.settings, match: ["/settings"] },
   ];
 }
 
-function workspaceTabFromPath(pathname: string, tabParam: string | null): "research" | "compare" | "journal" {
-  if (pathname === "/trades") return "journal";
-  if (pathname !== "/workspace" && !pathname.startsWith("/workspace/")) return "research";
-  if (tabParam === "compare") return "compare";
-  if (tabParam === "journal") return "journal";
-  return "research";
-}
-
-function isActive(
-  pathname: string,
-  href: string,
-  workspaceTab: "research" | "compare" | "journal",
-  match?: readonly string[],
-  linkWorkspaceTab?: NavLink["workspaceTab"]
-) {
-  if (linkWorkspaceTab) {
-    const prefixes = match ?? ["/workspace"];
-    const onWorkspace = prefixes.some(
-      (p) => pathname === p || pathname.startsWith(p + "/")
-    );
-    if (!onWorkspace) return false;
-    return workspaceTab === linkWorkspaceTab;
-  }
-
+function isActive(pathname: string, href: string, match?: readonly string[]) {
   if (pathname === href) return true;
   const prefixes = match ?? [href];
   return prefixes.some((p) => pathname === p || pathname.startsWith(p + "/"));
 }
 
-function NavTabs() {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const { t } = useTranslation();
-  const links = useNavLinks();
-  const workspaceTab = workspaceTabFromPath(pathname, searchParams.get("tab"));
-
-  return (
-    <AppTabBar aria-label={t.navAria.main} className="app-nav-tabs">
-      {links.map((link) => (
-        <AppTabLink
-          key={link.href}
-          href={link.href}
-          active={isActive(pathname, link.href, workspaceTab, link.match, link.workspaceTab)}
-        >
-          {link.label}
-        </AppTabLink>
-      ))}
-    </AppTabBar>
-  );
-}
-
-function NavTabsFallback() {
-  const links = useNavLinks();
-  const pathname = usePathname();
-  const { t } = useTranslation();
-
-  return (
-    <AppTabBar aria-label={t.navAria.main} className="app-nav-tabs">
-      {links.map((link) => (
-        <AppTabLink
-          key={link.href}
-          href={link.href}
-          active={pathname === link.href || (link.match?.includes(pathname) ?? false)}
-        >
-          {link.label}
-        </AppTabLink>
-      ))}
-    </AppTabBar>
-  );
-}
-
 export function Nav() {
+  const pathname = usePathname();
+  const { t } = useTranslation();
+  const links = useNavLinks();
+
   return (
     <>
       <header className="app-nav sticky top-0 z-40">
@@ -129,12 +59,26 @@ export function Nav() {
           </Link>
 
           <div className="app-nav-center">
-            <Suspense fallback={<NavTabsFallback />}>
-              <NavTabs />
-            </Suspense>
+            <AppTabBar aria-label={t.navAria.main} className="app-nav-tabs">
+              {links.map((link) => (
+                <AppTabLink
+                  key={link.href}
+                  href={link.href}
+                  active={isActive(pathname, link.href, link.match)}
+                >
+                  {link.label}
+                </AppTabLink>
+              ))}
+            </AppTabBar>
           </div>
 
           <div className="app-nav-actions">
+            <Link
+              href="/trader-intel"
+              className="hidden rounded-lg px-2 py-1.5 text-xs text-zinc-500 transition hover:bg-zinc-900 hover:text-zinc-200 md:inline"
+            >
+              {t.nav.traderIntel}
+            </Link>
             <SettingsMenu />
             <CommandPaletteTrigger />
           </div>

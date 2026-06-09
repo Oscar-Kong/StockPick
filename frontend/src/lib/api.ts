@@ -36,6 +36,25 @@ import type {
   FactorExposureResponse,
   UnifiedRiskV2,
   V2ScoreResponse,
+  MarketRegimeV2,
+  SleeveWeightsV2,
+  HardFiltersResponse,
+  FactorPerformanceResponse,
+  PredictionsListResponse,
+  FeedbackSummaryResponse,
+  WalkForwardResearchRequest,
+  WalkForwardResearchResponse,
+  WalkForwardRunDetailResponse,
+  PairsResearchRequest,
+  PairsResearchResponse,
+  SchedulerStatusResponse,
+  V2VersionResponse,
+  V2AuditResponse,
+  V2JobsQueueResponse,
+  SimilarSignalBacktestResponse,
+  ValuationV2,
+  QuantHealthSummary,
+  QuantHealthSection,
   SavedReportCreateRequest,
   SavedAnalyzeItem,
   SavedProgressSummary,
@@ -504,4 +523,343 @@ export function getV2UnifiedRisk(
 ): Promise<UnifiedRiskV2> {
   const qs = bucket ? `?sleeve=${bucket}` : "";
   return request(`/api/v2/risk/${symbol}${qs}`, { signal: options?.signal });
+}
+
+export type V2RequestOptions = { signal?: AbortSignal };
+
+export function getV2Regime(
+  refresh = false,
+  options?: V2RequestOptions
+): Promise<MarketRegimeV2> {
+  const qs = refresh ? "?refresh=true" : "";
+  return request(`/api/v2/regime${qs}`, { signal: options?.signal });
+}
+
+export function getV2SleeveWeights(
+  sleeve: Bucket,
+  regime?: string,
+  options?: V2RequestOptions
+): Promise<SleeveWeightsV2> {
+  const params = new URLSearchParams();
+  if (regime) params.set("regime", regime);
+  const qs = params.toString() ? `?${params}` : "";
+  return request(`/api/v2/weights/${sleeve}${qs}`, { signal: options?.signal });
+}
+
+export function getV2HardFilters(
+  sleeve: Bucket,
+  options?: V2RequestOptions
+): Promise<HardFiltersResponse> {
+  return request(`/api/v2/hard-filters/${sleeve}`, { signal: options?.signal });
+}
+
+export function getV2FactorPerformance(
+  params?: { sleeve?: Bucket; factorId?: string; horizonDays?: number },
+  options?: V2RequestOptions
+): Promise<FactorPerformanceResponse> {
+  const search = new URLSearchParams();
+  if (params?.sleeve) search.set("sleeve", params.sleeve);
+  if (params?.factorId) search.set("factor_id", params.factorId);
+  if (params?.horizonDays != null) search.set("horizon_days", String(params.horizonDays));
+  const qs = search.toString() ? `?${search}` : "";
+  return request(`/api/v2/factors/performance${qs}`, { signal: options?.signal });
+}
+
+export function getV2FactorIc(
+  params?: { sleeve?: Bucket; factorId?: string; horizonDays?: number },
+  options?: V2RequestOptions
+): Promise<FactorPerformanceResponse> {
+  const search = new URLSearchParams();
+  if (params?.sleeve) search.set("sleeve", params.sleeve);
+  if (params?.factorId) search.set("factor_id", params.factorId);
+  if (params?.horizonDays != null) search.set("horizon_days", String(params.horizonDays));
+  const qs = search.toString() ? `?${search}` : "";
+  return request(`/api/v2/factors/ic${qs}`, { signal: options?.signal });
+}
+
+export function getV2Predictions(
+  params?: {
+    symbol?: string;
+    source?: string;
+    sleeve?: Bucket;
+    fromDate?: string;
+    toDate?: string;
+    limit?: number;
+  },
+  options?: V2RequestOptions
+): Promise<PredictionsListResponse> {
+  const search = new URLSearchParams();
+  if (params?.symbol) search.set("symbol", params.symbol);
+  if (params?.source) search.set("source", params.source);
+  if (params?.sleeve) search.set("sleeve", params.sleeve);
+  if (params?.fromDate) search.set("from_date", params.fromDate);
+  if (params?.toDate) search.set("to_date", params.toDate);
+  if (params?.limit != null) search.set("limit", String(params.limit));
+  const qs = search.toString() ? `?${search}` : "";
+  return request(`/api/v2/predictions${qs}`, { signal: options?.signal });
+}
+
+export function getV2FeedbackSummary(options?: V2RequestOptions): Promise<FeedbackSummaryResponse> {
+  return request("/api/v2/feedback/summary", { signal: options?.signal });
+}
+
+export function getV2Valuation(
+  symbol: string,
+  options?: V2RequestOptions
+): Promise<ValuationV2> {
+  return request(`/api/v2/valuation/${encodeURIComponent(symbol)}`, { signal: options?.signal });
+}
+
+export function getV2SimilarSignal(
+  symbol: string,
+  bucket?: Bucket,
+  options?: V2RequestOptions
+): Promise<SimilarSignalBacktestResponse> {
+  const qs = bucket ? `?sleeve=${bucket}` : "";
+  return request(`/api/v2/similar-signal/${encodeURIComponent(symbol)}${qs}`, {
+    signal: options?.signal,
+  });
+}
+
+export function getV2Agents(
+  symbol: string,
+  bucket?: Bucket,
+  options?: V2RequestOptions
+): Promise<Record<string, unknown>> {
+  const qs = bucket ? `?sleeve=${bucket}` : "";
+  return request(`/api/v2/agents/${encodeURIComponent(symbol)}${qs}`, { signal: options?.signal });
+}
+
+export function getV2Version(options?: V2RequestOptions): Promise<V2VersionResponse> {
+  return request("/api/v2/version", { signal: options?.signal });
+}
+
+export function getV2Audit(
+  params?: { limit?: number; eventType?: string; symbol?: string },
+  options?: V2RequestOptions
+): Promise<V2AuditResponse> {
+  const search = new URLSearchParams();
+  if (params?.limit != null) search.set("limit", String(params.limit));
+  if (params?.eventType) search.set("event_type", params.eventType);
+  if (params?.symbol) search.set("symbol", params.symbol);
+  const qs = search.toString() ? `?${search}` : "";
+  return request(`/api/v2/audit${qs}`, { signal: options?.signal });
+}
+
+export function getV2JobsQueue(
+  limit = 20,
+  options?: V2RequestOptions
+): Promise<V2JobsQueueResponse> {
+  return request(`/api/v2/jobs/queue?limit=${limit}`, { signal: options?.signal });
+}
+
+export function getV2Round2Stats(options?: V2RequestOptions): Promise<Record<string, unknown>> {
+  return request("/api/v2/admin/round2-stats", { signal: options?.signal });
+}
+
+export function getV2FactorsAdmin(
+  sleeve?: Bucket,
+  options?: V2RequestOptions
+): Promise<Record<string, unknown>> {
+  const qs = sleeve ? `?sleeve=${sleeve}` : "";
+  return request(`/api/v2/factors/admin${qs}`, { signal: options?.signal });
+}
+
+export function runWalkForwardResearch(
+  body: WalkForwardResearchRequest,
+  options?: V2RequestOptions
+): Promise<WalkForwardResearchResponse> {
+  return request("/research/walk-forward", {
+    method: "POST",
+    body: JSON.stringify(body),
+    signal: options?.signal,
+  });
+}
+
+export function getWalkForwardRun(
+  runId: string,
+  options?: V2RequestOptions
+): Promise<WalkForwardRunDetailResponse> {
+  return request(`/research/walk-forward/${encodeURIComponent(runId)}`, {
+    signal: options?.signal,
+  });
+}
+
+export function runPairsResearch(
+  body: PairsResearchRequest,
+  options?: V2RequestOptions
+): Promise<PairsResearchResponse> {
+  return request("/research/pairs", {
+    method: "POST",
+    body: JSON.stringify(body),
+    signal: options?.signal,
+  });
+}
+
+export function getSchedulerStatus(options?: V2RequestOptions): Promise<SchedulerStatusResponse> {
+  return request("/data/scheduler/status", { signal: options?.signal });
+}
+
+export function runSchedulerDailyPipeline(
+  options?: V2RequestOptions
+): Promise<Record<string, unknown>> {
+  return request("/data/scheduler/run", { method: "POST", signal: options?.signal });
+}
+
+export function refreshSchedulerQuotes(options?: V2RequestOptions): Promise<Record<string, unknown>> {
+  return request("/data/scheduler/refresh-quotes", { method: "POST", signal: options?.signal });
+}
+
+export function refreshSchedulerFundamentals(
+  options?: V2RequestOptions
+): Promise<Record<string, unknown>> {
+  return request("/data/scheduler/refresh-fundamentals", {
+    method: "POST",
+    signal: options?.signal,
+  });
+}
+
+export function enqueueV2Job(
+  jobName: string,
+  forceRebalance = false,
+  options?: V2RequestOptions
+): Promise<Record<string, unknown>> {
+  const qs = forceRebalance ? "?force_rebalance=true" : "";
+  return request(`/api/v2/jobs/enqueue/${encodeURIComponent(jobName)}${qs}`, {
+    method: "POST",
+    signal: options?.signal,
+  });
+}
+
+const STALE_SCAN_MS = 1000 * 60 * 60 * 24;
+
+function scanAgeSeverity(completedAt: string | null | undefined): QuantHealthSection | null {
+  if (!completedAt) {
+    return {
+      id: "scan_freshness",
+      label: "Scan freshness",
+      severity: "warning",
+      message: "No completed scan timestamp",
+    };
+  }
+  const ageMs = Date.now() - new Date(completedAt).getTime();
+  if (Number.isNaN(ageMs)) return null;
+  const stale = ageMs > STALE_SCAN_MS;
+  return {
+    id: "scan_freshness",
+    label: "Scan freshness",
+    severity: stale ? "warning" : "ok",
+    message: stale ? "Latest cached scan is older than 24h" : "Latest scan is fresh",
+    as_of: completedAt,
+  };
+}
+
+/** Client-side aggregate until a dedicated /api/v2/health/quant endpoint exists. */
+export async function getQuantHealthSummary(
+  options?: V2RequestOptions
+): Promise<QuantHealthSummary> {
+  const checkedAt = new Date().toISOString();
+  const sections: QuantHealthSection[] = [];
+
+  const [health, progress, penny, medium, compounder, scheduler, factorPerf] =
+    await Promise.allSettled([
+      getHealth(),
+      getSavedProgressSummary(),
+      getLatestScan("penny"),
+      getLatestScan("medium"),
+      getLatestScan("compounder"),
+      getSchedulerStatus(options),
+      getV2FactorPerformance(undefined, options),
+    ]);
+
+  let healthData: HealthResponse | null = null;
+  if (health.status === "fulfilled") {
+    healthData = health.value;
+    const missingProviders = [
+      !healthData.fmp_configured && "FMP",
+      !healthData.finnhub_configured && "Finnhub",
+      !healthData.llm_configured && "LLM",
+    ].filter(Boolean) as string[];
+    sections.push({
+      id: "providers",
+      label: "Data providers",
+      severity: missingProviders.length >= 2 ? "warning" : "ok",
+      message:
+        missingProviders.length > 0
+          ? `Some providers not configured: ${missingProviders.join(", ")}`
+          : "Core providers configured",
+    });
+    if (!healthData.scheduler_enabled) {
+      sections.push({
+        id: "scheduler",
+        label: "Scheduler",
+        severity: "warning",
+        message: "Scheduler disabled in environment",
+      });
+    }
+  } else {
+    sections.push({
+      id: "health",
+      label: "System health",
+      severity: "error",
+      message: "Could not reach /health",
+      detail: health.reason instanceof Error ? health.reason.message : String(health.reason),
+    });
+  }
+
+  const latestScans: Partial<Record<Bucket, LatestScanResponse | null>> = {};
+  for (const [bucket, result] of [
+    ["penny", penny],
+    ["medium", medium],
+    ["compounder", compounder],
+  ] as const) {
+    if (result.status === "fulfilled") {
+      latestScans[bucket] = result.value;
+      const scanSection = scanAgeSeverity(result.value.completed_at);
+      if (scanSection && bucket === "medium") {
+        sections.push({ ...scanSection, id: `scan_${bucket}` });
+      }
+    }
+  }
+
+  let factorIcAsOf: string | null = null;
+  if (factorPerf.status === "fulfilled") {
+    factorIcAsOf = factorPerf.value.as_of_date;
+    sections.push({
+      id: "factor_ic",
+      label: "Factor IC",
+      severity: factorIcAsOf ? "ok" : "warning",
+      message: factorIcAsOf ? `IC panel as of ${factorIcAsOf}` : "No factor IC history yet",
+      as_of: factorIcAsOf,
+    });
+  }
+
+  if (scheduler.status === "fulfilled") {
+    const failed = scheduler.value.recent_jobs?.filter((j) => j.status === "failed") ?? [];
+    if (failed.length > 0) {
+      sections.push({
+        id: "scheduler_jobs",
+        label: "Scheduler jobs",
+        severity: "warning",
+        message: `${failed.length} recent job failure(s)`,
+        detail: failed[0]?.message ?? null,
+      });
+    }
+  }
+
+  const overall: QuantHealthSummary["overall"] = sections.some((s) => s.severity === "error")
+    ? "error"
+    : sections.some((s) => s.severity === "warning")
+      ? "warning"
+      : "ok";
+
+  return {
+    overall,
+    checked_at: checkedAt,
+    sections,
+    health: healthData,
+    latest_scans: latestScans,
+    progress: progress.status === "fulfilled" ? progress.value : null,
+    factor_ic_as_of: factorIcAsOf,
+  };
 }

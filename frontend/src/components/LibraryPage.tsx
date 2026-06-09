@@ -2,22 +2,27 @@
 "use client";
 
 import { AppTabBar, AppTabButton } from "@/components/AppTabs";
-import { deleteSavedReport, deleteSavedScan, listSavedReports, listSavedScans, updateSavedReport } from "@/lib/api";
+import { deleteSavedReport, deleteSavedScan, listSavedAnalyze, listSavedReports, listSavedScans, updateSavedReport } from "@/lib/api";
 import { ResearchReport } from "@/components/ResearchReport";
-import type { SavedReportItem, SavedScanItem, StockResearchReport } from "@/lib/types";
+import type { SavedAnalyzeItem, SavedReportItem, SavedScanItem, StockResearchReport } from "@/lib/types";
 import clsx from "clsx";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { fmt, useTranslation } from "@/lib/i18n";
 import { Suspense, useCallback, useEffect, useState } from "react";
 
-type LibraryTab = "scans" | "reports";
+type LibraryTab = "scans" | "reports" | "snapshots";
 
 function LibraryContent() {
   const { t } = useTranslation();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const tab: LibraryTab = searchParams.get("tab") === "reports" ? "reports" : "scans";
+  const tab: LibraryTab =
+    searchParams.get("tab") === "reports"
+      ? "reports"
+      : searchParams.get("tab") === "snapshots"
+        ? "snapshots"
+        : "scans";
 
   const setTab = useCallback(
     (next: LibraryTab) => {
@@ -31,6 +36,7 @@ function LibraryContent() {
   const [scans, setScans] = useState<SavedScanItem[]>([]);
   const [selectedScan, setSelectedScan] = useState<SavedScanItem | null>(null);
   const [reports, setReports] = useState<SavedReportItem[]>([]);
+  const [snapshots, setSnapshots] = useState<SavedAnalyzeItem[]>([]);
   const [selectedReport, setSelectedReport] = useState<SavedReportItem | null>(null);
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
@@ -59,12 +65,17 @@ function LibraryContent() {
     }
   }, []);
 
+  const loadSnapshots = useCallback(async () => {
+    const data = await listSavedAnalyze();
+    setSnapshots(data);
+  }, []);
+
   useEffect(() => {
     setLoading(true);
-    Promise.all([loadScans(), loadReports()])
+    Promise.all([loadScans(), loadReports(), loadSnapshots()])
       .catch(() => undefined)
       .finally(() => setLoading(false));
-  }, [loadScans, loadReports]);
+  }, [loadScans, loadReports, loadSnapshots]);
 
   useEffect(() => {
     if (!selectedReport) return;
@@ -107,6 +118,7 @@ function LibraryContent() {
             [
               ["scans", t.library.tabScans],
               ["reports", t.library.tabReports],
+              ["snapshots", t.library.tabSnapshots],
             ] as const
           ).map(([id, label]) => (
             <AppTabButton key={id} active={tab === id} onClick={() => setTab(id)}>
@@ -206,6 +218,37 @@ function LibraryContent() {
                 </div>
               )}
             </section>
+          </div>
+        )
+      ) : tab === "snapshots" ? (
+        snapshots.length === 0 ? (
+          <div className="surface-card border-dashed p-8 text-sm text-zinc-500">{t.library.noSnapshots}</div>
+        ) : (
+          <div className="surface-card overflow-x-auto p-4">
+            <table className="min-w-full text-sm">
+              <thead className="text-left text-xs text-zinc-500">
+                <tr>
+                  <th className="py-2 pr-4">{t.common.symbol}</th>
+                  <th className="py-2 pr-4">{t.common.bucket}</th>
+                  <th className="py-2 pr-4">{t.common.score}</th>
+                  <th className="py-2">{t.common.action}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {snapshots.map((s) => (
+                  <tr key={s.id} className="border-t border-zinc-900">
+                    <td className="py-2 font-medium">{s.symbol}</td>
+                    <td className="py-2">{s.bucket}</td>
+                    <td className="py-2 tabular-nums">{s.score?.toFixed(1) ?? "—"}</td>
+                    <td className="py-2">
+                      <Link href={`/workspace?symbol=${s.symbol}`} className="text-[#7dff8e] underline text-xs">
+                        {t.library.openInWorkspace}
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )
       ) : reports.length === 0 ? (

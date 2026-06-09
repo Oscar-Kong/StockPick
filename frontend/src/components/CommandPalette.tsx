@@ -38,17 +38,24 @@ export function CommandPalette() {
   const staticItems: CommandItem[] = useMemo(
     () => [
       { id: "home", label: t.nav.home, hint: t.nav.home, href: "/", group: t.command.go },
-      { id: "research", label: t.nav.research, hint: t.command.researchWorkspace, href: "/workspace", group: t.command.go },
-      { id: "compare", label: t.command.comparePeers, hint: t.home.routeCompareHint, href: "/workspace?tab=compare", group: t.command.go },
-      { id: "scan", label: t.nav.screen, hint: t.nav.screen, href: "/scan", group: t.command.go },
+      {
+        id: "workspace",
+        label: t.nav.workspace,
+        hint: t.command.researchWorkspace,
+        href: "/workspace",
+        group: t.command.go,
+      },
+      { id: "scan", label: t.nav.scan, hint: t.nav.scan, href: "/scan", group: t.command.go },
       { id: "portfolio", label: t.nav.portfolio, hint: t.nav.portfolio, href: "/portfolio", group: t.command.go },
+      { id: "quant-lab", label: t.nav.quantLab, hint: t.home.routeQuantLabHint, href: "/quant-lab", group: t.command.go },
       { id: "library", label: t.nav.library, hint: t.nav.library, href: "/library", group: t.command.go },
-      { id: "settings", label: t.settings.apiSettings, hint: t.settings.apiSettingsDesc, href: "/settings", group: t.command.go },
+      { id: "settings", label: t.nav.settings, hint: t.settings.apiSettingsDesc, href: "/settings", group: t.command.go },
       { id: "intel", label: t.command.traderIntel, href: "/trader-intel", group: t.command.go },
+      { id: "compare", label: t.command.comparePeers, hint: t.home.routeCompareHint, href: "/workspace?tab=compare", group: t.command.go },
+      { id: "journal", label: t.command.tradeJournal, href: "/workspace?tab=journal", group: t.command.go },
       { id: "penny", label: t.command.scanPenny, href: "/scan?bucket=penny", group: t.command.screens },
       { id: "medium", label: t.command.scanMedium, href: "/scan?bucket=medium", group: t.command.screens },
       { id: "compound", label: t.command.scanCompound, href: "/scan?bucket=compounder", group: t.command.screens },
-      { id: "journal", label: t.command.tradeJournal, href: "/workspace?tab=journal", group: t.command.go },
     ],
     [t, locale]
   );

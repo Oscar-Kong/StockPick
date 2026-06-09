@@ -151,16 +151,17 @@ def persist_ic_row(
     horizon_days: int,
     stats: dict,
 ) -> None:
-    row = (
-        session.query(FactorIcHistory)
-        .filter(
-            FactorIcHistory.factor_id == factor_id,
-            FactorIcHistory.sleeve == sleeve,
-            FactorIcHistory.as_of_date == as_of_date,
-            FactorIcHistory.horizon_days == horizon_days,
+    with session.no_autoflush:
+        row = (
+            session.query(FactorIcHistory)
+            .filter(
+                FactorIcHistory.factor_id == factor_id,
+                FactorIcHistory.sleeve == sleeve,
+                FactorIcHistory.as_of_date == as_of_date,
+                FactorIcHistory.horizon_days == horizon_days,
+            )
+            .first()
         )
-        .first()
-    )
     payload = dict(
         factor_id=factor_id,
         sleeve=sleeve,
@@ -194,17 +195,18 @@ def persist_decile_rows(
         dec = int(d.get("decile") or 0)
         if dec <= 0:
             continue
-        row = (
-            session.query(FactorDecileHistory)
-            .filter(
-                FactorDecileHistory.factor_id == factor_id,
-                FactorDecileHistory.sleeve == sleeve,
-                FactorDecileHistory.as_of_date == as_of_date,
-                FactorDecileHistory.horizon_days == horizon_days,
-                FactorDecileHistory.decile == dec,
+        with session.no_autoflush:
+            row = (
+                session.query(FactorDecileHistory)
+                .filter(
+                    FactorDecileHistory.factor_id == factor_id,
+                    FactorDecileHistory.sleeve == sleeve,
+                    FactorDecileHistory.as_of_date == as_of_date,
+                    FactorDecileHistory.horizon_days == horizon_days,
+                    FactorDecileHistory.decile == dec,
+                )
+                .first()
             )
-            .first()
-        )
         payload = dict(
             factor_id=factor_id,
             sleeve=sleeve,

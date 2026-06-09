@@ -57,6 +57,7 @@ def get_engine() -> Engine:
         def _sqlite_wal(dbapi_conn, _record) -> None:
             cur = dbapi_conn.cursor()
             cur.execute("PRAGMA journal_mode=WAL")
+            cur.execute("PRAGMA busy_timeout=60000")
             cur.close()
 
     return _engine
