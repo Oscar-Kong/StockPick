@@ -43,8 +43,12 @@ export function arePredictionOutcomesStale(
   if (unresolved.length === 0) return false;
 
   if (feedback && feedback.snapshots_count > 0 && feedback.outcomes_count === 0) {
-    const oldest = Math.min(...unresolved.map((item) => new Date(item.created_at).getTime()));
-    if (Number.isFinite(oldest) && Date.now() - oldest > staleMs) return true;
+    const times = unresolved
+      .map((item) => new Date(item.created_at).getTime())
+      .filter((t) => Number.isFinite(t));
+    if (times.length === 0) return false;
+    const oldest = Math.min(...times);
+    if (Date.now() - oldest > staleMs) return true;
   }
 
   return false;

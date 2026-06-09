@@ -235,6 +235,9 @@ def run_ic_panel(
     horizons: list[int] | None = None,
 ) -> dict:
     """Compute and persist IC panel for all catalog factors."""
+    import os
+
+    os.environ["IC_PANEL_OFFLINE"] = "1"
     from config import IC_PANEL_HORIZONS
 
     symbols = symbols or _panel_symbols()

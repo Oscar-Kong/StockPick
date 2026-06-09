@@ -2,6 +2,8 @@
 
 import { fmt, useTranslation } from "@/lib/i18n";
 import type { SimilarSignalV2 } from "@/lib/types";
+import { ResearchOnlyBadge } from "./ui/ResearchOnlyBadge";
+import { TooltipLabel } from "./ui/TooltipLabel";
 
 export function SimilarSignalBlock({ data }: { data: SimilarSignalV2 }) {
   const { t } = useTranslation();
@@ -15,9 +17,14 @@ export function SimilarSignalBlock({ data }: { data: SimilarSignalV2 }) {
   }
   return (
     <div className="space-y-2 rounded-lg border border-zinc-800 bg-zinc-950/50 p-3 text-xs">
-      <p className="font-medium text-zinc-300">
-        {fmt(t.quant.similarBacktest, { days: data.forward_days ?? 60 })}
-      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <TooltipLabel
+          label={fmt(t.quant.similarBacktest, { days: data.forward_days ?? 60 })}
+          tooltip={t.product.similarSignalTooltip}
+          className="font-medium text-zinc-300"
+        />
+        <ResearchOnlyBadge tooltip={t.product.similarSignalTooltip} />
+      </div>
       <div className="grid grid-cols-3 gap-2 tabular-nums">
         <div>
           <p className="text-zinc-500">{t.quant.sampleN}</p>

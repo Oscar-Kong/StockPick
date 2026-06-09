@@ -45,11 +45,14 @@ import type {
   WalkForwardResearchRequest,
   WalkForwardResearchResponse,
   WalkForwardRunDetailResponse,
+  QuantLabLastRunSummary,
+  QuantLabEvidenceResponse,
   PairsResearchRequest,
   PairsResearchResponse,
   SchedulerStatusResponse,
   V2VersionResponse,
   V2AuditResponse,
+  V2FactorsAdminResponse,
   V2JobsQueueResponse,
   SimilarSignalBacktestResponse,
   ValuationV2,
@@ -77,6 +80,17 @@ import type {
   AnalyzeWatchlistResponse,
 } from "./types";
 import type { Locale } from "@/lib/i18n";
+import {
+  normalizeFactorPerformanceResponse,
+  normalizeFeedbackSummaryResponse,
+  normalizePairsResearchResponse,
+  normalizePredictionsListResponse,
+  normalizeSchedulerStatusResponse,
+  normalizeV2AuditResponse,
+  normalizeV2FactorsAdminResponse,
+  normalizeWalkForwardResearchResponse,
+} from "./quantLabNormalizers";
+import { normalizeLastRunSummary, normalizeQuantLabEvidence } from "./quantLabLastRun";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:18731";
 
@@ -553,7 +567,7 @@ export function getV2HardFilters(
   return request(`/api/v2/hard-filters/${sleeve}`, { signal: options?.signal });
 }
 
-export function getV2FactorPerformance(
+export async function getV2FactorPerformance(
   params?: { sleeve?: Bucket; factorId?: string; horizonDays?: number },
   options?: V2RequestOptions
 ): Promise<FactorPerformanceResponse> {
@@ -562,10 +576,11 @@ export function getV2FactorPerformance(
   if (params?.factorId) search.set("factor_id", params.factorId);
   if (params?.horizonDays != null) search.set("horizon_days", String(params.horizonDays));
   const qs = search.toString() ? `?${search}` : "";
-  return request(`/api/v2/factors/performance${qs}`, { signal: options?.signal });
+  const raw = await request<unknown>(`/api/v2/factors/performance${qs}`, { signal: options?.signal });
+  return normalizeFactorPerformanceResponse(raw);
 }
 
-export function getV2FactorIc(
+export async function getV2FactorIc(
   params?: { sleeve?: Bucket; factorId?: string; horizonDays?: number },
   options?: V2RequestOptions
 ): Promise<FactorPerformanceResponse> {
@@ -574,10 +589,11 @@ export function getV2FactorIc(
   if (params?.factorId) search.set("factor_id", params.factorId);
   if (params?.horizonDays != null) search.set("horizon_days", String(params.horizonDays));
   const qs = search.toString() ? `?${search}` : "";
-  return request(`/api/v2/factors/ic${qs}`, { signal: options?.signal });
+  const raw = await request<unknown>(`/api/v2/factors/ic${qs}`, { signal: options?.signal });
+  return normalizeFactorPerformanceResponse(raw);
 }
 
-export function getV2Predictions(
+export async function getV2Predictions(
   params?: {
     symbol?: string;
     source?: string;
@@ -596,11 +612,13 @@ export function getV2Predictions(
   if (params?.toDate) search.set("to_date", params.toDate);
   if (params?.limit != null) search.set("limit", String(params.limit));
   const qs = search.toString() ? `?${search}` : "";
-  return request(`/api/v2/predictions${qs}`, { signal: options?.signal });
+  const raw = await request<unknown>(`/api/v2/predictions${qs}`, { signal: options?.signal });
+  return normalizePredictionsListResponse(raw);
 }
 
-export function getV2FeedbackSummary(options?: V2RequestOptions): Promise<FeedbackSummaryResponse> {
-  return request("/api/v2/feedback/summary", { signal: options?.signal });
+export async function getV2FeedbackSummary(options?: V2RequestOptions): Promise<FeedbackSummaryResponse> {
+  const raw = await request<unknown>("/api/v2/feedback/summary", { signal: options?.signal });
+  return normalizeFeedbackSummaryResponse(raw);
 }
 
 export function getV2Valuation(
@@ -634,7 +652,7 @@ export function getV2Version(options?: V2RequestOptions): Promise<V2VersionRespo
   return request("/api/v2/version", { signal: options?.signal });
 }
 
-export function getV2Audit(
+export async function getV2Audit(
   params?: { limit?: number; eventType?: string; symbol?: string },
   options?: V2RequestOptions
 ): Promise<V2AuditResponse> {
@@ -643,7 +661,8 @@ export function getV2Audit(
   if (params?.eventType) search.set("event_type", params.eventType);
   if (params?.symbol) search.set("symbol", params.symbol);
   const qs = search.toString() ? `?${search}` : "";
-  return request(`/api/v2/audit${qs}`, { signal: options?.signal });
+  const raw = await request<unknown>(`/api/v2/audit${qs}`, { signal: options?.signal });
+  return normalizeV2AuditResponse(raw);
 }
 
 export function getV2JobsQueue(
@@ -657,23 +676,35 @@ export function getV2Round2Stats(options?: V2RequestOptions): Promise<Record<str
   return request("/api/v2/admin/round2-stats", { signal: options?.signal });
 }
 
-export function getV2FactorsAdmin(
+export async function getV2FactorsAdmin(
   sleeve?: Bucket,
   options?: V2RequestOptions
-): Promise<Record<string, unknown>> {
+): Promise<V2FactorsAdminResponse> {
   const qs = sleeve ? `?sleeve=${sleeve}` : "";
-  return request(`/api/v2/factors/admin${qs}`, { signal: options?.signal });
+  const raw = await request<unknown>(`/api/v2/factors/admin${qs}`, { signal: options?.signal });
+  return normalizeV2FactorsAdminResponse(raw);
 }
 
-export function runWalkForwardResearch(
+export async function runWalkForwardResearch(
   body: WalkForwardResearchRequest,
   options?: V2RequestOptions
 ): Promise<WalkForwardResearchResponse> {
-  return request("/research/walk-forward", {
+  const raw = await request<unknown>("/research/walk-forward", {
     method: "POST",
     body: JSON.stringify(body),
     signal: options?.signal,
   });
+  return normalizeWalkForwardResearchResponse(raw);
+}
+
+export async function getWalkForwardLatest(
+  sleeve: Bucket = "medium",
+  options?: V2RequestOptions
+): Promise<QuantLabLastRunSummary> {
+  const raw = await request<unknown>(`/research/walk-forward/latest?sleeve=${sleeve}`, {
+    signal: options?.signal,
+  });
+  return normalizeLastRunSummary(raw, "walk_forward");
 }
 
 export function getWalkForwardRun(
@@ -685,19 +716,36 @@ export function getWalkForwardRun(
   });
 }
 
-export function runPairsResearch(
+export async function runPairsResearch(
   body: PairsResearchRequest,
   options?: V2RequestOptions
 ): Promise<PairsResearchResponse> {
-  return request("/research/pairs", {
+  const raw = await request<unknown>("/research/pairs", {
     method: "POST",
     body: JSON.stringify(body),
     signal: options?.signal,
   });
+  return normalizePairsResearchResponse(raw);
 }
 
-export function getSchedulerStatus(options?: V2RequestOptions): Promise<SchedulerStatusResponse> {
-  return request("/data/scheduler/status", { signal: options?.signal });
+export async function getPairsLatest(options?: V2RequestOptions): Promise<QuantLabLastRunSummary> {
+  const raw = await request<unknown>("/research/pairs/latest", { signal: options?.signal });
+  return normalizeLastRunSummary(raw, "pairs");
+}
+
+export async function getQuantLabEvidence(
+  sleeve: Bucket = "medium",
+  options?: V2RequestOptions
+): Promise<QuantLabEvidenceResponse> {
+  const raw = await request<unknown>(`/api/v2/quant-lab/evidence?sleeve=${sleeve}`, {
+    signal: options?.signal,
+  });
+  return normalizeQuantLabEvidence(raw);
+}
+
+export async function getSchedulerStatus(options?: V2RequestOptions): Promise<SchedulerStatusResponse> {
+  const raw = await request<unknown>("/data/scheduler/status", { signal: options?.signal });
+  return normalizeSchedulerStatusResponse(raw);
 }
 
 export function runSchedulerDailyPipeline(

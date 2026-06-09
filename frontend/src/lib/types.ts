@@ -1282,6 +1282,49 @@ export interface WalkForwardRunDetailResponse {
   finished_at?: string | null;
 }
 
+export type QuantLabTrustIndicator =
+  | "fresh"
+  | "stale"
+  | "insufficient_sample"
+  | "feature_disabled"
+  | "no_saved_run"
+  | "research_only"
+  | "needs_attention";
+
+export interface QuantLabMainMetric {
+  label: string;
+  value: string;
+}
+
+export interface QuantLabLastRunSummary {
+  id: string;
+  available: boolean;
+  reason?: string | null;
+  generated_at?: string | null;
+  run_id?: string | null;
+  sleeve?: string | null;
+  status?: string | null;
+  sample_size?: number | null;
+  main_metric?: QuantLabMainMetric | null;
+  stale: boolean;
+  stale_reason?: string | null;
+  warnings: string[];
+  trust_indicator: QuantLabTrustIndicator;
+  research_only: boolean;
+  tab?: string | null;
+}
+
+export interface QuantLabEvidenceResponse {
+  sleeve: string;
+  generated_at: string;
+  validation_copy: string;
+  factor_ic: QuantLabLastRunSummary;
+  walk_forward: QuantLabLastRunSummary;
+  predictions: QuantLabLastRunSummary;
+  pairs: QuantLabLastRunSummary;
+  jobs: QuantLabLastRunSummary;
+}
+
 export interface PairResearchItem {
   pair: string[];
   symbol_y: string;
@@ -1362,6 +1405,14 @@ export interface V2AuditEvent {
 
 export interface V2AuditResponse {
   events: V2AuditEvent[];
+}
+
+export interface V2FactorsAdminResponse {
+  factors: unknown[];
+  trade_predictions_count: number;
+  trade_outcomes_count: number;
+  sleeve_filter?: string | null;
+  outcome_feedback_preview?: unknown;
 }
 
 export interface V2JobsQueueResponse {

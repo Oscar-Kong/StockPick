@@ -3,6 +3,7 @@
 import { fmt, useTranslation } from "@/lib/i18n";
 import type { ScanParitySummary } from "@/lib/types";
 import type { ScoreSource } from "@/lib/v2Score";
+import { TooltipLabel } from "./ui/TooltipLabel";
 import { ScoreSourceBadge } from "./ScoreSourceBadge";
 
 interface ScanScoreMetaProps {
@@ -24,16 +25,15 @@ export function ScanScoreMeta({ scoringEngineUsed, paritySummary }: ScanScoreMet
       <ScoreSourceBadge source={source} />
       {paritySummary &&
         (paritySummary.average_delta != null || paritySummary.max_delta != null) && (
-          <span
-            className="chip px-2 py-1 text-[10px] tabular-nums text-zinc-500"
-            title={t.scan.parityHint}
-          >
-            {fmt(t.scan.paritySummary, {
+          <TooltipLabel
+            label={fmt(t.scan.paritySummary, {
               avg: paritySummary.average_delta?.toFixed(1) ?? "—",
               max: paritySummary.max_delta?.toFixed(1) ?? "—",
               diffs: String(paritySummary.recommendation_bucket_diffs ?? 0),
             })}
-          </span>
+            tooltip={t.product.parityDeltaTooltip}
+            className="chip px-2 py-1 text-[10px] tabular-nums text-zinc-500"
+          />
         )}
     </div>
   );

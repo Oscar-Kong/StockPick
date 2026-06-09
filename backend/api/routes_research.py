@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from models.schemas_v2 import (
     PairsResearchRequest,
     PairsResearchResponse,
+    QuantLabLastRunSummary,
     WalkForwardResearchRequest,
     WalkForwardResearchResponse,
     WalkForwardRunDetailResponse,
@@ -16,6 +17,7 @@ from services.walk_forward_research_service import (
     run_walk_forward_research,
 )
 from services.pairs_research_service import run_pairs_research
+from services.quant_lab_summary_service import build_pairs_last_run, build_walk_forward_last_run
 
 router = APIRouter(prefix="/research", tags=["research"])
 
@@ -39,6 +41,12 @@ def post_walk_forward_research(body: WalkForwardResearchRequest):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"walk-forward research failed: {exc}") from exc
     return summary
+
+
+@router.get("/walk-forward/latest", response_model=QuantLabLastRunSummary)
+def get_walk_forward_latest(sleeve: str = "medium"):
+    """Latest persisted walk-forward run summary for a sleeve (read-only)."""
+    return build_walk_forward_last_run(sleeve)
 
 
 @router.get("/walk-forward/{run_id}", response_model=WalkForwardRunDetailResponse)
@@ -65,4 +73,10 @@ def post_pairs_research(body: PairsResearchRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"pairs research failed: {exc}") from exc
+
+
+@router.get("/pairs/latest", response_model=QuantLabLastRunSummary)
+def get_pairs_latest():
+    """Latest pairs research summary — unavailable until runs are persisted."""
+    return build_pairs_last_run()
 

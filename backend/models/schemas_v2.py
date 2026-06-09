@@ -265,3 +265,41 @@ class PairsResearchResponse(BaseModel):
     statsmodels_available: bool = False
     pairs: list[PairResearchItem] = []
     notes: list[str] = []
+
+
+class QuantLabMainMetric(BaseModel):
+    label: str
+    value: str
+
+
+class QuantLabLastRunSummary(BaseModel):
+    """Read-only summary of latest persisted evidence for Quant Lab cards."""
+
+    id: str
+    available: bool
+    reason: str | None = None
+    generated_at: str | None = None
+    run_id: str | None = None
+    sleeve: str | None = None
+    status: str | None = None
+    sample_size: int | None = None
+    main_metric: QuantLabMainMetric | None = None
+    stale: bool = False
+    stale_reason: str | None = None
+    warnings: list[str] = Field(default_factory=list)
+    trust_indicator: str = "no_saved_run"
+    research_only: bool = False
+    tab: str | None = None
+
+
+class QuantLabEvidenceResponse(BaseModel):
+    sleeve: str
+    generated_at: str
+    validation_copy: str = (
+        "Quant Lab validates the scoring system. It does not automatically change scan rankings."
+    )
+    factor_ic: QuantLabLastRunSummary
+    walk_forward: QuantLabLastRunSummary
+    predictions: QuantLabLastRunSummary
+    pairs: QuantLabLastRunSummary
+    jobs: QuantLabLastRunSummary

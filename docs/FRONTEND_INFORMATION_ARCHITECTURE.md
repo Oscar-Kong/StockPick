@@ -2,6 +2,17 @@
 
 **Updated:** 2026-06-08
 
+## Product model
+
+| Route | Role |
+|-------|------|
+| `/scan` | Ranked candidates — shows **How this scan was scored** (source, parity, freshness) + link to Quant Lab |
+| `/workspace` | Single-symbol explanation |
+| `/portfolio` | Basket optimization and policy backtest |
+| `/quant-lab` | System validation — **How Quant Lab affects Scan** panel + evidence cards |
+
+Quant Lab never auto-applies weight or model changes. Risky actions use explicit confirmation when apply endpoints exist; otherwise **Manual review required**.
+
 ## Top navigation
 
 | Route | Purpose | Audience |

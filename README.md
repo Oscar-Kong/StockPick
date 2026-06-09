@@ -16,14 +16,25 @@ From one UI, you can:
 2. **Scan** a bucket and rank candidates (`/scan`)
 3. **Workspace** — watchlist, single-symbol analyze (primary score from `/api/v2/score` when enabled), compare peers, trade journal (`/workspace`)
 4. **Portfolio** — basket weight optimization and rebalance policy backtests (`/portfolio`)
-5. **Quant Lab** — advanced factor IC, walk-forward, prediction outcomes, pairs research, data ops (`/quant-lab`)
+5. **Quant Lab** — latest evidence cards (factor IC, walk-forward, predictions, jobs), validation tabs, research on demand (`/quant-lab`)
 6. **Library** — saved scans, research reports, analyze snapshots (`/library`)
 7. **Settings** — language, API providers, ops (`/settings`)
 8. **Trader Intel** — style presets and bucket tilts (`/trader-intel`, secondary nav link)
 
 Top navigation: **Home · Scan · Workspace · Portfolio · Quant Lab · Library · Settings**. Compare and journal remain inside Workspace (`?tab=compare|journal`). Legacy routes (`/penny`, `/watchlist`, `/trades`, etc.) redirect.
 
-**Wiring in progress:** allocation recommendation, LEAN export, and full Quant Lab tab content. See [UI Feature Integration Audit](docs/UI_FEATURE_INTEGRATION_AUDIT.md).
+## Scan vs Workspace vs Quant Lab
+
+| | Scan | Workspace | Quant Lab |
+|---|------|-----------|-----------|
+| **Question** | Who ranked today? | Why this stock? | Can I trust the model? |
+| **Output** | Ranked candidate list | Symbol analysis, compare, journal | Factor IC, walk-forward, outcomes, jobs |
+| **Affects live rankings** | Yes (on new scan) | No | **No** — validation only |
+| **Heavy jobs** | Scan button only | Analyze on open | Run buttons only |
+
+**Flow:** Market Data → ScoringEngine → Scan Results → Workspace. Quant Lab validates factors, weights, and outcomes to inform *future* changes — not today's live ranking.
+
+**Wiring in progress:** allocation recommendation, LEAN export. See [Quant Lab docs](docs/QUANT_LAB.md).
 
 ## How It Works (End-to-End Flow)
 

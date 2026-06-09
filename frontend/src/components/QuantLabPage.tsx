@@ -9,6 +9,8 @@ import {
   WalkForwardTab,
 } from "@/components/quant-lab/QuantLabTabs";
 import { AppTabBar, AppTabButton } from "@/components/AppTabs";
+import { QuantLabEvidencePanel } from "@/components/quant-lab/QuantLabEvidencePanel";
+import { QuantLabScanRelationshipPanel } from "@/components/product/QuantLabScanRelationshipPanel";
 import { ResearchWarning } from "@/components/ui/ResearchWarning";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { useTranslation } from "@/lib/i18n";
@@ -58,7 +60,11 @@ function QuantLabContent() {
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-6 sm:px-6">
       <SectionHeader title={t.quantLab.title} subtitle={t.quantLab.subtitle} />
-      <ResearchWarning className="mb-4" />
+      <ResearchWarning className="mb-4" message={t.quantLab.validationCopy} />
+
+      <QuantLabScanRelationshipPanel />
+
+      <QuantLabEvidencePanel onNavigateTab={setTab} />
 
       <AppTabBar aria-label={t.quantLab.tabsAria} className="mb-4 overflow-x-auto">
         {TABS.map((key) => (

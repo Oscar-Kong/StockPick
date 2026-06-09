@@ -33,6 +33,11 @@ def _lexicon_score(text: str) -> float:
 
 
 def fetch_stocktwits_sentiment(symbol: str) -> float:
+    import os
+
+    if os.getenv("IC_PANEL_OFFLINE", "").lower() in ("1", "true", "yes"):
+        return 50.0
+
     url = f"https://api.stocktwits.com/api/2/streams/symbol/{symbol}.json"
     try:
         response = requests.get(url, params={"limit": 30}, timeout=10)
@@ -100,6 +105,11 @@ def fetch_finnhub_sentiment(symbol: str) -> dict[str, Any]:
 
 def sentiment_polarity_scores(symbol: str) -> dict[str, float]:
     """Positive / negative buzz scores (0–100) from StockTwits messages."""
+    import os
+
+    if os.getenv("IC_PANEL_OFFLINE", "").lower() in ("1", "true", "yes"):
+        return {"combined": 50.0, "positive": 50.0, "negative": 50.0}
+
     url = f"https://api.stocktwits.com/api/2/streams/symbol/{symbol}.json"
     combined = 50.0
     positive = 50.0

@@ -19,6 +19,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ScanControls } from "./ScanControls";
 import { ScanProgress } from "./ScanProgress";
+import { ScanScoringNote } from "./product/ScanScoringNote";
 import { ScanScoreMeta } from "./ScanScoreMeta";
 import { StaleDataBadge } from "./badges/StaleDataBadge";
 import { StockDetailDrawer } from "./StockDetailDrawer";
@@ -250,6 +251,15 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
             </div>
           </div>
         </div>
+      )}
+
+      {embedded && (
+        <ScanScoringNote
+          scoringEngineUsed={scoringEngineUsed}
+          paritySummary={paritySummary}
+          lastScanAt={lastScanAt}
+          scanStale={scanStale}
+        />
       )}
 
       <ScanControls

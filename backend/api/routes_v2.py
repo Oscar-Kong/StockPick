@@ -6,7 +6,7 @@ from fastapi import APIRouter, Header, HTTPException, Query
 from config import DYNAMIC_WEIGHTS_ENABLED, SCORE_ENGINE_V2_ENABLED
 from models.schemas import Bucket, PortfolioPolicyBacktestRequest, PortfolioPolicyBacktestResponse
 from config import AI_REPORT_SCHEMA, BACKTEST_INSTITUTIONAL, POSITION_SIZING_V2, TRADE_FEEDBACK_ENABLED
-from models.schemas_v2 import MarketRegimeV2, PositionSizingV2, SleeveWeightsV2, UnifiedRiskV2, V2ScoreResponse
+from models.schemas_v2 import MarketRegimeV2, PositionSizingV2, QuantLabEvidenceResponse, SleeveWeightsV2, UnifiedRiskV2, V2ScoreResponse
 from services.institutional_backtest_service import run_portfolio_backtest
 from services.quant_risk_sizing_service import build_position_sizing, build_unified_risk
 from services.research_report_v2 import build_research_report_v2, get_cached_report_v2
@@ -74,7 +74,7 @@ def get_sleeve_weights(
     return SleeveWeightsV2(
         sleeve=sleeve_val,
         regime=regime_val,
-        dynamic_enabled=DYNAMIC_WEIGHTS_ENABLED,
+        dynamic_enabled=bool(DYNAMIC_WEIGHTS_ENABLED),
         weights=weights,
         weights_by_regime=by_regime,
     )
@@ -363,6 +363,14 @@ def factors_admin(sleeve: Bucket | None = Query(None)):
 
     sleeve_val = sleeve.value if sleeve else None
     return factor_admin_view(sleeve_val)
+
+
+@router.get("/quant-lab/evidence", response_model=QuantLabEvidenceResponse)
+def get_quant_lab_evidence(sleeve: Bucket = Query(Bucket.medium)):
+    """Read-only latest evidence summaries for Quant Lab overview cards."""
+    from services.quant_lab_summary_service import get_quant_lab_evidence as _evidence
+
+    return _evidence(sleeve.value)
 
 
 @router.get("/version")
