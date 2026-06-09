@@ -58,7 +58,9 @@ Heavy jobs (`POST /research/walk-forward`, `POST /research/pairs`, IC panel, sch
 ```
 frontend/src/components/quant-lab/
   QuantLabTabs.tsx          # re-exports
-  QuantLabTabShell.tsx      # shared UI helpers
+  QuantLabTabShell.tsx      # shared UI helpers (+ reliability slot)
+  ResearchReliabilityCard.tsx
+  FactorLifecycleBadge.tsx
   FactorPerformanceTab.tsx
   WalkForwardTab.tsx
   PredictionsTab.tsx
@@ -66,13 +68,34 @@ frontend/src/components/quant-lab/
   DataQualityTab.tsx
   ModelAdminTab.tsx
   QuantLabTabs.test.tsx
+  ResearchReliabilityCard.test.tsx
+
+frontend/src/components/product/
+  EvidenceToActionBoundary.tsx
 
 frontend/src/lib/
+  researchReliability.ts    # reliability scores + factor lifecycle
+  researchReliability.test.ts
   quantLabNormalizers.ts    # API response normalizers
   quantLabFormatters.ts     # dates, symbols, horizon text
   apiError.ts
   predictions.ts
 ```
+
+## Research Reliability
+
+Every tab shows a **Research Reliability** card first (badge, 0–100 score, reasons, warnings, blockers, suggested next action). See [RESEARCH_RELIABILITY.md](./RESEARCH_RELIABILITY.md).
+
+| Tab | Reliability inputs |
+|-----|-------------------|
+| Factor Performance | IC freshness, factor count, sample size, mean IC + **Promote/Keep/Watch/Retire** per factor |
+| Walk-Forward | Periods, windows, horizons, rank IC — plus **overfitting warnings** (no PBO/CPCV yet) |
+| Prediction Outcomes | Resolved/unresolved counts, forecast error, stale outcomes |
+| Pairs | Universe size, cointegration, statsmodels, sample length |
+| Data Quality | Quant Health, scheduler, failed jobs |
+| Model Admin | v2 version, catalog, dynamic weights, audit |
+
+**Evidence → action:** `EvidenceToActionBoundary` on the page states that Quant Lab does not change live scan rankings. Weight or model changes require explicit manual review (`ApplyChangesNotice`).
 
 ## Ops
 

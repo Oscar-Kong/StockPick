@@ -12,9 +12,11 @@ import {
   predictionReturnPct,
 } from "@/lib/predictions";
 import { useTranslation } from "@/lib/i18n";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { computePredictionsReliability } from "@/lib/researchReliability";
 import { TooltipLabel } from "@/components/ui/TooltipLabel";
 import { ResearchOnlyBadge } from "@/components/ui/ResearchOnlyBadge";
+import { ResearchReliabilityCard } from "./ResearchReliabilityCard";
 import {
   QuantLabEmptyState,
   QuantLabTabLayout,
@@ -68,6 +70,10 @@ export function PredictionsTab() {
   const resolved = countResolvedPredictions(predictions);
   const stale = arePredictionOutcomesStale(predictions, feedback);
   const hasAnyData = predictions.length > 0 || feedback != null;
+  const reliability = useMemo(
+    () => computePredictionsReliability({ predictions, feedback, disabled, loading }),
+    [predictions, feedback, disabled, loading]
+  );
 
   return (
     <QuantLabTabLayout
@@ -75,6 +81,7 @@ export function PredictionsTab() {
       description={
         <TooltipLabel label={t.quantLab.hintPredictions} tooltip={t.product.predictionOutcomeTooltip} />
       }
+      reliability={<ResearchReliabilityCard score={reliability} />}
       statusBadge={
         <>
           <ResearchOnlyBadge tooltip={t.product.predictionOutcomeTooltip} />

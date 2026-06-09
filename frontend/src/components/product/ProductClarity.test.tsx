@@ -4,6 +4,7 @@ import { en } from "@/lib/i18n/messages/en";
 import { ScanScoringNote } from "./ScanScoringNote";
 import { QuantLabScanRelationshipPanel } from "./QuantLabScanRelationshipPanel";
 import { ApplyChangesConfirm, ApplyChangesNotice } from "./ApplyChangesNotice";
+import { EvidenceToActionBoundary } from "./EvidenceToActionBoundary";
 
 vi.mock("@/lib/i18n", () => ({
   useTranslation: () => ({ t: en, locale: "en" }),
@@ -76,5 +77,16 @@ describe("ApplyChangesNotice", () => {
     fireEvent.click(screen.getByRole("button", { name: "Apply weights" }));
     expect(onConfirm).toHaveBeenCalledTimes(1);
     confirmSpy.mockRestore();
+  });
+});
+
+describe("EvidenceToActionBoundary", () => {
+  afterEach(() => cleanup());
+
+  it("shows evidence-to-action copy on Quant Lab", () => {
+    render(<EvidenceToActionBoundary />);
+    expect(screen.getByTestId("evidence-to-action-boundary")).toBeInTheDocument();
+    expect(screen.getByText(en.reliability.evidenceBoundaryTitle)).toBeInTheDocument();
+    expect(screen.getByText(en.reliability.evidenceBoundaryCopy)).toBeInTheDocument();
   });
 });

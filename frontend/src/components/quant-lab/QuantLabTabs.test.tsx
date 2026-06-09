@@ -50,6 +50,11 @@ const emptyFeedbackSummary = {
 describe("Quant Lab tabs", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocked.getQuantHealthSummary.mockResolvedValue({
+      overall: "ok",
+      checked_at: new Date().toISOString(),
+      sections: [],
+    });
     mocked.getWalkForwardLatest.mockResolvedValue({
       id: "walk_forward",
       available: false,
@@ -66,6 +71,10 @@ describe("Quant Lab tabs", () => {
     cleanup();
   });
 
+  const expectReliabilityCard = () => {
+    expect(screen.getByTestId("research-reliability-card")).toBeInTheDocument();
+  };
+
   describe("FactorPerformanceTab", () => {
     it("renders tab title", async () => {
       mocked.getV2FactorPerformance.mockResolvedValue({
@@ -77,6 +86,7 @@ describe("Quant Lab tabs", () => {
         by_sector: {},
       });
       render(<FactorPerformanceTab />);
+      expectReliabilityCard();
       expect(screen.getByText(en.quantLab.tabFactorPerformance)).toBeInTheDocument();
       await waitFor(() => {
         expect(screen.getByText(en.quantLab.noFactorIc)).toBeInTheDocument();
@@ -97,6 +107,31 @@ describe("Quant Lab tabs", () => {
         expect(screen.getByText(en.quantLab.noFactorIc)).toBeInTheDocument();
       });
       expect(mocked.getV2FactorPerformance).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows insufficient_data reliability when IC empty", async () => {
+      mocked.getV2FactorPerformance.mockResolvedValue({
+        as_of_date: null,
+        horizons: [],
+        factors: [],
+        by_horizon: {},
+        by_regime: {},
+        by_sector: {},
+      });
+      render(<FactorPerformanceTab />);
+      await waitFor(() => {
+        expect(screen.getByText(en.reliability.statusInsufficientData)).toBeInTheDocument();
+      });
+    });
+
+    it("shows disabled reliability when feature off", async () => {
+      mocked.getV2FactorPerformance.mockRejectedValue(
+        new Error('{"detail":"SCORE_ENGINE_V2_ENABLED is false"}')
+      );
+      render(<FactorPerformanceTab />);
+      await waitFor(() => {
+        expect(screen.getByText(en.reliability.statusDisabled)).toBeInTheDocument();
+      });
     });
 
     it("shows feature disabled on 503", async () => {
@@ -134,8 +169,9 @@ describe("Quant Lab tabs", () => {
   });
 
   describe("WalkForwardTab", () => {
-    it("renders research-only warning", () => {
+    it("renders research-only warning and reliability card", () => {
       render(<WalkForwardTab />);
+      expectReliabilityCard();
       expect(screen.getByText(en.quantLab.researchOnlyExtended)).toBeInTheDocument();
       expect(screen.getByText(en.product.researchOnlyBadge)).toBeInTheDocument();
     });
@@ -197,13 +233,40 @@ describe("Quant Lab tabs", () => {
         expect(screen.getByText(en.quantLab.walkForwardNoPeriods)).toBeInTheDocument();
       });
     });
+    it("shows weak walk-forward overfitting warnings after run", async () => {
+      mocked.runWalkForwardResearch.mockResolvedValue({
+        run_id: "abc",
+        status: "completed",
+        sleeve: "medium",
+        start_date: "2024-01-01",
+        end_date: "2026-01-01",
+        rebalance_frequency: "monthly",
+        forward_horizons: [20],
+        rebalance_periods: 1,
+        periods_scored: 1,
+        snapshots_written: 0,
+      });
+      render(<WalkForwardTab />);
+      fireEvent.click(screen.getByRole("button", { name: en.quantLab.runWalkForward }));
+      await waitFor(() => {
+        const panel = screen.getByTestId("walk-forward-overfitting-warnings");
+        expect(panel).toBeInTheDocument();
+        expect(panel.textContent).toContain(en.reliability.warnings.noTransactionCosts);
+      });
+    });
+
+    it("does not expose auto-apply button", () => {
+      render(<WalkForwardTab />);
+      expect(screen.queryByRole("button", { name: /apply/i })).not.toBeInTheDocument();
+    });
   });
 
   describe("PredictionsTab", () => {
-    it("renders tab title", async () => {
+    it("renders tab title and reliability card", async () => {
       mocked.getV2Predictions.mockResolvedValue({ predictions: [] });
       mocked.getV2FeedbackSummary.mockResolvedValue(emptyFeedbackSummary);
       render(<PredictionsTab />);
+      expectReliabilityCard();
       expect(screen.getByText(en.quantLab.tabPredictions)).toBeInTheDocument();
       await waitFor(() => {
         expect(screen.getByText(en.home.unresolvedPredictions)).toBeInTheDocument();
@@ -247,10 +310,11 @@ describe("Quant Lab tabs", () => {
   });
 
   describe("PairsTab", () => {
-    it("renders research-only warning and badge", () => {
+    it("renders research-only warning, badge, and reliability card", () => {
       render(<PairsTab />);
+      expectReliabilityCard();
       expect(screen.getByText(en.quantLab.researchOnlyExtended)).toBeInTheDocument();
-      expect(screen.getByText(en.product.researchOnlyBadge)).toBeInTheDocument();
+      expect(screen.getAllByText(en.product.researchOnlyBadge).length).toBeGreaterThanOrEqual(1);
     });
 
     it("does not call API on mount", () => {
@@ -315,12 +379,13 @@ describe("Quant Lab tabs", () => {
   });
 
   describe("DataQualityTab", () => {
-    it("renders quant health card and scheduler panel", async () => {
+    it("renders quant health card, scheduler panel, and reliability card", async () => {
       mocked.getSchedulerStatus.mockResolvedValue({
         enabled: true,
         recent_jobs: [],
       });
       render(<DataQualityTab />);
+      expectReliabilityCard();
       expect(screen.getByText(en.quantLab.tabDataQuality)).toBeInTheDocument();
       expect(screen.getByTestId("quant-health-card")).toBeInTheDocument();
       await waitFor(() => {
@@ -332,13 +397,13 @@ describe("Quant Lab tabs", () => {
       mocked.getSchedulerStatus.mockRejectedValue(new Error("scheduler offline"));
       render(<DataQualityTab />);
       await waitFor(() => {
-        expect(screen.getByText(/scheduler offline/)).toBeInTheDocument();
+        expect(screen.getByText(en.settings.schedulerUnavailable)).toBeInTheDocument();
       });
     });
   });
 
   describe("ModelAdminTab", () => {
-    it("renders version when loaded", async () => {
+    it("renders version and reliability card when loaded", async () => {
       mocked.getV2Version.mockResolvedValue({
         strategy_version: "v1",
         factor_model_version: "quant-v2",
@@ -357,6 +422,7 @@ describe("Quant Lab tabs", () => {
       });
       render(<ModelAdminTab />);
       await waitFor(() => {
+        expectReliabilityCard();
         expect(screen.getByText(/strategy: v1/)).toBeInTheDocument();
       });
     });

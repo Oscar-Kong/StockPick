@@ -9,7 +9,8 @@ import {
 import { isFeatureDisabledError, parseApiError } from "@/lib/apiError";
 import type { V2FactorsAdminResponse } from "@/lib/types";
 import { useTranslation } from "@/lib/i18n";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { computeModelAdminReliability } from "@/lib/researchReliability";
 import {
   FeatureDisabledNotice,
   QuantLabEmptyState,
@@ -17,6 +18,7 @@ import {
   TabRefreshRow,
 } from "./QuantLabTabShell";
 import { ApplyChangesNotice } from "@/components/product/ApplyChangesNotice";
+import { ResearchReliabilityCard } from "./ResearchReliabilityCard";
 
 export function ModelAdminTab() {
   const { t } = useTranslation();
@@ -82,11 +84,25 @@ export function ModelAdminTab() {
   const events = audit?.events ?? [];
   const factorCount = factorsAdmin?.factors?.length ?? 0;
   const hasContent = Boolean(version || weights || audit || factorsAdmin);
+  const reliability = useMemo(
+    () =>
+      computeModelAdminReliability({
+        version,
+        weights,
+        audit,
+        factorsAdmin,
+        disabled,
+        panelErrors,
+        loading,
+      }),
+    [version, weights, audit, factorsAdmin, disabled, panelErrors, loading]
+  );
 
   return (
     <QuantLabTabLayout
       title={t.quantLab.tabModelAdmin}
       description={t.quantLab.hintModelAdmin}
+      reliability={<ResearchReliabilityCard score={reliability} />}
       controls={<TabRefreshRow onRefresh={() => void load()} />}
       loading={loading}
       disabled={disabled}

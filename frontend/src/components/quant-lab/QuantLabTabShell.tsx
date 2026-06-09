@@ -48,6 +48,7 @@ interface QuantLabTabLayoutProps {
   title: string;
   description?: ReactNode;
   statusBadge?: ReactNode;
+  reliability?: ReactNode;
   controls?: ReactNode;
   loading?: boolean;
   error?: string | null;
@@ -63,6 +64,7 @@ export function QuantLabTabLayout({
   title,
   description,
   statusBadge,
+  reliability,
   controls,
   loading,
   error,
@@ -81,6 +83,7 @@ export function QuantLabTabLayout({
         </div>
         {description && <div className="text-xs text-zinc-500">{description}</div>}
       </header>
+      {reliability}
       {controls}
       {loading && <LoadingSkeleton lines={4} />}
       {disabled && disabledMessage && <FeatureDisabledNotice message={disabledMessage} />}

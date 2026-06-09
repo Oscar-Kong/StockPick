@@ -13,11 +13,17 @@ import {
 } from "@/lib/quantLabFormatters";
 import { normalizeWalkForwardResearchResponse } from "@/lib/quantLabNormalizers";
 import { saveWalkForwardLastRun, validateWalkForwardHorizons } from "@/lib/quantLabStability";
+import {
+  computeWalkForwardOverfittingWarnings,
+  computeWalkForwardReliability,
+  translateReliabilityList,
+} from "@/lib/researchReliability";
 import type { Bucket, QuantLabLastRunSummary } from "@/lib/types";
 import { useTranslation } from "@/lib/i18n";
 import { useEffect, useMemo, useState } from "react";
 import { BucketSelect, QuantLabEmptyState, QuantLabTabLayout } from "./QuantLabTabShell";
 import { QuantLabTrustBadge } from "./QuantLabTrustBadge";
+import { ResearchReliabilityCard } from "./ResearchReliabilityCard";
 
 const HORIZON_OPTIONS = [20, 60, 90] as const;
 
@@ -111,12 +117,26 @@ export function WalkForwardTab() {
     ? Object.entries(result.aggregate_horizons)
     : [];
 
+  const reliability = useMemo(
+    () =>
+      computeWalkForwardReliability({
+        result,
+        latestStale: latestSummary?.stale,
+        loading: loadingLatest || running,
+      }),
+    [result, latestSummary?.stale, loadingLatest, running]
+  );
+
+  const overfitting = useMemo(() => computeWalkForwardOverfittingWarnings(result), [result]);
+  const overfittingLines = translateReliabilityList(overfitting.warnings, "warnings", t);
+
   return (
     <QuantLabTabLayout
       title={t.quantLab.tabWalkForward}
       description={
         <TooltipLabel label={t.quantLab.hintWalkForward} tooltip={t.product.walkForwardTooltip} />
       }
+      reliability={<ResearchReliabilityCard score={reliability} />}
       statusBadge={
         <>
           <ResearchOnlyBadge tooltip={t.product.walkForwardTooltip} />
@@ -192,6 +212,23 @@ export function WalkForwardTab() {
       {result && (
         <div className="space-y-4">
           <ApplyChangesNotice />
+          {overfittingLines.length > 0 && (
+            <div
+              className="rounded-lg border border-amber-900/40 bg-amber-950/20 p-3"
+              data-testid="walk-forward-overfitting-warnings"
+            >
+              <h4 className="text-xs font-semibold text-amber-200">{t.quantLab.overfittingTitle}</h4>
+              <p className="mt-1 text-[10px] text-amber-200/70">
+                PBO: {overfitting.pbo_available ? "yes" : "no"} —{" "}
+                {translateReliabilityList([overfitting.pbo_warning], "warnings", t)[0]}
+              </p>
+              <ul className="mt-2 list-inside list-disc text-xs text-amber-200/90">
+                {overfittingLines.map((line, i) => (
+                  <li key={i}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
             <div>
               <dt className="text-xs text-zinc-500">{t.quantLab.runStatus}</dt>

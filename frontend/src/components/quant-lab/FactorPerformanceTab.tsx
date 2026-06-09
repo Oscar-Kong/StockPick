@@ -8,10 +8,16 @@ import {
   primaryFactorHorizon,
 } from "@/lib/quantLabNormalizers";
 import { isFactorIcStale } from "@/lib/quantLabStability";
+import {
+  computeFactorLifecycleStatus,
+  computeFactorPerformanceReliability,
+} from "@/lib/researchReliability";
 import type { Bucket } from "@/lib/types";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { TooltipLabel } from "@/components/ui/TooltipLabel";
 import { ResearchOnlyBadge } from "@/components/ui/ResearchOnlyBadge";
+import { FactorLifecycleBadge } from "./FactorLifecycleBadge";
+import { ResearchReliabilityCard } from "./ResearchReliabilityCard";
 import {
   BucketSelect,
   QuantLabEmptyState,
@@ -54,6 +60,10 @@ export function FactorPerformanceTab() {
 
   const factors = factorPerformanceRows(data);
   const icStale = isFactorIcStale(data?.as_of_date);
+  const reliability = useMemo(
+    () => computeFactorPerformanceReliability({ data, disabled, loading }),
+    [data, disabled, loading]
+  );
 
   return (
     <QuantLabTabLayout
@@ -61,6 +71,7 @@ export function FactorPerformanceTab() {
       description={
         <TooltipLabel label={t.quantLab.hintFactorPerformance} tooltip={t.product.factorIcTooltip} />
       }
+      reliability={<ResearchReliabilityCard score={reliability} />}
       statusBadge={
         <>
           <ResearchOnlyBadge tooltip={t.product.factorIcTooltip} />
@@ -97,17 +108,21 @@ export function FactorPerformanceTab() {
             factors.slice(0, 12).map((f, index) => {
               const h = primaryFactorHorizon(f);
               if (!h) return null;
+              const lifecycle = computeFactorLifecycleStatus(f, icStale);
               return (
                 <div
                   key={f.factor_id || `factor-${index}`}
                   className="rounded-lg border border-zinc-800 p-3 text-xs"
                 >
-                  <div className="flex justify-between gap-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
                     <span className="font-medium text-zinc-200">{f.factor_id}</span>
-                    <span className="tabular-nums text-zinc-400">
-                      IC {h.ic != null && Number.isFinite(h.ic) ? h.ic.toFixed(3) : "—"} · n=
-                      {h.sample_n ?? "—"}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <FactorLifecycleBadge status={lifecycle} />
+                      <span className="tabular-nums text-zinc-400">
+                        IC {h.ic != null && Number.isFinite(h.ic) ? h.ic.toFixed(3) : "—"} · n=
+                        {h.sample_n ?? "—"}
+                      </span>
+                    </div>
                   </div>
                 </div>
               );

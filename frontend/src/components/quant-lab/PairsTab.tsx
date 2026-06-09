@@ -6,9 +6,11 @@ import { TooltipLabel } from "@/components/ui/TooltipLabel";
 import { runPairsResearch } from "@/lib/api";
 import { parseApiError } from "@/lib/apiError";
 import { PAIRS_MAX_SYMBOLS, parseSymbolList } from "@/lib/quantLabFormatters";
+import { computePairsReliability } from "@/lib/researchReliability";
 import { useTranslation } from "@/lib/i18n";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { QuantLabEmptyState, QuantLabTabLayout } from "./QuantLabTabShell";
+import { ResearchReliabilityCard } from "./ResearchReliabilityCard";
 
 export function PairsTab() {
   const { t } = useTranslation();
@@ -44,10 +46,15 @@ export function PairsTab() {
 
   const pairs = result?.pairs ?? [];
   const notes = result?.notes ?? [];
+  const reliability = useMemo(
+    () => computePairsReliability({ result, running }),
+    [result, running]
+  );
 
   return (
     <QuantLabTabLayout
       title={t.quantLab.tabPairs}
+      reliability={<ResearchReliabilityCard score={reliability} />}
       statusBadge={<ResearchOnlyBadge tooltip={t.product.researchOnlyTooltip} />}
       description={
         <TooltipLabel label={t.quantLab.hintPairs} tooltip={t.quantLab.cointegrationTooltip} />

@@ -1,56 +1,80 @@
 "use client";
 
 import { QuantHealthCard } from "@/components/quant/QuantHealthCard";
-import { getSchedulerStatus } from "@/lib/api";
-import { parseApiError } from "@/lib/apiError";
+import { getQuantHealthSummary, getSchedulerStatus } from "@/lib/api";
 import { countFailedSchedulerJobs } from "@/lib/quantLabStability";
+import { computeDataQualityReliability } from "@/lib/researchReliability";
+import type { QuantHealthSummary, SchedulerStatusResponse } from "@/lib/types";
 import { useTranslation } from "@/lib/i18n";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { QuantLabEmptyState, QuantLabTabLayout, TabRefreshRow } from "./QuantLabTabShell";
+import { ResearchReliabilityCard } from "./ResearchReliabilityCard";
 
 export function DataQualityTab() {
   const { t } = useTranslation();
+  const [health, setHealth] = useState<QuantHealthSummary | null>(null);
+  const [scheduler, setScheduler] = useState<SchedulerStatusResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [h, s] = await Promise.allSettled([getQuantHealthSummary(), getSchedulerStatus()]);
+    setHealth(h.status === "fulfilled" ? h.value : null);
+    setScheduler(s.status === "fulfilled" ? s.value : null);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const failedJobCount = countFailedSchedulerJobs(scheduler?.recent_jobs ?? []);
+  const reliability = useMemo(
+    () => computeDataQualityReliability({ health, scheduler, failedJobCount, loading }),
+    [health, scheduler, failedJobCount, loading]
+  );
+
   return (
     <QuantLabTabLayout
       title={t.quantLab.tabDataQuality}
       description={t.quantLab.hintDataQuality}
+      reliability={<ResearchReliabilityCard score={reliability} />}
     >
       <QuantHealthCard embedded />
-      <SchedulerPanel />
+      <SchedulerPanel scheduler={scheduler} loading={loading} onRefresh={load} failedJobCount={failedJobCount} />
     </QuantLabTabLayout>
   );
 }
 
-function SchedulerPanel() {
+function SchedulerPanel({
+  scheduler,
+  loading,
+  onRefresh,
+  failedJobCount,
+}: {
+  scheduler: SchedulerStatusResponse | null;
+  loading: boolean;
+  onRefresh: () => void;
+  failedJobCount: number;
+}) {
   const { t } = useTranslation();
-  const [status, setStatus] = useState<Awaited<ReturnType<typeof getSchedulerStatus>> | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(() => {
-    setLoading(true);
-    setError(null);
-    getSchedulerStatus()
-      .then(setStatus)
-      .catch((e) => {
-        setStatus(null);
-        setError(parseApiError(e, t.settings.schedulerUnavailable));
-      })
-      .finally(() => setLoading(false));
-  }, [t.settings.schedulerUnavailable]);
-
   useEffect(() => {
-    load();
-  }, [load]);
+    if (!loading && !scheduler) {
+      setError(t.settings.schedulerUnavailable);
+    } else {
+      setError(null);
+    }
+  }, [loading, scheduler, t.settings.schedulerUnavailable]);
 
-  const jobs = status?.recent_jobs ?? [];
-  const failedCount = countFailedSchedulerJobs(jobs);
+  const jobs = scheduler?.recent_jobs ?? [];
 
   return (
     <div className="surface-card p-4 space-y-2">
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-zinc-200">{t.settings.schedulerTitle}</h3>
-        <TabRefreshRow onRefresh={load} />
+        <TabRefreshRow onRefresh={onRefresh} />
       </div>
       {loading && <p className="text-xs text-zinc-500">{t.common.loading}</p>}
       {error && (
@@ -58,14 +82,14 @@ function SchedulerPanel() {
           {t.quantLab.schedulerUnavailableWarning}: {error}
         </p>
       )}
-      {!loading && status && (
+      {!loading && scheduler && (
         <>
           <p className="text-xs text-zinc-500">
-            {status.enabled ? t.settings.schedulerOn : t.settings.schedulerOff}
+            {scheduler.enabled ? t.settings.schedulerOn : t.settings.schedulerOff}
           </p>
-          {failedCount > 0 && (
+          {failedJobCount > 0 && (
             <p className="text-xs text-amber-300">
-              {t.quantLab.schedulerFailedJobs.replace("{count}", String(failedCount))}
+              {t.quantLab.schedulerFailedJobs.replace("{count}", String(failedJobCount))}
             </p>
           )}
           {jobs.length === 0 ? (
@@ -81,7 +105,7 @@ function SchedulerPanel() {
           )}
         </>
       )}
-      {!loading && !status && !error && (
+      {!loading && !scheduler && !error && (
         <p className="text-xs text-zinc-500">{t.settings.schedulerUnavailable}</p>
       )}
     </div>

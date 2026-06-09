@@ -16,7 +16,7 @@ From one UI, you can:
 2. **Scan** a bucket and rank candidates (`/scan`)
 3. **Workspace** — watchlist, single-symbol analyze (primary score from `/api/v2/score` when enabled), compare peers, trade journal (`/workspace`)
 4. **Portfolio** — basket weight optimization and rebalance policy backtests (`/portfolio`)
-5. **Quant Lab** — latest evidence cards (factor IC, walk-forward, predictions, jobs), validation tabs, research on demand (`/quant-lab`)
+5. **Quant Lab** — latest evidence cards, **Research Reliability** scores per tab, validation tabs, research on demand (`/quant-lab`)
 6. **Library** — saved scans, research reports, analyze snapshots (`/library`)
 7. **Settings** — language, API providers, ops (`/settings`)
 8. **Trader Intel** — style presets and bucket tilts (`/trader-intel`, secondary nav link)
@@ -32,7 +32,7 @@ Top navigation: **Home · Scan · Workspace · Portfolio · Quant Lab · Library
 | **Affects live rankings** | Yes (on new scan) | No | **No** — validation only |
 | **Heavy jobs** | Scan button only | Analyze on open | Run buttons only |
 
-**Flow:** Market Data → ScoringEngine → Scan Results → Workspace. Quant Lab validates factors, weights, and outcomes to inform *future* changes — not today's live ranking.
+**Flow:** Market Data → ScoringEngine → Scan Results → Workspace. Quant Lab validates factors, weights, and outcomes to inform *future* changes — not today's live ranking. Each tab shows a Research Reliability score (see [docs/RESEARCH_RELIABILITY.md](docs/RESEARCH_RELIABILITY.md)).
 
 **Wiring in progress:** allocation recommendation, LEAN export. See [Quant Lab docs](docs/QUANT_LAB.md).
 
