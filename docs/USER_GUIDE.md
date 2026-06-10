@@ -11,6 +11,7 @@ This guide is the **mental map** for the project. Use it when the app feels crow
 | OpenAlpha-inspired research factors | [OPENALPHA_INTEGRATION.md](OPENALPHA_INTEGRATION.md) |
 | API keys & toggles | [RUNBOOK.md](RUNBOOK.md) |
 | Business meaning of Analyze tabs | [ANALYZE_PANEL.md](ANALYZE_PANEL.md) |
+| **Every Analyze stat explained** | [ANALYZE_PANEL_STATS_GUIDE.md](ANALYZE_PANEL_STATS_GUIDE.md) |
 | Full product route list | [PROJECT_INVENTORY.md](PROJECT_INVENTORY.md) |
 | Future / institutional design | [INSTITUTIONAL_QUANT_ARCHITECTURE.md](INSTITUTIONAL_QUANT_ARCHITECTURE.md) — *reference, not daily* |
 | Round 2 engineering backlog | [ROUND2_REMAINING_WORK.md](ROUND2_REMAINING_WORK.md) — *for builders* |
@@ -51,7 +52,7 @@ Library (/library) → saved scans & reports
 Portfolio (/portfolio) → basket weights & policy backtest (optional)
 ```
 
-Inside **Research → Analyze**, use the **Insights** tab for v2 recommendation, valuation, similar-signal, and position sizing (visible on all screen sizes; the right sidebar keeps technicals and factor weights).
+Inside **Research → Analyze**, use **Overview** for v2 recommendation, valuation, similar-signal, and position sizing (visible on all screen sizes; the right sidebar keeps technicals and factor weights).
 
 Everything else is **secondary**:
 
@@ -109,15 +110,19 @@ Inside **Research → Analyze**, tabs are ordered by **how often you need them**
 
 | Tab | Read when… | Skip when… |
 |-----|------------|------------|
-| **Overview** | Always — score summary + your notes | — |
-| **Insights** | Recommendation, valuation, sizing, similar-signal | Penny scalps where headline score is enough |
-| **Quant** | Factor breakdown & bucket fit chart | You trust the headline score |
-| **Chart** | Checking trend / MAs | You already know the chart |
-| **Data** | Data-quality / reconcile doubts | Score is high and stable |
+| **Overview** | Always — v2 recommendation, valuation, sizing, chart | — |
+| **Score breakdown** | Which factors drove the score | You trust the headline score |
+| **Risk** | Volatility, liquidity, event risk before sizing | Penny scalp with fixed size |
+| **Diagnostics** | Is the price series momentum or noise? | You only care about fundamentals |
+| **Valuation** | DCF / peer fair value / margin of safety | Penny momentum-only |
 | **Backtest** | Validating a rule-based story | Short-term penny flip |
+| **Similar signal** | Historical analog context (research only) | You want live signals only |
 | **Report** | Writing up a thesis for Library | Quick watchlist check |
+| **Notes** | Your personal thesis / reminders | — |
 
-**Round 2 quant block** (Insights tab + sidebar technicals): recommendation, valuation, earnings, similar-signal — use for **medium/compounder** decisions; optional noise for penny scalps.
+**Sidebar (desktop):** technicals, bucket fit, and signal weights on every tab.
+
+Full stat definitions: [ANALYZE_PANEL_STATS_GUIDE.md](ANALYZE_PANEL_STATS_GUIDE.md).
 
 ---
 
@@ -129,7 +134,7 @@ The score is a **weighted blend** of factors (momentum, volume, RS vs SPY, senti
 
 **Simplify:**
 
-- Trust **top 2–3 signals** in Quant tab + **risk level** chip.
+- Trust **top 2–3 signals** in Score breakdown tab + **risk level** chip.
 - Ignore experimental factors unless `OPENALPHA_FACTORS_ENABLED=true` ([OPENALPHA_INTEGRATION.md](OPENALPHA_INTEGRATION.md)).
 
 ### Problem: Sector / industry everywhere
@@ -191,7 +196,7 @@ Check **Data quality %** badge; below ~60%, treat fundamentals and LLM as weak.
 
 ## 8. Language
 
-Gear icon (top right) → **English** / **中文**. UI chrome translates; API-generated report text stays in the language the backend returns.
+Gear icon (top right) → **English** / **中文**. UI labels and buttons translate instantly — **scores, scans, and analysis data are not re-fetched** when you switch language. API-generated report or pick-summary text stays in the language it was generated until you explicitly request a new run.
 
 ---
 

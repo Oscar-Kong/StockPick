@@ -37,7 +37,7 @@ import type {
   UnifiedRiskV2,
   V2ScoreResponse,
 } from "@/lib/types";
-import { useTranslation } from "@/lib/i18n";
+import { useTranslation, useTRef } from "@/lib/i18n";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -67,6 +67,7 @@ export function StockDetailDrawer({
   onClose,
 }: StockDetailDrawerProps) {
   const { t } = useTranslation();
+  const tRef = useTRef();
   const [tab, setTab] = useState<DrawerTab>("summary");
   const [detail, setDetail] = useState<StockDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -132,7 +133,7 @@ export function StockDetailDrawer({
         try {
           setV2Score(await getV2Score(stock.symbol, bucket));
         } catch (e) {
-          setV2Error(e instanceof Error ? e.message : t.scanDrawer.loadFailed);
+          setV2Error(e instanceof Error ? e.message : tRef.current.scanDrawer.loadFailed);
         } finally {
           setV2Loading(false);
         }
@@ -143,7 +144,7 @@ export function StockDetailDrawer({
         try {
           setRisk(await getV2UnifiedRisk(stock.symbol, bucket));
         } catch (e) {
-          setRiskError(e instanceof Error ? e.message : t.scanDrawer.loadFailed);
+          setRiskError(e instanceof Error ? e.message : tRef.current.scanDrawer.loadFailed);
         } finally {
           setRiskLoading(false);
         }
@@ -154,7 +155,7 @@ export function StockDetailDrawer({
         try {
           setDiagnostics(await getSymbolDiagnostics(stock.symbol));
         } catch (e) {
-          setDiagError(e instanceof Error ? e.message : t.scanDrawer.loadFailed);
+          setDiagError(e instanceof Error ? e.message : tRef.current.scanDrawer.loadFailed);
         } finally {
           setDiagLoading(false);
         }
@@ -166,7 +167,7 @@ export function StockDetailDrawer({
           const res = await getV2SimilarSignal(stock.symbol, bucket);
           setSimilar(res);
         } catch (e) {
-          setSimilarError(e instanceof Error ? e.message : t.scanDrawer.loadFailed);
+          setSimilarError(e instanceof Error ? e.message : tRef.current.scanDrawer.loadFailed);
         } finally {
           setSimilarLoading(false);
         }
@@ -177,13 +178,13 @@ export function StockDetailDrawer({
         try {
           setReport(await getResearchReport(stock.symbol, bucket));
         } catch (e) {
-          setReportError(e instanceof Error ? e.message : t.scanDrawer.loadFailed);
+          setReportError(e instanceof Error ? e.message : tRef.current.scanDrawer.loadFailed);
         } finally {
           setReportLoading(false);
         }
       }
     },
-    [stock, bucket, t.scanDrawer.loadFailed]
+    [stock, bucket]
   );
 
   useEffect(() => {

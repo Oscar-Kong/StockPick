@@ -14,7 +14,7 @@ import {
   parseApiDate,
   toDatetimeLocalValue,
 } from "@/lib/datetime";
-import { useTranslation } from "@/lib/i18n";
+import { useTranslation, useTRef } from "@/lib/i18n";
 import type { TradeCreateRequest, TradeItem, TradeStatsResponse } from "@/lib/types";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -49,6 +49,7 @@ type SortDirection = "asc" | "desc";
 
 export function TradeJournal({ embedded = false }: { embedded?: boolean }) {
   const { t } = useTranslation();
+  const tRef = useTRef();
   const [trades, setTrades] = useState<TradeItem[]>([]);
   const [stats, setStats] = useState<TradeStatsResponse | null>(null);
   const [manual, setManual] = useState<TradeCreateRequest>(defaultManual);
@@ -68,9 +69,9 @@ export function TradeJournal({ embedded = false }: { embedded?: boolean }) {
   useEffect(() => {
     reload().catch(() => {
       setStatusTone("error");
-      setStatus(t.journal.loadFailed);
+      setStatus(tRef.current.journal.loadFailed);
     });
-  }, [reload, t.journal.loadFailed]);
+  }, [reload]);
 
   const submitManual = async () => {
     if (!manual.symbol || !manual.entry_price) {

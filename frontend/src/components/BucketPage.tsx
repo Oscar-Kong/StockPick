@@ -11,7 +11,7 @@ import {
   startScan,
 } from "@/lib/api";
 import { getBucketMeta } from "@/lib/buckets";
-import { fmt, useTranslation } from "@/lib/i18n";
+import { fmt, useTranslation, useTRef } from "@/lib/i18n";
 import type { Bucket, SavedScanItem, ScanOptions, ScanParitySummary, StockResult } from "@/lib/types";
 import { formatDateTime } from "@/lib/datetime";
 import { isStaleTimestamp } from "@/lib/quantHealth";
@@ -36,6 +36,7 @@ interface BucketPageProps {
 
 export function BucketPage({ bucket, title, description, embedded }: BucketPageProps) {
   const { t } = useTranslation();
+  const tRef = useTRef();
   const meta = getBucketMeta(t)[bucket];
   const displayTitle = title ?? meta.title;
   const displayDescription = description ?? meta.description;
@@ -80,11 +81,11 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
       setScoringEngineUsed(data.scoring_engine_used ?? null);
       setParitySummary(data.parity_summary ?? null);
       setStatus("completed");
-      setMessage(fmt(t.scan.loadedResults, { count: data.results.length }));
+      setMessage(fmt(tRef.current.scan.loadedResults, { count: data.results.length }));
     } catch {
-      setMessage(t.scan.noLatestScan);
+      setMessage(tRef.current.scan.noLatestScan);
     }
-  }, [bucket, t]);
+  }, [bucket]);
 
   useEffect(() => {
     if (latestScanLoadedRef.current) return;
@@ -108,10 +109,10 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
     const hasPreset = Boolean(maxResults || minPrice || maxPrice || minVolume);
     if (hasPreset) {
       setOptions(next);
-      setMessage(t.scan.presetLoaded);
+      setMessage(tRef.current.scan.presetLoaded);
       presetLoadedRef.current = true;
     }
-  }, [bucket, options, searchParams, t]);
+  }, [bucket, options, searchParams]);
 
   useEffect(() => {
     void loadSavedScans();

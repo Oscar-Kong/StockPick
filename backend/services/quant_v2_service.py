@@ -365,7 +365,7 @@ def build_v2_score(
         sleeve=sleeve,
         score=final,
         market_regime=regime_name,
-        dynamic_weights=DYNAMIC_WEIGHTS_ENABLED,
+        dynamic_weights=bool(DYNAMIC_WEIGHTS_ENABLED),
         position_sizing=sizing_payload,
         recommendation=recommendation_payload,
         valuation=valuation_payload,

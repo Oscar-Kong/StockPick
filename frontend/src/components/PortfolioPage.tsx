@@ -13,7 +13,7 @@ import type {
   PortfolioOptimizeResponse,
   PortfolioPolicyBacktestResponse,
 } from "@/lib/types";
-import { fmt, useTranslation } from "@/lib/i18n";
+import { fmt, useTranslation, useTRef } from "@/lib/i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppTabBar, AppTabButton } from "./AppTabs";
 import { ChartMount } from "./ChartMount";
@@ -38,6 +38,7 @@ function parseSymbols(raw: string): string[] {
 
 export function PortfolioPage() {
   const { t } = useTranslation();
+  const tRef = useTRef();
   const [panel, setPanel] = useState<PanelTab>("optimize");
   const [symbolInput, setSymbolInput] = useState("");
   const [watchlistSyms, setWatchlistSyms] = useState<string[]>([]);
@@ -89,7 +90,7 @@ export function PortfolioPage() {
 
   const runExposure = useCallback(async () => {
     if (symbols.length < 2) {
-      setExposureError(t.portfolio.needTwoSymbols);
+      setExposureError(tRef.current.portfolio.needTwoSymbols);
       return;
     }
     if (exposureCacheRef.current?.key === exposureKey) {
@@ -112,11 +113,11 @@ export function PortfolioPage() {
     } catch (err) {
       setExposureResult(null);
       setExposureResultKey(null);
-      setExposureError(err instanceof Error ? err.message : t.portfolio.exposureFailed);
+      setExposureError(err instanceof Error ? err.message : tRef.current.portfolio.exposureFailed);
     } finally {
       setExposureLoading(false);
     }
-  }, [symbols, exposureKey, lookback, t]);
+  }, [symbols, exposureKey, lookback]);
 
   useEffect(() => {
     if (panel !== "exposure" || symbols.length < 2) return;

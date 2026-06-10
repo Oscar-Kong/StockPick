@@ -3,7 +3,7 @@
 
 import { getTraderPreset, getTraderQuickCompare, listTraderIntelProfiles } from "@/lib/api";
 import { formatDateTime } from "@/lib/datetime";
-import { fmt, useTranslation } from "@/lib/i18n";
+import { fmt, useTranslation, useTRef } from "@/lib/i18n";
 import type { Bucket, TraderProfileItem, TraderQuickCompareResponse } from "@/lib/types";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -17,6 +17,7 @@ function reliabilityTone(value: string): string {
 
 export default function TraderIntelPage() {
   const { t } = useTranslation();
+  const tRef = useTRef();
   const [profiles, setProfiles] = useState<TraderProfileItem[]>([]);
   const [notes, setNotes] = useState<string[]>([]);
   const [collectedAt, setCollectedAt] = useState<string>("");
@@ -39,9 +40,9 @@ export default function TraderIntelPage() {
         });
         setSelectedBucketBySlug(bucketMap);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : t.traderIntel.loadFailed))
+      .catch((err) => setError(err instanceof Error ? err.message : tRef.current.traderIntel.loadFailed))
       .finally(() => setLoading(false));
-  }, [t.traderIntel.loadFailed]);
+  }, []);
 
   return (
     <div className="space-y-6">

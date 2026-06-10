@@ -42,6 +42,8 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     setLocaleState(next);
   }, []);
 
+  // `en` / `zh` are module singletons — switching locale re-renders UI only.
+  // Do not put `t` in useEffect deps; use useTRef() for error strings in fetch handlers.
   const t = locale === "zh" ? zh : en;
 
   const value = useMemo(() => ({ locale, setLocale, t }), [locale, setLocale, t]);

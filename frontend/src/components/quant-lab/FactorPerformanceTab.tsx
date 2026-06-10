@@ -2,7 +2,7 @@
 
 import { getV2FactorPerformance } from "@/lib/api";
 import { isFeatureDisabledError, parseApiError } from "@/lib/apiError";
-import { useTranslation } from "@/lib/i18n";
+import { useTranslation, useTRef } from "@/lib/i18n";
 import {
   factorPerformanceRows,
   primaryFactorHorizon,
@@ -28,6 +28,7 @@ import {
 
 export function FactorPerformanceTab() {
   const { t } = useTranslation();
+  const tRef = useTRef();
   const [data, setData] = useState<Awaited<ReturnType<typeof getV2FactorPerformance>> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +42,7 @@ export function FactorPerformanceTab() {
     try {
       setData(await getV2FactorPerformance({ sleeve }));
     } catch (e) {
-      const msg = parseApiError(e, t.quantLab.loadFailed);
+      const msg = parseApiError(e, tRef.current.quantLab.loadFailed);
       if (isFeatureDisabledError(msg)) {
         setDisabled(true);
         setData(null);
@@ -52,7 +53,7 @@ export function FactorPerformanceTab() {
     } finally {
       setLoading(false);
     }
-  }, [sleeve, t.quantLab.loadFailed]);
+  }, [sleeve]);
 
   useEffect(() => {
     void load();

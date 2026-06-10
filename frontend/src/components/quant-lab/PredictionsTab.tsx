@@ -11,7 +11,7 @@ import {
   predictionDisplayScore,
   predictionReturnPct,
 } from "@/lib/predictions";
-import { useTranslation } from "@/lib/i18n";
+import { useTranslation, useTRef } from "@/lib/i18n";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { computePredictionsReliability } from "@/lib/researchReliability";
 import { TooltipLabel } from "@/components/ui/TooltipLabel";
@@ -26,6 +26,7 @@ import {
 
 export function PredictionsTab() {
   const { t } = useTranslation();
+  const tRef = useTRef();
   const [predictions, setPredictions] = useState<Awaited<ReturnType<typeof getV2Predictions>>["predictions"]>([]);
   const [feedback, setFeedback] = useState<Awaited<ReturnType<typeof getV2FeedbackSummary>> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,7 +46,7 @@ export function PredictionsTab() {
       setPredictions(p.value.predictions ?? []);
     } else {
       setPredictions([]);
-      const msg = parseApiError(p.reason, t.quantLab.loadFailed);
+      const msg = parseApiError(p.reason, tRef.current.quantLab.loadFailed);
       if (isFeatureDisabledError(msg)) setDisabled(true);
       else setPredictionsError(msg);
     }
@@ -54,13 +55,13 @@ export function PredictionsTab() {
       setFeedback(f.value);
     } else {
       setFeedback(null);
-      const msg = parseApiError(f.reason, t.quantLab.loadFailed);
+      const msg = parseApiError(f.reason, tRef.current.quantLab.loadFailed);
       if (isFeatureDisabledError(msg)) setDisabled(true);
       else setFeedbackError(msg);
     }
 
     setLoading(false);
-  }, [t.quantLab.loadFailed]);
+  }, []);
 
   useEffect(() => {
     void load();

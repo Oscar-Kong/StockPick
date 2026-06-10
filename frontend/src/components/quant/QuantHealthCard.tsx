@@ -2,7 +2,7 @@
 
 import { getQuantHealthSummary } from "@/lib/api";
 import type { QuantHealthSummary } from "@/lib/types";
-import { useTranslation } from "@/lib/i18n";
+import { useTranslation, useTRef } from "@/lib/i18n";
 import { useCallback, useEffect, useState } from "react";
 import { HealthStatusBadge } from "@/components/badges/HealthStatusBadge";
 import { ErrorState } from "@/components/ui/ErrorState";
@@ -12,6 +12,7 @@ import Link from "next/link";
 
 export function QuantHealthCard({ embedded = false }: { embedded?: boolean }) {
   const { t } = useTranslation();
+  const tRef = useTRef();
   const [data, setData] = useState<QuantHealthSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -22,12 +23,12 @@ export function QuantHealthCard({ embedded = false }: { embedded?: boolean }) {
     try {
       setData(await getQuantHealthSummary());
     } catch (e) {
-      setError(e instanceof Error ? e.message : t.quantHealth.loadFailed);
+      setError(e instanceof Error ? e.message : tRef.current.quantHealth.loadFailed);
       setData(null);
     } finally {
       setLoading(false);
     }
-  }, [t.quantHealth.loadFailed]);
+  }, []);
 
   useEffect(() => {
     void load();

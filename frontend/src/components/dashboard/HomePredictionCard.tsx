@@ -13,12 +13,13 @@ import {
   isPredictionResolved,
   predictionReturnPct,
 } from "@/lib/predictions";
-import { useTranslation } from "@/lib/i18n";
+import { useTranslation, useTRef } from "@/lib/i18n";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 export function HomePredictionCard() {
   const { t } = useTranslation();
+  const tRef = useTRef();
   const [predictions, setPredictions] = useState<PredictionSnapshotItem[]>([]);
   const [feedback, setFeedback] = useState<FeedbackSummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,18 +39,18 @@ export function HomePredictionCard() {
         setPredictions(pred.value.predictions ?? []);
       } else {
         setPredictions([]);
-        const msg = parseApiError(pred.reason, t.home.predictionsFailed);
+        const msg = parseApiError(pred.reason, tRef.current.home.predictionsFailed);
         if (isFeatureDisabledError(msg)) setDisabled(true);
         else setError(msg);
       }
       if (fb.status === "fulfilled") setFeedback(fb.value);
       else setFeedback(null);
     } catch (e) {
-      setError(parseApiError(e, t.home.predictionsFailed));
+      setError(parseApiError(e, tRef.current.home.predictionsFailed));
     } finally {
       setLoading(false);
     }
-  }, [t.home.predictionsFailed]);
+  }, []);
 
   useEffect(() => {
     void load();

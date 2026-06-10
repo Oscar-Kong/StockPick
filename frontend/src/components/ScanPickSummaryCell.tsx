@@ -1,7 +1,7 @@
 "use client";
 
 import { getScanPickSummary } from "@/lib/api";
-import { useTranslation } from "@/lib/i18n";
+import { useTranslation, useTRef } from "@/lib/i18n";
 import type { ScanPickSummaryResponse, StockResult } from "@/lib/types";
 import clsx from "clsx";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -20,19 +20,16 @@ function blurb(stock: StockResult): string {
 
 export function ScanPickSummaryCell({ stock, variant = "table" }: ScanPickSummaryCellProps) {
   const { locale, t } = useTranslation();
+  const tRef = useTRef();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ScanPickSummaryResponse | null>(null);
+  const fetchedLocaleRef = useRef<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    setData(null);
-    setOpen(false);
-  }, [locale, stock.symbol]);
-
   const load = useCallback(async () => {
-    if (data) {
+    if (data && fetchedLocaleRef.current === locale) {
       setOpen(true);
       return;
     }
@@ -41,14 +38,15 @@ export function ScanPickSummaryCell({ stock, variant = "table" }: ScanPickSummar
     try {
       const res = await getScanPickSummary(stock.bucket, stock, locale);
       setData(res);
+      fetchedLocaleRef.current = locale;
       setOpen(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.scan.summaryUnavailable);
+      setError(err instanceof Error ? err.message : tRef.current.scan.summaryUnavailable);
       setOpen(true);
     } finally {
       setLoading(false);
     }
-  }, [data, stock, locale, t.scan.summaryUnavailable]);
+  }, [data, stock, locale, tRef]);
 
   useEffect(() => {
     if (!open) return;

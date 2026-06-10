@@ -6,12 +6,13 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 import { TooltipLabel } from "@/components/ui/TooltipLabel";
 import { getV2Regime, getV2SleeveWeights } from "@/lib/api";
 import type { MarketRegimeV2, SleeveWeightsV2 } from "@/lib/types";
-import { useTranslation } from "@/lib/i18n";
+import { useTranslation, useTRef } from "@/lib/i18n";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 export function HomeRegimeCard() {
   const { t } = useTranslation();
+  const tRef = useTRef();
   const [regime, setRegime] = useState<MarketRegimeV2 | null>(null);
   const [weights, setWeights] = useState<SleeveWeightsV2 | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,12 +29,12 @@ export function HomeRegimeCard() {
       setRegime(r.status === "fulfilled" ? r.value : null);
       setWeights(w.status === "fulfilled" ? w.value : null);
       if (r.status === "rejected" && w.status === "rejected") {
-        setError(t.home.regimeUnavailable);
+        setError(tRef.current.home.regimeUnavailable);
       }
     } finally {
       setLoading(false);
     }
-  }, [t.home.regimeUnavailable]);
+  }, []);
 
   useEffect(() => {
     void load();

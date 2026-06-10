@@ -4,7 +4,7 @@ import { getQuantLabEvidence } from "@/lib/api";
 import { parseApiError } from "@/lib/apiError";
 import { evidenceCards } from "@/lib/quantLabLastRun";
 import type { Bucket, QuantLabEvidenceResponse } from "@/lib/types";
-import { useTranslation } from "@/lib/i18n";
+import { useTranslation, useTRef } from "@/lib/i18n";
 import { useCallback, useEffect, useState } from "react";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
@@ -33,6 +33,7 @@ const CARD_TITLE_KEYS = {
 
 export function QuantLabEvidencePanel({ sleeve = "medium", onNavigateTab }: QuantLabEvidencePanelProps) {
   const { t } = useTranslation();
+  const tRef = useTRef();
   const [data, setData] = useState<QuantLabEvidenceResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,11 +45,11 @@ export function QuantLabEvidencePanel({ sleeve = "medium", onNavigateTab }: Quan
       setData(await getQuantLabEvidence(sleeve));
     } catch (e) {
       setData(null);
-      setError(parseApiError(e, t.quantLab.loadFailed));
+      setError(parseApiError(e, tRef.current.quantLab.loadFailed));
     } finally {
       setLoading(false);
     }
-  }, [sleeve, t.quantLab.loadFailed]);
+  }, [sleeve]);
 
   useEffect(() => {
     void load();

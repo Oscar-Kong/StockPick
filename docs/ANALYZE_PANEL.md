@@ -2,6 +2,8 @@
 
 How to read and use **Workspace → Research** (single-stock underwriting). This is written for investors and operators, not developers.
 
+**For a complete dictionary of every stat, badge, and tab field**, see **[ANALYZE_PANEL_STATS_GUIDE.md](ANALYZE_PANEL_STATS_GUIDE.md)**.
+
 ---
 
 ## Purpose
@@ -106,14 +108,23 @@ The **headline score** can differ slightly from the sum of bars because steps 3�
 
 ## Views (when to use each)
 
-| View | Use for |
-|------|---------|
-| **Overview** | Summary, your notes, optional AI narrative |
-| **Quant** | Which factors drove the score; bucket fit on small screens |
-| **Data** | Verify P/E, market cap, etc. before size |
-| **Chart** | ~6 months daily closes — visual check |
+Current Analyze tabs (left panel):
+
+| Tab | Use for |
+|-----|---------|
+| **Overview** | v2 recommendation, valuation, earnings, sizing, chart, similar-signal summary |
+| **Score breakdown** | Factor table + contribution bars — which inputs drove the score |
+| **Risk** | Volatility, liquidity, macro, event risk, risk index |
+| **Diagnostics** | Return distribution stats (momentum vs mean reversion vs noise) |
+| **Valuation** | DCF / peer fair value, margin of safety, sensitivity grid |
 | **Backtest** | Historical rule-based strategy test (not a forecast) |
-| **Report** | Structured memo; save to Library |
+| **Similar signal** | Research-only historical analogs |
+| **Report** | LLM structured memo; save to Library |
+| **Notes** | Your watchlist notes |
+
+**Sidebar (desktop):** technicals, data quality, bucket fit, and signal weights — visible on all tabs.
+
+See [ANALYZE_PANEL_STATS_GUIDE.md](ANALYZE_PANEL_STATS_GUIDE.md) for field-by-field definitions.
 
 **Compare** (Workspace tab) ranks 2–4 tickers quickly; **Analyze** is full underwriting for one name.
 

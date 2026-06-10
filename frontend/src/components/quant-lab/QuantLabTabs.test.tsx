@@ -11,6 +11,7 @@ import * as api from "@/lib/api";
 
 vi.mock("@/lib/i18n", () => ({
   useTranslation: () => ({ t: en, locale: "en" }),
+  useTRef: () => ({ current: en }),
 }));
 
 vi.mock("@/components/quant/QuantHealthCard", () => ({

@@ -11,7 +11,7 @@ import { getBucketMeta } from "@/lib/buckets";
 import { formatDateTime } from "@/lib/datetime";
 import { isStaleTimestamp } from "@/lib/quantHealth";
 import type { Bucket, LatestScanResponse } from "@/lib/types";
-import { fmt, useTranslation } from "@/lib/i18n";
+import { fmt, useTranslation, useTRef } from "@/lib/i18n";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
@@ -20,6 +20,7 @@ const STALE_MS = 24 * 60 * 60 * 1000;
 
 export function HomeScanSummary() {
   const { t } = useTranslation();
+  const tRef = useTRef();
   const bucketMeta = getBucketMeta(t);
   const [scans, setScans] = useState<Partial<Record<Bucket, LatestScanResponse>>>({});
   const [loading, setLoading] = useState(true);
@@ -37,11 +38,11 @@ export function HomeScanSummary() {
       });
       setScans(next);
     } catch (e) {
-      setError(e instanceof Error ? e.message : t.home.scanSummaryFailed);
+      setError(e instanceof Error ? e.message : tRef.current.home.scanSummaryFailed);
     } finally {
       setLoading(false);
     }
-  }, [t.home.scanSummaryFailed]);
+  }, []);
 
   useEffect(() => {
     void load();

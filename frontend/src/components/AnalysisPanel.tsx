@@ -14,7 +14,7 @@ import {
   updateWatchlistNotes,
 } from "@/lib/api";
 import { getBucketMeta } from "@/lib/buckets";
-import { useTranslation } from "@/lib/i18n";
+import { useTranslation, useTRef } from "@/lib/i18n";
 import type { AnalyzeSymbolResponse, Bucket, PositionSizingV2, StockResearchReport, SymbolDiagnosticsResponse, UnifiedRiskV2, V2ScoreResponse } from "@/lib/types";
 import clsx from "clsx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -102,6 +102,7 @@ export function AnalysisPanel({
   embedded = false,
 }: AnalysisPanelProps) {
   const { t } = useTranslation();
+  const tRef = useTRef();
   const bucketMeta = getBucketMeta(t);
 
   const tabLabels = useMemo(
@@ -193,7 +194,7 @@ export function AnalysisPanel({
         setData(res);
       } catch (err) {
         if (ac.signal.aborted || gen !== loadGenRef.current) return;
-        setError(err instanceof Error ? err.message : t.analysis.failed);
+        setError(err instanceof Error ? err.message : tRef.current.analysis.failed);
         setData(null);
       } finally {
         if (gen === loadGenRef.current) setLoading(false);
@@ -201,7 +202,7 @@ export function AnalysisPanel({
     })();
 
     return () => ac.abort();
-  }, [symbol, bucket, initialNotes, t]);
+  }, [symbol, bucket, initialNotes]);
 
   useEffect(() => {
     if (!data || data.symbol !== symbol) return;
@@ -247,7 +248,7 @@ export function AnalysisPanel({
             })
             .catch((err) => {
               if (ac.signal.aborted) return;
-              const msg = err instanceof Error ? err.message : t.analysis.sizingUnavailable;
+              const msg = err instanceof Error ? err.message : tRef.current.analysis.sizingUnavailable;
               if (!msg.includes("503")) setSizingError(msg);
               setPositionSizing(null);
             })
@@ -267,7 +268,7 @@ export function AnalysisPanel({
         if (!ac.signal.aborted) setV2Loading(false);
       });
     return () => ac.abort();
-  }, [data, symbol, bucket, t]);
+  }, [data, symbol, bucket]);
 
   const retryDiagnostics = useCallback(() => {
     diagnosticsOkRef.current = null;
@@ -296,7 +297,7 @@ export function AnalysisPanel({
         })
         .catch((err) => {
           if (ac.signal.aborted) return;
-          setDiagnosticsError(err instanceof Error ? err.message : t.analysis.failed);
+          setDiagnosticsError(err instanceof Error ? err.message : tRef.current.analysis.failed);
         })
         .finally(() => {
           if (!ac.signal.aborted) setDiagnosticsLoading(false);
@@ -314,10 +315,10 @@ export function AnalysisPanel({
         })
         .catch((err) => {
           if (ac.signal.aborted) return;
-          const msg = err instanceof Error ? err.message : t.analysis.failed;
+          const msg = err instanceof Error ? err.message : tRef.current.analysis.failed;
           setRiskError(
             msg.includes("503") || msg.toLowerCase().includes("score_engine")
-              ? t.riskPanel.v2Disabled
+              ? tRef.current.riskPanel.v2Disabled
               : msg
           );
         })
@@ -327,7 +328,7 @@ export function AnalysisPanel({
     }
 
     return () => ac.abort();
-  }, [tab, data, symbol, bucket, t, insightsRetryTick]);
+  }, [tab, data, symbol, bucket, insightsRetryTick]);
 
   useEffect(() => {
     if (tab !== "report" || !symbol) return;
@@ -363,11 +364,11 @@ export function AnalysisPanel({
       setData(res);
     } catch (err) {
       if (ac.signal.aborted || gen !== loadGenRef.current) return;
-      setError(err instanceof Error ? err.message : t.analysis.failed);
+      setError(err instanceof Error ? err.message : tRef.current.analysis.failed);
     } finally {
       if (gen === loadGenRef.current) setLoading(false);
     }
-  }, [symbol, bucket, t]);
+  }, [symbol, bucket]);
 
   const saveNotes = async () => {
     setSavingNotes(true);
