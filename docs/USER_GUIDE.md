@@ -33,7 +33,9 @@ The product focuses on **Penny** (default) and **Compounder**. Legacy **Medium**
 | **Penny** | Days → ~2 weeks | Momentum / volume / catalyst trades; **daily portfolio decisions** |
 | **Compounder** | Years | Quality growers, macro + governance matter |
 
-**Rule of thumb:** Tag each holding **penny** or **compounder** in Portfolio → Daily Decisions. The app auto-assigns penny for most short-term names.
+**Rule of thumb:** Import your Robinhood CSV on **Home** for reconstructed holdings. The app auto-assigns **penny** for most speculative names; **compounder** only for obvious long-term quality tickers.
+
+**Disclaimer:** Daily decisions are model-generated research outputs, not financial advice. Review before trading. The app does not place trades.
 
 ---
 
@@ -42,13 +44,14 @@ The product focuses on **Penny** (default) and **Compounder**. Legacy **Medium**
 You only need **five routes** for 90% of work:
 
 ```
-Home (/)           → jump in, resume last work
-Screen (/scan)     → discover ranked candidates
+Home (/)           → **Daily Decision cockpit** — Robinhood holdings, buy/keep/sell, CSV import
+Screen (/scan)     → discover ranked candidates (Penny + Compounder)
 Research (/workspace) → watchlist + deep dive + journal
 Compare (/workspace?tab=compare) → peer metrics (also in top nav)
 Journal (/workspace?tab=journal) → trade log (also in top nav)
 Library (/library) → saved scans & reports
-Portfolio (/portfolio) → basket weights & policy backtest (optional)
+Portfolio (/portfolio) → basket optimization & policy backtest (research; not daily workflow)
+Quant Lab (/quant-lab) → validation & factor research (not daily workflow)
 ```
 
 Inside **Research → Analyze**, use **Overview** for v2 recommendation, valuation, similar-signal, and position sizing (visible on all screen sizes; the right sidebar keeps technicals and factor weights).

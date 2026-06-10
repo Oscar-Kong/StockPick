@@ -43,6 +43,7 @@ from screeners.penny import PennyScreener
 from services.market_context import enrich_metrics
 from services.watchlist_scanner import analyze_symbol
 from quant_core.returns import simple_returns
+from utils.pydantic_util import model_to_dict
 
 logger = logging.getLogger(__name__)
 
@@ -169,7 +170,7 @@ def build_v2_score(
         )
         for f in scoring.factors
     ]
-    factor_dicts = [f.model_dump() for f in factors]
+    factor_dicts = [model_to_dict(f) for f in factors]
 
     weights = {f.factor_id: f.weight for f in scoring.factors}
     attribution = ScoreAttributionV2(
@@ -280,8 +281,8 @@ def build_v2_score(
             valuation=valuation_payload,
             catalyst_score=earnings_dict.get("catalyst_score") if earnings_dict else None,
             liquidity_penalty=liq_pen,
-            similar_signal=similar_payload.model_dump() if similar_payload else None,
-            portfolio_impact=portfolio_impact_payload.model_dump() if portfolio_impact_payload else None,
+            similar_signal=model_to_dict(similar_payload) if similar_payload else None,
+            portfolio_impact=model_to_dict(portfolio_impact_payload) if portfolio_impact_payload else None,
             summary=scoring.summary,
         )
         p = rec_obj.pillars.to_dict()
@@ -308,10 +309,10 @@ def build_v2_score(
                 fundamentals=ctx.fundamentals,
                 factors=factor_dicts,
                 risk_assess=risk_assess,
-                recommendation=recommendation_payload.model_dump(),
+                recommendation=model_to_dict(recommendation_payload),
                 rec=rec,
                 days_until_earnings=metrics.get("days_until_earnings"),
-                similar_signal=similar_payload.model_dump() if similar_payload else None,
+                similar_signal=model_to_dict(similar_payload) if similar_payload else None,
             )
 
         if PREDICTION_SNAPSHOTS_ENABLED and persist_snapshot:

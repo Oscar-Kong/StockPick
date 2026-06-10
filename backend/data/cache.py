@@ -7,7 +7,11 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from config import FUNDAMENTALS_CACHE_TTL, PRICE_CACHE_TTL
 from data.db_engine import get_engine
-from utils.datetime_util import utc_iso_z
+from utils.datetime_util import utc_iso_z, utc_now
+
+
+def _utcnow() -> datetime:
+    return utc_now()
 
 
 class Base(DeclarativeBase):

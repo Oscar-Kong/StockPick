@@ -950,29 +950,54 @@ class PortfolioDecisionRequest(BaseModel):
 class PortfolioDecisionItem(BaseModel):
     symbol: str
     bucket: str
-    price: float
+    price: float = 0.0
+    price_available: bool = True
     shares: float
     avg_cost: float
     market_value: float
+    pl_pct: float | None = None
     current_weight: float
     target_weight: float
     buy_pct: float
     keep_pct: float
     sell_pct: float
     decision: str
+    suggested_action: str = ""
     score: float
     risk_index: float
     suggested_dollar_action: float
     reasons: list[str] = []
     risk_flags: list[str] = []
+    # explainability / debug
+    alpha_score: float | None = None
+    momentum_score: float | None = None
+    liquidity_score: float | None = None
+    risk_score: float | None = None
+    data_quality_score: float | None = None
+    max_allowed_weight: float | None = None
+    overweight_penalty: float | None = None
+    missing_data_penalty: float | None = None
+    stop_loss_trigger: bool = False
+    final_buy_raw: float | None = None
+    final_keep_raw: float | None = None
+    final_sell_raw: float | None = None
 
 
 class PortfolioDecisionResponse(BaseModel):
     as_of: str
     cash: float
     total_value: float
+    invested_value: float = 0.0
     items: list[PortfolioDecisionItem] = []
     notes: list[str] = []
+
+
+class ClosedPositionItem(BaseModel):
+    symbol: str
+    total_bought: float = 0.0
+    total_sold: float = 0.0
+    realized_pl: float = 0.0
+    last_activity: str = ""
 
 
 class PennyOpportunityItem(BaseModel):
@@ -986,13 +1011,19 @@ class PennyOpportunityItem(BaseModel):
 class DailyDashboardResponse(BaseModel):
     portfolio_value: float = 0.0
     cash: float = 0.0
+    invested_value: float = 0.0
+    cash_pct: float = 0.0
+    active_holdings_count: int = 0
     data_source: str = "manual"
     data_source_label: str = "Manual holdings"
+    is_demo_data: bool = False
     last_brokerage_sync_at: str | None = None
     last_decision_run_at: str | None = None
     decision: PortfolioDecisionResponse | None = None
     holdings: list[dict[str, Any]] = []
+    closed_positions: list[ClosedPositionItem] = []
     top_penny_opportunities: list[PennyOpportunityItem] = []
+    risk_alerts: list[str] = []
     portfolio_warnings: list[str] = []
     disclaimer: str = ""
 

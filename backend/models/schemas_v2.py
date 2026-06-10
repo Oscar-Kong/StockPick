@@ -303,3 +303,7 @@ class QuantLabEvidenceResponse(BaseModel):
     predictions: QuantLabLastRunSummary
     pairs: QuantLabLastRunSummary
     jobs: QuantLabLastRunSummary
+
+
+# Pydantic v1: resolve forward refs on V2ScoreResponse (defined before nested types).
+V2ScoreResponse.update_forward_refs()

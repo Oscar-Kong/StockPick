@@ -1,9 +1,8 @@
-"""Daily portfolio decision support — deterministic rule engine."""
+"""Daily portfolio decision support — rule engine with explainability."""
 from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Literal
 
 from buckets import DEFAULT_BUCKET, resolve_bucket
 from config import SLEEVE_MAX_WEIGHT
@@ -12,50 +11,61 @@ from data.portfolio_store import DEFAULT_ACCOUNT_ID, save_decision_snapshot
 from data.price_service import PriceService
 from data.reconciler import DataReconciler
 from models.schemas import (
+    ClosedPositionItem,
     PortfolioDecisionItem,
     PortfolioDecisionRequest,
     PortfolioDecisionResponse,
 )
+from services.portfolio_decision_engine import DecisionInput, compute_holding_decision, max_weight_for_sleeve
 from services.quant_risk_sizing_service import build_unified_risk, sizing_from_score_context
 from services.quant_v2_service import build_v2_score
+from utils.pydantic_util import model_to_dict
 
 logger = logging.getLogger(__name__)
-
-DecisionType = Literal["buy", "keep", "trim", "sell", "watch"]
-
-# Penny: tighter triggers
-_PENNY_SELL_SCORE = 38
-_PENNY_TRIM_SCORE = 52
-_PENNY_RISK_SELL = 72
-_PENNY_RISK_TRIM = 58
-_PENNY_OVERWEIGHT_MULT = 1.15
-
-# Compounder: slower-moving
-_COMPO_SELL_SCORE = 40
-_COMPO_TRIM_SCORE = 50
-_COMPO_RISK_SELL = 78
-_COMPO_RISK_TRIM = 65
-_COMPO_OVERWEIGHT_MULT = 1.25
 
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
-def _action_pcts(decision: DecisionType) -> tuple[float, float, float]:
-    """Return (buy_pct, keep_pct, sell_pct) summing to 100."""
-    table: dict[DecisionType, tuple[float, float, float]] = {
-        "buy": (45.0, 45.0, 10.0),
-        "keep": (15.0, 70.0, 15.0),
-        "trim": (5.0, 35.0, 60.0),
-        "sell": (0.0, 15.0, 85.0),
-        "watch": (10.0, 60.0, 30.0),
-    }
-    return table[decision]
+def _last_price(ps: PriceService, symbol: str) -> float | None:
+    df = ps.get_history(symbol, period="5d")
+    if df is None or df.empty:
+        return None
+    return float(df["close"].iloc[-1])
 
 
-def _score_context(symbol: str, sleeve: str) -> dict:
-    """Fetch score, risk, sizing for one symbol."""
+def _momentum_score(symbol: str, ps: PriceService) -> float:
+    df = ps.get_history(symbol, period="3mo")
+    if df is None or len(df) < 20:
+        return 50.0
+    close = df["close"]
+    ret_20 = (close.iloc[-1] / close.iloc[-20] - 1) * 100 if len(close) >= 20 else 0
+    ret_5 = (close.iloc[-1] / close.iloc[-5] - 1) * 100 if len(close) >= 5 else 0
+    score = 50 + ret_20 * 1.2 + ret_5 * 0.8
+    return max(0.0, min(100.0, score))
+
+
+def _liquidity_score(symbol: str, ps: PriceService) -> float:
+    df = ps.get_history(symbol, period="1mo")
+    if df is None or df.empty:
+        return 45.0
+    vol = df.get("volume")
+    if vol is None or vol.empty:
+        return 50.0
+    avg_vol = float(vol.tail(10).mean())
+    if avg_vol >= 5_000_000:
+        return 85.0
+    if avg_vol >= 1_000_000:
+        return 70.0
+    if avg_vol >= 200_000:
+        return 55.0
+    if avg_vol >= 50_000:
+        return 40.0
+    return 25.0
+
+
+def _score_context(symbol: str, sleeve: str, ps: PriceService) -> dict:
     score_res = build_v2_score(
         symbol,
         sleeve,
@@ -64,7 +74,13 @@ def _score_context(symbol: str, sleeve: str) -> dict:
         persist_snapshot=False,
     )
     if isinstance(score_res, dict) and score_res.get("error"):
-        return {"error": score_res.get("error"), "score": 50.0, "risk_index": 50.0}
+        return {
+            "error": score_res.get("error"),
+            "alpha": 50.0,
+            "risk_index": 50.0,
+            "momentum": _momentum_score(symbol, ps),
+            "liquidity": _liquidity_score(symbol, ps),
+        }
 
     rec = DataReconciler().reconcile(symbol)
     dq = rec.quality_score if rec else None
@@ -97,72 +113,14 @@ def _score_context(symbol: str, sleeve: str) -> dict:
                 risk_flags.append(msg[:80])
 
     return {
-        "score": float(score_res.score),
+        "alpha": float(score_res.score),
         "risk_index": float(risk_index),
         "target_weight": float(target_w),
         "dq": dq,
         "risk_flags": risk_flags,
-        "recommendation": getattr(score_res.recommendation, "action", None) if score_res.recommendation else None,
+        "momentum": _momentum_score(symbol, ps),
+        "liquidity": _liquidity_score(symbol, ps),
     }
-
-
-def _decide(
-    *,
-    sleeve: str,
-    score: float,
-    risk_index: float,
-    current_weight: float,
-    target_weight: float,
-    dq: float | None,
-) -> tuple[DecisionType, list[str]]:
-    reasons: list[str] = []
-    max_w = float(SLEEVE_MAX_WEIGHT.get(sleeve, 0.08))
-    overweight = current_weight > min(max_w * (1.15 if sleeve == "penny" else 1.25), target_weight * 1.2 + 0.005)
-
-    if sleeve == "penny":
-        if score <= _PENNY_SELL_SCORE or risk_index >= _PENNY_RISK_SELL:
-            reasons.append(f"Penny score {score:.0f} or risk {risk_index:.0f} triggers exit")
-            return "sell", reasons
-        if overweight or score <= _PENNY_TRIM_SCORE or risk_index >= _PENNY_RISK_TRIM:
-            if overweight:
-                reasons.append(f"Weight {current_weight*100:.1f}% above penny cap")
-            if score <= _PENNY_TRIM_SCORE:
-                reasons.append(f"Score {score:.0f} below trim threshold")
-            return "trim", reasons
-        if current_weight < target_weight * 0.85 and score >= 62:
-            reasons.append(f"Score {score:.0f} supports adding toward {target_weight*100:.1f}% target")
-            return "buy", reasons
-        if dq is not None and dq < 40:
-            reasons.append("Data quality too low for penny add")
-            return "watch", reasons
-        reasons.append("Penny position within score and risk bands")
-        return "keep", reasons
-
-    # compounder
-    if score <= _COMPO_SELL_SCORE and risk_index >= _COMPO_RISK_TRIM:
-        reasons.append("Compounder score and risk both weak — consider exit")
-        return "sell", reasons
-    if overweight and score <= _COMPO_TRIM_SCORE:
-        reasons.append("Overweight vs target with fading score")
-        return "trim", reasons
-    if risk_index >= _COMPO_RISK_SELL:
-        reasons.append(f"Risk index {risk_index:.0f} elevated for compounder")
-        return "trim", reasons
-    if current_weight < target_weight * 0.75 and score >= 68:
-        reasons.append(f"Quality score {score:.0f} — room to add toward target")
-        return "buy", reasons
-    if score < _COMPO_TRIM_SCORE:
-        reasons.append("Hold but monitor — score below add threshold")
-        return "watch", reasons
-    reasons.append("Compounder hold — short-term noise discounted")
-    return "keep", reasons
-
-
-def _last_price(ps: PriceService, symbol: str) -> float | None:
-    df = ps.get_history(symbol, period="5d")
-    if df is None or df.empty:
-        return None
-    return float(df["close"].iloc[-1])
 
 
 def run_portfolio_daily_decision(body: PortfolioDecisionRequest) -> PortfolioDecisionResponse:
@@ -176,113 +134,137 @@ def run_portfolio_daily_decision(body: PortfolioDecisionRequest) -> PortfolioDec
         sleeve = resolve_bucket(h.bucket.value if hasattr(h.bucket, "value") else str(h.bucket))
         if sleeve == "medium":
             sleeve = DEFAULT_BUCKET
-            notes.append(f"{sym}: medium bucket mapped to penny for decisions")
-        price = _last_price(ps, sym) or float(h.avg_cost)
-        mv = price * float(h.shares)
+            notes.append(f"{sym}: medium bucket deprecated — using penny rules")
+        latest = _last_price(ps, sym)
+        price_for_mv = latest  # no avg_cost fallback for decisions
+        mv = (price_for_mv * float(h.shares)) if price_for_mv else 0.0
         priced.append(
             {
                 "symbol": sym,
                 "shares": float(h.shares),
                 "avg_cost": float(h.avg_cost),
                 "bucket": sleeve,
-                "price": price,
+                "latest_price": latest,
                 "market_value": mv,
             }
         )
 
-    total_value = cash + sum(p["market_value"] for p in priced)
-    if total_value <= 0:
+    invested = sum(p["market_value"] for p in priced if p["latest_price"])
+    total_value = cash + invested
+    if total_value <= 0 and not priced:
         raise ValueError("Portfolio value must be positive")
+
+    # If all prices missing, use cost basis only for display total — decisions still REVIEW
+    if total_value <= 0:
+        total_value = cash + sum(p["avg_cost"] * p["shares"] for p in priced)
 
     items: list[PortfolioDecisionItem] = []
     for row in priced:
         sym = row["symbol"]
         sleeve = row["bucket"]
-        current_w = row["market_value"] / total_value
+        latest = row["latest_price"]
+        mv = row["market_value"] if latest else row["avg_cost"] * row["shares"]
+        current_w = mv / total_value if total_value > 0 else 0.0
 
         try:
-            ctx = _score_context(sym, sleeve)
+            ctx = _score_context(sym, sleeve, ps)
         except Exception as exc:
             logger.warning("Decision context failed for %s: %s", sym, exc)
-            ctx = {"score": 50.0, "risk_index": 50.0, "target_weight": SLEEVE_MAX_WEIGHT.get(sleeve, 0.05), "risk_flags": ["score_fetch_failed"], "dq": None}
+            ctx = {
+                "alpha": 50.0,
+                "risk_index": 50.0,
+                "target_weight": SLEEVE_MAX_WEIGHT.get(sleeve, 0.05),
+                "risk_flags": ["score_fetch_failed"],
+                "dq": None,
+                "momentum": 50.0,
+                "liquidity": 45.0,
+            }
 
         if ctx.get("error"):
             notes.append(f"{sym}: {ctx['error']}")
 
-        score = ctx["score"]
-        risk_index = ctx["risk_index"]
-        target_w = min(float(ctx["target_weight"]), float(SLEEVE_MAX_WEIGHT.get(sleeve, 0.08)))
-        decision, reasons = _decide(
-            sleeve=sleeve,
-            score=score,
-            risk_index=risk_index,
-            current_weight=current_w,
-            target_weight=target_w,
-            dq=ctx.get("dq"),
-        )
-        buy_pct, keep_pct, sell_pct = _action_pcts(decision)
-        delta_w = target_w - current_w
-        suggested_usd = round(delta_w * total_value, 2)
+        target_w = min(float(ctx["target_weight"]), max_weight_for_sleeve(sleeve))
+        max_w = max_weight_for_sleeve(sleeve)
 
-        if decision == "sell":
-            suggested_usd = round(-row["market_value"], 2)
-        elif decision == "trim":
-            trim_to = target_w * 0.9
-            suggested_usd = round((trim_to - current_w) * total_value, 2)
+        out = compute_holding_decision(
+            DecisionInput(
+                symbol=sym,
+                sleeve=sleeve,
+                shares=row["shares"],
+                avg_cost=row["avg_cost"],
+                latest_price=latest,
+                alpha_score=ctx["alpha"],
+                momentum_score=ctx["momentum"],
+                liquidity_score=ctx["liquidity"],
+                risk_score=ctx["risk_index"],
+                data_quality_score=ctx.get("dq"),
+                current_weight=current_w,
+                target_weight=target_w,
+                max_allowed_weight=max_w,
+            ),
+            total_portfolio_value=total_value,
+        )
+
+        pl_pct = None
+        if latest and row["avg_cost"] > 0:
+            pl_pct = round((latest - row["avg_cost"]) / row["avg_cost"] * 100, 2)
+
+        flags = list(dict.fromkeys(list(ctx.get("risk_flags") or []) + out.risk_flags))
 
         items.append(
             PortfolioDecisionItem(
                 symbol=sym,
                 bucket=sleeve,
-                price=round(row["price"], 4),
+                price=round(latest, 4) if latest else 0.0,
+                price_available=out.price_available,
                 shares=row["shares"],
                 avg_cost=row["avg_cost"],
-                market_value=round(row["market_value"], 2),
+                market_value=round(mv, 2),
+                pl_pct=pl_pct,
                 current_weight=round(current_w * 100, 2),
                 target_weight=round(target_w * 100, 2),
-                buy_pct=buy_pct,
-                keep_pct=keep_pct,
-                sell_pct=sell_pct,
-                decision=decision,
-                score=round(score, 1),
-                risk_index=round(risk_index, 1),
-                suggested_dollar_action=suggested_usd,
-                reasons=reasons,
-                risk_flags=list(ctx.get("risk_flags") or []),
+                buy_pct=out.buy_pct,
+                keep_pct=out.keep_pct,
+                sell_pct=out.sell_pct,
+                decision=out.final_decision,
+                suggested_action=out.suggested_action,
+                score=round(ctx["alpha"], 1),
+                risk_index=round(ctx["risk_index"], 1),
+                suggested_dollar_action=out.suggested_dollar_action,
+                reasons=out.reasons,
+                risk_flags=flags,
+                alpha_score=out.alpha_score,
+                momentum_score=out.momentum_score,
+                liquidity_score=out.liquidity_score,
+                risk_score=out.risk_score,
+                data_quality_score=out.data_quality_score,
+                max_allowed_weight=round(out.max_allowed_weight * 100, 2),
+                overweight_penalty=round(out.overweight_penalty, 2),
+                missing_data_penalty=round(out.missing_data_penalty, 2),
+                stop_loss_trigger=out.stop_loss_trigger,
+                final_buy_raw=out.final_buy_raw,
+                final_keep_raw=out.final_keep_raw,
+                final_sell_raw=out.final_sell_raw,
             )
         )
 
     as_of = _utcnow().isoformat()
-    response = PortfolioDecisionResponse(
+    return PortfolioDecisionResponse(
         as_of=as_of,
         cash=cash,
         total_value=round(total_value, 2),
+        invested_value=round(invested, 2),
         items=items,
-        notes=notes + [
-            "Model/rule-based research output — not financial advice.",
-            "Penny positions use stricter trim/sell triggers than compounder.",
+        notes=notes
+        + [
+            "Model-generated research output — not financial advice. The app does not place trades.",
+            "Cost basis: weighted average cost from Robinhood CSV reconstruction.",
+            "Penny positions use stricter add/trim rules than compounder.",
         ],
     )
 
-    if body.persist:
-        try:
-            HistoricalStore().log_job(
-                "portfolio_daily_decision",
-                "ok",
-                f"{len(items)} holdings",
-                symbols_processed=len(items),
-                errors=0,
-                started_at=_utcnow(),
-                finished_at=_utcnow(),
-            )
-        except Exception as exc:
-            logger.debug("Decision snapshot log skipped: %s", exc)
-
-    return response
-
 
 def run_stored_portfolio_decision(*, trigger: str = "manual", persist: bool = True) -> PortfolioDecisionResponse:
-    """Run daily decision from persisted holdings (CSV / manual / sync)."""
     from services.portfolio_snapshot_service import holdings_to_request
 
     cash, holdings = holdings_to_request()
@@ -293,8 +275,44 @@ def run_stored_portfolio_decision(*, trigger: str = "manual", persist: bool = Tr
     response = run_portfolio_daily_decision(body)
 
     if persist:
-        payload = response.model_dump()
+        payload = model_to_dict(response)
         payload["trigger"] = trigger
-        save_decision_snapshot(DEFAULT_ACCOUNT_ID, trigger, payload)
+        snap = save_decision_snapshot(DEFAULT_ACCOUNT_ID, trigger, payload)
+        try:
+            HistoricalStore().log_job(
+                "portfolio_daily_decision",
+                "ok",
+                f"{len(response.items)} holdings",
+                symbols_processed=len(response.items),
+                errors=0,
+                started_at=_utcnow(),
+                finished_at=_utcnow(),
+            )
+        except Exception as exc:
+            logger.debug("Decision job log skipped: %s", exc)
+        payload["_snapshot_id"] = snap.get("id")
 
     return response
+
+
+def closed_positions_from_snapshot() -> list[ClosedPositionItem]:
+    from data.portfolio_store import get_latest_portfolio_snapshot
+
+    snap = get_latest_portfolio_snapshot()
+    if not snap:
+        return []
+    out: list[ClosedPositionItem] = []
+    for c in snap.get("closed_positions") or []:
+        if isinstance(c, dict):
+            out.append(ClosedPositionItem(**c))
+        else:
+            out.append(
+                ClosedPositionItem(
+                    symbol=c.symbol,
+                    total_bought=c.total_bought,
+                    total_sold=c.total_sold,
+                    realized_pl=c.realized_pl,
+                    last_activity=getattr(c, "last_activity", ""),
+                )
+            )
+    return out

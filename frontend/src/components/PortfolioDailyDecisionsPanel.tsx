@@ -21,8 +21,8 @@ function DecisionBadge({ decision }: { decision: string }) {
   const colors: Record<string, string> = {
     buy: "text-[#7dff8e] border-[#7dff8e]/40 bg-[#7dff8e]/10",
     keep: "text-zinc-200 border-zinc-600 bg-zinc-800/60",
-    trim: "text-amber-300 border-amber-500/40 bg-amber-500/10",
     sell: "text-red-300 border-red-500/40 bg-red-500/10",
+    review: "text-amber-300 border-amber-500/40 bg-amber-500/10",
     watch: "text-sky-300 border-sky-500/40 bg-sky-500/10",
   };
   return (

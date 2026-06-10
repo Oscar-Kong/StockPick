@@ -61,11 +61,16 @@ class TradeHistory(PortfolioBase):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     account_id = Column(Integer, nullable=False, index=True)
-    symbol = Column(String, nullable=False, index=True)
-    side = Column(String, nullable=False)
-    quantity = Column(Float, nullable=False)
-    price = Column(Float, nullable=False)
+    symbol = Column(String, nullable=False, default="", index=True)
+    side = Column(String, nullable=False)  # buy | sell | cash | income
+    quantity = Column(Float, nullable=True)
+    price = Column(Float, nullable=True)
     fees = Column(Float, nullable=False, default=0.0)
+    amount = Column(Float, nullable=True)
+    trans_code = Column(String, nullable=True)
+    description = Column(Text, nullable=True)
+    activity_date = Column(String, nullable=True)
+    process_date = Column(String, nullable=True)
     executed_at = Column(DateTime, nullable=True)
     order_id = Column(String, nullable=True)
     row_hash = Column(String, nullable=False, index=True)
@@ -115,8 +120,30 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
+def _migrate_trade_history_columns() -> None:
+    """Add ledger columns to existing SQLite trade_history tables."""
+    from sqlalchemy import inspect, text
+
+    insp = inspect(_engine)
+    if "trade_history" not in insp.get_table_names():
+        return
+    existing = {c["name"] for c in insp.get_columns("trade_history")}
+    alters = [
+        ("amount", "FLOAT"),
+        ("trans_code", "VARCHAR"),
+        ("description", "TEXT"),
+        ("activity_date", "VARCHAR"),
+        ("process_date", "VARCHAR"),
+    ]
+    with _engine.begin() as conn:
+        for col, typ in alters:
+            if col not in existing:
+                conn.execute(text(f"ALTER TABLE trade_history ADD COLUMN {col} {typ}"))
+
+
 def init_portfolio_db() -> None:
     PortfolioBase.metadata.create_all(bind=_engine)
+    _migrate_trade_history_columns()
 
 
 def _ensure_default_account(session: Session) -> BrokerageAccount:
@@ -222,11 +249,16 @@ def upsert_trades(
             session.add(
                 TradeHistory(
                     account_id=account_id,
-                    symbol=t.symbol.upper(),
+                    symbol=(t.symbol or "").upper(),
                     side=t.side,
-                    quantity=float(t.quantity),
-                    price=float(t.price),
+                    quantity=float(t.quantity) if t.quantity is not None else None,
+                    price=float(t.price) if t.price is not None else None,
                     fees=float(getattr(t, "fees", 0) or 0),
+                    amount=float(getattr(t, "amount", 0) or 0) or None,
+                    trans_code=getattr(t, "trans_code", None),
+                    description=getattr(t, "description", None),
+                    activity_date=getattr(t, "activity_date", None),
+                    process_date=getattr(t, "process_date", None),
                     executed_at=t.executed_at,
                     order_id=getattr(t, "order_id", None),
                     row_hash=t.row_hash,
@@ -237,6 +269,106 @@ def upsert_trades(
             imported += 1
         session.commit()
         return imported, skipped
+    finally:
+        session.close()
+
+
+def upsert_ledger_rows(
+    account_id: int,
+    rows: list,
+    *,
+    source_file_id: int | None = None,
+) -> tuple[int, int]:
+    """Insert all parsed CSV rows (buy/sell/cash/income) by row_hash."""
+    from integrations.robinhood.models import ParsedCsvRow
+
+    session = SessionLocal()
+    imported = 0
+    skipped = 0
+    try:
+        now = _utcnow()
+        for r in rows:
+            if not isinstance(r, ParsedCsvRow):
+                continue
+            existing = (
+                session.query(TradeHistory)
+                .filter(TradeHistory.row_hash == r.row_hash)
+                .first()
+            )
+            if existing:
+                skipped += 1
+                continue
+            side = r.row_type if r.row_type in ("cash", "income") else r.row_type
+            qty = r.quantity if r.quantity is not None else 0.0
+            pr = r.price if r.price is not None else 0.0
+            session.add(
+                TradeHistory(
+                    account_id=account_id,
+                    symbol=(r.instrument or "").upper(),
+                    side=side,
+                    quantity=qty,
+                    price=pr,
+                    amount=r.amount,
+                    trans_code=r.trans_code,
+                    description=r.description,
+                    activity_date=r.activity_date,
+                    process_date=r.process_date,
+                    executed_at=r.executed_at,
+                    row_hash=r.row_hash,
+                    source_file_id=source_file_id,
+                    created_at=now,
+                )
+            )
+            imported += 1
+        session.commit()
+        return imported, skipped
+    finally:
+        session.close()
+
+
+def load_all_ledger_rows(account_id: int = DEFAULT_ACCOUNT_ID) -> list:
+    from integrations.robinhood.models import ParsedCsvRow
+
+    session = SessionLocal()
+    try:
+        rows = (
+            session.query(TradeHistory)
+            .filter(TradeHistory.account_id == account_id)
+            .order_by(TradeHistory.executed_at, TradeHistory.id)
+            .all()
+        )
+        out: list[ParsedCsvRow] = []
+        for r in rows:
+            row_type = r.side if r.side in ("buy", "sell", "cash", "income") else "excluded"
+            qty = None if r.side in ("cash", "income") and (r.quantity or 0) == 0 else r.quantity
+            price = None if r.side in ("cash", "income") and (r.price or 0) == 0 else r.price
+            out.append(
+                ParsedCsvRow(
+                    activity_date=r.activity_date or "",
+                    process_date=r.process_date or "",
+                    instrument=r.symbol or "",
+                    description=r.description or "",
+                    trans_code=(r.trans_code or r.side or "").upper(),
+                    quantity=qty,
+                    price=price,
+                    amount=float(r.amount or 0),
+                    row_type=row_type,  # type: ignore[arg-type]
+                    row_hash=r.row_hash,
+                    executed_at=r.executed_at,
+                )
+            )
+        return out
+    finally:
+        session.close()
+
+
+def set_account_cash(account_id: int, cash: float) -> None:
+    session = SessionLocal()
+    try:
+        acct = _ensure_default_account(session)
+        acct.cash_balance = float(cash)
+        acct.updated_at = _utcnow()
+        session.commit()
     finally:
         session.close()
 
@@ -290,17 +422,24 @@ def load_all_trades(account_id: int = DEFAULT_ACCOUNT_ID) -> list:
 
     session = SessionLocal()
     try:
-        rows = session.query(TradeHistory).filter(TradeHistory.account_id == account_id).all()
+        rows = (
+            session.query(TradeHistory)
+            .filter(TradeHistory.account_id == account_id, TradeHistory.side.in_(("buy", "sell")))
+            .all()
+        )
         return [
             ParsedTrade(
                 symbol=r.symbol,
                 side=r.side,
-                quantity=r.quantity,
-                price=r.price,
+                quantity=float(r.quantity or 0),
+                price=float(r.price or 0),
                 fees=r.fees,
                 executed_at=r.executed_at,
                 order_id=r.order_id,
                 row_hash=r.row_hash,
+                trans_code=r.trans_code or "",
+                amount=float(r.amount or 0),
+                description=r.description or "",
             )
             for r in rows
         ]
@@ -361,15 +500,57 @@ def get_current_holdings(account_id: int = DEFAULT_ACCOUNT_ID) -> list[dict]:
         session.close()
 
 
-def save_portfolio_snapshot(account_id: int, cash: float, total_value: float, holdings: list, source: str) -> dict:
+def get_latest_portfolio_snapshot(account_id: int = DEFAULT_ACCOUNT_ID) -> dict | None:
+    session = SessionLocal()
+    try:
+        row = (
+            session.query(PortfolioSnapshot)
+            .filter(PortfolioSnapshot.account_id == account_id)
+            .order_by(PortfolioSnapshot.created_at.desc())
+            .first()
+        )
+        if not row:
+            return None
+        data = json.loads(row.holdings_json or "{}")
+        if isinstance(data, list):
+            holdings = data
+            closed = []
+        else:
+            holdings = data.get("holdings") or []
+            closed = data.get("closed_positions") or []
+        return {
+            "cash": float(row.cash),
+            "total_value": float(row.total_value),
+            "holdings": holdings,
+            "closed_positions": closed,
+            "source": row.source,
+            "created_at": utc_iso_z(row.created_at),
+        }
+    finally:
+        session.close()
+
+
+def save_portfolio_snapshot(
+    account_id: int,
+    cash: float,
+    total_value: float,
+    holdings: list,
+    source: str,
+    *,
+    closed_positions: list | None = None,
+    extra: dict | None = None,
+) -> dict:
     session = SessionLocal()
     try:
         now = _utcnow()
+        payload = {"holdings": holdings, "closed_positions": closed_positions or []}
+        if extra:
+            payload.update(extra)
         row = PortfolioSnapshot(
             account_id=account_id,
             cash=cash,
             total_value=total_value,
-            holdings_json=json.dumps(holdings),
+            holdings_json=json.dumps(payload),
             source=source,
             created_at=now,
         )

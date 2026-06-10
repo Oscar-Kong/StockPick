@@ -992,28 +992,52 @@ export interface PortfolioDecisionItem {
   symbol: string;
   bucket: string;
   price: number;
+  price_available?: boolean;
   shares: number;
   avg_cost: number;
   market_value: number;
+  pl_pct?: number | null;
   current_weight: number;
   target_weight: number;
   buy_pct: number;
   keep_pct: number;
   sell_pct: number;
   decision: string;
+  suggested_action?: string;
   score: number;
   risk_index: number;
   suggested_dollar_action: number;
   reasons: string[];
   risk_flags: string[];
+  alpha_score?: number | null;
+  momentum_score?: number | null;
+  liquidity_score?: number | null;
+  risk_score?: number | null;
+  data_quality_score?: number | null;
+  max_allowed_weight?: number | null;
+  overweight_penalty?: number | null;
+  missing_data_penalty?: number | null;
+  stop_loss_trigger?: boolean;
+  final_buy_raw?: number | null;
+  final_keep_raw?: number | null;
+  final_sell_raw?: number | null;
 }
 
 export interface PortfolioDecisionResponse {
   as_of: string;
   cash: number;
   total_value: number;
+  invested_value?: number;
   items: PortfolioDecisionItem[];
   notes: string[];
+}
+
+export interface ClosedPositionItem {
+  symbol: string;
+  total_bought: number;
+  total_sold: number;
+  realized_pl: number;
+  last_activity?: string;
 }
 
 export interface PennyOpportunityItem {
@@ -1027,13 +1051,19 @@ export interface PennyOpportunityItem {
 export interface DailyDashboardResponse {
   portfolio_value: number;
   cash: number;
+  invested_value?: number;
+  cash_pct?: number;
+  active_holdings_count?: number;
   data_source: string;
   data_source_label: string;
+  is_demo_data?: boolean;
   last_brokerage_sync_at?: string | null;
   last_decision_run_at?: string | null;
   decision?: PortfolioDecisionResponse | null;
   holdings: Array<{ symbol: string; shares: number; avg_cost: number; bucket: string }>;
+  closed_positions?: ClosedPositionItem[];
   top_penny_opportunities: PennyOpportunityItem[];
+  risk_alerts?: string[];
   portfolio_warnings: string[];
   disclaimer: string;
 }

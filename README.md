@@ -16,7 +16,7 @@ From one UI, you can:
 1. **Home** — daily buy/keep/sell dashboard for your Robinhood holdings (`/`)
 2. **Scan** a bucket and rank candidates (`/scan`)
 3. **Workspace** — watchlist, single-symbol analyze (primary score from `/api/v2/score` when enabled), compare peers, trade journal (`/workspace`)
-4. **Portfolio** — daily decision support (manual holdings), basket optimization, rebalance policy backtests (`/portfolio`)
+4. **Portfolio** — basket optimization, rebalance policy backtests (research; daily decisions live on Home) (`/portfolio`)
 5. **Quant Lab** — latest evidence cards, **Research Reliability** scores per tab, validation tabs, research on demand (`/quant-lab`)
 6. **Library** — saved scans, research reports, analyze snapshots (`/library`)
 7. **Settings** — language, API providers, ops (`/settings`)

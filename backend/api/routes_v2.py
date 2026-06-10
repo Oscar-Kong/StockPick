@@ -15,6 +15,7 @@ from engines.weighting.regime_classifier import classify_spy
 from engines.weighting.weight_store import WeightStore
 from services.quant_jobs import run_daily_quant_jobs
 from services.quant_v2_service import build_v2_score
+from utils.pydantic_util import models_to_dicts
 
 router = APIRouter(prefix="/api/v2", tags=["quant-v2"])
 
@@ -309,7 +310,7 @@ def get_similar_signal(
     score = build_v2_score(symbol, sleeve_val, validate_parity=False, persist_snapshot=False)
     if isinstance(score, dict) and score.get("error"):
         raise HTTPException(status_code=404, detail=score["error"])
-    factors = [f.model_dump() for f in score.factors]
+    factors = models_to_dicts(score.factors)
     return run_similar_signal_backtest(
         symbol=symbol.upper(),
         sleeve=sleeve_val,
