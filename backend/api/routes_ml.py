@@ -15,7 +15,7 @@ router = APIRouter(prefix="/ml", tags=["ml"])
 
 
 @router.get("/alpha/latest", response_model=AlphaLatestResponse)
-def alpha_latest(bucket: Bucket = Bucket.medium):
+def alpha_latest(bucket: Bucket = Bucket.penny):
     return AlphaLatestResponse(**get_latest_alpha(bucket))
 
 

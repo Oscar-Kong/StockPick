@@ -203,6 +203,11 @@ SCHEDULER_MARKET_CALENDAR = os.getenv("SCHEDULER_MARKET_CALENDAR", "XNYS")
 # Deprecated: use SCHEDULER_CRON + SCHEDULER_TZ instead
 SCHEDULER_HOUR_UTC = int(os.getenv("SCHEDULER_HOUR_UTC", "6"))
 
+# --- Daily portfolio decision (pre-market NY) ---
+PORTFOLIO_DECISION_ENABLED = _env_bool("PORTFOLIO_DECISION_ENABLED", "true")
+PORTFOLIO_DECISION_CRON = os.getenv("PORTFOLIO_DECISION_CRON", "0 9 * * 1-5")
+PORTFOLIO_DECISION_TZ = os.getenv("PORTFOLIO_DECISION_TZ", "America/New_York")
+
 # --- LLM (Proxy-compatible) ---
 # Preferred custom proxy vars:
 # - GPT_PROXY_API_KEY
@@ -255,8 +260,10 @@ PENNY_MIN_VOLUME = int(os.getenv("PENNY_MIN_VOLUME", "1000000"))
 PENNY_MIN_DOLLAR_VOLUME_20D = float(os.getenv("PENNY_MIN_DOLLAR_VOLUME_20D", "1000000"))
 PENNY_MARKET_CAP_MIN = float(os.getenv("PENNY_MARKET_CAP_MIN", "100000000"))
 PENNY_MARKET_CAP_MAX = float(os.getenv("PENNY_MARKET_CAP_MAX", "300000000"))
+PENNY_MIN_DATA_QUALITY_SCORE = float(os.getenv("PENNY_MIN_DATA_QUALITY_SCORE", "45"))
+PENNY_MIN_SPREAD_SCORE = float(os.getenv("PENNY_MIN_SPREAD_SCORE", "35"))
 
-# --- Medium bucket ---
+# --- Medium bucket (deprecated — kept for historical data compatibility) ---
 MEDIUM_PRICE_MIN = float(os.getenv("MEDIUM_PRICE_MIN", "10.0"))
 MEDIUM_PRICE_MAX = float(os.getenv("MEDIUM_PRICE_MAX", "200.0"))
 MEDIUM_MIN_VOLUME = int(os.getenv("MEDIUM_MIN_VOLUME", "2000000"))

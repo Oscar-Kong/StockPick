@@ -975,6 +975,87 @@ export interface PortfolioPolicyBacktestResponse {
   institutional?: boolean;
 }
 
+export interface PortfolioHolding {
+  symbol: string;
+  shares: number;
+  avg_cost: number;
+  bucket: Bucket;
+}
+
+export interface PortfolioDecisionRequest {
+  cash?: number;
+  holdings: PortfolioHolding[];
+  persist?: boolean;
+}
+
+export interface PortfolioDecisionItem {
+  symbol: string;
+  bucket: string;
+  price: number;
+  shares: number;
+  avg_cost: number;
+  market_value: number;
+  current_weight: number;
+  target_weight: number;
+  buy_pct: number;
+  keep_pct: number;
+  sell_pct: number;
+  decision: string;
+  score: number;
+  risk_index: number;
+  suggested_dollar_action: number;
+  reasons: string[];
+  risk_flags: string[];
+}
+
+export interface PortfolioDecisionResponse {
+  as_of: string;
+  cash: number;
+  total_value: number;
+  items: PortfolioDecisionItem[];
+  notes: string[];
+}
+
+export interface PennyOpportunityItem {
+  symbol: string;
+  score: number;
+  price: number;
+  setup_type?: string | null;
+  summary?: string;
+}
+
+export interface DailyDashboardResponse {
+  portfolio_value: number;
+  cash: number;
+  data_source: string;
+  data_source_label: string;
+  last_brokerage_sync_at?: string | null;
+  last_decision_run_at?: string | null;
+  decision?: PortfolioDecisionResponse | null;
+  holdings: Array<{ symbol: string; shares: number; avg_cost: number; bucket: string }>;
+  top_penny_opportunities: PennyOpportunityItem[];
+  portfolio_warnings: string[];
+  disclaimer: string;
+}
+
+export interface BrokerageCsvImportResponse {
+  filename: string;
+  trades_parsed: number;
+  trades_imported: number;
+  trades_skipped: number;
+  holdings_count: number;
+  holdings: Array<{ symbol: string; shares: number; avg_cost: number; bucket: string }>;
+  warnings: string[];
+  account: Record<string, unknown>;
+}
+
+export interface PortfolioDecisionRunResponse {
+  ok: boolean;
+  trigger: string;
+  decision: PortfolioDecisionResponse;
+  snapshot_id?: number | null;
+}
+
 export interface AlphaSignalItem {
   symbol: string;
   alpha_score: number;

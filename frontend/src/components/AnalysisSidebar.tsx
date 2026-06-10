@@ -3,6 +3,7 @@
 
 import { fmt, useTranslation } from "@/lib/i18n";
 import type { AnalyzeSymbolResponse, Bucket, Signal, V2ScoreResponse } from "@/lib/types";
+import { bucketFitDisplayOrder } from "@/lib/buckets";
 import type { AnalysisDisplay } from "@/lib/v2Score";
 import clsx from "clsx";
 import { ScoreSourceBadge } from "./ScoreSourceBadge";
@@ -65,8 +66,8 @@ function BucketFitMini({
     return <p className="text-xs text-zinc-500">{t.analysis.scoringBuckets}</p>;
   }
   return (
-    <div className="grid grid-cols-3 gap-1.5">
-      {(["penny", "medium", "compounder"] as Bucket[]).map((b) => {
+    <div className={`grid gap-1.5 ${scores.medium != null ? "grid-cols-3" : "grid-cols-2"}`}>
+      {bucketFitDisplayOrder(scores).map((b) => {
         const s = scores[b];
         const active = b === assigned;
         return (
@@ -77,7 +78,9 @@ function BucketFitMini({
               active ? "border-[#00c805]/40 bg-[#00c805]/10" : "border-zinc-800"
             )}
           >
-            <p className="text-[10px] capitalize text-zinc-500">{b.slice(0, 4)}</p>
+            <p className="text-[10px] capitalize text-zinc-500">
+              {b === "medium" ? `${b.slice(0, 4)}*` : b.slice(0, 4)}
+            </p>
             <p className="text-sm font-semibold tabular-nums text-zinc-100">
               {s?.score?.toFixed(0) ?? "—"}
             </p>

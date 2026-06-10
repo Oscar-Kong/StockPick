@@ -65,7 +65,7 @@ export function normalizeQuantLabEvidence(raw: unknown): {
 } {
   const o = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   return {
-    sleeve: String(o.sleeve ?? "medium"),
+    sleeve: String(o.sleeve ?? "penny"),
     generated_at: String(o.generated_at ?? ""),
     validation_copy: String(
       o.validation_copy ??

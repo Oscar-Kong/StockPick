@@ -159,7 +159,7 @@ def analyze_symbol_route(
 ):
     if symbol.upper() == "COMPARE":
         raise HTTPException(status_code=404, detail="Use /analyze/compare")
-    selected_bucket = bucket or Bucket.medium
+    selected_bucket = bucket or Bucket.penny
     if not refresh:
         cached = get_cached_symbol_analysis(symbol, selected_bucket)
         if cached and not cached.get("error"):

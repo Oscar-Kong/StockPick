@@ -12,7 +12,7 @@ interface PortfolioAllocationPanelProps {
 
 export function PortfolioAllocationPanel({ symbols }: PortfolioAllocationPanelProps) {
   const { t } = useTranslation();
-  const [bucket, setBucket] = useState<Bucket>("medium");
+  const [bucket, setBucket] = useState<Bucket>("penny");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AllocationRecommendationResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +58,6 @@ export function PortfolioAllocationPanel({ symbols }: PortfolioAllocationPanelPr
           className="rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-sm"
         >
           <option value="penny">penny</option>
-          <option value="medium">medium</option>
           <option value="compounder">compounder</option>
         </select>
         <button type="button" onClick={() => void run()} disabled={loading} className="btn-primary px-3 py-1.5 text-sm">

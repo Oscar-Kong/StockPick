@@ -1,4 +1,4 @@
-// Unified scan page with penny / medium / compounder bucket tabs.
+// Unified scan page with penny / compounder bucket tabs.
 "use client";
 
 import { AppTabBar, AppTabButton } from "@/components/AppTabs";

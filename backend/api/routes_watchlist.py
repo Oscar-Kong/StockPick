@@ -129,7 +129,7 @@ def generate_watchlist_reports():
             break
         sym = item["symbol"]
         try:
-            b = Bucket(item.get("bucket", "medium"))
+            b = Bucket(item.get("bucket", "penny"))
             future = _REPORT_EXECUTOR.submit(build_research_report, sym, b)
             report = future.result(timeout=min(8.0, WATCHLIST_REPORT_BUDGET_SECONDS))
             results.append({"symbol": sym, "ok": not report.get("error"), "report": report})

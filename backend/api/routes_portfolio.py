@@ -6,6 +6,8 @@ from fastapi import APIRouter, HTTPException
 from models.schemas import (
     FactorExposureRequest,
     FactorExposureResponse,
+    PortfolioDecisionRequest,
+    PortfolioDecisionResponse,
     PortfolioOptimizeItem,
     PortfolioOptimizeRequest,
     PortfolioOptimizeResponse,
@@ -15,6 +17,7 @@ from models.schemas import (
 from services.portfolio_optimizer import optimize_portfolio
 from services.institutional_backtest_service import run_portfolio_backtest
 from services.factor_exposure_service import build_factor_exposure_report
+from services.portfolio_decision_service import run_portfolio_daily_decision
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
@@ -93,4 +96,15 @@ def portfolio_factor_exposure(body: FactorExposureRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Factor exposure analysis failed: {exc}") from exc
+
+
+@router.post("/daily-decision", response_model=PortfolioDecisionResponse)
+def portfolio_daily_decision(body: PortfolioDecisionRequest):
+    """Rule-based daily buy/keep/trim/sell guidance for manual holdings (not financial advice)."""
+    try:
+        return run_portfolio_daily_decision(body)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Daily decision failed: {exc}") from exc
 

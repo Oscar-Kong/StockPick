@@ -5,14 +5,14 @@ from engines.factor.catalog import FactorSpec, _fid
 
 FACTOR_CATALOG_V3: dict[str, list[FactorSpec]] = {
     "penny": [
-        FactorSpec(_fid("penny", "rel_volume"), "Relative volume", 0.20, "critical", signal_name="Relative volume"),
-        FactorSpec(_fid("penny", "volume_surge"), "Volume surge", 0.20, "critical", signal_name="Volume surge"),
-        FactorSpec(_fid("penny", "breakout_strength"), "Breakout strength", 0.15, "important", signal_name="Breakout strength"),
-        FactorSpec(_fid("penny", "social_sentiment"), "Social sentiment", 0.15, "important", signal_name="Social sentiment"),
-        FactorSpec(_fid("penny", "sentiment_pos"), "Sentiment positive", 0.10, "secondary", signal_name="Sentiment positive"),
-        FactorSpec(_fid("penny", "sentiment_neg"), "Sentiment negative", 0.05, "secondary", signal_name="Sentiment negative"),
-        FactorSpec(_fid("penny", "intraday_vol"), "Intraday volatility", 0.10, "secondary", signal_name="Intraday volatility"),
-        FactorSpec(_fid("penny", "float_size"), "Float size", 0.05, "secondary", signal_name="Float size"),
+        FactorSpec(_fid("penny", "rel_volume"), "Relative volume", 0.22, "critical", signal_name="Relative volume"),
+        FactorSpec(_fid("penny", "volume_surge"), "Volume surge", 0.22, "critical", signal_name="Volume surge"),
+        FactorSpec(_fid("penny", "breakout_strength"), "Breakout strength", 0.16, "important", signal_name="Breakout strength"),
+        FactorSpec(_fid("penny", "social_sentiment"), "Social sentiment", 0.16, "important", signal_name="Social sentiment"),
+        FactorSpec(_fid("penny", "sentiment_pos"), "Sentiment positive", 0.08, "secondary", signal_name="Sentiment positive"),
+        FactorSpec(_fid("penny", "sentiment_neg"), "Sentiment negative", 0.04, "secondary", signal_name="Sentiment negative"),
+        FactorSpec(_fid("penny", "intraday_vol"), "Intraday volatility", 0.08, "secondary", signal_name="Intraday volatility"),
+        FactorSpec(_fid("penny", "float_size"), "Float size", 0.04, "secondary", signal_name="Float size"),
     ],
     "medium": [
         FactorSpec(_fid("medium", "rs_vs_spy"), "20d momentum vs SPY", 0.18, "critical", signal_name="20d momentum vs SPY"),

@@ -120,7 +120,7 @@ function MetricsGrid({ data }: { data: BacktestResult }) {
   );
 }
 
-export function BacktestPanel({ symbol, bucket = "medium", embedded }: BacktestPanelProps) {
+export function BacktestPanel({ symbol, bucket = "penny", embedded }: BacktestPanelProps) {
   const { t } = useTranslation();
   const [data, setData] = useState<BacktestResult | MultiHorizonBacktestResponse | null>(
     embedded ?? null
@@ -128,7 +128,7 @@ export function BacktestPanel({ symbol, bucket = "medium", embedded }: BacktestP
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [horizon, setHorizon] = useState(HORIZONS[bucket][0]);
-  const [multiHorizon, setMultiHorizon] = useState(bucket === "medium");
+  const [multiHorizon, setMultiHorizon] = useState(bucket === "compounder");
   const [engine, setEngine] = useState<BacktestEngine>("default");
   const [sweepData, setSweepData] = useState<BacktestSweepResponse | null>(null);
   const [sweepLoading, setSweepLoading] = useState(false);
@@ -140,7 +140,7 @@ export function BacktestPanel({ symbol, bucket = "medium", embedded }: BacktestP
 
   useEffect(() => {
     setHorizon(HORIZONS[bucket][0]);
-    setMultiHorizon(bucket === "medium");
+    setMultiHorizon(bucket === "compounder");
     setSweepData(null);
     setAppliedOverrides(null);
     setEntryVariant("default");

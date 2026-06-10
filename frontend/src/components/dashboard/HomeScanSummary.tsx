@@ -7,7 +7,7 @@ import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { getLatestScan } from "@/lib/api";
-import { getBucketMeta } from "@/lib/buckets";
+import { ACTIVE_BUCKET_ORDER, getBucketMeta } from "@/lib/buckets";
 import { formatDateTime } from "@/lib/datetime";
 import { isStaleTimestamp } from "@/lib/quantHealth";
 import type { Bucket, LatestScanResponse } from "@/lib/types";
@@ -15,7 +15,7 @@ import { fmt, useTranslation, useTRef } from "@/lib/i18n";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-const BUCKETS: Bucket[] = ["penny", "medium", "compounder"];
+const BUCKETS: Bucket[] = ACTIVE_BUCKET_ORDER;
 const STALE_MS = 24 * 60 * 60 * 1000;
 
 export function HomeScanSummary() {
@@ -54,7 +54,7 @@ export function HomeScanSummary() {
         title={t.home.scanSummaryTitle}
         subtitle={t.home.scanSummarySubtitle}
         action={
-          <Link href="/scan" className="text-xs text-[#7dff8e] hover:underline">
+          <Link href="/scan?bucket=penny" className="text-xs text-[#7dff8e] hover:underline">
             {t.home.openScan}
           </Link>
         }
@@ -62,7 +62,7 @@ export function HomeScanSummary() {
       {loading && <LoadingSkeleton lines={3} />}
       {!loading && error && <ErrorState message={error} onRetry={() => void load()} />}
       {!loading && !error && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           {BUCKETS.map((bucket) => {
             const data = scans[bucket];
             const count = data?.results?.length ?? 0;

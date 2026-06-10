@@ -20,21 +20,20 @@ This guide is the **mental map** for the project. Use it when the app feels crow
 
 ## 1. One-sentence purpose
 
-**Find US stock ideas in three time horizons, analyze them locally, optionally size and backtest — without sending your watchlist to the cloud.**
+**Find US penny-stock ideas, run daily portfolio decisions locally, and analyze compounders for the long term — without sending your watchlist to the cloud.**
 
 ---
 
-## 2. The three sleeves (ignore everything else at first)
+## 2. The two active sleeves
 
-Everything in screening and scoring rolls up to **one of three buckets**:
+The product focuses on **Penny** (default) and **Compounder**. Legacy **Medium** data may still appear in Library or old watchlist tags but is not offered for new scans.
 
 | Sleeve | Hold period | You use it when… |
 |--------|-------------|------------------|
-| **Penny** | Days → ~2 weeks | Momentum / volume / short-term trades |
-| **Medium** | Weeks → few months | Swing setups with RS vs SPY + fundamentals |
+| **Penny** | Days → ~2 weeks | Momentum / volume / catalyst trades; **daily portfolio decisions** |
 | **Compounder** | Years | Quality growers, macro + governance matter |
 
-**Rule of thumb:** Pick **one primary sleeve** per symbol. The app assigns a bucket automatically; you can override in Workspace.
+**Rule of thumb:** Tag each holding **penny** or **compounder** in Portfolio → Daily Decisions. The app auto-assigns penny for most short-term names.
 
 ---
 
@@ -95,8 +94,9 @@ Everything else is **secondary**:
 
 ### E. “I want portfolio-level math” (advanced)
 
-1. **Portfolio** → paste symbols or **Use watchlist**.
-2. **Optimize weights** *or* **Policy backtest** — not both on day one.
+1. **Portfolio** → **Daily decisions** — enter cash + holdings (penny or compounder tags) for rule-based buy/keep/trim/sell guidance.
+2. **Optimize weights** or **Policy backtest** for basket-level math (optional).
+3. Decision percentages are **model outputs, not financial advice** — see Portfolio tab disclaimer.
 
 ### F. “I want to research new factors” (offline)
 

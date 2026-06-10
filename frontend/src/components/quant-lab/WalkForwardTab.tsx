@@ -30,7 +30,7 @@ const HORIZON_OPTIONS = [20, 60, 90] as const;
 export function WalkForwardTab() {
   const { t } = useTranslation();
   const defaults = useMemo(() => defaultWalkForwardDates(), []);
-  const [sleeve, setSleeve] = useState<Bucket>("medium");
+  const [sleeve, setSleeve] = useState<Bucket>("penny");
   const [startDate, setStartDate] = useState(defaults.start_date);
   const [endDate, setEndDate] = useState(defaults.end_date);
   const [horizons, setHorizons] = useState<number[]>([20, 60]);

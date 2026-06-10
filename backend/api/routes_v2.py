@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Header, HTTPException, Query
 
+from buckets import DEFAULT_BUCKET
 from config import DYNAMIC_WEIGHTS_ENABLED, SCORE_ENGINE_V2_ENABLED
 from models.schemas import Bucket, PortfolioPolicyBacktestRequest, PortfolioPolicyBacktestResponse
 from config import AI_REPORT_SCHEMA, BACKTEST_INSTITUTIONAL, POSITION_SIZING_V2, TRADE_FEEDBACK_ENABLED
@@ -34,7 +35,7 @@ def get_v2_score(
         strategy_version=x_strategy_version,
         factor_model_version=x_factor_model_version,
     )
-    sleeve_val = sleeve.value if sleeve else "medium"
+    sleeve_val = sleeve.value if sleeve else DEFAULT_BUCKET
     result = build_v2_score(symbol, sleeve_val, validate_parity=validate_parity)
     if isinstance(result, dict) and result.get("error"):
         raise HTTPException(status_code=404, detail=result["error"])
@@ -135,7 +136,7 @@ def get_unified_risk(
 ):
     if not SCORE_ENGINE_V2_ENABLED:
         raise HTTPException(status_code=503, detail="SCORE_ENGINE_V2_ENABLED is false")
-    sleeve_val = sleeve.value if sleeve else "medium"
+    sleeve_val = sleeve.value if sleeve else DEFAULT_BUCKET
     result = build_unified_risk(symbol, sleeve_val)
     if isinstance(result, dict) and result.get("error"):
         raise HTTPException(status_code=404, detail=result["error"])
@@ -153,7 +154,7 @@ def get_position_sizing(
         raise HTTPException(status_code=503, detail="SCORE_ENGINE_V2_ENABLED is false")
     if not POSITION_SIZING_V2:
         raise HTTPException(status_code=503, detail="POSITION_SIZING_V2 is false")
-    sleeve_val = sleeve.value if sleeve else "medium"
+    sleeve_val = sleeve.value if sleeve else DEFAULT_BUCKET
     result = build_position_sizing(
         symbol,
         sleeve_val,
@@ -178,7 +179,7 @@ def get_report_v2(
     sleeve_val = sleeve.value if sleeve else None
     sym = symbol.upper()
     if not refresh:
-        cached = get_cached_report_v2(sym, sleeve_val or "medium")
+        cached = get_cached_report_v2(sym, sleeve_val or DEFAULT_BUCKET)
         if cached:
             return cached
     data = build_research_report_v2(sym, sleeve_val)
@@ -304,7 +305,7 @@ def get_similar_signal(
         raise HTTPException(status_code=503, detail="SCORE_ENGINE_V2_ENABLED is false")
     from engines.backtest.similar_signal import run_similar_signal_backtest
 
-    sleeve_val = sleeve.value if sleeve else "medium"
+    sleeve_val = sleeve.value if sleeve else DEFAULT_BUCKET
     score = build_v2_score(symbol, sleeve_val, validate_parity=False, persist_snapshot=False)
     if isinstance(score, dict) and score.get("error"):
         raise HTTPException(status_code=404, detail=score["error"])
@@ -326,7 +327,7 @@ def get_agent_pipeline(
         raise HTTPException(status_code=503, detail="SCORE_ENGINE_V2_ENABLED is false")
     result = build_v2_score(
         symbol,
-        sleeve.value if sleeve else "medium",
+        sleeve.value if sleeve else DEFAULT_BUCKET,
         validate_parity=False,
         persist_snapshot=False,
     )
@@ -366,7 +367,7 @@ def factors_admin(sleeve: Bucket | None = Query(None)):
 
 
 @router.get("/quant-lab/evidence", response_model=QuantLabEvidenceResponse)
-def get_quant_lab_evidence(sleeve: Bucket = Query(Bucket.medium)):
+def get_quant_lab_evidence(sleeve: Bucket = Query(Bucket.penny)):
     """Read-only latest evidence summaries for Quant Lab overview cards."""
     from services.quant_lab_summary_service import get_quant_lab_evidence as _evidence
 

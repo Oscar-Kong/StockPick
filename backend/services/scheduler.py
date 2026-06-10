@@ -102,8 +102,10 @@ def run_daily_pipeline() -> dict:
 
 
 def _collect_all_symbols() -> list[str]:
+    from buckets import ACTIVE_BUCKETS
+
     seen: set[str] = set()
-    for bucket in ("penny", "medium", "compounder"):
+    for bucket in ACTIVE_BUCKETS:
         for s in get_universe(bucket):
             seen.add(s.upper())
     return sorted(seen)
@@ -145,10 +147,26 @@ def _scheduled_quant_jobs() -> dict:
     return dispatch_job("quant_daily_jobs", {})
 
 
+def _scheduled_portfolio_decision() -> dict:
+    if not _is_trading_session():
+        logger.info("Skipping portfolio decision — not a trading session")
+        return {"skipped": True, "reason": "non_trading_day"}
+    from engines.jobs.queue import dispatch_job
+
+    return dispatch_job("daily_portfolio_decision", {})
+
+
 def start_scheduler() -> None:
     """Start APScheduler for daily jobs if SCHEDULER_ENABLED."""
     global _scheduler
-    from config import SCHEDULER_CRON, SCHEDULER_ENABLED, SCHEDULER_TZ
+    from config import (
+        PORTFOLIO_DECISION_CRON,
+        PORTFOLIO_DECISION_ENABLED,
+        PORTFOLIO_DECISION_TZ,
+        SCHEDULER_CRON,
+        SCHEDULER_ENABLED,
+        SCHEDULER_TZ,
+    )
 
     if not SCHEDULER_ENABLED:
         logger.info("Scheduler disabled (SCHEDULER_ENABLED=false)")
@@ -180,11 +198,20 @@ def start_scheduler() -> None:
             id="quant_daily_jobs",
             replace_existing=True,
         )
+    if PORTFOLIO_DECISION_ENABLED:
+        _scheduler.add_job(
+            _scheduled_portfolio_decision,
+            CronTrigger.from_crontab(PORTFOLIO_DECISION_CRON, timezone=PORTFOLIO_DECISION_TZ),
+            id="daily_portfolio_decision",
+            replace_existing=True,
+        )
     _scheduler.start()
     logger.info(
-        "Scheduler started — cron '%s' (%s)",
+        "Scheduler started — pipeline '%s' (%s); portfolio decision '%s' (%s)",
         SCHEDULER_CRON,
         SCHEDULER_TZ,
+        PORTFOLIO_DECISION_CRON if PORTFOLIO_DECISION_ENABLED else "off",
+        PORTFOLIO_DECISION_TZ,
     )
 
 

@@ -33,7 +33,7 @@ export function FactorPerformanceTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [disabled, setDisabled] = useState(false);
-  const [sleeve, setSleeve] = useState<Bucket>("medium");
+  const [sleeve, setSleeve] = useState<Bucket>("penny");
 
   const load = useCallback(async () => {
     setLoading(true);

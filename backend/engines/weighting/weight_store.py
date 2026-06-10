@@ -180,7 +180,9 @@ class WeightStore:
     @staticmethod
     def rebalance_all_sleeves(*, smooth: bool = True) -> dict:
         out = {}
-        for sleeve in ("penny", "medium", "compounder"):
+        from buckets import ACTIVE_BUCKETS
+
+        for sleeve in ACTIVE_BUCKETS:
             out[sleeve] = WeightStore.rebalance_sleeve(sleeve, smooth=smooth)
         return out
 

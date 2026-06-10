@@ -111,7 +111,7 @@ def build_symbol_analysis(
     include_bucket_fit: bool = False,
 ) -> dict[str, Any]:
     sym = symbol.upper()
-    bucket = bucket or Bucket.medium
+    bucket = bucket or Bucket.penny
     ps = PriceService()
 
     result, error = analyze_symbol(sym, bucket)

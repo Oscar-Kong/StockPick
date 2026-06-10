@@ -41,13 +41,12 @@ def detect_bucket(price: float, market_cap: float | None) -> Bucket:
     if market_cap and market_cap >= COMPOUNDER_MARKET_CAP_MIN:
         if price >= MEDIUM_PRICE_MAX or price == 0:
             return Bucket.compounder
-    if MEDIUM_PRICE_MIN <= price <= MEDIUM_PRICE_MAX:
-        return Bucket.medium
     if market_cap and market_cap >= COMPOUNDER_MARKET_CAP_MIN:
         return Bucket.compounder
-    if price > PENNY_PRICE_MAX and price < MEDIUM_PRICE_MIN:
-        return Bucket.penny if price < 10 else Bucket.medium
-    return Bucket.medium
+    # Former medium-range names default to penny (short-term product focus)
+    if price > PENNY_PRICE_MAX:
+        return Bucket.penny
+    return Bucket.penny
 
 
 def analyze_symbol(
@@ -232,7 +231,7 @@ def refresh_watchlist(
         try:
             bucket_enum = Bucket(bucket)
         except ValueError:
-            bucket_enum = Bucket.medium
+            bucket_enum = Bucket.penny
 
         result, error = _analyze_with_timeout(symbol, bucket_enum, per_symbol_timeout_seconds)
         if error or result is None:

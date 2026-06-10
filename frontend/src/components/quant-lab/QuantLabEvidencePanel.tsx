@@ -31,7 +31,7 @@ const CARD_TITLE_KEYS = {
   jobs: "lastRunJobs",
 } as const;
 
-export function QuantLabEvidencePanel({ sleeve = "medium", onNavigateTab }: QuantLabEvidencePanelProps) {
+export function QuantLabEvidencePanel({ sleeve = "penny", onNavigateTab }: QuantLabEvidencePanelProps) {
   const { t } = useTranslation();
   const tRef = useTRef();
   const [data, setData] = useState<QuantLabEvidenceResponse | null>(null);

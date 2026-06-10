@@ -215,7 +215,7 @@ export function normalizeWalkForwardResearchResponse(raw: unknown): WalkForwardR
     return {
       run_id: "",
       status: "unknown",
-      sleeve: "medium",
+      sleeve: "penny",
       start_date: "",
       end_date: "",
       rebalance_frequency: "monthly",
@@ -228,7 +228,7 @@ export function normalizeWalkForwardResearchResponse(raw: unknown): WalkForwardR
   return {
     run_id: asString(raw.run_id) ?? "",
     status: asString(raw.status) ?? "unknown",
-    sleeve: asString(raw.sleeve) ?? "medium",
+    sleeve: asString(raw.sleeve) ?? "penny",
     start_date: asString(raw.start_date) ?? "",
     end_date: asString(raw.end_date) ?? "",
     rebalance_frequency: asString(raw.rebalance_frequency) ?? "monthly",

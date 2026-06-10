@@ -18,9 +18,16 @@ def _daily_pipeline(payload: dict[str, Any]) -> dict[str, Any]:
     return run_daily_pipeline()
 
 
+def _daily_portfolio_decision(payload: dict[str, Any]) -> dict[str, Any]:
+    from services.portfolio_jobs import run_scheduled_portfolio_decision
+
+    return run_scheduled_portfolio_decision()
+
+
 JOB_HANDLERS: dict[str, JobHandler] = {
     "quant_daily_jobs": _quant_daily,
     "daily_pipeline": _daily_pipeline,
+    "daily_portfolio_decision": _daily_portfolio_decision,
 }
 
 

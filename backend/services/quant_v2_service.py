@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from buckets import DEFAULT_BUCKET
 from config import (
     DYNAMIC_WEIGHTS_ENABLED,
     FACTOR_MODEL_VERSION,
@@ -64,7 +65,7 @@ def build_v2_score(
         return {"error": "SCORE_ENGINE_V2_ENABLED is false"}
 
     sym = symbol.upper()
-    sleeve = sleeve or "medium"
+    sleeve = sleeve or DEFAULT_BUCKET
     if sleeve not in _SCREENERS:
         return {"error": f"Invalid sleeve: {sleeve}"}
 

@@ -4,7 +4,9 @@ from __future__ import annotations
 from config import (
     PENNY_MARKET_CAP_MAX,
     PENNY_MARKET_CAP_MIN,
+    PENNY_MIN_DATA_QUALITY_SCORE,
     PENNY_MIN_DOLLAR_VOLUME_20D,
+    PENNY_MIN_SPREAD_SCORE,
     PENNY_MIN_VOLUME,
     PENNY_PRICE_MAX,
     PENNY_PRICE_MIN,
@@ -15,6 +17,7 @@ from data.price_service import (
     avg_dollar_volume_from_history,
     avg_volume_from_history,
 )
+from data.reconciler import DataReconciler
 from models.schemas import Bucket, RiskLevel, ScanOptions
 from scoring.sentiment import combined_sentiment_score
 from scoring.technical import (
@@ -25,6 +28,7 @@ from scoring.technical import (
     volume_spike_score,
 )
 from screeners.base import BaseScreener, CandidateContext, WeightedSignal
+from screeners.penny_setup import classify_penny_setup
 
 
 class PennyScreener(BaseScreener):
@@ -59,7 +63,19 @@ class PennyScreener(BaseScreener):
         if df is None or df.empty or len(df) < 21:
             return False
 
-        if spread_proxy_score(df) < 30:
+        spread_score = spread_proxy_score(df)
+        if spread_score < PENNY_MIN_SPREAD_SCORE:
+            return False
+
+        try:
+            rec = DataReconciler().reconcile(ctx.symbol)
+            if rec.quality_score < PENNY_MIN_DATA_QUALITY_SCORE:
+                return False
+        except Exception:
+            pass
+
+        exchange = (ctx.info.get("exchange") or ctx.info.get("fullExchangeName") or "").upper()
+        if "OTC" in exchange or "PINK" in exchange:
             return False
 
         if options.exclude_sectors:
@@ -73,19 +89,32 @@ class PennyScreener(BaseScreener):
         from config import SLEEVE_FACTORS_V3_ENABLED
 
         df = ctx.history
+        warnings: list[str] = []
+        dq_score: float | None = None
+        try:
+            rec = DataReconciler().reconcile(ctx.symbol)
+            dq_score = rec.quality_score
+            for flag in rec.flags or []:
+                if "split" in flag.lower() or "dilut" in flag.lower():
+                    warnings.append(flag)
+        except Exception:
+            pass
+
         if SLEEVE_FACTORS_V3_ENABLED:
             from engines.factor.sleeve_signals import build_sleeve_signals
 
             signals = self.prepare_signals(ctx, build_sleeve_signals(ctx, "penny"))
-            sentiment_data = combined_sentiment_score(ctx.symbol, include_news=False)
+            sentiment_data = combined_sentiment_score(ctx.symbol, include_news=True)
         else:
-            sentiment_data = combined_sentiment_score(ctx.symbol, include_news=False)
+            sentiment_data = combined_sentiment_score(ctx.symbol, include_news=True)
+            spread_val = spread_proxy_score(df)
             signals = [
-                WeightedSignal("5-day momentum", momentum_score(df, 5), 0.25, "Recent price momentum"),
-                WeightedSignal("Volume spike", volume_spike_score(df), 0.25, "Today vs 20-day average volume"),
-                WeightedSignal("RSI fit", rsi_score(df), 0.15, "Not overbought"),
-                WeightedSignal("Social buzz", sentiment_data["score"], 0.20, "StockTwits sentiment"),
-                WeightedSignal("Volatility fit", volatility_fit_score(df), 0.15, "ATR-based tradeability"),
+                WeightedSignal("Volume spike", volume_spike_score(df), 0.28, "Today vs 20-day average volume"),
+                WeightedSignal("5-day momentum", momentum_score(df, 5), 0.24, "Recent price momentum"),
+                WeightedSignal("Social buzz", sentiment_data["score"], 0.18, "StockTwits + news sentiment"),
+                WeightedSignal("Volatility fit", volatility_fit_score(df), 0.12, "ATR-based tradeability"),
+                WeightedSignal("RSI fit", rsi_score(df), 0.10, "Not overbought"),
+                WeightedSignal("Liquidity/spread", spread_val, 0.08, "Bid-ask proxy from OHLC"),
             ]
             signals = self.prepare_signals(ctx, signals)
         raw_score = self.composite_score(signals)
@@ -94,18 +123,30 @@ class PennyScreener(BaseScreener):
         risk = RiskLevel.high
 
         vol_ratio = volume_spike_score(df) / 100
+        setup_type, setup_notes = classify_penny_setup(
+            ctx,
+            signals,
+            score=score,
+            data_quality_score=dq_score,
+            warnings=warnings,
+        )
         summary = (
-            f"Short-term penny momentum play; suggested hold 3-10 days. "
-            f"Volume activity ~{vol_ratio:.1f}x baseline."
+            f"Penny {setup_type.replace('_', ' ')}; hold 3-10 days. "
+            f"Volume ~{vol_ratio:.1f}x baseline."
         )
         metrics = {
             "momentum_5d": momentum_score(df, 5),
             "volume_ratio": round(vol_ratio, 2),
-            "sentiment": round(sentiment_data["stocktwits"], 1),
+            "sentiment": round(sentiment_data.get("stocktwits", sentiment_data["score"]), 1),
             "hold_horizon": "3-10 days",
             "sector": ctx.info.get("sector"),
             "regime": regime_meta,
             "raw_score": round(raw_score, 1),
+            "setup_type": setup_type,
+            "setup_notes": setup_notes,
+            "data_quality_score": dq_score,
+            "spread_score": round(spread_proxy_score(df), 1),
+            "dilution_warnings": warnings,
         }
         return score, signals, risk, summary, metrics
 

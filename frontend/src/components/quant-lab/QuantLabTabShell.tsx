@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { RetryButton } from "@/components/ui/RetryButton";
+import { ACTIVE_BUCKET_ORDER } from "@/lib/buckets";
 import type { ReactNode } from "react";
 
 export function FeatureDisabledNotice({ message }: { message: string }) {
@@ -23,10 +24,13 @@ export function BucketSelect({
   value,
   onChange,
   label,
+  includeDeprecated = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   label: string;
+  /** Show legacy medium for historical data only */
+  includeDeprecated?: boolean;
 }) {
   return (
     <label className="text-xs text-zinc-500">
@@ -36,9 +40,14 @@ export function BucketSelect({
         onChange={(e) => onChange(e.target.value)}
         className="ml-2 rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-sm"
       >
-        <option value="penny">penny</option>
-        <option value="medium">medium</option>
-        <option value="compounder">compounder</option>
+        {ACTIVE_BUCKET_ORDER.map((b) => (
+          <option key={b} value={b}>
+            {b}
+          </option>
+        ))}
+        {includeDeprecated && value === "medium" && (
+          <option value="medium">medium (legacy)</option>
+        )}
       </select>
     </label>
   );

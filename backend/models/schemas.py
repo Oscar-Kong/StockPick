@@ -561,7 +561,7 @@ class PortfolioPolicyBacktestRequest(BaseModel):
     max_weight: float = Field(default=0.35, gt=0, le=1)
     cash_buffer: float = Field(default=0.0, ge=0, lt=1)
     institutional: bool = False
-    sleeve: str | None = Field(default="medium", pattern="^(penny|medium|compounder)$")
+    sleeve: str | None = Field(default="penny", pattern="^(penny|medium|compounder)$")
     fee_bps: float | None = Field(default=None, ge=0, le=100)
     slip_bps: float | None = Field(default=None, ge=0, le=100)
     use_universe_pit: bool = True
@@ -647,7 +647,7 @@ class AlphaIngestItem(BaseModel):
 
 
 class AlphaIngestRequest(BaseModel):
-    bucket: Bucket = Bucket.medium
+    bucket: Bucket = Bucket.penny
     as_of: str | None = None
     model_version: str = "offline-v1"
     items: list[AlphaIngestItem] = []
@@ -683,7 +683,7 @@ class AllocationRecommendationResponse(BaseModel):
 
 
 class LeanExportRequest(BaseModel):
-    bucket: Bucket = Bucket.medium
+    bucket: Bucket = Bucket.penny
     symbols: list[str] = []
     rebalance: str = Field(default="monthly", pattern="^(weekly|monthly)$")
     objective: str = Field(default="min_vol", pattern="^(max_sharpe|min_vol|target_return)$")
@@ -932,3 +932,99 @@ class AnalyzeTimeSeriesDiagnosticsResponse(BaseModel):
     autocorrelation: dict[str, Any] = {}
     interpretation: str = "insufficient data"
     notes: list[str] = []
+
+
+class PortfolioHolding(BaseModel):
+    symbol: str
+    shares: float = Field(gt=0)
+    avg_cost: float = Field(gt=0)
+    bucket: Bucket = Bucket.penny
+
+
+class PortfolioDecisionRequest(BaseModel):
+    cash: float = Field(default=0.0, ge=0)
+    holdings: list[PortfolioHolding] = Field(default_factory=list)
+    persist: bool = False
+
+
+class PortfolioDecisionItem(BaseModel):
+    symbol: str
+    bucket: str
+    price: float
+    shares: float
+    avg_cost: float
+    market_value: float
+    current_weight: float
+    target_weight: float
+    buy_pct: float
+    keep_pct: float
+    sell_pct: float
+    decision: str
+    score: float
+    risk_index: float
+    suggested_dollar_action: float
+    reasons: list[str] = []
+    risk_flags: list[str] = []
+
+
+class PortfolioDecisionResponse(BaseModel):
+    as_of: str
+    cash: float
+    total_value: float
+    items: list[PortfolioDecisionItem] = []
+    notes: list[str] = []
+
+
+class PennyOpportunityItem(BaseModel):
+    symbol: str
+    score: float
+    price: float
+    setup_type: str | None = None
+    summary: str = ""
+
+
+class DailyDashboardResponse(BaseModel):
+    portfolio_value: float = 0.0
+    cash: float = 0.0
+    data_source: str = "manual"
+    data_source_label: str = "Manual holdings"
+    last_brokerage_sync_at: str | None = None
+    last_decision_run_at: str | None = None
+    decision: PortfolioDecisionResponse | None = None
+    holdings: list[dict[str, Any]] = []
+    top_penny_opportunities: list[PennyOpportunityItem] = []
+    portfolio_warnings: list[str] = []
+    disclaimer: str = ""
+
+
+class BrokerageCsvImportResponse(BaseModel):
+    filename: str
+    trades_parsed: int = 0
+    trades_imported: int = 0
+    trades_skipped: int = 0
+    holdings_count: int = 0
+    holdings: list[dict[str, Any]] = []
+    warnings: list[str] = []
+    account: dict[str, Any] = {}
+
+
+class CurrentPortfolioResponse(BaseModel):
+    account: dict[str, Any] = {}
+    cash: float = 0.0
+    holdings: list[dict[str, Any]] = []
+    data_source: str = "manual"
+    disclaimer: str = ""
+
+
+class PortfolioDecisionRunResponse(BaseModel):
+    ok: bool = True
+    trigger: str = "manual"
+    decision: PortfolioDecisionResponse
+    snapshot_id: int | None = None
+
+
+class PortfolioDecisionHistoryItem(BaseModel):
+    id: int
+    trigger: str
+    created_at: str
+    holding_count: int = 0

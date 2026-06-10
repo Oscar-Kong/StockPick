@@ -138,12 +138,12 @@ def init_db() -> None:
 
     init_historical_db()
     init_strategy_db()
+    from data.portfolio_store import init_portfolio_db
+
+    init_portfolio_db()
     from engines.quant_db import init_quant_db
 
     init_quant_db()
-
-
-def _utcnow() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 

@@ -20,6 +20,7 @@ import { ChartMount } from "./ChartMount";
 import { DarkChartTooltip, darkTooltipCursor } from "./DarkChartTooltip";
 import { PortfolioFactorExposurePanel } from "./PortfolioFactorExposurePanel";
 import { PortfolioAllocationPanel } from "./PortfolioAllocationPanel";
+import { PortfolioDailyDecisionsPanel } from "./PortfolioDailyDecisionsPanel";
 import {
   CartesianGrid,
   Line,
@@ -30,7 +31,7 @@ import {
   YAxis,
 } from "recharts";
 
-type PanelTab = "optimize" | "policy" | "exposure" | "allocation";
+type PanelTab = "optimize" | "policy" | "exposure" | "allocation" | "daily";
 
 function parseSymbols(raw: string): string[] {
   return [...new Set(raw.split(/[\s,]+/).map((s) => s.trim().toUpperCase()).filter(Boolean))];
@@ -175,7 +176,7 @@ export function PortfolioPage() {
         max_weight: Number(maxWeight) || 0.35,
         cash_buffer: Number(cashBuffer) || 0.05,
         institutional,
-        sleeve: "medium" as const,
+        sleeve: "penny" as const,
         use_universe_pit: institutional,
       };
       const res = institutional
@@ -214,6 +215,9 @@ export function PortfolioPage() {
           </AppTabButton>
           <AppTabButton active={panel === "allocation"} onClick={() => setPanel("allocation")}>
             {t.portfolio.tabAllocation}
+          </AppTabButton>
+          <AppTabButton active={panel === "daily"} onClick={() => setPanel("daily")}>
+            {t.portfolio.tabDaily}
           </AppTabButton>
         </AppTabBar>
       </header>
@@ -658,6 +662,7 @@ export function PortfolioPage() {
       )}
 
       {panel === "allocation" && <PortfolioAllocationPanel symbols={symbols} />}
+      {panel === "daily" && <PortfolioDailyDecisionsPanel />}
 
       <p className="text-xs text-zinc-600">{t.portfolio.quantHint}</p>
     </div>

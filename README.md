@@ -1,10 +1,11 @@
 # Stock Picker
 
-Stock Picker is a local-first US equities research dashboard with three strategy buckets:
+Stock Picker is a local-first US equities research dashboard focused on **two active strategy buckets**:
 
-- **Penny**: short-term momentum candidates (days to ~2 weeks)
-- **Medium**: swing candidates (roughly 1-2 months)
+- **Penny** (primary): short-term momentum scanner, daily portfolio decisions, volume/catalyst setups (days to ~2 weeks)
 - **Compounder**: long-term quality growers (multi-year)
+
+The legacy **Medium** swing bucket is deprecated in the UI; saved medium scans and watchlist tags still load for history.
 
 It combines rule-based screening, data reconciliation, optional OpenBB governance/macro signals, backtesting, portfolio tooling, and quant integration scaffolding (vectorbt / PyPortfolioOpt / Qlib / FinRL / LEAN handoff).
 
@@ -12,10 +13,10 @@ It combines rule-based screening, data reconciliation, optional OpenBB governanc
 
 From one UI, you can:
 
-1. **Home** — system health, quick actions, resume links (`/`)
+1. **Home** — daily buy/keep/sell dashboard for your Robinhood holdings (`/`)
 2. **Scan** a bucket and rank candidates (`/scan`)
 3. **Workspace** — watchlist, single-symbol analyze (primary score from `/api/v2/score` when enabled), compare peers, trade journal (`/workspace`)
-4. **Portfolio** — basket weight optimization and rebalance policy backtests (`/portfolio`)
+4. **Portfolio** — daily decision support (manual holdings), basket optimization, rebalance policy backtests (`/portfolio`)
 5. **Quant Lab** — latest evidence cards, **Research Reliability** scores per tab, validation tabs, research on demand (`/quant-lab`)
 6. **Library** — saved scans, research reports, analyze snapshots (`/library`)
 7. **Settings** — language, API providers, ops (`/settings`)

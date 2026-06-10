@@ -31,6 +31,9 @@ from api.routes_data import router as data_router
 from api.routes_explain import router as explain_router
 from api.routes_lean import router as lean_router
 from api.routes_ml import router as ml_router
+from api.routes_brokerage import router as brokerage_router, router_portfolio as portfolio_holdings_router
+from api.routes_home import router as home_router
+from api.routes_portfolio_decision import router as portfolio_decision_router
 from api.routes_portfolio import router as portfolio_router
 from api.routes_scan import router as scan_router
 from api.routes_saved import router as saved_router
@@ -93,6 +96,10 @@ app.include_router(explain_router)
 app.include_router(data_router)
 app.include_router(analyze_router)
 app.include_router(portfolio_router)
+app.include_router(portfolio_decision_router)
+app.include_router(portfolio_holdings_router)
+app.include_router(brokerage_router)
+app.include_router(home_router)
 app.include_router(ml_router)
 app.include_router(allocation_router)
 app.include_router(lean_router)

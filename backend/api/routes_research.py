@@ -1,6 +1,7 @@
 """Walk-forward research API — offline scoring evaluation, no live weight updates."""
 from __future__ import annotations
 
+from buckets import DEFAULT_BUCKET
 from fastapi import APIRouter, HTTPException
 
 from models.schemas_v2 import (
@@ -44,7 +45,7 @@ def post_walk_forward_research(body: WalkForwardResearchRequest):
 
 
 @router.get("/walk-forward/latest", response_model=QuantLabLastRunSummary)
-def get_walk_forward_latest(sleeve: str = "medium"):
+def get_walk_forward_latest(sleeve: str = DEFAULT_BUCKET):
     """Latest persisted walk-forward run summary for a sleeve (read-only)."""
     return build_walk_forward_last_run(sleeve)
 

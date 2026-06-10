@@ -6,6 +6,12 @@ import type {
   AlphaLatestResponse,
   PortfolioPolicyBacktestRequest,
   PortfolioPolicyBacktestResponse,
+  PortfolioDecisionRequest,
+  PortfolioDecisionResponse,
+  PortfolioDecisionRunResponse,
+  DailyDashboardResponse,
+  BrokerageCsvImportResponse,
+  PennyOpportunityItem,
   PortfolioOptimizeRequest,
   PortfolioOptimizeResponse,
   LeanExportRequest,
@@ -221,6 +227,38 @@ export function runPortfolioPolicyBacktest(
   });
 }
 
+export function runPortfolioDailyDecision(
+  body: PortfolioDecisionRequest
+): Promise<PortfolioDecisionResponse> {
+  return request("/portfolio/daily-decision", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function getDailyDashboard(): Promise<DailyDashboardResponse> {
+  return request("/home/daily-dashboard");
+}
+
+export function runDailyDecisionNow(): Promise<PortfolioDecisionRunResponse> {
+  return request("/portfolio/daily-decision/run", { method: "POST" });
+}
+
+export async function importRobinhoodCsv(file: File, cash?: number): Promise<BrokerageCsvImportResponse> {
+  const form = new FormData();
+  form.append("file", file);
+  if (cash != null) form.append("cash", String(cash));
+  const res = await fetch(`${API_URL}/brokerage/import/robinhood-csv`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `Import failed: ${res.status}`);
+  }
+  return res.json() as Promise<BrokerageCsvImportResponse>;
+}
+
 export function runV2PortfolioBacktest(
   body: PortfolioPolicyBacktestRequest
 ): Promise<PortfolioPolicyBacktestResponse> {
@@ -230,7 +268,7 @@ export function runV2PortfolioBacktest(
   });
 }
 
-export function getLatestAlpha(bucket: Bucket = "medium"): Promise<AlphaLatestResponse> {
+export function getLatestAlpha(bucket: Bucket = "penny"): Promise<AlphaLatestResponse> {
   return request(`/ml/alpha/latest?bucket=${bucket}`);
 }
 
@@ -698,7 +736,7 @@ export async function runWalkForwardResearch(
 }
 
 export async function getWalkForwardLatest(
-  sleeve: Bucket = "medium",
+  sleeve: Bucket = "penny",
   options?: V2RequestOptions
 ): Promise<QuantLabLastRunSummary> {
   const raw = await request<unknown>(`/research/walk-forward/latest?sleeve=${sleeve}`, {
@@ -734,7 +772,7 @@ export async function getPairsLatest(options?: V2RequestOptions): Promise<QuantL
 }
 
 export async function getQuantLabEvidence(
-  sleeve: Bucket = "medium",
+  sleeve: Bucket = "penny",
   options?: V2RequestOptions
 ): Promise<QuantLabEvidenceResponse> {
   const raw = await request<unknown>(`/api/v2/quant-lab/evidence?sleeve=${sleeve}`, {
@@ -809,12 +847,11 @@ export async function getQuantHealthSummary(
   const checkedAt = new Date().toISOString();
   const sections: QuantHealthSection[] = [];
 
-  const [health, progress, penny, medium, compounder, scheduler, factorPerf] =
+  const [health, progress, penny, compounder, scheduler, factorPerf] =
     await Promise.allSettled([
       getHealth(),
       getSavedProgressSummary(),
       getLatestScan("penny"),
-      getLatestScan("medium"),
       getLatestScan("compounder"),
       getSchedulerStatus(options),
       getV2FactorPerformance(undefined, options),
@@ -858,13 +895,12 @@ export async function getQuantHealthSummary(
   const latestScans: Partial<Record<Bucket, LatestScanResponse | null>> = {};
   for (const [bucket, result] of [
     ["penny", penny],
-    ["medium", medium],
     ["compounder", compounder],
   ] as const) {
     if (result.status === "fulfilled") {
       latestScans[bucket] = result.value;
       const scanSection = scanAgeSeverity(result.value.completed_at);
-      if (scanSection && bucket === "medium") {
+      if (scanSection && bucket === "penny") {
         sections.push({ ...scanSection, id: `scan_${bucket}` });
       }
     }

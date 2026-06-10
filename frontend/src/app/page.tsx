@@ -1,6 +1,6 @@
-// Home hub — routes, ticker jump, saved counts.
-import { HomeDashboard } from "@/components/dashboard/HomeDashboard";
+// Home — daily portfolio decision dashboard.
+import { DailyDecisionHome } from "@/components/dashboard/DailyDecisionHome";
 
 export default function Home() {
-  return <HomeDashboard />;
+  return <DailyDecisionHome />;
 }

@@ -33,7 +33,7 @@ SCREENERS = {
 @router.get("/{symbol}", response_model=StockDetail)
 def get_stock(symbol: str, bucket: Bucket | None = None, include_backtest: bool = False):
     symbol = symbol.upper()
-    bucket = bucket or Bucket.medium
+    bucket = bucket or Bucket.penny
     cache_key = f"stock:{symbol}:{bucket.value}:{int(include_backtest)}"
     cached = Cache().get(cache_key)
     try:

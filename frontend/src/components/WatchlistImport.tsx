@@ -15,7 +15,7 @@ interface WatchlistImportProps {
 export function WatchlistImport({ onImported }: WatchlistImportProps) {
   const { t } = useTranslation();
   const [manualSymbol, setManualSymbol] = useState("");
-  const [manualBucket, setManualBucket] = useState<Bucket>("medium");
+  const [manualBucket, setManualBucket] = useState<Bucket>("penny");
   const [manualNotes, setManualNotes] = useState("");
   const [manualAdding, setManualAdding] = useState(false);
   const [manualMsg, setManualMsg] = useState<string | null>(null);
@@ -93,7 +93,6 @@ export function WatchlistImport({ onImported }: WatchlistImportProps) {
               className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
             >
               <option value="penny">{t.buckets.penny.label}</option>
-              <option value="medium">{t.buckets.medium.label}</option>
               <option value="compounder">{t.buckets.compounder.label}</option>
             </select>
           </label>
@@ -144,7 +143,6 @@ export function WatchlistImport({ onImported }: WatchlistImportProps) {
             >
               <option value="auto">{t.buckets.autoDetect}</option>
               <option value="penny">{t.buckets.penny.label}</option>
-              <option value="medium">{t.buckets.medium.label}</option>
               <option value="compounder">{t.buckets.compounder.label}</option>
             </select>
           </label>

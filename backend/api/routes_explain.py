@@ -20,7 +20,7 @@ SCREENERS = {
 @router.post("", response_model=ExplainResponse)
 def explain_stock(body: ExplainRequest):
     symbol = body.symbol.upper()
-    bucket = body.bucket or Bucket.medium
+    bucket = body.bucket or Bucket.penny
     screener = SCREENERS.get(bucket, MediumScreener)()
 
     ctx = screener.enrich(symbol)

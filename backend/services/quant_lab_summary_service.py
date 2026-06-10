@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from buckets import DEFAULT_BUCKET
 from datetime import date, datetime, timezone
 from typing import Any
 
@@ -86,7 +87,7 @@ def load_latest_walk_forward_run(sleeve: str | None = None) -> dict[str, Any] | 
     return None
 
 
-def build_walk_forward_last_run(sleeve: str = "medium") -> QuantLabLastRunSummary:
+def build_walk_forward_last_run(sleeve: str = DEFAULT_BUCKET) -> QuantLabLastRunSummary:
     row = load_latest_walk_forward_run(sleeve)
     if not row:
         return _unavailable(
@@ -154,7 +155,7 @@ def build_pairs_last_run() -> QuantLabLastRunSummary:
     )
 
 
-def build_factor_ic_last_run(sleeve: str = "medium") -> QuantLabLastRunSummary:
+def build_factor_ic_last_run(sleeve: str = DEFAULT_BUCKET) -> QuantLabLastRunSummary:
     if not SCORE_ENGINE_V2_ENABLED:
         return _unavailable(
             "factor_ic",
@@ -400,7 +401,7 @@ def _list_recent_queue_jobs(limit: int = 10) -> list[dict[str, Any]]:
         ]
 
 
-def get_quant_lab_evidence(sleeve: str = "medium") -> QuantLabEvidenceResponse:
+def get_quant_lab_evidence(sleeve: str = DEFAULT_BUCKET) -> QuantLabEvidenceResponse:
     return QuantLabEvidenceResponse(
         sleeve=sleeve,
         generated_at=_utcnow().isoformat(),

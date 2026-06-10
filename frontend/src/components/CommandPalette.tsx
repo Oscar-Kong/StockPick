@@ -54,7 +54,6 @@ export function CommandPalette() {
       { id: "compare", label: t.command.comparePeers, hint: t.home.routeCompareHint, href: "/workspace?tab=compare", group: t.command.go },
       { id: "journal", label: t.command.tradeJournal, href: "/workspace?tab=journal", group: t.command.go },
       { id: "penny", label: t.command.scanPenny, href: "/scan?bucket=penny", group: t.command.screens },
-      { id: "medium", label: t.command.scanMedium, href: "/scan?bucket=medium", group: t.command.screens },
       { id: "compound", label: t.command.scanCompound, href: "/scan?bucket=compounder", group: t.command.screens },
     ],
     [t, locale]
