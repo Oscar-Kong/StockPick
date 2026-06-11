@@ -3,6 +3,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, HTTPException
 
+from data import cache as cache_module
 from models.schemas import (
     Bucket,
     LatestScanResponse,
@@ -42,10 +43,24 @@ def scan_compounder(options: ScanOptions | None = None):
 @router.get("/latest/{bucket}", response_model=LatestScanResponse)
 def get_latest_scan(bucket: Bucket):
     data = scan_manager.get_latest_scan(bucket)
+    last_attempt = cache_module.get_last_scan_attempt_failure(bucket.value) or {}
+    last_attempt_failed_at = last_attempt.get("failed_at")
+    last_attempt_error = last_attempt.get("error")
     if not data:
-        return LatestScanResponse(bucket=bucket, results=[], completed_at=None)
+        return LatestScanResponse(
+            bucket=bucket,
+            results=[],
+            completed_at=None,
+            last_attempt_failed_at=(
+                datetime.fromisoformat(last_attempt_failed_at.replace("Z", ""))
+                if isinstance(last_attempt_failed_at, str)
+                else None
+            ),
+            last_attempt_error=last_attempt_error,
+        )
     results = [StockResult(**r) for r in data.get("results", [])]
     completed = data.get("completed_at")
+    cache_age = cache_module.get_latest_scan_cache_age_seconds(bucket.value)
     return LatestScanResponse(
         bucket=bucket,
         results=results,
@@ -53,6 +68,14 @@ def get_latest_scan(bucket: Bucket):
         strategy_version=data.get("strategy_version"),
         parity_summary=data.get("parity_summary"),
         scoring_engine_used=data.get("scoring_engine_used"),
+        timings=data.get("timings"),
+        cache_age_seconds=cache_age,
+        last_attempt_failed_at=(
+            datetime.fromisoformat(last_attempt_failed_at.replace("Z", ""))
+            if isinstance(last_attempt_failed_at, str)
+            else None
+        ),
+        last_attempt_error=last_attempt_error,
     )
 
 
@@ -86,4 +109,5 @@ def get_scan_status(job_id: str):
         completed_at=job.completed_at,
         parity_summary=job.parity_summary,
         scoring_engine_used=job.parity_summary.get("scoring_engine_used") if job.parity_summary else None,
+        timings=dict(job.timings) if job.timings else None,
     )

@@ -125,6 +125,10 @@ def _run_scan_with_mocks(
     max_results: int = 25,
     use_engine: bool = False,
     engine_scores: dict[str, float] | None = None,
+    mode: str = "deep",
+    stage_b_top_n: int = 50,
+    stage_b_top_n_fast: int = 15,
+    download_side_effect=None,
 ):
     manager = ScanManager()
     job = manager.create_job(bucket)
@@ -136,6 +140,7 @@ def _run_scan_with_mocks(
         saved["bucket"] = bucket_name
         saved["results"] = results
         saved["completed_at"] = completed_at
+        saved["ttl"] = ttl
         saved["strategy_version"] = strategy_version
         saved["metadata"] = metadata
 
@@ -149,6 +154,8 @@ def _run_scan_with_mocks(
     with ExitStack() as stack:
         stack.enter_context(patch("services.scan_manager.get_universe", return_value=[s.upper() for s in universe]))
         stack.enter_context(patch("services.scan_manager.UNIVERSE_SCAN_BATCH_SIZE", 0))
+        stack.enter_context(patch("services.scan_manager.SCAN_STAGE_B_TOP_N", stage_b_top_n))
+        stack.enter_context(patch("services.scan_manager.SCAN_STAGE_B_TOP_N_FAST", stage_b_top_n_fast))
         stack.enter_context(
             patch(
                 "services.scan_manager.filter_universe_by_price",
@@ -174,6 +181,23 @@ def _run_scan_with_mocks(
             patch("services.scan_manager.cache_module.save_scan_results", side_effect=_capture_save)
         )
         stack.enter_context(patch("services.scan_manager.cache_module.save_scan_snapshot"))
+        attempt_marker: dict = {}
+
+        def _record_failure(bucket_name, error, *, ttl_seconds=3600.0):
+            attempt_marker["bucket"] = bucket_name
+            attempt_marker["error"] = error
+            attempt_marker["ttl"] = ttl_seconds
+
+        def _clear_failure(bucket_name):
+            attempt_marker["cleared_for"] = bucket_name
+
+        stack.enter_context(
+            patch("services.scan_manager.cache_module.record_scan_attempt_failure", side_effect=_record_failure)
+        )
+        stack.enter_context(
+            patch("services.scan_manager.cache_module.clear_scan_attempt_failure", side_effect=_clear_failure)
+        )
+        saved["_attempt_marker"] = attempt_marker
         stack.enter_context(patch.object(manager, "_get_screener", return_value=mock_screener))
         stack.enter_context(patch("services.scan_scoring.USE_SCORING_ENGINE_IN_SCAN", use_engine))
         stack.enter_context(patch("services.scan_scoring.PERSIST_SCORE_ATTRIBUTION", False))
@@ -187,7 +211,10 @@ def _run_scan_with_mocks(
             patch("services.scan_scoring._apply_openbb_adjustment", side_effect=lambda score, metrics: score)
         )
         ps_cls = stack.enter_context(patch("services.scan_manager.PriceService"))
-        ps_cls.return_value.download_batch.return_value = bulk_hist
+        if download_side_effect is not None:
+            ps_cls.return_value.download_batch.side_effect = download_side_effect
+        else:
+            ps_cls.return_value.download_batch.return_value = bulk_hist
 
         if use_engine:
             stack.enter_context(
@@ -198,7 +225,8 @@ def _run_scan_with_mocks(
         reg_cls.return_value.get_active.return_value = SimpleNamespace(version_id="test-integration-v1")
         options = MagicMock()
         options.max_results = max_results
-        options.model_dump.return_value = {"max_results": max_results}
+        options.mode = mode
+        options.model_dump.return_value = {"max_results": max_results, "mode": mode}
         manager.run_scan(job.job_id, options)
 
     finished = manager.get_job(job.job_id)
@@ -242,7 +270,14 @@ def test_stage_b_ranking_and_max_results_truncation():
     assert scores == sorted(scores, reverse=True)
     assert scores[0] == 92.0
     assert scores[1] == 78.0
-    assert saved["metadata"] is None
+    # Metadata is no longer None when the engine is disabled — the job always
+    # records its timings so the UI can render stage A/B durations.
+    metadata = saved["metadata"]
+    assert metadata is not None
+    assert "scoring_engine_used" not in metadata
+    assert "parity_summary" not in metadata
+    assert "timings" in metadata
+    assert metadata["timings"]["stage_b_candidates"] == 3.0
 
 
 def test_cache_metadata_and_parity_summary_when_engine_enabled():
@@ -272,3 +307,122 @@ def test_cache_metadata_and_parity_summary_when_engine_enabled():
     assert metadata["scoring_engine_used"] is True
     assert metadata["parity_summary"]["symbol_count"] == 2
     assert "ScoringEngine" in (job.message or "")
+
+
+def test_scan_records_stage_a_and_stage_b_timings():
+    """The scan job must publish stage A and stage B durations so the UI can
+    render timing badges and ops can spot slow provider fetches."""
+    stage_a = ["A1", "A2", "A3"]
+    job, _screener, saved = _run_scan_with_mocks(
+        bucket=Bucket.medium,
+        universe=stage_a,
+        stage_a_symbols=stage_a,
+        score_map={"A1": 70.0, "A2": 60.0, "A3": 55.0},
+        max_results=25,
+    )
+    assert job.status == ScanStatus.completed
+    assert "stage_a_ms" in job.timings
+    assert "stage_b_ms" in job.timings
+    assert "total_ms" in job.timings
+    assert job.timings["stage_b_candidates"] == 3.0
+    # Persisted scan cache must include the timings so /scan/latest/{bucket}
+    # can echo them to the frontend after a backend restart.
+    assert saved["metadata"]["timings"]["stage_b_candidates"] == 3.0
+
+
+def test_scan_options_fast_mode_caps_stage_b_at_fast_top_n():
+    """`mode=fast` must cut Stage B candidate count to SCAN_STAGE_B_TOP_N_FAST.
+
+    This is the smallest unit of work that proves the new env knob is wired
+    through ScanOptions → run_scan without changing legacy "deep" behavior.
+    """
+    stage_a = [f"SYM{i:02d}" for i in range(20)]  # 20 candidates passing Stage A
+    score_map = {sym: 70.0 - i * 0.5 for i, sym in enumerate(stage_a)}
+
+    job, screener, _saved = _run_scan_with_mocks(
+        bucket=Bucket.medium,
+        universe=stage_a,
+        stage_a_symbols=stage_a,
+        score_map=score_map,
+        max_results=25,
+        mode="fast",
+        stage_b_top_n=50,
+        stage_b_top_n_fast=5,
+    )
+    assert job.status == ScanStatus.completed
+    # Only the top 5 (by Stage A order) should reach the deep-scoring path.
+    assert screener.enrich.call_count == 5
+
+
+def test_scan_options_deep_mode_uses_stage_b_top_n():
+    stage_a = [f"D{i:02d}" for i in range(8)]
+    score_map = {sym: 60.0 for sym in stage_a}
+    job, screener, _saved = _run_scan_with_mocks(
+        bucket=Bucket.medium,
+        universe=stage_a,
+        stage_a_symbols=stage_a,
+        score_map=score_map,
+        mode="deep",
+        stage_b_top_n=6,
+        stage_b_top_n_fast=2,
+    )
+    assert job.status == ScanStatus.completed
+    assert screener.enrich.call_count == 6
+
+
+def test_compounder_scan_uses_long_ttl():
+    """Per-bucket TTL: compounder should write with SCAN_RESULT_TTL_COMPOUNDER,
+    which is much longer than the default penny TTL because fundamentals do
+    not change intra-day."""
+    from config import SCAN_RESULT_TTL_COMPOUNDER, SCAN_RESULT_TTL_PENNY
+
+    _job, _screener, saved = _run_scan_with_mocks(
+        bucket=Bucket.compounder,
+        universe=["CMP1"],
+        stage_a_symbols=["CMP1"],
+        score_map={"CMP1": 80.0},
+    )
+    assert saved["ttl"] == SCAN_RESULT_TTL_COMPOUNDER
+
+    _job2, _screener2, saved2 = _run_scan_with_mocks(
+        bucket=Bucket.penny,
+        universe=["PNY1"],
+        stage_a_symbols=["PNY1"],
+        score_map={"PNY1": 70.0},
+    )
+    assert saved2["ttl"] == SCAN_RESULT_TTL_PENNY
+
+
+def test_failed_scan_records_attempt_marker_without_touching_latest():
+    """When run_scan raises, we must NOT clobber `scan:latest:{bucket}` but
+    we MUST stamp a `scan:last_attempt:{bucket}` marker so the route can
+    show "last attempt failed" alongside the prior successful results."""
+
+    def _boom(symbols, period, max_runtime_seconds):
+        raise RuntimeError("synthetic provider failure")
+
+    job, _screener, saved = _run_scan_with_mocks(
+        bucket=Bucket.penny,
+        universe=["PNY1", "PNY2"],
+        stage_a_symbols=["PNY1", "PNY2"],
+        score_map={"PNY1": 70.0, "PNY2": 60.0},
+        download_side_effect=_boom,
+    )
+    assert job.status == ScanStatus.failed
+    # `latest` must not be overwritten by a failed run.
+    assert "results" not in saved
+    # The failure-attempt marker must be recorded for /scan/latest/{bucket}.
+    attempt = saved["_attempt_marker"]
+    assert attempt.get("bucket") == "penny"
+    assert "synthetic provider failure" in (attempt.get("error") or "")
+
+
+def test_successful_scan_clears_prior_failure_marker():
+    job, _screener, saved = _run_scan_with_mocks(
+        bucket=Bucket.penny,
+        universe=["PNY1"],
+        stage_a_symbols=["PNY1"],
+        score_map={"PNY1": 70.0},
+    )
+    assert job.status == ScanStatus.completed
+    assert saved["_attempt_marker"].get("cleared_for") == "penny"

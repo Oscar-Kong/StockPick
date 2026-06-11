@@ -305,6 +305,56 @@ def get_latest_scan(bucket: str) -> dict | None:
     return Cache().get(f"scan:latest:{bucket}")
 
 
+def get_latest_scan_cache_age_seconds(bucket: str) -> float | None:
+    """Return seconds since the latest-scan cache row was written (ignoring TTL).
+
+    Used by the API layer to expose `cache_age_seconds` to clients so the UI can
+    decide whether to render a "stale" badge independent of the cache TTL.
+    """
+    session = SessionLocal()
+    try:
+        entry = session.get(CacheEntry, f"scan:latest:{bucket}")
+        if not entry:
+            return None
+        age = (_utcnow() - entry.cached_at).total_seconds()
+        return round(max(0.0, age), 2)
+    finally:
+        session.close()
+
+
+def record_scan_attempt_failure(bucket: str, error: str, *, ttl_seconds: float = 3600.0) -> None:
+    """Stamp the most recent failed scan attempt without touching `scan:latest:{bucket}`.
+
+    Lets `/scan/latest/{bucket}` report `last_attempt_failed_at` so the UI can show
+    "last scan attempt failed; showing prior results" instead of pretending the
+    cached results are fresh.
+    """
+    Cache().set(
+        f"scan:last_attempt:{bucket}",
+        {
+            "failed_at": utc_iso_z(_utcnow()),
+            "error": (error or "")[:500],
+        },
+        ttl_seconds,
+    )
+
+
+def clear_scan_attempt_failure(bucket: str) -> None:
+    """Remove the failed-attempt marker after a subsequent successful scan."""
+    session = SessionLocal()
+    try:
+        entry = session.get(CacheEntry, f"scan:last_attempt:{bucket}")
+        if entry:
+            session.delete(entry)
+            session.commit()
+    finally:
+        session.close()
+
+
+def get_last_scan_attempt_failure(bucket: str) -> dict | None:
+    return Cache().get(f"scan:last_attempt:{bucket}")
+
+
 def get_watchlist_symbols() -> list[dict]:
     return get_watchlist()
 

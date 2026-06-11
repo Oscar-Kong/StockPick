@@ -3,11 +3,21 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from config import MAX_CANDIDATES_PER_BUCKET, SCAN_RESULT_TTL, UNIVERSE_SCAN_BATCH_SIZE
+from config import (
+    MAX_CANDIDATES_PER_BUCKET,
+    SCAN_PRICE_DOWNLOAD_MAX_SECONDS,
+    SCAN_RESULT_TTL,
+    SCAN_RESULT_TTL_COMPOUNDER,
+    SCAN_RESULT_TTL_PENNY,
+    SCAN_STAGE_B_TOP_N,
+    SCAN_STAGE_B_TOP_N_FAST,
+    UNIVERSE_SCAN_BATCH_SIZE,
+)
 from data import cache as cache_module
 from data.candidate_builder import build_candidate
 from data.historical_store import HistoricalStore
@@ -26,7 +36,23 @@ from services.scan_display import enrich_scan_display, refresh_results_return_me
 
 logger = logging.getLogger(__name__)
 
-STAGE_B_TOP_N = 50
+# Backwards-compatible alias; tests patch this symbol directly. New code should
+# read SCAN_STAGE_B_TOP_N from config.
+STAGE_B_TOP_N = SCAN_STAGE_B_TOP_N
+
+
+def _ttl_for_bucket(bucket: Bucket) -> int:
+    if bucket == Bucket.penny:
+        return SCAN_RESULT_TTL_PENNY
+    if bucket == Bucket.compounder:
+        return SCAN_RESULT_TTL_COMPOUNDER
+    return SCAN_RESULT_TTL
+
+
+def _stage_b_cap(mode: str) -> int:
+    if (mode or "deep").lower() == "fast":
+        return SCAN_STAGE_B_TOP_N_FAST
+    return SCAN_STAGE_B_TOP_N
 
 
 @dataclass
@@ -40,6 +66,7 @@ class ScanJob:
     completed_at: datetime | None = None
     error: str | None = None
     parity_summary: dict | None = None
+    timings: dict[str, float] = field(default_factory=dict)
 
 
 class ScanManager:
@@ -102,8 +129,11 @@ class ScanManager:
         if UNIVERSE_SCAN_BATCH_SIZE > 0:
             universe = universe[:UNIVERSE_SCAN_BATCH_SIZE]
         max_results = min(options.max_results, MAX_CANDIDATES_PER_BUCKET)
+        stage_b_cap = _stage_b_cap(getattr(options, "mode", "deep"))
         candidates: list[StockResult] = []
         fallback_candidates: list[StockResult] = []
+        scan_started = time.monotonic()
+        stage_a_started = scan_started
 
         try:
             # Stage A — bulk OHLC filter
@@ -112,20 +142,22 @@ class ScanManager:
             bulk_hist = ps.download_batch(
                 universe,
                 period=period,
-                max_runtime_seconds=45,
+                max_runtime_seconds=SCAN_PRICE_DOWNLOAD_MAX_SECONDS,
             )
+            job.timings["stage_a_ms"] = round((time.monotonic() - stage_a_started) * 1000.0, 1)
             job.message = f"Stage A: filtered {len(bulk_hist)} symbols with price data"
             job.progress = 25.0
 
             stage_a = filter_universe_by_price(job.bucket, bulk_hist)
             if not stage_a:
-                stage_a = [s for s in universe if s.upper() in bulk_hist][:STAGE_B_TOP_N]
+                stage_a = [s for s in universe if s.upper() in bulk_hist][:stage_b_cap]
 
-            # Limit deep analysis count
-            stage_b_symbols = stage_a[:STAGE_B_TOP_N]
+            # Limit deep analysis count (mode-aware)
+            stage_b_symbols = stage_a[:stage_b_cap]
             total = len(stage_b_symbols)
             job.message = f"Stage B: deep scoring top {total} candidates"
             parity_records: list = []
+            stage_b_started = time.monotonic()
 
             for idx, symbol in enumerate(stage_b_symbols):
                 job.progress = 25.0 + round((idx / max(total, 1)) * 70, 1)
@@ -186,8 +218,13 @@ class ScanManager:
                                     metrics=fallback_metrics,
                                 )
                             )
-                        except Exception:
-                            pass
+                        except Exception as fb_exc:
+                            # Fallback candidate is a UX nicety — failure here must not
+                            # kill the symbol's main scoring path. Log so we can spot
+                            # regressions instead of swallowing silently.
+                            logger.warning(
+                                "Fallback candidate skipped for %s: %s", symbol, fb_exc
+                            )
 
                     quality_score = ctx.info.get("_reconcile_quality")
                     hist_len = len(ctx.history) if ctx.history is not None else 0
@@ -253,6 +290,7 @@ class ScanManager:
             from config import USE_SCORING_ENGINE_IN_SCAN
             from services.scan_parity import aggregate_scan_parity_summary, log_scan_parity_summary
 
+            job.timings["stage_b_ms"] = round((time.monotonic() - stage_b_started) * 1000.0, 1)
             parity_summary_obj = aggregate_scan_parity_summary(parity_records)
             if parity_summary_obj is not None:
                 job.parity_summary = parity_summary_obj.to_dict()
@@ -277,19 +315,20 @@ class ScanManager:
             else:
                 job.message = f"Found {len(job.results)} candidates"
             job.completed_at = datetime.utcnow()
+            job.timings["total_ms"] = round((time.monotonic() - scan_started) * 1000.0, 1)
+            job.timings["stage_b_candidates"] = float(total)
+            job.timings["stage_b_mode"] = 1.0 if getattr(options, "mode", "deep") == "fast" else 0.0
 
-            scan_metadata: dict | None = None
+            scan_metadata: dict = {"timings": dict(job.timings)}
             if job.parity_summary is not None:
-                scan_metadata = {
-                    "scoring_engine_used": USE_SCORING_ENGINE_IN_SCAN,
-                    "parity_summary": job.parity_summary,
-                }
+                scan_metadata["scoring_engine_used"] = USE_SCORING_ENGINE_IN_SCAN
+                scan_metadata["parity_summary"] = job.parity_summary
 
             cache_module.save_scan_results(
                 job.bucket.value,
                 [r.model_dump(mode="json") for r in job.results],
                 job.completed_at.isoformat(),
-                SCAN_RESULT_TTL,
+                _ttl_for_bucket(job.bucket),
                 strategy_version=strategy.version_id,
                 metadata=scan_metadata,
             )
@@ -301,11 +340,31 @@ class ScanManager:
                 strategy_version=strategy.version_id,
                 completed_at=job.completed_at,
             )
+            # A successful scan supersedes any prior failed-attempt marker.
+            try:
+                cache_module.clear_scan_attempt_failure(job.bucket.value)
+            except Exception as clear_exc:
+                logger.warning(
+                    "Failed to clear scan_attempt_failure marker for %s: %s",
+                    job.bucket.value,
+                    clear_exc,
+                )
         except Exception as exc:
             logger.exception("Scan failed: %s", exc)
             job.status = ScanStatus.failed
             job.error = str(exc)
             job.message = f"Scan failed: {exc}"
+            job.timings["total_ms"] = round((time.monotonic() - scan_started) * 1000.0, 1)
+            # Stamp a separate marker so /scan/latest/{bucket} can show
+            # "last attempt failed" without overwriting the prior successful results.
+            try:
+                cache_module.record_scan_attempt_failure(job.bucket.value, str(exc))
+            except Exception as marker_exc:
+                logger.warning(
+                    "Failed to record scan_attempt_failure marker for %s: %s",
+                    job.bucket.value,
+                    marker_exc,
+                )
 
     def start_scan_async(self, bucket: Bucket, options: ScanOptions | None = None) -> ScanJob:
         job = self.create_job(bucket)

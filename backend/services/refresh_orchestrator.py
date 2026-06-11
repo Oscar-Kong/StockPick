@@ -320,6 +320,62 @@ def _begin_home_refresh(*, force: bool) -> str | None:
     return job_id
 
 
+def try_begin_auto_refresh() -> str | None:
+    """Atomic check+reserve+stamp-cooldown for stale-while-revalidate auto refresh.
+
+    Previously `_attach_auto_refresh` called `is_home_refresh_running()`,
+    `auto_refresh_allowed()`, `start_home_refresh_async()`, and
+    `mark_auto_refresh_started()` as four separate lock acquisitions. Two
+    near-simultaneous dashboard GETs could both observe "not running" before
+    either reserved the slot, then advance the cooldown twice while only one
+    actually did work.
+
+    This helper performs the check / cooldown / reservation under a single
+    `_lock` acquire, then drops the lock before spawning the thread. Returns
+    the job_id of the refresh that THIS caller successfully started, or None
+    if another caller beat us to it OR the cooldown forbids a new auto
+    refresh right now.
+    """
+    global _home_refresh_running, _active_home_job_id, _refresh_started_at, _last_auto_refresh_at
+
+    _maybe_recover_stuck_refresh()
+    with _lock:
+        if _home_refresh_running:
+            return None
+        if _last_auto_refresh_at is not None:
+            age = (_utcnow() - _last_auto_refresh_at).total_seconds()
+            if age < AUTO_REFRESH_COOLDOWN_SECONDS:
+                return None
+        job_id = str(uuid.uuid4())
+        _home_refresh_running = True
+        _refresh_started_at = _utcnow()
+        _active_home_job_id = job_id
+        _last_auto_refresh_at = _utcnow()
+
+    # Lock released — safe to do I/O-ish work.
+    _register_job(job_id, scope="home", force=False)
+    _spawn_home_refresh_thread(job_id=job_id, force=False)
+    return job_id
+
+
+def _spawn_home_refresh_thread(*, job_id: str, force: bool) -> None:
+    """Spawn the background worker for an already-reserved home refresh job."""
+
+    def _run() -> None:
+        try:
+            result = _execute_home_refresh(force=force)
+            status = "completed" if result.get("status") != "failed" else "failed"
+            _finish_job(job_id, status=status, result=result, error=result.get("error"))
+        except Exception as exc:
+            _finish_job(job_id, status="failed", error=str(exc)[:500])
+        finally:
+            with _lock:
+                _clear_home_refresh_state()
+
+    thread = threading.Thread(target=_run, name=f"home-refresh-{job_id[:8]}", daemon=True)
+    thread.start()
+
+
 def refresh_home_dashboard(*, force: bool = False) -> dict:
     """Run dependency-ordered refresh for home cockpit data (synchronous)."""
     job_id = _begin_home_refresh(force=force)
@@ -343,20 +399,7 @@ def start_home_refresh_async(*, force: bool = False) -> str | None:
     job_id = _begin_home_refresh(force=force)
     if not job_id:
         return None
-
-    def _run() -> None:
-        try:
-            result = _execute_home_refresh(force=force)
-            status = "completed" if result.get("status") != "failed" else "failed"
-            _finish_job(job_id, status=status, result=result, error=result.get("error"))
-        except Exception as exc:
-            _finish_job(job_id, status="failed", error=str(exc)[:500])
-        finally:
-            with _lock:
-                _clear_home_refresh_state()
-
-    thread = threading.Thread(target=_run, name=f"home-refresh-{job_id[:8]}", daemon=True)
-    thread.start()
+    _spawn_home_refresh_thread(job_id=job_id, force=force)
     return job_id
 
 

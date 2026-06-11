@@ -1,7 +1,7 @@
 """Pydantic schemas for API requests and responses."""
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -64,6 +64,7 @@ class ScanStatusResponse(BaseModel):
     completed_at: datetime | None = None
     parity_summary: dict[str, Any] | None = None
     scoring_engine_used: bool | None = None
+    timings: dict[str, float] | None = None
 
 
 class ScanOptions(BaseModel):
@@ -72,6 +73,9 @@ class ScanOptions(BaseModel):
     max_price: float | None = None
     min_volume: float | None = None
     exclude_sectors: list[str] = []
+    # "deep" (default) runs Stage B over SCAN_STAGE_B_TOP_N candidates.
+    # "fast" runs over SCAN_STAGE_B_TOP_N_FAST for a much quicker first pass.
+    mode: Literal["deep", "fast"] = "deep"
 
 
 class ScanPickSummaryRequest(BaseModel):
@@ -127,6 +131,10 @@ class LatestScanResponse(BaseModel):
     strategy_version: str | None = None
     parity_summary: dict[str, Any] | None = None
     scoring_engine_used: bool | None = None
+    timings: dict[str, float] | None = None
+    cache_age_seconds: float | None = None
+    last_attempt_failed_at: datetime | None = None
+    last_attempt_error: str | None = None
 
 
 class SavedScanCreateRequest(BaseModel):

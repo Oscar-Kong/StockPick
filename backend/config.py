@@ -285,6 +285,14 @@ COMPOUNDER_MIN_REVENUE_GROWTH = float(os.getenv("COMPOUNDER_MIN_REVENUE_GROWTH",
 # --- Scan limits ---
 MAX_CANDIDATES_PER_BUCKET = int(os.getenv("MAX_CANDIDATES_PER_BUCKET", "25"))
 UNIVERSE_SCAN_BATCH_SIZE = int(os.getenv("UNIVERSE_SCAN_BATCH_SIZE", "100"))
+SCAN_STAGE_B_TOP_N = int(os.getenv("SCAN_STAGE_B_TOP_N", "50"))
+SCAN_STAGE_B_TOP_N_FAST = int(os.getenv("SCAN_STAGE_B_TOP_N_FAST", "15"))
+SCAN_PRICE_DOWNLOAD_MAX_SECONDS = float(os.getenv("SCAN_PRICE_DOWNLOAD_MAX_SECONDS", "45"))
+
+# Per-bucket SCAN_RESULT_TTL overrides. Compounder data changes slowly, so we
+# allow operators to keep its "latest" payload warm for much longer than penny.
+SCAN_RESULT_TTL_PENNY = int(os.getenv("SCAN_RESULT_TTL_PENNY", str(SCAN_RESULT_TTL)))
+SCAN_RESULT_TTL_COMPOUNDER = int(os.getenv("SCAN_RESULT_TTL_COMPOUNDER", "86400"))
 
 # --- Data quality gates (0–100 scale) ---
 MIN_DATA_QUALITY_SCORE = float(os.getenv("MIN_DATA_QUALITY_SCORE", "60"))

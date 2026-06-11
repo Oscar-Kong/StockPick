@@ -20,7 +20,6 @@ from models.schemas import Bucket, ScanOptions, StockResult
 from screeners.compounder import CompounderScreener
 from screeners.medium import MediumScreener
 from screeners.penny import PennyScreener
-from services.market_context import enrich_metrics
 from services.symbol_parser import parse_symbols
 
 logger = logging.getLogger(__name__)
@@ -74,27 +73,30 @@ def analyze_symbol(
 
         options = ScanOptions()
         passed_filter = screener.hard_filter(ctx, options)
-        score, signals, risk, summary, metrics = screener.score(ctx)
-        from scoring.data_quality import adjust_score_for_data_quality
-
         quality_score = ctx.info.get("_reconcile_quality")
-        score = adjust_score_for_data_quality(score, quality_score)
-        metrics = enrich_metrics(
-            symbol,
-            ctx.info,
-            ctx.fundamentals,
-            metrics,
-            bucket,
-            # Avoid slow/interactive OpenBB SEC backfills during watchlist add/import.
-            allow_openbb_fetch=False,
+
+        # Route through the canonical scoring facade so Watchlist and Scan
+        # always agree on the numeric score for the same CandidateContext.
+        # The facade handles legacy DQ → enrich → OpenBB and (when the flag
+        # flips) ScoringEngine routing — both call sites move together.
+        from services.scoring_facade import score_symbol_canonical
+
+        outcome = score_symbol_canonical(
+            ctx=ctx,
+            screener=screener,
+            bucket=bucket,
+            symbol=symbol,
+            quality_score=quality_score,
         )
-        try:
-            from services.openbb_integration import apply_openbb_score_adjustment
+        score = outcome.score
+        signals = outcome.signals
+        risk = outcome.risk
+        summary = outcome.summary
+        metrics = outcome.metrics
 
-            score = apply_openbb_score_adjustment(score, metrics)
-        except Exception:
-            pass
-
+        # Watchlist-only UX annotations — these are surface text only and do
+        # not affect the numeric score, so adding them here keeps parity with
+        # Scan while preserving the existing watchlist messaging.
         if not passed_filter:
             summary = f"[Outside typical {bucket.value} filters] {summary}"
         if metrics.get("earnings_soon"):

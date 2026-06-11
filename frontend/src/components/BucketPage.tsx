@@ -62,6 +62,20 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
   const [watchlistPending, setWatchlistPending] = useState<string | null>(null);
   const latestScanLoadedRef = useRef(false);
   const presetLoadedRef = useRef(false);
+  // Owns the scan-status polling interval so we can guarantee teardown on
+  // unmount, on a second handleScan(), or once the job reaches a terminal state.
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearPoll = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }, []);
+
+  // Always clear any outstanding scan-poll interval when the component unmounts
+  // so a navigated-away page does not keep firing requests at the backend.
+  useEffect(() => clearPoll, [clearPoll]);
 
   const loadSavedScans = useCallback(async () => {
     try {
@@ -119,6 +133,9 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
   }, [loadSavedScans]);
 
   const pollScan = useCallback(async (jobId: string) => {
+    // If a previous scan poll is still running (e.g. user double-clicked Scan),
+    // tear it down before starting a new interval so we never run two at once.
+    clearPoll();
     let ticks = 0;
     const interval = setInterval(async () => {
       ticks += 1;
@@ -133,24 +150,25 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
           setScoringEngineUsed(data.scoring_engine_used ?? null);
           setParitySummary(data.parity_summary ?? null);
           setScanning(false);
-          clearInterval(interval);
+          clearPoll();
         } else if (data.status === "failed") {
           setScanning(false);
-          clearInterval(interval);
+          clearPoll();
         } else if (ticks >= 120) {
           setScanning(false);
           setStatus("failed");
           setMessage(t.scan.scanTimeout);
-          clearInterval(interval);
+          clearPoll();
         }
       } catch {
         setScanning(false);
         setStatus("failed");
         setMessage(t.scan.statusFetchFailed);
-        clearInterval(interval);
+        clearPoll();
       }
     }, 1500);
-  }, [t]);
+    pollRef.current = interval;
+  }, [t, clearPoll]);
 
   const handleScan = async () => {
     setScanning(true);
