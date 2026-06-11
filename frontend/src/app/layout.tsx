@@ -20,7 +20,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Picker Quant",
-  description: "US equity screening — penny, medium, and compounder sleeves",
+  description: "Daily portfolio decisions and penny stock screening for US equities",
 };
 
 export default function RootLayout({

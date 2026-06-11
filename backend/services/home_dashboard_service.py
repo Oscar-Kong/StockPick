@@ -8,8 +8,11 @@ from models.schemas import (
     PennyOpportunityItem,
     PortfolioDecisionResponse,
 )
-from data.portfolio_store import get_latest_decision, get_latest_portfolio_snapshot
-from services.portfolio_snapshot_service import DISCLAIMER, get_current_portfolio
+from data.portfolio_store import get_latest_decision, get_latest_portfolio_snapshot, list_uploads, load_all_ledger_rows
+from integrations.robinhood.portfolio_rebuilder import rebuild_portfolio
+from services.data_freshness_service import assess_all_freshness, assess_freshness
+from services.portfolio_snapshot_service import DISCLAIMER, estimate_ledger_cash, get_current_portfolio
+from services.refresh_orchestrator import get_active_home_job_id, is_home_refresh_running
 from services.scan_manager import scan_manager
 
 _SOURCE_LABELS = {
@@ -81,7 +84,7 @@ def _portfolio_warnings(portfolio: dict, decision: PortfolioDecisionResponse | N
     return warnings
 
 
-def build_daily_dashboard() -> DailyDashboardResponse:
+def build_daily_dashboard(*, include_freshness: bool = False) -> DailyDashboardResponse:
     portfolio = get_current_portfolio()
     latest = get_latest_decision()
     snap = get_latest_portfolio_snapshot()
@@ -97,22 +100,74 @@ def build_daily_dashboard() -> DailyDashboardResponse:
     account = portfolio.get("account") or {}
     source = portfolio.get("data_source") or account.get("source") or "manual"
     cash = float(portfolio.get("cash") or 0)
+    reserved_cash = float(portfolio.get("reserved_cash") or 0)
     holdings = portfolio.get("holdings") or []
     closed_raw = portfolio.get("closed_positions") or []
     closed = [ClosedPositionItem(**c) if isinstance(c, dict) else c for c in closed_raw]
 
-    total_value = decision.total_value if decision else float((snap or {}).get("total_value") or 0)
-    invested = decision.invested_value if decision else max(0.0, total_value - cash)
-    if total_value <= 0:
-        total_value = sum(h.get("shares", 0) * h.get("avg_cost", 0) for h in holdings) + cash
-        invested = total_value - cash
+    if decision:
+        invested = float(decision.invested_value or 0)
+    elif holdings:
+        invested = sum(h.get("shares", 0) * h.get("avg_cost", 0) for h in holdings)
+    else:
+        invested = max(0.0, float((snap or {}).get("total_value") or 0) - cash)
+
+    # Robinhood: total = buying power + reserved (IPO) + invested holdings.
+    total_value = cash + reserved_cash + invested
 
     cash_pct = round(cash / total_value * 100, 2) if total_value > 0 else 0.0
     allow_buys = source in ("csv", "snaptrade") and bool(holdings) and source != "demo"
 
+    warnings = _portfolio_warnings(portfolio, decision)
+    decision_stale_warning: str | None = None
+    if include_freshness:
+        d_status = assess_freshness("daily_decision")
+        if d_status.is_stale or d_status.is_missing:
+            decision_stale_warning = "Decision is based on older data. Refresh before acting."
+            warnings = list(dict.fromkeys(warnings + [decision_stale_warning]))
+        if portfolio.get("is_demo_data"):
+            demo_msg = "Demo data is displayed. Import Robinhood CSV before making decisions."
+            warnings = list(dict.fromkeys([demo_msg] + warnings))
+
+    freshness = None
+    if include_freshness:
+        in_progress = is_home_refresh_running()
+        active_job = get_active_home_job_id() if in_progress else None
+        freshness = assess_all_freshness(refresh_in_progress=in_progress, refresh_job_id=active_job)
+        if freshness.overall_status == "demo":
+            pass
+        elif portfolio.get("is_demo_data"):
+            freshness.overall_status = "demo"
+
+    csv_rows_loaded: int | None = None
+    ledger_rows_count: int | None = None
+    ledger_cash_estimate: float | None = None
+    cash_source: str | None = portfolio.get("cash_source")
+    if source == "csv":
+        uploads = list_uploads()
+        if uploads:
+            csv_rows_loaded = int(uploads[0].get("row_count") or 0)
+        ledger_rows = load_all_ledger_rows()
+        ledger_rows_count = len(ledger_rows)
+        ledger_cash_estimate = round(estimate_ledger_cash(), 2)
+        if csv_rows_loaded is not None and csv_rows_loaded < 50:
+            warnings = list(
+                dict.fromkeys(
+                    warnings
+                    + [
+                        f"Incomplete CSV history loaded ({csv_rows_loaded} rows). "
+                        "A full Robinhood export usually has hundreds of rows — re-import with Replace checked."
+                    ]
+                )
+            )
+
     return DailyDashboardResponse(
         portfolio_value=round(total_value, 2),
         cash=cash,
+        reserved_cash=reserved_cash,
+        ipo_shares=portfolio.get("ipo_shares"),
+        ipo_list_price=portfolio.get("ipo_list_price"),
+        ipo_buffer=1.2,
         invested_value=round(invested, 2),
         cash_pct=cash_pct,
         active_holdings_count=len(holdings),
@@ -126,6 +181,12 @@ def build_daily_dashboard() -> DailyDashboardResponse:
         closed_positions=closed,
         top_penny_opportunities=_top_penny_opportunities(cash=cash, allow_new_buys=allow_buys),
         risk_alerts=_risk_alerts(decision, portfolio),
-        portfolio_warnings=_portfolio_warnings(portfolio, decision),
+        portfolio_warnings=warnings,
         disclaimer=DISCLAIMER,
+        freshness=freshness,
+        decision_stale_warning=decision_stale_warning,
+        csv_rows_loaded=csv_rows_loaded,
+        ledger_rows_count=ledger_rows_count,
+        ledger_cash_estimate=ledger_cash_estimate,
+        cash_source=cash_source,
     )

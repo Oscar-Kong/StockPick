@@ -10,6 +10,8 @@ import type {
   PortfolioDecisionResponse,
   PortfolioDecisionRunResponse,
   DailyDashboardResponse,
+  HomeRefreshResponse,
+  HomeRefreshStatusResponse,
   BrokerageCsvImportResponse,
   PennyOpportunityItem,
   PortfolioOptimizeRequest,
@@ -236,18 +238,32 @@ export function runPortfolioDailyDecision(
   });
 }
 
-export function getDailyDashboard(): Promise<DailyDashboardResponse> {
-  return request("/home/daily-dashboard");
+export function getDailyDashboard(opts?: { skipAutoRefresh?: boolean }): Promise<DailyDashboardResponse> {
+  const qs = opts?.skipAutoRefresh ? "?skip_auto_refresh=true" : "";
+  return request(`/home/daily-dashboard${qs}`);
+}
+
+export function refreshHomeData(force = false): Promise<HomeRefreshResponse> {
+  return request(`/home/refresh?force=${force ? "true" : "false"}`, { method: "POST" });
+}
+
+export function getHomeRefreshStatus(jobId: string): Promise<HomeRefreshStatusResponse> {
+  return request(`/home/refresh-status/${encodeURIComponent(jobId)}`);
 }
 
 export function runDailyDecisionNow(): Promise<PortfolioDecisionRunResponse> {
   return request("/portfolio/daily-decision/run", { method: "POST" });
 }
 
-export async function importRobinhoodCsv(file: File, cash?: number): Promise<BrokerageCsvImportResponse> {
+export async function importRobinhoodCsv(
+  file: File,
+  cash?: number,
+  replace = false
+): Promise<BrokerageCsvImportResponse> {
   const form = new FormData();
   form.append("file", file);
   if (cash != null) form.append("cash", String(cash));
+  if (replace) form.append("replace", "true");
   const res = await fetch(`${API_URL}/brokerage/import/robinhood-csv`, {
     method: "POST",
     body: form,
@@ -257,6 +273,24 @@ export async function importRobinhoodCsv(file: File, cash?: number): Promise<Bro
     throw new Error(text || `Import failed: ${res.status}`);
   }
   return res.json() as Promise<BrokerageCsvImportResponse>;
+}
+
+export async function setBuyingPower(
+  cash: number,
+  reservedCash = 0,
+  ipo?: { shares?: number; listPrice?: number }
+): Promise<{ cash: number; reserved_cash: number }> {
+  const form = new FormData();
+  form.append("cash", String(cash));
+  form.append("reserved_cash", String(reservedCash));
+  if (ipo?.shares != null && ipo.shares > 0) form.append("ipo_shares", String(ipo.shares));
+  if (ipo?.listPrice != null && ipo.listPrice > 0) form.append("ipo_list_price", String(ipo.listPrice));
+  const res = await fetch(`${API_URL}/brokerage/buying-power`, { method: "POST", body: form });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `Update buying power failed: ${res.status}`);
+  }
+  return res.json() as Promise<{ cash: number }>;
 }
 
 export function runV2PortfolioBacktest(
@@ -498,14 +532,18 @@ export function listTrades(symbol?: string): Promise<TradeItem[]> {
   return request(`/trades${qs}`);
 }
 
-export function createTradeManual(body: TradeCreateRequest): Promise<TradeItem> {
+export function createTradeManual(body: TradeCreateRequest): Promise<TradeManualResponse> {
   return request("/trades/manual", {
     method: "POST",
     body: JSON.stringify(body),
   });
 }
 
-export async function createTradeUpload(body: FormData): Promise<TradeItem> {
+export function syncTradeToPortfolio(tradeId: number): Promise<TradeManualResponse> {
+  return request(`/trades/${tradeId}/sync-portfolio`, { method: "POST" });
+}
+
+export async function createTradeUpload(body: FormData): Promise<TradeManualResponse> {
   const res = await fetch(`${API_URL}/trades/upload`, {
     method: "POST",
     body,
@@ -514,7 +552,7 @@ export async function createTradeUpload(body: FormData): Promise<TradeItem> {
     const text = await res.text();
     throw new Error(text || `Request failed: ${res.status}`);
   }
-  return res.json() as Promise<TradeItem>;
+  return res.json() as Promise<TradeManualResponse>;
 }
 
 export function deleteTrade(tradeId: number): Promise<{ ok: boolean }> {

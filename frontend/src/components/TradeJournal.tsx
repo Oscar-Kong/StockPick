@@ -7,6 +7,7 @@ import {
   deleteTrade,
   getTradeStats,
   listTrades,
+  syncTradeToPortfolio,
 } from "@/lib/api";
 import {
   formatDateTime,
@@ -44,6 +45,12 @@ function qualityTone(score: number): string {
   return "text-red-300 border-red-500/40 bg-red-500/10";
 }
 
+function portfolioSyncBadgeClass(status: TradeItem["portfolio_sync_status"]): string {
+  if (status === "synced") return "text-emerald-300 border-emerald-500/40 bg-emerald-500/10";
+  if (status === "pending") return "text-amber-300 border-amber-500/40 bg-amber-500/10";
+  return "text-zinc-400 border-zinc-600/50 bg-zinc-900/60";
+}
+
 type TradeSortField = "updated" | "quality" | "pnl";
 type SortDirection = "asc" | "desc";
 
@@ -59,6 +66,7 @@ export function TradeJournal({ embedded = false }: { embedded?: boolean }) {
   const [statusTone, setStatusTone] = useState<"neutral" | "success" | "error">("neutral");
   const [sortField, setSortField] = useState<TradeSortField>("updated");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [syncingTradeId, setSyncingTradeId] = useState<number | null>(null);
 
   const reload = useCallback(async () => {
     const [rows, summary] = await Promise.all([listTrades(), getTradeStats()]);
@@ -79,10 +87,15 @@ export function TradeJournal({ embedded = false }: { embedded?: boolean }) {
       setStatus(t.journal.symbolRequired);
       return;
     }
+    if (!manual.quantity || manual.quantity <= 0) {
+      setStatusTone("error");
+      setStatus(t.journal.quantityRequired);
+      return;
+    }
     try {
       setStatusTone("neutral");
       setStatus(t.journal.saving);
-      await createTradeManual({
+      const saved = await createTradeManual({
         ...manual,
         symbol: manual.symbol.toUpperCase(),
         setup_tags: (manual.setup_tags || []).filter(Boolean),
@@ -92,7 +105,11 @@ export function TradeJournal({ embedded = false }: { embedded?: boolean }) {
       setManual(defaultManual);
       await reload();
       setStatusTone("success");
-      setStatus(t.journal.saved);
+      setStatus(
+        saved.portfolio_synced
+          ? t.journal.savedPortfolioSynced
+          : saved.portfolio_message || t.journal.savedJournalOnly
+      );
     } catch (err) {
       setStatusTone("error");
       setStatus(err instanceof Error ? err.message : t.journal.saveFailed);
@@ -105,6 +122,11 @@ export function TradeJournal({ embedded = false }: { embedded?: boolean }) {
       setStatus(t.journal.uploadRequired);
       return;
     }
+    if (!manual.quantity || manual.quantity <= 0) {
+      setStatusTone("error");
+      setStatus(t.journal.quantityRequired);
+      return;
+    }
     try {
       setStatusTone("neutral");
       setStatus(t.journal.uploading);
@@ -114,20 +136,24 @@ export function TradeJournal({ embedded = false }: { embedded?: boolean }) {
       form.set("side", manual.side);
       form.set("entry_time", fromDatetimeLocalValue(manual.entry_time).toISOString());
       form.set("entry_price", String(manual.entry_price));
+      form.set("quantity", String(manual.quantity));
       if (manual.exit_time) form.set("exit_time", fromDatetimeLocalValue(manual.exit_time).toISOString());
       if (manual.exit_price != null) form.set("exit_price", String(manual.exit_price));
-      if (manual.quantity != null) form.set("quantity", String(manual.quantity));
       if (manual.stop_loss != null) form.set("stop_loss", String(manual.stop_loss));
       if (manual.take_profit != null) form.set("take_profit", String(manual.take_profit));
       if (manual.thesis) form.set("thesis", manual.thesis);
       if (manual.notes) form.set("notes", manual.notes);
       form.set("setup_tags", uploadTags);
-      await createTradeUpload(form);
+      const saved = await createTradeUpload(form);
       setUploadFile(null);
       setUploadTags("");
       await reload();
       setStatusTone("success");
-      setStatus(t.journal.uploadSaved);
+      setStatus(
+        saved.portfolio_synced
+          ? t.journal.savedPortfolioSynced
+          : saved.portfolio_message || t.journal.savedJournalOnly
+      );
     } catch (err) {
       setStatusTone("error");
       setStatus(err instanceof Error ? err.message : t.journal.uploadFailed);
@@ -271,6 +297,8 @@ export function TradeJournal({ embedded = false }: { embedded?: boolean }) {
               <input
                 type="number"
                 step="0.01"
+                min={0}
+                required
                 placeholder="0"
                 value={manual.quantity ?? ""}
                 onChange={(e) =>
@@ -278,6 +306,7 @@ export function TradeJournal({ embedded = false }: { embedded?: boolean }) {
                 }
                 className={inputClass}
               />
+              <span className="mt-1 block text-[11px] text-zinc-600">{t.journal.quantityPortfolioHint}</span>
             </label>
             <label className="text-xs text-zinc-500">
               {t.journal.stopLoss}
@@ -436,24 +465,69 @@ export function TradeJournal({ embedded = false }: { embedded?: boolean }) {
                     >
                       {t.journal.quality} {trade.review.quality_score} ({trade.review.quality_label})
                     </span>
+                    {syncingTradeId === trade.id ? (
+                      <span className="rounded-full border border-zinc-600/50 bg-zinc-900/60 px-2 py-0.5 text-xs text-zinc-400">
+                        {t.journal.syncingPortfolio}
+                      </span>
+                    ) : trade.portfolio_sync_status ? (
+                      <span
+                        className={`rounded-full border px-2 py-0.5 text-xs ${portfolioSyncBadgeClass(trade.portfolio_sync_status)}`}
+                        title={trade.portfolio_sync_status === "pending" ? t.journal.syncPendingHint : undefined}
+                      >
+                        {trade.portfolio_sync_status === "synced"
+                          ? t.journal.syncBadgeSynced
+                          : trade.portfolio_sync_status === "pending"
+                            ? t.journal.syncBadgePending
+                            : t.journal.syncBadgeNeedsQuantity}
+                      </span>
+                    ) : null}
                   </div>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        await deleteTrade(trade.id);
-                        await reload();
-                        setStatusTone("success");
-                        setStatus(`${t.common.delete} #${trade.id}`);
-                      } catch (err) {
-                        setStatusTone("error");
-                        setStatus(err instanceof Error ? err.message : t.journal.saveFailed);
-                      }
-                    }}
-                    className="btn-ghost px-2 py-1 text-xs hover:bg-zinc-900"
-                  >
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={syncingTradeId === trade.id || trade.portfolio_sync_status === "needs_quantity"}
+                      onClick={async () => {
+                        try {
+                          setSyncingTradeId(trade.id);
+                          setStatusTone("neutral");
+                          setStatus(t.journal.syncingPortfolio);
+                          const res = await syncTradeToPortfolio(trade.id);
+                          await reload();
+                          setStatusTone("success");
+                          setStatus(
+                            res.portfolio_synced
+                              ? t.journal.syncPortfolioDone
+                              : res.portfolio_message || t.journal.syncPortfolioFailed
+                          );
+                        } catch (err) {
+                          setStatusTone("error");
+                          setStatus(err instanceof Error ? err.message : t.journal.syncPortfolioFailed);
+                        } finally {
+                          setSyncingTradeId(null);
+                        }
+                      }}
+                      className="btn-ghost px-2 py-1 text-xs hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {t.journal.syncToPortfolio}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await deleteTrade(trade.id);
+                          await reload();
+                          setStatusTone("success");
+                          setStatus(`${t.common.delete} #${trade.id}`);
+                        } catch (err) {
+                          setStatusTone("error");
+                          setStatus(err instanceof Error ? err.message : t.journal.saveFailed);
+                        }
+                      }}
+                      className="btn-ghost px-2 py-1 text-xs hover:bg-zinc-900"
+                    >
                     {t.common.delete}
                   </button>
+                  </div>
                 </div>
                 <p className="mt-2 text-xs text-zinc-400">{trade.review.review_note}</p>
                 <div className="mt-3 grid gap-2 text-xs text-zinc-500 sm:grid-cols-2 lg:grid-cols-4">

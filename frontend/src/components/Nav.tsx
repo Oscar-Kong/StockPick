@@ -54,7 +54,7 @@ export function Nav() {
             <span className="app-brand-mark" aria-hidden />
             <span className="app-brand-text">
               <span className="app-brand-name">Picker</span>
-              <span className="app-brand-sub">Quant</span>
+              <span className="app-brand-sub">Daily</span>
             </span>
           </Link>
 

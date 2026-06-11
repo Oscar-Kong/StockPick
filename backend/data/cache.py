@@ -145,6 +145,9 @@ def init_db() -> None:
     from data.portfolio_store import init_portfolio_db
 
     init_portfolio_db()
+    from data.freshness_store import init_freshness_db
+
+    init_freshness_db()
     from engines.quant_db import init_quant_db
 
     init_quant_db()

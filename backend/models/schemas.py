@@ -336,6 +336,15 @@ class TradeItem(BaseModel):
     review: TradeReviewSnapshot = TradeReviewSnapshot()
     created_at: datetime
     updated_at: datetime
+    portfolio_synced: bool | None = None
+    portfolio_sync_status: str | None = None  # synced | pending | needs_quantity
+
+
+class TradeManualResponse(TradeItem):
+    """Manual trade create/upload response with portfolio sync status."""
+
+    portfolio_synced: bool = False
+    portfolio_message: str | None = None
 
 
 class TradeStatsResponse(BaseModel):
@@ -943,6 +952,7 @@ class PortfolioHolding(BaseModel):
 
 class PortfolioDecisionRequest(BaseModel):
     cash: float = Field(default=0.0, ge=0)
+    reserved_cash: float = Field(default=0.0, ge=0)
     holdings: list[PortfolioHolding] = Field(default_factory=list)
     persist: bool = False
 
@@ -986,6 +996,7 @@ class PortfolioDecisionItem(BaseModel):
 class PortfolioDecisionResponse(BaseModel):
     as_of: str
     cash: float
+    reserved_cash: float = 0.0
     total_value: float
     invested_value: float = 0.0
     items: list[PortfolioDecisionItem] = []
@@ -1008,9 +1019,50 @@ class PennyOpportunityItem(BaseModel):
     summary: str = ""
 
 
+class DataFreshnessStatus(BaseModel):
+    key: str
+    last_updated_at: str | None = None
+    stale_after_seconds: int | None = None
+    is_stale: bool = False
+    is_missing: bool = False
+    reason: str = ""
+    source: str = ""
+
+
+class DashboardFreshnessSummary(BaseModel):
+    overall_status: str = "fresh"  # fresh | updating | stale | missing | demo
+    items: list[DataFreshnessStatus] = []
+    refresh_recommended: bool = False
+    refresh_in_progress: bool = False
+    refresh_job_id: str | None = None
+    last_holdings_sync_at: str | None = None
+    last_price_update_at: str | None = None
+    last_decision_run_at: str | None = None
+    last_penny_scan_at: str | None = None
+
+
+class HomeRefreshResponse(BaseModel):
+    job_id: str
+    status: str = "running"
+    message: str = ""
+
+
+class HomeRefreshStatusResponse(BaseModel):
+    job_id: str
+    status: str  # pending | running | completed | failed
+    started_at: str | None = None
+    finished_at: str | None = None
+    error: str | None = None
+    result: dict[str, Any] | None = None
+
+
 class DailyDashboardResponse(BaseModel):
     portfolio_value: float = 0.0
     cash: float = 0.0
+    reserved_cash: float = 0.0
+    ipo_shares: float | None = None
+    ipo_list_price: float | None = None
+    ipo_buffer: float = 1.2
     invested_value: float = 0.0
     cash_pct: float = 0.0
     active_holdings_count: int = 0
@@ -1026,6 +1078,12 @@ class DailyDashboardResponse(BaseModel):
     risk_alerts: list[str] = []
     portfolio_warnings: list[str] = []
     disclaimer: str = ""
+    freshness: DashboardFreshnessSummary | None = None
+    decision_stale_warning: str | None = None
+    csv_rows_loaded: int | None = None
+    ledger_rows_count: int | None = None
+    ledger_cash_estimate: float | None = None
+    cash_source: str | None = None  # buying_power | ledger | unset
 
 
 class BrokerageCsvImportResponse(BaseModel):

@@ -21,22 +21,22 @@ export function CollapsibleSection({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <section className={clsx("surface-card overflow-hidden", className)}>
+    <section className={clsx("app-card app-card--elevated overflow-hidden", className)}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-zinc-900/40"
+        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left hover:bg-zinc-900/40"
         aria-expanded={open}
       >
         <span>
-          <span className="block text-sm font-medium text-zinc-200">{title}</span>
-          {summary && !open && <span className="mt-0.5 block text-xs text-zinc-500">{summary}</span>}
+          <span className="block text-sm font-semibold text-zinc-100">{title}</span>
+          {summary && !open && <span className="mt-1 block text-xs text-secondary">{summary}</span>}
         </span>
-        <span className="text-zinc-500" aria-hidden>
+        <span className="text-tertiary" aria-hidden>
           {open ? "−" : "+"}
         </span>
       </button>
-      {open && <div className="border-t border-zinc-800 px-4 py-3">{children}</div>}
+      {open && <div className="border-t border-white/8 px-5 py-4">{children}</div>}
     </section>
   );
 }

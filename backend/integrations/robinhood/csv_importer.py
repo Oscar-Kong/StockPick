@@ -57,6 +57,22 @@ def _parse_optional_float(val: str | None) -> float | None:
         return None
 
 
+def _effective_fill_price(*, price: float | None, quantity: float, amount: float) -> float:
+    """Prefer Robinhood Amount / Quantity when it disagrees with the Price column."""
+    qty = abs(float(quantity))
+    if qty <= 0:
+        return float(price or 0)
+    if amount == 0:
+        return float(price or 0)
+    from_amount = abs(float(amount)) / qty
+    if price is None or price <= 0:
+        return round(from_amount, 6)
+    # Allow ~2% for fees/rounding; beyond that the cash Amount is authoritative.
+    if abs(from_amount - price) / max(price, 0.01) > 0.02:
+        return round(from_amount, 6)
+    return float(price)
+
+
 def _parse_datetime(activity: str, process: str) -> datetime | None:
     for raw in (activity, process):
         if not raw:
@@ -202,6 +218,7 @@ def parse_robinhood_csv(content: str | bytes) -> tuple[list[ParsedCsvRow], list[
                 else:
                     warnings.append(f"Line {line_no}: {symbol} {trans_upper} missing price — skipped")
                     continue
+            price = _effective_fill_price(price=price, quantity=qty, amount=amount)
 
         rh = row_hash_from_fields(
             activity_date=activity,

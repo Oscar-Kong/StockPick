@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { Messages } from "./messages/en";
 import { useTranslation } from "./context";
 
@@ -12,6 +12,8 @@ import { useTranslation } from "./context";
 export function useTRef(): React.MutableRefObject<Messages> {
   const { t } = useTranslation();
   const ref = useRef(t);
-  ref.current = t;
+  useEffect(() => {
+    ref.current = t;
+  }, [t]);
   return ref;
 }

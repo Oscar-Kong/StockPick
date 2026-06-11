@@ -11,10 +11,10 @@ interface EmptyStateProps {
 
 export function EmptyState({ title, message, className, action }: EmptyStateProps) {
   return (
-    <div className={clsx("rounded-lg border border-dashed border-zinc-800 px-4 py-6 text-center", className)}>
-      {title && <p className="text-sm font-medium text-zinc-300">{title}</p>}
-      <p className={clsx("text-xs text-zinc-500", title && "mt-1")}>{message}</p>
-      {action && <div className="mt-3">{action}</div>}
+    <div className={clsx("app-card app-card--ghost px-6 py-10 text-center", className)}>
+      {title && <p className="text-base font-semibold text-zinc-200">{title}</p>}
+      <p className={clsx("text-sm leading-relaxed text-zinc-500", title && "mt-2")}>{message}</p>
+      {action && <div className="mt-5">{action}</div>}
     </div>
   );
 }

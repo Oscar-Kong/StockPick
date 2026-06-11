@@ -13,7 +13,7 @@ It combines rule-based screening, data reconciliation, optional OpenBB governanc
 
 From one UI, you can:
 
-1. **Home** — daily buy/keep/sell dashboard for your Robinhood holdings (`/`)
+1. **Home** — daily buy/keep/sell dashboard for your Robinhood holdings (`/`). Import Robinhood CSV or log a **manual journal trade** (with quantity) to rebuild positions. Shows the latest saved snapshot immediately; if holdings, prices, or decisions are stale, the UI marks status as **Updating** and refreshes in the background (holdings → prices → daily decision; penny scan runs async). Use **Refresh data now** to force a sync.
 2. **Scan** a bucket and rank candidates (`/scan`)
 3. **Workspace** — watchlist, single-symbol analyze (primary score from `/api/v2/score` when enabled), compare peers, trade journal (`/workspace`)
 4. **Portfolio** — basket optimization, rebalance policy backtests (research; daily decisions live on Home) (`/portfolio`)
@@ -246,6 +246,10 @@ Optional LLM profile tuning:
 ### Trades (journal)
 
 - `GET/POST/PATCH/DELETE /trades`, `/trades/manual`, `/trades/upload`, `/trades/stats/summary`
+- Manual journal entries with **quantity** also append to the portfolio ledger, rebuild holdings, and rerun the daily decision (same as a new CSV buy/sell row). Each saved trade shows an **On Home / Not on Home** badge; use **Sync to Home** to backfill. Screenshot uploads require quantity too.
+- `GET /trades` includes `portfolio_sync_status` (`synced` | `pending` | `needs_quantity`) per row
+- `POST /trades/{id}/sync-portfolio` — push an existing journal trade to Home holdings
+- `GET /home/daily-dashboard?skip_auto_refresh=true` — poll without starting another background refresh (used while Home is updating)
 
 ### Backtesting
 
@@ -309,6 +313,7 @@ For production-grade models, offline training pipelines still need to be operate
 | [Institutional Quant Architecture](docs/INSTITUTIONAL_QUANT_ARCHITECTURE.md) | Target v2 engines, formulas, schema, roadmap |
 | [Scan ScoringEngine migration](docs/SCAN_SCORING_ENGINE_MIGRATION.md) | Enable engine path in staging; parity logs & metadata |
 | [Scan engine v2 staging report](docs/SCAN_ENGINE_V2_STAGING_REPORT.md) | Local parity rollout results & commands |
+| **[Cursor Skills quick manual](docs/CURSOR_SKILLS.md)** | **Using `.cursor/skills/` workflows, personas, and commands in this repo** |
 
 ## Common Commands
 

@@ -13,6 +13,7 @@ from data import cache as cache_module
 from models.schemas import (
     TradeCreateRequest,
     TradeItem,
+    TradeManualResponse,
     TradeReviewSnapshot,
     TradeStatsResponse,
     TradeUpdateRequest,
@@ -20,6 +21,7 @@ from models.schemas import (
 from services.trade_review import parse_iso_datetime, review_trade
 from services.image_trade_analyzer import analyze_trade_screenshot
 from services.trade_feedback_service import record_outcome_for_trade, record_prediction_for_trade
+from services.portfolio_snapshot_service import journal_trade_sync_status
 
 router = APIRouter(prefix="/trades", tags=["trades"])
 
@@ -36,8 +38,36 @@ def _parse_tags(raw: str | None) -> list[str]:
 
 
 def _to_trade_item(row: dict) -> TradeItem:
+    status, synced = journal_trade_sync_status(
+        trade_id=int(row["id"]),
+        quantity=row.get("quantity"),
+    )
+    return _to_trade_response(
+        row,
+        portfolio_synced=synced if status != "needs_quantity" else False,
+        portfolio_sync_status=status,
+    )
+
+
+def _trade_response_after_sync(row: dict, synced: bool, msg: str | None) -> TradeManualResponse:
+    status, _ = journal_trade_sync_status(trade_id=int(row["id"]), quantity=row.get("quantity"))
+    return _to_trade_response(
+        row,
+        portfolio_synced=synced,
+        portfolio_message=msg,
+        portfolio_sync_status=status,
+    )
+
+
+def _to_trade_response(
+    row: dict,
+    *,
+    portfolio_synced: bool = False,
+    portfolio_message: str | None = None,
+    portfolio_sync_status: str | None = None,
+) -> TradeManualResponse:
     review = row.get("review") or {}
-    return TradeItem(
+    return TradeManualResponse(
         id=int(row["id"]),
         symbol=row["symbol"],
         side=row.get("side", "long"),
@@ -55,6 +85,9 @@ def _to_trade_item(row: dict) -> TradeItem:
         review=TradeReviewSnapshot(**review),
         created_at=datetime.fromisoformat(row["created_at"]),
         updated_at=datetime.fromisoformat(row["updated_at"]),
+        portfolio_synced=portfolio_synced,
+        portfolio_message=portfolio_message,
+        portfolio_sync_status=portfolio_sync_status,
     )
 
 
@@ -91,7 +124,7 @@ def _build_review(
     }
 
 
-def _on_trade_opened(row: dict, *, sleeve: str | None = None) -> None:
+def _on_trade_opened(row: dict, *, sleeve: str | None = None) -> tuple[bool, str | None]:
     try:
         record_prediction_for_trade(
             int(row["id"]),
@@ -103,6 +136,39 @@ def _on_trade_opened(row: dict, *, sleeve: str | None = None) -> None:
         )
     except Exception:
         pass
+    return _sync_trade_to_portfolio(row)
+
+
+def _sync_trade_to_portfolio(row: dict) -> tuple[bool, str | None]:
+    qty = row.get("quantity")
+    if qty is None or float(qty) <= 0:
+        return False, "Add a share quantity to update the Home portfolio"
+    try:
+        from services.portfolio_snapshot_service import (
+            apply_manual_trade_to_portfolio,
+            evaluate_portfolio_sync_result,
+        )
+
+        entry_time = row.get("entry_time")
+        if isinstance(entry_time, str):
+            entry_time = datetime.fromisoformat(entry_time.replace("Z", "+00:00"))
+        exit_time = row.get("exit_time")
+        if isinstance(exit_time, str):
+            exit_time = datetime.fromisoformat(exit_time.replace("Z", "+00:00"))
+        result = apply_manual_trade_to_portfolio(
+            trade_id=int(row["id"]),
+            symbol=row["symbol"],
+            side=row.get("side", "long"),
+            entry_time=entry_time,
+            entry_price=float(row["entry_price"]),
+            quantity=float(qty),
+            exit_time=exit_time,
+            exit_price=float(row["exit_price"]) if row.get("exit_price") is not None else None,
+            notes=row.get("notes") or "",
+        )
+        return evaluate_portfolio_sync_result(result)
+    except Exception as exc:
+        return False, str(exc)[:200]
 
 
 def _on_trade_closed(row: dict) -> None:
@@ -126,8 +192,13 @@ def list_trades(symbol: str | None = None, limit: int = Query(default=100, ge=1,
     return [_to_trade_item(r) for r in rows]
 
 
-@router.post("/manual", response_model=TradeItem)
+@router.post("/manual", response_model=TradeManualResponse)
 def create_trade_manual(body: TradeCreateRequest):
+    if body.quantity is None or float(body.quantity) <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Quantity is required — journal trades need share count to update the Home portfolio",
+        )
     review = _build_review(
         side=body.side,
         entry_price=body.entry_price,
@@ -153,13 +224,13 @@ def create_trade_manual(body: TradeCreateRequest):
         notes=body.notes,
         review=review,
     )
-    _on_trade_opened(row, sleeve=body.sleeve)
+    synced, msg = _on_trade_opened(row, sleeve=body.sleeve)
     if body.exit_price is not None:
         _on_trade_closed(row)
-    return _to_trade_item(row)
+    return _trade_response_after_sync(row, synced, msg)
 
 
-@router.post("/upload", response_model=TradeItem)
+@router.post("/upload", response_model=TradeManualResponse)
 async def create_trade_upload(
     symbol: str = Form(...),
     side: str = Form("long"),
@@ -175,6 +246,11 @@ async def create_trade_upload(
     notes: str = Form(""),
     screenshot: UploadFile | None = File(None),
 ):
+    if quantity is None or float(quantity) <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Quantity is required — journal trades need share count to update the Home portfolio",
+        )
     parsed_entry = parse_iso_datetime(entry_time)
     if not parsed_entry:
         raise HTTPException(status_code=400, detail="Invalid entry_time format")
@@ -232,13 +308,24 @@ async def create_trade_upload(
         screenshot_path=screenshot_path,
         review=review,
     )
-    _on_trade_opened(row)
+    synced, msg = _on_trade_opened(row)
     if exit_price is not None:
         _on_trade_closed(row)
-    return _to_trade_item(row)
+    return _trade_response_after_sync(row, synced, msg)
 
 
-@router.patch("/{trade_id}", response_model=TradeItem)
+@router.post("/{trade_id}/sync-portfolio", response_model=TradeManualResponse)
+def sync_trade_portfolio(trade_id: int):
+    row = cache_module.get_trade(trade_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Trade not found")
+    synced, msg = _sync_trade_to_portfolio(row)
+    if not synced and msg and "quantity" in msg.lower():
+        raise HTTPException(status_code=400, detail=msg)
+    return _trade_response_after_sync(row, synced, msg)
+
+
+@router.patch("/{trade_id}", response_model=TradeManualResponse)
 def update_trade(trade_id: int, body: TradeUpdateRequest):
     existing = cache_module.get_trade(trade_id)
     if not existing:
@@ -279,9 +366,10 @@ def update_trade(trade_id: int, body: TradeUpdateRequest):
     )
     if not row:
         raise HTTPException(status_code=404, detail="Trade not found")
+    synced, msg = _sync_trade_to_portfolio(row)
     if row.get("exit_price") is not None:
         _on_trade_closed(row)
-    return _to_trade_item(row)
+    return _trade_response_after_sync(row, synced, msg)
 
 
 @router.delete("/{trade_id}")

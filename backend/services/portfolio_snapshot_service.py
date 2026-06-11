@@ -2,20 +2,26 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 
 from data.portfolio_store import (
     DEFAULT_ACCOUNT_ID,
     get_account_cash,
+    get_account_reserved_cash,
     get_current_holdings,
     get_latest_portfolio_snapshot,
     get_or_create_account,
     list_uploads,
     load_all_ledger_rows,
     mark_sync,
+    clear_trade_ledger,
+    purge_duplicate_trades,
     record_upload,
     save_holdings,
     save_portfolio_snapshot,
     set_account_cash,
+    set_account_ipo_order,
+    set_account_reserved_cash,
     update_account_source,
     upsert_ledger_rows,
 )
@@ -38,13 +44,20 @@ def _rebuild_from_store(account_id: int = DEFAULT_ACCOUNT_ID):
     return rebuild_portfolio(rows)
 
 
-def import_robinhood_csv(content: str | bytes, filename: str, *, cash: float | None = None) -> dict:
+def import_robinhood_csv(content: str | bytes, filename: str, *, cash: float | None = None, replace: bool = False) -> dict:
     rows, warnings = parse_robinhood_csv(content)
     account = get_or_create_account()
     account_id = account["id"]
 
+    if replace:
+        cleared = clear_trade_ledger(account_id)
+        if cleared:
+            warnings = list(warnings) + [f"Replaced prior ledger ({cleared} rows cleared)"]
+
     file_id = record_upload(account_id, filename, len(rows), 0, warnings)
+    purge_duplicate_trades(account_id)
     imported, skipped = upsert_ledger_rows(account_id, rows, source_file_id=file_id)
+    purge_duplicate_trades(account_id)
 
     rebuild = _rebuild_from_store(account_id)
     saved = save_holdings(account_id, rebuild.open_holdings, source="csv")
@@ -84,6 +97,13 @@ def import_robinhood_csv(content: str | bytes, filename: str, *, cash: float | N
         trades_skipped=skipped,
         message=f"Imported {imported} ledger rows from {filename}",
     )
+
+    from data.freshness_store import clear_freshness_flag, mark_freshness_updated
+
+    mark_freshness_updated("portfolio_holdings", source="csv_import", extra={"holdings": len(saved)})
+    mark_freshness_updated("closed_positions", source="csv_import")
+    clear_freshness_flag("portfolio_holdings", "holdings_dirty")
+    clear_freshness_flag("closed_positions", "needs_refresh")
 
     return {
         "filename": filename,
@@ -137,17 +157,203 @@ def validate_robinhood_csv(content: str | bytes) -> dict:
     }
 
 
-def import_robinhood_csv_and_decide(content: str | bytes, filename: str, *, cash: float | None = None) -> dict:
-    result = import_robinhood_csv(content, filename, cash=cash)
+def import_robinhood_csv_and_decide(content: str | bytes, filename: str, *, cash: float | None = None, replace: bool = False) -> dict:
+    result = import_robinhood_csv(content, filename, cash=cash, replace=replace)
     if result.get("holdings_count", 0) > 0:
         try:
             from services.portfolio_decision_service import run_stored_portfolio_decision
+            from data.freshness_store import mark_freshness_updated
 
             decision = run_stored_portfolio_decision(trigger="manual", persist=True)
             result["decision"] = model_to_dict(decision)
+            mark_freshness_updated("daily_decision", source="csv_import")
+            mark_freshness_updated("risk_metrics", source="csv_import")
+            mark_freshness_updated("data_quality", source="csv_import")
         except Exception as exc:
             result["warnings"] = list(result.get("warnings") or []) + [f"Decision after import skipped: {exc}"]
     return result
+
+
+def _dt_to_csv_dates(dt: datetime) -> tuple[str, str]:
+    day = dt.strftime("%Y-%m-%d")
+    return day, day
+
+
+def _journal_ledger_hash(trade_id: int, leg: str) -> str:
+    import hashlib
+
+    return hashlib.sha256(f"journal-trade|{trade_id}|{leg}".encode()).hexdigest()
+
+
+def is_journal_trade_synced(trade_id: int) -> bool:
+    """True when the journal trade's open leg exists in the portfolio ledger."""
+    from data.portfolio_store import ledger_has_row_hash
+
+    return ledger_has_row_hash(_journal_ledger_hash(trade_id, "buy"))
+
+
+def journal_trade_sync_status(*, trade_id: int, quantity: float | None) -> tuple[str, bool]:
+    """Return (status, synced) for journal list UI — synced | pending | needs_quantity."""
+    qty = float(quantity or 0)
+    if qty <= 0:
+        return "needs_quantity", False
+    if is_journal_trade_synced(trade_id):
+        return "synced", True
+    return "pending", False
+
+
+def evaluate_portfolio_sync_result(result: dict | None) -> tuple[bool, str | None]:
+    """Interpret apply_manual_trade_to_portfolio output for API responses."""
+    if not result:
+        return False, "Portfolio sync failed"
+    imported = int(result.get("imported") or 0)
+    skipped = int(result.get("skipped") or 0)
+    holdings_count = int(result.get("holdings_count") or 0)
+    msg = str(result.get("message") or "")
+    decision_error = result.get("decision_error")
+
+    ledger_touched = imported > 0 or skipped > 0
+    if decision_error:
+        if ledger_touched:
+            note = f"{msg} (decision refresh: {decision_error})" if msg else str(decision_error)[:200]
+            return True, note[:200]
+        return False, str(decision_error)[:200]
+    if imported > 0:
+        return True, msg or "Portfolio updated from journal trade"
+    if skipped > 0:
+        return True, msg or "Portfolio refreshed (trade already synced)"
+    if holdings_count > 0 and msg:
+        return True, msg
+    return False, msg or "No ledger changes — check quantity and symbol"
+
+
+def apply_manual_trade_to_portfolio(
+    *,
+    trade_id: int,
+    symbol: str,
+    side: str,
+    entry_time: datetime,
+    entry_price: float,
+    quantity: float | None,
+    exit_time: datetime | None = None,
+    exit_price: float | None = None,
+    notes: str = "",
+) -> dict | None:
+    """Append a journal/manual trade to the portfolio ledger and rebuild holdings."""
+    from datetime import datetime as dt_cls
+
+    from integrations.robinhood.models import ParsedCsvRow
+
+    qty = float(quantity or 0)
+    if qty <= 0:
+        return {"imported": 0, "skipped": 0, "message": "Quantity required to update Home portfolio"}
+
+    sym = (symbol or "").upper().strip()
+    if not sym:
+        return None
+
+    account = get_or_create_account()
+    account_id = account["id"]
+    description = (notes or "Manual trade entry").strip()[:300]
+    ledger_rows: list[ParsedCsvRow] = []
+
+    entry_dt = entry_time.replace(tzinfo=None) if getattr(entry_time, "tzinfo", None) else entry_time
+    activity, process = _dt_to_csv_dates(entry_dt)
+    buy_amount = -(qty * float(entry_price))
+    buy_hash = _journal_ledger_hash(trade_id, "buy")
+    ledger_rows.append(
+        ParsedCsvRow(
+            activity_date=activity,
+            process_date=process,
+            instrument=sym,
+            description=f"{description} [journal #{trade_id}]",
+            trans_code="MANUAL",
+            quantity=qty,
+            price=float(entry_price),
+            amount=buy_amount,
+            row_type="buy",
+            row_hash=buy_hash,
+            executed_at=entry_dt,
+        )
+    )
+
+    if exit_price is not None and float(exit_price) > 0:
+        exit_dt = exit_time or entry_dt
+        if isinstance(exit_dt, dt_cls) and exit_dt.tzinfo:
+            exit_dt = exit_dt.replace(tzinfo=None)
+        ex_activity, ex_process = _dt_to_csv_dates(exit_dt)
+        sell_amount = qty * float(exit_price)
+        sell_hash = _journal_ledger_hash(trade_id, "sell")
+        ledger_rows.append(
+            ParsedCsvRow(
+                activity_date=ex_activity,
+                process_date=ex_process,
+                instrument=sym,
+                description=f"{description} [journal #{trade_id}]",
+                trans_code="MANUAL",
+                quantity=qty,
+                price=float(exit_price),
+                amount=sell_amount,
+                row_type="sell",
+                row_hash=sell_hash,
+                executed_at=exit_dt,
+            )
+        )
+
+    imported, skipped = upsert_ledger_rows(account_id, ledger_rows)
+    already_synced = imported == 0 and skipped > 0
+
+    purge_duplicate_trades(account_id)
+    rebuild = _rebuild_from_store(account_id)
+    source = account.get("source") or "manual"
+    if source == "manual" and rebuild.open_holdings:
+        update_account_source("csv")
+        source = "csv"
+    saved = save_holdings(account_id, rebuild.open_holdings, source=source)
+    closed = [
+        {
+            "symbol": c.symbol,
+            "total_bought": c.total_bought,
+            "total_sold": c.total_sold,
+            "realized_pl": c.realized_pl,
+            "last_activity": c.last_activity,
+        }
+        for c in rebuild.closed_positions
+    ]
+    cash = get_account_cash()
+    total_est = sum(h["shares"] * h["avg_cost"] for h in saved) + cash
+    save_portfolio_snapshot(account_id, cash, total_est, saved, source, closed_positions=closed)
+
+    portfolio_result: dict = {
+        "imported": imported,
+        "skipped": skipped,
+        "holdings_count": len(saved),
+        "holdings": saved,
+        "closed_positions": closed,
+        "message": "Portfolio updated from journal trade"
+        if imported > 0
+        else ("Portfolio refreshed (trade already synced)" if already_synced else "No ledger changes"),
+    }
+
+    from data.freshness_store import clear_freshness_flag, mark_freshness_updated
+
+    mark_freshness_updated("portfolio_holdings", source="manual_trade", extra={"symbol": sym})
+    mark_freshness_updated("closed_positions", source="manual_trade")
+    clear_freshness_flag("portfolio_holdings", "holdings_dirty")
+    clear_freshness_flag("closed_positions", "needs_refresh")
+
+    try:
+        from services.portfolio_decision_service import run_stored_portfolio_decision
+
+        decision = run_stored_portfolio_decision(trigger="manual_trade", persist=True)
+        portfolio_result["decision"] = model_to_dict(decision)
+        mark_freshness_updated("daily_decision", source="manual_trade")
+        mark_freshness_updated("risk_metrics", source="manual_trade")
+        mark_freshness_updated("data_quality", source="manual_trade")
+    except Exception as exc:
+        portfolio_result["decision_error"] = str(exc)[:200]
+
+    return portfolio_result
 
 
 def sync_brokerage_if_configured() -> dict:
@@ -160,6 +366,7 @@ def sync_brokerage_if_configured() -> dict:
 
 def refresh_holdings_snapshot() -> dict:
     account = get_or_create_account()
+    removed = purge_duplicate_trades(DEFAULT_ACCOUNT_ID)
     rebuild = _rebuild_from_store()
     saved = save_holdings(DEFAULT_ACCOUNT_ID, rebuild.open_holdings, source=account["source"])
     cash = get_account_cash()
@@ -175,11 +382,88 @@ def refresh_holdings_snapshot() -> dict:
     ]
     total_est = sum(h["shares"] * h["avg_cost"] for h in saved) + cash
     snap = save_portfolio_snapshot(DEFAULT_ACCOUNT_ID, cash, total_est, saved, account["source"], closed_positions=closed)
-    return {"holdings": saved, "cash": cash, "closed_positions": closed, "snapshot": snap}
+    return {"holdings": saved, "cash": cash, "closed_positions": closed, "snapshot": snap, "duplicates_removed": removed}
 
 
-def holdings_to_request() -> tuple[float, list[PortfolioHolding]]:
-    cash = get_account_cash()
+def estimate_ledger_cash(account_id: int = DEFAULT_ACCOUNT_ID) -> float:
+    """Uninvested cash reconstructed from CSV ledger (deposits − buys + sells)."""
+    rows = load_all_ledger_rows(account_id)
+    if not rows:
+        return 0.0
+    return max(0.0, rebuild_portfolio(rows).cash_delta)
+
+
+def resolve_portfolio_cash(account_id: int = DEFAULT_ACCOUNT_ID) -> tuple[float, str]:
+    """
+    Robinhood buying power — uninvested cash available to trade.
+    Does not include reserved IPO cash (see reserved_cash on account).
+    """
+    acct = get_or_create_account()
+    stored = float(acct.get("cash_balance") or 0)
+    source = acct.get("source", "manual")
+    if stored > 0:
+        return stored, "buying_power"
+    if source == "csv":
+        ledger = estimate_ledger_cash(account_id)
+        reserved = float(acct.get("reserved_cash") or 0)
+        # Ledger cash may include reserved IPO; subtract if both set via import
+        if ledger > 0 and reserved > 0:
+            return max(0.0, ledger - reserved), "ledger"
+        if ledger > 0:
+            return ledger, "ledger"
+    return stored, "buying_power"
+
+
+def get_reserved_cash(account_id: int = DEFAULT_ACCOUNT_ID) -> float:
+    return get_account_reserved_cash(account_id)
+
+
+def set_portfolio_cash(
+    *,
+    buying_power: float,
+    reserved_cash: float = 0,
+    ipo_shares: float | None = None,
+    ipo_list_price: float | None = None,
+    account_id: int = DEFAULT_ACCOUNT_ID,
+) -> dict:
+    """Set buying power and optional reserved cash (e.g. upcoming IPO)."""
+    from integrations.robinhood.ipo import ROBINHOOD_IPO_BUFFER, compute_ipo_reserved_cash
+
+    reserved = max(0.0, float(reserved_cash))
+    shares = float(ipo_shares) if ipo_shares is not None else None
+    list_price = float(ipo_list_price) if ipo_list_price is not None else None
+    if shares is not None and list_price is not None and shares > 0 and list_price > 0:
+        reserved = compute_ipo_reserved_cash(shares=shares, list_price=list_price)
+
+    set_account_cash(account_id, max(0.0, float(buying_power)))
+    set_account_ipo_order(
+        account_id,
+        shares=shares if shares and shares > 0 else None,
+        list_price=list_price if list_price and list_price > 0 else None,
+        reserved=reserved,
+    )
+    acct = get_or_create_account()
+    return {
+        "cash": float(acct.get("cash_balance") or 0),
+        "reserved_cash": float(acct.get("reserved_cash") or 0),
+        "ipo_shares": acct.get("ipo_shares"),
+        "ipo_list_price": acct.get("ipo_list_price"),
+        "ipo_buffer": ROBINHOOD_IPO_BUFFER,
+        "account": acct,
+    }
+
+
+def set_buying_power(cash: float, *, account_id: int = DEFAULT_ACCOUNT_ID) -> dict:
+    """Set uninvested cash / buying power (Robinhood unused cash in total portfolio)."""
+    cash = max(0.0, float(cash))
+    set_account_cash(account_id, cash)
+    acct = get_or_create_account()
+    return {"cash": cash, "account": acct}
+
+
+def holdings_to_request() -> tuple[float, float, list[PortfolioHolding]]:
+    cash, _ = resolve_portfolio_cash()
+    reserved = get_reserved_cash()
     rows = get_current_holdings()
     holdings = [
         PortfolioHolding(
@@ -190,7 +474,7 @@ def holdings_to_request() -> tuple[float, list[PortfolioHolding]]:
         )
         for r in rows
     ]
-    return cash, holdings
+    return cash, reserved, holdings
 
 
 def get_current_portfolio() -> dict:
@@ -198,9 +482,15 @@ def get_current_portfolio() -> dict:
     holdings = get_current_holdings()
     snap = get_latest_portfolio_snapshot()
     closed = (snap or {}).get("closed_positions") or []
+    cash, cash_source = resolve_portfolio_cash()
+    reserved_cash = get_reserved_cash()
     return {
         "account": account,
-        "cash": account["cash_balance"],
+        "cash": cash,
+        "cash_source": cash_source,
+        "reserved_cash": reserved_cash,
+        "ipo_shares": account.get("ipo_shares"),
+        "ipo_list_price": account.get("ipo_list_price"),
         "holdings": holdings,
         "closed_positions": closed,
         "data_source": account["source"],

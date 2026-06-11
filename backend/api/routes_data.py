@@ -1,7 +1,7 @@
 """Data quality, strategy version, and scheduler status API routes."""
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from config import QUANDL_API_KEY
 from data.historical_store import HistoricalStore
@@ -111,3 +111,13 @@ def trigger_quote_refresh():
 @router.post("/scheduler/refresh-fundamentals")
 def trigger_fundamentals_refresh():
     return refresh_fundamentals()
+
+
+@router.post("/refresh")
+def data_refresh(scope: str = Query("home", description="home | portfolio | prices | penny_scan | all"), force: bool = False):
+    from services.refresh_orchestrator import refresh_if_stale
+
+    try:
+        return refresh_if_stale(scope, force=force)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

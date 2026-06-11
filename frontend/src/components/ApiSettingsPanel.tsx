@@ -55,7 +55,7 @@ function SettingRow({
   const active = item.enabled && !missingKey;
 
   return (
-    <div className="flex items-center gap-4 border-b border-zinc-800/80 px-4 py-3.5 last:border-b-0">
+    <div className="flex items-center gap-4 border-b border-white/8 px-5 py-3.5 last:border-b-0">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium text-zinc-100">{item.label}</span>
@@ -80,7 +80,7 @@ function SettingRow({
             </span>
           )}
         </div>
-        <p className="mt-1 text-xs leading-relaxed text-zinc-500">{item.description}</p>
+        <p className="mt-1 text-xs leading-relaxed text-secondary">{item.description}</p>
         {missingKey && item.enabled && (
           <p className="mt-1 text-xs text-amber-400/90">
             {fmt(t.settings.addKeyHint, { key: item.requires_key ?? "" })}
@@ -161,7 +161,7 @@ export function ApiSettingsPanel() {
 
   if (loading) {
     return (
-      <div className="surface-card p-8 text-center text-sm text-zinc-500">{t.settings.loadingApi}</div>
+      <div className="app-card p-8 text-center text-sm text-secondary">{t.settings.loadingApi}</div>
     );
   }
 
@@ -175,11 +175,11 @@ export function ApiSettingsPanel() {
 
   return (
     <div className="space-y-6">
-      <div className="surface-card p-4">
+      <div className="app-card app-card--elevated p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold text-zinc-100">{t.settings.activeRouting}</h2>
-            <p className="mt-1 text-xs text-zinc-500">
+            <h2 className="text-sm font-semibold text-zinc-50">{t.settings.activeRouting}</h2>
+            <p className="mt-1 text-sm text-secondary">
               {fmt(t.settings.routingDetail, {
                 price: data.primary_price_source,
                 fundamentals: data.primary_fundamentals_source,
@@ -191,21 +191,21 @@ export function ApiSettingsPanel() {
             type="button"
             onClick={() => void handleResetAll()}
             disabled={pendingKey !== null}
-            className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 transition hover:border-zinc-500 hover:text-zinc-200 disabled:opacity-50"
+            className="btn-secondary px-3 py-1.5 text-xs disabled:opacity-50"
           >
             {t.settings.resetDefaults}
           </button>
         </div>
-        {message && <p className="mt-3 text-xs text-[#7dff8e]">{message}</p>}
-        {error && <p className="mt-3 text-xs text-red-400">{error}</p>}
-        <p className="mt-3 text-xs text-zinc-600">{t.settings.togglesHint}</p>
+        {message && <p className="mt-3 text-sm text-brand">{message}</p>}
+        {error && <p className="mt-3 text-sm text-negative">{error}</p>}
+        <p className="mt-3 text-xs text-tertiary">{t.settings.togglesHint}</p>
       </div>
 
       {data.groups.map((group) => (
-        <section key={group.id} className="surface-card overflow-hidden">
-          <div className="border-b border-zinc-800 px-4 py-3">
-            <h3 className="text-sm font-semibold text-zinc-100">{group.title}</h3>
-            <p className="mt-0.5 text-xs text-zinc-500">{group.description}</p>
+        <section key={group.id} className="app-card app-card--elevated overflow-hidden">
+          <div className="border-b border-white/8 px-5 py-3.5">
+            <h3 className="text-sm font-semibold text-zinc-50">{group.title}</h3>
+            <p className="mt-0.5 text-xs text-secondary">{group.description}</p>
           </div>
           <div>
             {group.items.map((item) => (

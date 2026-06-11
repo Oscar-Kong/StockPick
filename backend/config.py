@@ -208,6 +208,13 @@ PORTFOLIO_DECISION_ENABLED = _env_bool("PORTFOLIO_DECISION_ENABLED", "true")
 PORTFOLIO_DECISION_CRON = os.getenv("PORTFOLIO_DECISION_CRON", "0 9 * * 1-5")
 PORTFOLIO_DECISION_TZ = os.getenv("PORTFOLIO_DECISION_TZ", "America/New_York")
 
+# --- Market data refresh during trading hours ---
+MARKET_DATA_REFRESH_ENABLED = _env_bool("MARKET_DATA_REFRESH_ENABLED", "true")
+MARKET_DATA_REFRESH_CRON = os.getenv("MARKET_DATA_REFRESH_CRON", "*/15 9-16 * * 1-5")
+MARKET_DATA_REFRESH_TZ = os.getenv("MARKET_DATA_REFRESH_TZ", "America/New_York")
+PENNY_SCAN_REFRESH_CRON = os.getenv("PENNY_SCAN_REFRESH_CRON", "*/30 9-16 * * 1-5")
+PENNY_SCAN_REFRESH_TZ = os.getenv("PENNY_SCAN_REFRESH_TZ", "America/New_York")
+
 # --- LLM (Proxy-compatible) ---
 # Preferred custom proxy vars:
 # - GPT_PROXY_API_KEY

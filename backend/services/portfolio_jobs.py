@@ -38,6 +38,10 @@ def run_scheduled_portfolio_decision() -> dict:
 
     try:
         decision = run_stored_portfolio_decision(trigger="scheduled", persist=True)
+        from data.freshness_store import mark_freshness_updated
+
+        mark_freshness_updated("daily_decision", source="scheduled")
+        mark_freshness_updated("latest_prices", source="scheduled")
         return {
             "status": "ok",
             "holdings": len(holdings),
@@ -47,3 +51,33 @@ def run_scheduled_portfolio_decision() -> dict:
     except Exception as exc:
         logger.warning("Scheduled portfolio decision failed: %s", exc)
         return {"status": "failed", "error": str(exc)[:200]}
+
+
+def run_market_data_price_refresh() -> dict:
+    from config import MARKET_DATA_REFRESH_ENABLED
+    from services.data_freshness_service import get_market_session_band
+
+    if not MARKET_DATA_REFRESH_ENABLED:
+        return {"skipped": True, "reason": "MARKET_DATA_REFRESH_ENABLED=false"}
+
+    if get_market_session_band() != "regular":
+        return {"skipped": True, "reason": "outside_regular_market_hours"}
+
+    from services.refresh_orchestrator import refresh_prices_for_holdings
+
+    return refresh_prices_for_holdings(force=False)
+
+
+def run_scheduled_penny_scan_refresh() -> dict:
+    from config import MARKET_DATA_REFRESH_ENABLED
+    from services.data_freshness_service import get_market_session_band
+
+    if not MARKET_DATA_REFRESH_ENABLED:
+        return {"skipped": True, "reason": "MARKET_DATA_REFRESH_ENABLED=false"}
+
+    if get_market_session_band() != "regular":
+        return {"skipped": True, "reason": "outside_regular_market_hours"}
+
+    from services.refresh_orchestrator import refresh_penny_scan_if_needed
+
+    return refresh_penny_scan_if_needed(force=False)

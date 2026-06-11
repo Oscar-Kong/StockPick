@@ -47,6 +47,16 @@ def test_parentheses_dollar_parsing():
     assert slip.amount == pytest.approx(0.01)
 
 
+def test_amount_overrides_wrong_price_column():
+    """Robinhood Price column can disagree with Amount; cash impact is authoritative."""
+    csv = """Activity Date,Process Date,Settle Date,Instrument,Description,Trans Code,Quantity,Price,Amount
+2025-06-01,2025-06-01,2025-06-02,LIDR,Lidar Technologies,Buy,10,1.19,($19.10)
+"""
+    rows, _ = parse_robinhood_csv(csv)
+    lidr = next(r for r in rows if r.instrument == "LIDR")
+    assert lidr.price == pytest.approx(1.91)
+
+
 def test_rtp_slip_do_not_create_holdings():
     _, _, rebuild = _parse_and_rebuild()
     symbols = {h.symbol for h in rebuild.open_holdings}

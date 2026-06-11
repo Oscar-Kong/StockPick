@@ -12,8 +12,8 @@ import { AppTabBar, AppTabButton } from "@/components/AppTabs";
 import { QuantLabEvidencePanel } from "@/components/quant-lab/QuantLabEvidencePanel";
 import { QuantLabScanRelationshipPanel } from "@/components/product/QuantLabScanRelationshipPanel";
 import { EvidenceToActionBoundary } from "@/components/product/EvidenceToActionBoundary";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { ResearchWarning } from "@/components/ui/ResearchWarning";
-import { SectionHeader } from "@/components/ui/SectionHeader";
 import { useTranslation } from "@/lib/i18n";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback } from "react";
@@ -59,16 +59,16 @@ function QuantLabContent() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-6 sm:px-6">
-      <SectionHeader title={t.quantLab.title} subtitle={t.quantLab.subtitle} />
+    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4">
+      <PageHeader title={t.quantLab.title} subtitle={t.quantLab.subtitle} />
       <EvidenceToActionBoundary />
-      <ResearchWarning className="mb-4" message={t.quantLab.validationCopy} />
+      <ResearchWarning message={t.quantLab.validationCopy} />
 
       <QuantLabScanRelationshipPanel />
 
       <QuantLabEvidencePanel onNavigateTab={setTab} />
 
-      <AppTabBar aria-label={t.quantLab.tabsAria} className="mb-4 overflow-x-auto">
+      <AppTabBar aria-label={t.quantLab.tabsAria} className="overflow-x-auto">
         {TABS.map((key) => (
           <AppTabButton key={key} active={tab === key} onClick={() => setTab(key)}>
             {tabLabel[key]}
@@ -76,7 +76,7 @@ function QuantLabContent() {
         ))}
       </AppTabBar>
 
-      <div className="surface-card p-4">
+      <div className="app-card p-5">
         {tab === "factor-performance" && <FactorPerformanceTab />}
         {tab === "walk-forward" && <WalkForwardTab />}
         {tab === "predictions" && <PredictionsTab />}

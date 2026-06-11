@@ -156,10 +156,33 @@ def _scheduled_portfolio_decision() -> dict:
     return dispatch_job("daily_portfolio_decision", {})
 
 
+def _scheduled_market_data_refresh() -> dict:
+    if not _is_trading_session():
+        logger.info("Skipping market data refresh — not a trading session")
+        return {"skipped": True, "reason": "non_trading_day"}
+    from engines.jobs.queue import dispatch_job
+
+    return dispatch_job("market_data_price_refresh", {})
+
+
+def _scheduled_penny_scan_refresh() -> dict:
+    if not _is_trading_session():
+        logger.info("Skipping penny scan refresh — not a trading session")
+        return {"skipped": True, "reason": "non_trading_day"}
+    from engines.jobs.queue import dispatch_job
+
+    return dispatch_job("penny_scan_refresh", {})
+
+
 def start_scheduler() -> None:
     """Start APScheduler for daily jobs if SCHEDULER_ENABLED."""
     global _scheduler
     from config import (
+        MARKET_DATA_REFRESH_CRON,
+        MARKET_DATA_REFRESH_ENABLED,
+        MARKET_DATA_REFRESH_TZ,
+        PENNY_SCAN_REFRESH_CRON,
+        PENNY_SCAN_REFRESH_TZ,
         PORTFOLIO_DECISION_CRON,
         PORTFOLIO_DECISION_ENABLED,
         PORTFOLIO_DECISION_TZ,
@@ -205,13 +228,27 @@ def start_scheduler() -> None:
             id="daily_portfolio_decision",
             replace_existing=True,
         )
+    if MARKET_DATA_REFRESH_ENABLED:
+        _scheduler.add_job(
+            _scheduled_market_data_refresh,
+            CronTrigger.from_crontab(MARKET_DATA_REFRESH_CRON, timezone=MARKET_DATA_REFRESH_TZ),
+            id="market_data_price_refresh",
+            replace_existing=True,
+        )
+        _scheduler.add_job(
+            _scheduled_penny_scan_refresh,
+            CronTrigger.from_crontab(PENNY_SCAN_REFRESH_CRON, timezone=PENNY_SCAN_REFRESH_TZ),
+            id="penny_scan_refresh",
+            replace_existing=True,
+        )
     _scheduler.start()
     logger.info(
-        "Scheduler started — pipeline '%s' (%s); portfolio decision '%s' (%s)",
+        "Scheduler started — pipeline '%s' (%s); portfolio decision '%s' (%s); market refresh '%s'",
         SCHEDULER_CRON,
         SCHEDULER_TZ,
         PORTFOLIO_DECISION_CRON if PORTFOLIO_DECISION_ENABLED else "off",
         PORTFOLIO_DECISION_TZ,
+        MARKET_DATA_REFRESH_CRON if MARKET_DATA_REFRESH_ENABLED else "off",
     )
 
 

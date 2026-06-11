@@ -18,6 +18,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppTabBar, AppTabButton } from "./AppTabs";
 import { ChartMount } from "./ChartMount";
 import { DarkChartTooltip, darkTooltipCursor } from "./DarkChartTooltip";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { PortfolioFactorExposurePanel } from "./PortfolioFactorExposurePanel";
 import { PortfolioAllocationPanel } from "./PortfolioAllocationPanel";
 import { PortfolioDailyDecisionsPanel } from "./PortfolioDailyDecisionsPanel";
@@ -197,30 +198,30 @@ export function PortfolioPage() {
     })) ?? [];
 
   return (
-    <div className="space-y-4">
-      <header className="page-toolbar">
-        <div className="page-toolbar-title">
-          <h1>{t.portfolio.title}</h1>
-          <p className="page-toolbar-meta">{t.portfolio.subtitle}</p>
-        </div>
-        <AppTabBar aria-label={t.portfolio.toolsAria}>
-          <AppTabButton active={panel === "optimize"} onClick={() => setPanel("optimize")}>
-            {t.portfolio.tabOptimize}
-          </AppTabButton>
-          <AppTabButton active={panel === "policy"} onClick={() => setPanel("policy")}>
-            {t.portfolio.tabPolicy}
-          </AppTabButton>
-          <AppTabButton active={panel === "exposure"} onClick={() => setPanel("exposure")}>
-            {t.portfolio.tabExposure}
-          </AppTabButton>
-          <AppTabButton active={panel === "allocation"} onClick={() => setPanel("allocation")}>
-            {t.portfolio.tabAllocation}
-          </AppTabButton>
-          <AppTabButton active={panel === "daily"} onClick={() => setPanel("daily")}>
-            {t.portfolio.tabDaily}
-          </AppTabButton>
-        </AppTabBar>
-      </header>
+    <div className="mx-auto max-w-6xl space-y-5">
+      <PageHeader
+        title={t.portfolio.title}
+        subtitle={t.portfolio.subtitle}
+        actions={
+          <AppTabBar aria-label={t.portfolio.toolsAria}>
+            <AppTabButton active={panel === "optimize"} onClick={() => setPanel("optimize")}>
+              {t.portfolio.tabOptimize}
+            </AppTabButton>
+            <AppTabButton active={panel === "policy"} onClick={() => setPanel("policy")}>
+              {t.portfolio.tabPolicy}
+            </AppTabButton>
+            <AppTabButton active={panel === "exposure"} onClick={() => setPanel("exposure")}>
+              {t.portfolio.tabExposure}
+            </AppTabButton>
+            <AppTabButton active={panel === "allocation"} onClick={() => setPanel("allocation")}>
+              {t.portfolio.tabAllocation}
+            </AppTabButton>
+            <AppTabButton active={panel === "daily"} onClick={() => setPanel("daily")}>
+              {t.portfolio.tabDaily}
+            </AppTabButton>
+          </AppTabBar>
+        }
+      />
 
       <div className="surface-card space-y-3 p-4">
         <label className="text-xs font-medium text-zinc-500">{t.portfolio.symbolsLabel}</label>

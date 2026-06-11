@@ -3,7 +3,8 @@
 
 import { AppTabBar, AppTabButton } from "@/components/AppTabs";
 import { BucketPage } from "@/components/BucketPage";
-import { BUCKET_ORDER, getBucketMeta, parseBucket } from "@/lib/buckets";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { ACTIVE_BUCKET_ORDER, getBucketMeta, parseBucket } from "@/lib/buckets";
 import { useTranslation } from "@/lib/i18n";
 import type { Bucket } from "@/lib/types";
 import Link from "next/link";
@@ -29,34 +30,30 @@ function ScanHubContent() {
   const meta = bucketMeta[bucket];
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-0">
-      <header className="page-toolbar shrink-0">
-        <div className="page-toolbar-title">
-          <h1>{t.scan.hubTitle}</h1>
-          <p className="page-toolbar-meta">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <PageHeader
+        title={t.scan.hubTitle}
+        subtitle={
+          <>
             {t.scan.hubSubtitle}{" "}
-            <Link href="/library?tab=scans" className="font-medium text-[#7dff8e] hover:underline">
+            <Link href="/library?tab=scans" className="font-medium text-brand hover:underline">
               {t.nav.library}
             </Link>
-          </p>
-        </div>
-        <AppTabBar aria-label={t.scan.bucketsAria}>
-          {BUCKET_ORDER.map((b) => (
-            <AppTabButton key={b} active={bucket === b} onClick={() => setBucket(b)}>
-              {bucketMeta[b].label}
-            </AppTabButton>
-          ))}
-        </AppTabBar>
-      </header>
-      <p className="shrink-0 pb-2 text-xs text-zinc-500">{meta.description}</p>
+          </>
+        }
+        actions={
+          <AppTabBar aria-label={t.scan.bucketsAria}>
+            {ACTIVE_BUCKET_ORDER.map((b) => (
+              <AppTabButton key={b} active={bucket === b} onClick={() => setBucket(b)}>
+                {bucketMeta[b].label}
+              </AppTabButton>
+            ))}
+          </AppTabBar>
+        }
+      />
+      <p className="text-sm text-zinc-500">{meta.description}</p>
       <div className="min-h-0 flex-1">
-        <BucketPage
-          key={bucket}
-          bucket={bucket}
-          title={meta.title}
-          description={meta.description}
-          embedded
-        />
+        <BucketPage key={bucket} bucket={bucket} title={meta.title} description={meta.description} embedded />
       </div>
     </div>
   );

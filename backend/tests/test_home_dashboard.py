@@ -39,6 +39,48 @@ def test_risk_alerts_tolerates_legacy_snapshot_fields():
 
 
 def test_build_daily_dashboard_does_not_crash():
-    result = build_daily_dashboard()
+    result = build_daily_dashboard(include_freshness=False)
     assert result.portfolio_value >= 0
     assert result.disclaimer
+    assert result.freshness is None
+
+
+def test_portfolio_total_is_buying_power_plus_invested():
+    from unittest.mock import patch
+
+    decision = PortfolioDecisionResponse(
+        as_of="2025-01-01",
+        cash=73.3,
+        reserved_cash=810.0,
+        total_value=986.91,
+        invested_value=103.61,
+        items=[],
+    )
+    with patch("services.home_dashboard_service.get_current_portfolio") as gp:
+        gp.return_value = {
+            "account": {"source": "csv", "cash_balance": 73.3},
+            "cash": 73.3,
+            "cash_source": "buying_power",
+            "reserved_cash": 810.0,
+            "holdings": [{"symbol": "X"}],
+            "closed_positions": [],
+            "data_source": "csv",
+            "is_demo_data": False,
+        }
+        with patch("services.home_dashboard_service.get_latest_decision") as gd:
+            gd.return_value = {
+                "created_at": "2025-01-01",
+                "payload": {
+                    **decision.model_dump(),
+                    "reserved_cash": 810.0,
+                    "total_value": 986.91,
+                    "invested_value": 103.61,
+                    "cash": 73.3,
+                },
+            }
+            with patch("services.home_dashboard_service.get_latest_portfolio_snapshot", return_value=None):
+                result = build_daily_dashboard(include_freshness=False)
+    assert result.cash == 73.3
+    assert result.reserved_cash == 810.0
+    assert result.invested_value == 103.61
+    assert result.portfolio_value == 986.91

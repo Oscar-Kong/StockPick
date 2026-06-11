@@ -92,8 +92,9 @@ Everything else is **secondary**:
 ### D. “I traded — log it” (5 min)
 
 1. **Research** → **Journal** tab.
-2. Manual entry or screenshot upload.
-3. Review process-quality score (not just PnL).
+2. Manual entry or screenshot upload — **quantity is required** so the trade can sync to **Home** holdings.
+3. Check the badge on each saved trade: **On Home** (in portfolio ledger) vs **Not on Home** (use **Sync to Home**).
+4. Review process-quality score (not just PnL).
 
 ### E. “I want portfolio-level math” (advanced)
 
@@ -242,6 +243,8 @@ You do **not** need to touch Portfolio, Trader Intel, Round 2 admin APIs, or arc
 |---------|-----|
 | Empty scan | Widen price/volume filters; check backend on `:18731` |
 | Stale watchlist prices | Refresh rail (↻) in Research |
+| Journal trade not on Home | Enter **quantity** when saving; check badge (**On Home** / **Not on Home**); click **Sync to Home** |
+| Home stuck on “Updating” | Wait for refresh to finish; use **Refresh data now** once; reload `/` |
 | LLM Summary empty | `LLM_ENABLED` + proxy keys in `.env` |
 | Portfolio optimize fails | Need 2+ symbols with history; optional `requirements-quant.txt` |
 | Overwhelmed by factors | Disable `OPENALPHA_FACTORS_ENABLED`; read Overview only |

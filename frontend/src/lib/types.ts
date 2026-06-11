@@ -527,6 +527,13 @@ export interface TradeItem {
   review: TradeReviewSnapshot;
   created_at: string;
   updated_at: string;
+  portfolio_synced?: boolean | null;
+  portfolio_sync_status?: "synced" | "pending" | "needs_quantity" | null;
+}
+
+export interface TradeManualResponse extends TradeItem {
+  portfolio_synced?: boolean;
+  portfolio_message?: string | null;
 }
 
 export interface TradeCreateRequest {
@@ -1048,9 +1055,52 @@ export interface PennyOpportunityItem {
   summary?: string;
 }
 
+export type DataFreshnessOverallStatus = "fresh" | "updating" | "stale" | "missing" | "demo";
+
+export interface DataFreshnessStatus {
+  key: string;
+  last_updated_at?: string | null;
+  stale_after_seconds?: number | null;
+  is_stale: boolean;
+  is_missing: boolean;
+  reason: string;
+  source: string;
+}
+
+export interface DashboardFreshnessSummary {
+  overall_status: DataFreshnessOverallStatus;
+  items: DataFreshnessStatus[];
+  refresh_recommended: boolean;
+  refresh_in_progress: boolean;
+  refresh_job_id?: string | null;
+  last_holdings_sync_at?: string | null;
+  last_price_update_at?: string | null;
+  last_decision_run_at?: string | null;
+  last_penny_scan_at?: string | null;
+}
+
+export interface HomeRefreshResponse {
+  job_id: string;
+  status: string;
+  message: string;
+}
+
+export interface HomeRefreshStatusResponse {
+  job_id: string;
+  status: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+  error?: string | null;
+  result?: Record<string, unknown> | null;
+}
+
 export interface DailyDashboardResponse {
   portfolio_value: number;
   cash: number;
+  reserved_cash?: number;
+  ipo_shares?: number | null;
+  ipo_list_price?: number | null;
+  ipo_buffer?: number;
   invested_value?: number;
   cash_pct?: number;
   active_holdings_count?: number;
@@ -1066,6 +1116,12 @@ export interface DailyDashboardResponse {
   risk_alerts?: string[];
   portfolio_warnings: string[];
   disclaimer: string;
+  freshness?: DashboardFreshnessSummary | null;
+  decision_stale_warning?: string | null;
+  csv_rows_loaded?: number | null;
+  ledger_rows_count?: number | null;
+  ledger_cash_estimate?: number | null;
+  cash_source?: string | null;
 }
 
 export interface BrokerageCsvImportResponse {

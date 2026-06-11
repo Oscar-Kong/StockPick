@@ -24,6 +24,7 @@ class DecisionInput:
     current_weight: float
     target_weight: float
     max_allowed_weight: float
+    price_stale: bool = False
 
 
 @dataclass
@@ -148,8 +149,16 @@ def compute_holding_decision(inp: DecisionInput, *, total_portfolio_value: float
     if stop_loss:
         sell_raw += 40.0
 
-    # Penny conservative gates — do NOT recommend buy
     block_buy = False
+    if inp.price_stale:
+        flags.append("stale_price")
+        buy_raw = 0.0
+        block_buy = True
+        reasons.append("Latest price is stale — refresh before acting; buy suppressed")
+        if inp.sleeve == "penny":
+            reasons.append("Penny add blocked — stale price data")
+
+    # Penny conservative gates — do NOT recommend buy
     if inp.sleeve == "penny":
         if overweight:
             block_buy = True

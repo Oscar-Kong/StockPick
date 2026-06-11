@@ -74,10 +74,10 @@ export function QuantLabEvidencePanel({ sleeve = "penny", onNavigateTab }: Quant
   };
 
   return (
-    <section className="mb-4 space-y-3">
-      <div className="space-y-1">
-        <h2 className="text-sm font-semibold text-zinc-200">{t.quantLab.evidenceTitle}</h2>
-        <p className="text-xs text-zinc-500">
+    <section className="mb-6 space-y-3">
+      <div>
+        <h2 className="text-base font-semibold text-zinc-100">{t.quantLab.evidenceTitle}</h2>
+        <p className="section-subtitle">
           {data?.validation_copy ?? t.quantLab.validationCopy}
         </p>
       </div>
@@ -85,7 +85,7 @@ export function QuantLabEvidencePanel({ sleeve = "penny", onNavigateTab }: Quant
       {loading && <LoadingSkeleton lines={3} />}
       {error && !loading && <ErrorState message={error} onRetry={() => void load()} />}
       {!loading && !error && data && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {evidenceCards(data).map((summary) => (
             <QuantLabLastRunCard
               key={summary.id}

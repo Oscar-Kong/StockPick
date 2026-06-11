@@ -24,6 +24,9 @@ class BrokerageAccount(PortfolioBase):
     label = Column(String, nullable=False, default="Primary")
     source = Column(String, nullable=False, default="manual")  # manual | csv | snaptrade
     cash_balance = Column(Float, nullable=False, default=0.0)
+    reserved_cash = Column(Float, nullable=False, default=0.0)  # e.g. upcoming IPO allocation
+    ipo_shares = Column(Float, nullable=True)
+    ipo_list_price = Column(Float, nullable=True)
     last_sync_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False)
     updated_at = Column(DateTime, nullable=False)
@@ -141,9 +144,26 @@ def _migrate_trade_history_columns() -> None:
                 conn.execute(text(f"ALTER TABLE trade_history ADD COLUMN {col} {typ}"))
 
 
+def _migrate_brokerage_account_columns() -> None:
+    from sqlalchemy import inspect, text
+
+    insp = inspect(_engine)
+    if "brokerage_accounts" not in insp.get_table_names():
+        return
+    existing = {c["name"] for c in insp.get_columns("brokerage_accounts")}
+    with _engine.begin() as conn:
+        if "reserved_cash" not in existing:
+            conn.execute(text("ALTER TABLE brokerage_accounts ADD COLUMN reserved_cash FLOAT DEFAULT 0"))
+        if "ipo_shares" not in existing:
+            conn.execute(text("ALTER TABLE brokerage_accounts ADD COLUMN ipo_shares FLOAT"))
+        if "ipo_list_price" not in existing:
+            conn.execute(text("ALTER TABLE brokerage_accounts ADD COLUMN ipo_list_price FLOAT"))
+
+
 def init_portfolio_db() -> None:
     PortfolioBase.metadata.create_all(bind=_engine)
     _migrate_trade_history_columns()
+    _migrate_brokerage_account_columns()
 
 
 def _ensure_default_account(session: Session) -> BrokerageAccount:
@@ -156,6 +176,7 @@ def _ensure_default_account(session: Session) -> BrokerageAccount:
         label="Robinhood",
         source="manual",
         cash_balance=0.0,
+        reserved_cash=0.0,
         created_at=now,
         updated_at=now,
     )
@@ -180,6 +201,9 @@ def _account_dict(acct: BrokerageAccount) -> dict:
         "label": acct.label,
         "source": acct.source,
         "cash_balance": float(acct.cash_balance or 0),
+        "reserved_cash": float(getattr(acct, "reserved_cash", 0) or 0),
+        "ipo_shares": float(acct.ipo_shares) if getattr(acct, "ipo_shares", None) is not None else None,
+        "ipo_list_price": float(acct.ipo_list_price) if getattr(acct, "ipo_list_price", None) is not None else None,
         "last_sync_at": utc_iso_z(acct.last_sync_at) if acct.last_sync_at else None,
     }
 
@@ -279,23 +303,55 @@ def upsert_ledger_rows(
     *,
     source_file_id: int | None = None,
 ) -> tuple[int, int]:
-    """Insert all parsed CSV rows (buy/sell/cash/income) by row_hash."""
+    """Insert all parsed CSV rows (buy/sell/cash/income) by row_hash and semantic key."""
     from integrations.robinhood.models import ParsedCsvRow
+    from integrations.robinhood.ledger_dedupe import dedupe_parsed_rows, is_incomplete_ghost_row, semantic_ledger_key
+
+    rows, _ = dedupe_parsed_rows([r for r in rows if isinstance(r, ParsedCsvRow)])
 
     session = SessionLocal()
     imported = 0
     skipped = 0
     try:
         now = _utcnow()
+        existing_hashes = {
+            h
+            for (h,) in session.query(TradeHistory.row_hash)
+            .filter(TradeHistory.account_id == account_id)
+            .all()
+            if h
+        }
+        existing_semantic: set[tuple] = set()
+        for r in session.query(TradeHistory).filter(TradeHistory.account_id == account_id).all():
+            row_type = r.side if r.side in ("buy", "sell", "cash", "income") else "excluded"
+            qty = None if r.side in ("cash", "income") and (r.quantity or 0) == 0 else r.quantity
+            price = None if r.side in ("cash", "income") and (r.price or 0) == 0 else r.price
+            parsed = ParsedCsvRow(
+                activity_date=r.activity_date or "",
+                process_date=r.process_date or "",
+                instrument=r.symbol or "",
+                description=r.description or "",
+                trans_code=(r.trans_code or r.side or "").upper(),
+                quantity=qty,
+                price=price,
+                amount=float(r.amount or 0),
+                row_type=row_type,  # type: ignore[arg-type]
+                row_hash=r.row_hash,
+                executed_at=r.executed_at,
+            )
+            existing_semantic.add(semantic_ledger_key(parsed))
+
         for r in rows:
             if not isinstance(r, ParsedCsvRow):
                 continue
-            existing = (
-                session.query(TradeHistory)
-                .filter(TradeHistory.row_hash == r.row_hash)
-                .first()
-            )
-            if existing:
+            if is_incomplete_ghost_row(r):
+                skipped += 1
+                continue
+            if r.row_hash in existing_hashes:
+                skipped += 1
+                continue
+            sem_key = semantic_ledger_key(r)
+            if sem_key in existing_semantic:
                 skipped += 1
                 continue
             side = r.row_type if r.row_type in ("cash", "income") else r.row_type
@@ -319,6 +375,8 @@ def upsert_ledger_rows(
                     created_at=now,
                 )
             )
+            existing_hashes.add(r.row_hash)
+            existing_semantic.add(sem_key)
             imported += 1
         session.commit()
         return imported, skipped
@@ -326,8 +384,91 @@ def upsert_ledger_rows(
         session.close()
 
 
+def purge_duplicate_trades(account_id: int = DEFAULT_ACCOUNT_ID) -> int:
+    """Remove duplicate ledger rows from DB, keeping the most complete row per trade."""
+    from integrations.robinhood.models import ParsedCsvRow
+    from integrations.robinhood.ledger_dedupe import _row_completeness, is_incomplete_ghost_row, semantic_ledger_key
+
+    session = SessionLocal()
+    try:
+        db_rows = (
+            session.query(TradeHistory)
+            .filter(TradeHistory.account_id == account_id)
+            .order_by(TradeHistory.id)
+            .all()
+        )
+        best_id: dict[tuple, tuple[int, ParsedCsvRow]] = {}
+        for r in db_rows:
+            row_type = r.side if r.side in ("buy", "sell", "cash", "income") else "excluded"
+            qty = None if r.side in ("cash", "income") and (r.quantity or 0) == 0 else r.quantity
+            price = None if r.side in ("cash", "income") and (r.price or 0) == 0 else r.price
+            parsed = ParsedCsvRow(
+                activity_date=r.activity_date or "",
+                process_date=r.process_date or "",
+                instrument=r.symbol or "",
+                description=r.description or "",
+                trans_code=(r.trans_code or r.side or "").upper(),
+                quantity=qty,
+                price=price,
+                amount=float(r.amount or 0),
+                row_type=row_type,  # type: ignore[arg-type]
+                row_hash=r.row_hash,
+                executed_at=r.executed_at,
+            )
+            if is_incomplete_ghost_row(parsed):
+                continue
+            key = semantic_ledger_key(parsed)
+            prev = best_id.get(key)
+            if prev is None or _row_completeness(parsed) > _row_completeness(prev[1]):
+                best_id[key] = (int(r.id), parsed)
+
+        keep_ids = {v[0] for v in best_id.values()}
+        removed = 0
+        for r in db_rows:
+            row_type = r.side if r.side in ("buy", "sell", "cash", "income") else "excluded"
+            qty = None if r.side in ("cash", "income") and (r.quantity or 0) == 0 else r.quantity
+            price = None if r.side in ("cash", "income") and (r.price or 0) == 0 else r.price
+            parsed = ParsedCsvRow(
+                activity_date=r.activity_date or "",
+                process_date=r.process_date or "",
+                instrument=r.symbol or "",
+                description=r.description or "",
+                trans_code=(r.trans_code or r.side or "").upper(),
+                quantity=qty,
+                price=price,
+                amount=float(r.amount or 0),
+                row_type=row_type,  # type: ignore[arg-type]
+                row_hash=r.row_hash,
+                executed_at=r.executed_at,
+            )
+            if is_incomplete_ghost_row(parsed) or int(r.id) not in keep_ids:
+                session.delete(r)
+                removed += 1
+        if removed:
+            session.commit()
+        return removed
+    finally:
+        session.close()
+
+
+def clear_trade_ledger(account_id: int = DEFAULT_ACCOUNT_ID) -> int:
+    """Remove all ledger rows for an account (used before full CSV replace import)."""
+    session = SessionLocal()
+    try:
+        removed = (
+            session.query(TradeHistory)
+            .filter(TradeHistory.account_id == account_id)
+            .delete(synchronize_session=False)
+        )
+        session.commit()
+        return int(removed or 0)
+    finally:
+        session.close()
+
+
 def load_all_ledger_rows(account_id: int = DEFAULT_ACCOUNT_ID) -> list:
     from integrations.robinhood.models import ParsedCsvRow
+    from integrations.robinhood.ledger_dedupe import dedupe_parsed_rows
 
     session = SessionLocal()
     try:
@@ -338,10 +479,15 @@ def load_all_ledger_rows(account_id: int = DEFAULT_ACCOUNT_ID) -> list:
             .all()
         )
         out: list[ParsedCsvRow] = []
+        from integrations.robinhood.csv_importer import _effective_fill_price
+
         for r in rows:
             row_type = r.side if r.side in ("buy", "sell", "cash", "income") else "excluded"
             qty = None if r.side in ("cash", "income") and (r.quantity or 0) == 0 else r.quantity
             price = None if r.side in ("cash", "income") and (r.price or 0) == 0 else r.price
+            amount = float(r.amount or 0)
+            if row_type in ("buy", "sell") and qty and amount:
+                price = _effective_fill_price(price=price, quantity=float(qty), amount=amount)
             out.append(
                 ParsedCsvRow(
                     activity_date=r.activity_date or "",
@@ -351,13 +497,14 @@ def load_all_ledger_rows(account_id: int = DEFAULT_ACCOUNT_ID) -> list:
                     trans_code=(r.trans_code or r.side or "").upper(),
                     quantity=qty,
                     price=price,
-                    amount=float(r.amount or 0),
+                    amount=amount,
                     row_type=row_type,  # type: ignore[arg-type]
                     row_hash=r.row_hash,
                     executed_at=r.executed_at,
                 )
             )
-        return out
+        deduped, _ = dedupe_parsed_rows(out)
+        return deduped
     finally:
         session.close()
 
@@ -369,6 +516,45 @@ def set_account_cash(account_id: int, cash: float) -> None:
         acct.cash_balance = float(cash)
         acct.updated_at = _utcnow()
         session.commit()
+    finally:
+        session.close()
+
+
+def set_account_reserved_cash(account_id: int, reserved: float) -> None:
+    session = SessionLocal()
+    try:
+        acct = _ensure_default_account(session)
+        acct.reserved_cash = max(0.0, float(reserved))
+        acct.updated_at = _utcnow()
+        session.commit()
+    finally:
+        session.close()
+
+
+def set_account_ipo_order(
+    account_id: int,
+    *,
+    shares: float | None,
+    list_price: float | None,
+    reserved: float,
+) -> None:
+    session = SessionLocal()
+    try:
+        acct = _ensure_default_account(session)
+        acct.reserved_cash = max(0.0, float(reserved))
+        acct.ipo_shares = float(shares) if shares is not None and shares > 0 else None
+        acct.ipo_list_price = float(list_price) if list_price is not None and list_price > 0 else None
+        acct.updated_at = _utcnow()
+        session.commit()
+    finally:
+        session.close()
+
+
+def get_account_reserved_cash(account_id: int = DEFAULT_ACCOUNT_ID) -> float:
+    session = SessionLocal()
+    try:
+        acct = session.get(BrokerageAccount, account_id)
+        return float(getattr(acct, "reserved_cash", 0) or 0) if acct else 0.0
     finally:
         session.close()
 
@@ -474,6 +660,22 @@ def save_holdings(account_id: int, holdings: list, *, source: str) -> list[dict]
             )
         session.commit()
         return out
+    finally:
+        session.close()
+
+
+def ledger_has_row_hash(row_hash: str, account_id: int = DEFAULT_ACCOUNT_ID) -> bool:
+    """True when a ledger row with this content hash exists (journal sync idempotency)."""
+    if not row_hash:
+        return False
+    session = SessionLocal()
+    try:
+        return (
+            session.query(TradeHistory.id)
+            .filter(TradeHistory.account_id == account_id, TradeHistory.row_hash == row_hash)
+            .first()
+            is not None
+        )
     finally:
         session.close()
 

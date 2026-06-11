@@ -10,6 +10,7 @@ from services.portfolio_snapshot_service import (
     get_current_portfolio,
     import_robinhood_csv_and_decide,
     list_import_history,
+    set_buying_power,
     validate_robinhood_csv,
 )
 
@@ -20,6 +21,7 @@ router = APIRouter(prefix="/brokerage", tags=["brokerage"])
 async def import_robinhood_csv_route(
     file: UploadFile = File(...),
     cash: float | None = Form(None),
+    replace: bool = Form(False),
 ):
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Upload a .csv file")
@@ -27,10 +29,38 @@ async def import_robinhood_csv_route(
     if not content:
         raise HTTPException(status_code=400, detail="Empty file")
     try:
-        result = import_robinhood_csv_and_decide(content, file.filename, cash=cash)
+        result = import_robinhood_csv_and_decide(content, file.filename, cash=cash, replace=replace)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"CSV import failed: {exc}") from exc
     return BrokerageCsvImportResponse(**result)
+
+
+@router.post("/buying-power")
+def update_buying_power(
+    cash: float = Form(..., ge=0),
+    reserved_cash: float = Form(0, ge=0),
+    ipo_shares: float | None = Form(None, ge=0),
+    ipo_list_price: float | None = Form(None, ge=0),
+):
+    """Set Robinhood buying power and optional reserved cash (e.g. upcoming IPO)."""
+    try:
+        from services.portfolio_decision_service import run_stored_portfolio_decision
+        from services.portfolio_snapshot_service import set_portfolio_cash
+
+        result = set_portfolio_cash(
+            buying_power=cash,
+            reserved_cash=reserved_cash,
+            ipo_shares=ipo_shares,
+            ipo_list_price=ipo_list_price,
+        )
+        try:
+            decision = run_stored_portfolio_decision(trigger="buying_power", persist=True)
+            result["decision"] = model_to_dict(decision)
+        except Exception as exc:
+            result["decision_error"] = str(exc)[:200]
+        return result
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/imports")

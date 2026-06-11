@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 from buckets import DEFAULT_BUCKET, resolve_bucket
@@ -19,6 +20,7 @@ from models.schemas import (
 from services.portfolio_decision_engine import DecisionInput, compute_holding_decision, max_weight_for_sleeve
 from services.quant_risk_sizing_service import build_unified_risk, sizing_from_score_context
 from services.quant_v2_service import build_v2_score
+from services.data_freshness_service import is_symbol_price_stale
 from utils.pydantic_util import model_to_dict
 
 logger = logging.getLogger(__name__)
@@ -126,6 +128,7 @@ def _score_context(symbol: str, sleeve: str, ps: PriceService) -> dict:
 def run_portfolio_daily_decision(body: PortfolioDecisionRequest) -> PortfolioDecisionResponse:
     ps = PriceService()
     cash = max(0.0, float(body.cash))
+    reserved = max(0.0, float(body.reserved_cash))
     notes: list[str] = []
 
     priced: list[dict] = []
@@ -150,21 +153,21 @@ def run_portfolio_daily_decision(body: PortfolioDecisionRequest) -> PortfolioDec
         )
 
     invested = sum(p["market_value"] for p in priced if p["latest_price"])
-    total_value = cash + invested
+    total_value = cash + reserved + invested
     if total_value <= 0 and not priced:
         raise ValueError("Portfolio value must be positive")
 
     # If all prices missing, use cost basis only for display total — decisions still REVIEW
     if total_value <= 0:
-        total_value = cash + sum(p["avg_cost"] * p["shares"] for p in priced)
+        total_value = cash + reserved + sum(p["avg_cost"] * p["shares"] for p in priced)
 
-    items: list[PortfolioDecisionItem] = []
-    for row in priced:
+    def _item_for_row(row: dict) -> tuple[PortfolioDecisionItem, str | None]:
         sym = row["symbol"]
         sleeve = row["bucket"]
         latest = row["latest_price"]
         mv = row["market_value"] if latest else row["avg_cost"] * row["shares"]
         current_w = mv / total_value if total_value > 0 else 0.0
+        note: str | None = None
 
         try:
             ctx = _score_context(sym, sleeve, ps)
@@ -181,7 +184,7 @@ def run_portfolio_daily_decision(body: PortfolioDecisionRequest) -> PortfolioDec
             }
 
         if ctx.get("error"):
-            notes.append(f"{sym}: {ctx['error']}")
+            note = f"{sym}: {ctx['error']}"
 
         target_w = min(float(ctx["target_weight"]), max_weight_for_sleeve(sleeve))
         max_w = max_weight_for_sleeve(sleeve)
@@ -201,6 +204,7 @@ def run_portfolio_daily_decision(body: PortfolioDecisionRequest) -> PortfolioDec
                 current_weight=current_w,
                 target_weight=target_w,
                 max_allowed_weight=max_w,
+                price_stale=is_symbol_price_stale(sym) if latest else False,
             ),
             total_portfolio_value=total_value,
         )
@@ -211,47 +215,56 @@ def run_portfolio_daily_decision(body: PortfolioDecisionRequest) -> PortfolioDec
 
         flags = list(dict.fromkeys(list(ctx.get("risk_flags") or []) + out.risk_flags))
 
-        items.append(
-            PortfolioDecisionItem(
-                symbol=sym,
-                bucket=sleeve,
-                price=round(latest, 4) if latest else 0.0,
-                price_available=out.price_available,
-                shares=row["shares"],
-                avg_cost=row["avg_cost"],
-                market_value=round(mv, 2),
-                pl_pct=pl_pct,
-                current_weight=round(current_w * 100, 2),
-                target_weight=round(target_w * 100, 2),
-                buy_pct=out.buy_pct,
-                keep_pct=out.keep_pct,
-                sell_pct=out.sell_pct,
-                decision=out.final_decision,
-                suggested_action=out.suggested_action,
-                score=round(ctx["alpha"], 1),
-                risk_index=round(ctx["risk_index"], 1),
-                suggested_dollar_action=out.suggested_dollar_action,
-                reasons=out.reasons,
-                risk_flags=flags,
-                alpha_score=out.alpha_score,
-                momentum_score=out.momentum_score,
-                liquidity_score=out.liquidity_score,
-                risk_score=out.risk_score,
-                data_quality_score=out.data_quality_score,
-                max_allowed_weight=round(out.max_allowed_weight * 100, 2),
-                overweight_penalty=round(out.overweight_penalty, 2),
-                missing_data_penalty=round(out.missing_data_penalty, 2),
-                stop_loss_trigger=out.stop_loss_trigger,
-                final_buy_raw=out.final_buy_raw,
-                final_keep_raw=out.final_keep_raw,
-                final_sell_raw=out.final_sell_raw,
-            )
+        item = PortfolioDecisionItem(
+            symbol=sym,
+            bucket=sleeve,
+            price=round(latest, 4) if latest else 0.0,
+            price_available=out.price_available,
+            shares=row["shares"],
+            avg_cost=row["avg_cost"],
+            market_value=round(mv, 2),
+            pl_pct=pl_pct,
+            current_weight=round(current_w * 100, 2),
+            target_weight=round(target_w * 100, 2),
+            buy_pct=out.buy_pct,
+            keep_pct=out.keep_pct,
+            sell_pct=out.sell_pct,
+            decision=out.final_decision,
+            suggested_action=out.suggested_action,
+            score=round(ctx["alpha"], 1),
+            risk_index=round(ctx["risk_index"], 1),
+            suggested_dollar_action=out.suggested_dollar_action,
+            reasons=out.reasons,
+            risk_flags=flags,
+            alpha_score=out.alpha_score,
+            momentum_score=out.momentum_score,
+            liquidity_score=out.liquidity_score,
+            risk_score=out.risk_score,
+            data_quality_score=out.data_quality_score,
+            max_allowed_weight=round(out.max_allowed_weight * 100, 2),
+            overweight_penalty=round(out.overweight_penalty, 2),
+            missing_data_penalty=round(out.missing_data_penalty, 2),
+            stop_loss_trigger=out.stop_loss_trigger,
+            final_buy_raw=out.final_buy_raw,
+            final_keep_raw=out.final_keep_raw,
+            final_sell_raw=out.final_sell_raw,
         )
+        return item, note
+
+    max_workers = min(6, max(1, len(priced)))
+    if len(priced) <= 1:
+        pairs = [_item_for_row(row) for row in priced]
+    else:
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            pairs = list(pool.map(_item_for_row, priced))
+    items = [p[0] for p in pairs]
+    notes.extend(n for n in (p[1] for p in pairs) if n)
 
     as_of = _utcnow().isoformat()
     return PortfolioDecisionResponse(
         as_of=as_of,
         cash=cash,
+        reserved_cash=reserved,
         total_value=round(total_value, 2),
         invested_value=round(invested, 2),
         items=items,
@@ -267,11 +280,11 @@ def run_portfolio_daily_decision(body: PortfolioDecisionRequest) -> PortfolioDec
 def run_stored_portfolio_decision(*, trigger: str = "manual", persist: bool = True) -> PortfolioDecisionResponse:
     from services.portfolio_snapshot_service import holdings_to_request
 
-    cash, holdings = holdings_to_request()
+    cash, reserved, holdings = holdings_to_request()
     if not holdings:
         raise ValueError("No holdings on file — import Robinhood CSV or add positions first")
 
-    body = PortfolioDecisionRequest(cash=cash, holdings=holdings, persist=False)
+    body = PortfolioDecisionRequest(cash=cash, reserved_cash=reserved, holdings=holdings, persist=False)
     response = run_portfolio_daily_decision(body)
 
     if persist:
