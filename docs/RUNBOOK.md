@@ -117,13 +117,38 @@ Primary data roles default to **akshare** for price/fundamentals; set API keys f
 
 ### Scan performance knobs
 
+Ticker universes are built in three layers (`backend/data/universe.py`, `backend/data/listing_master.py`):
+
+1. **Official listing master** — Nasdaq Trader `nasdaqlisted.txt` + `otherlisted.txt`, cached under `universe:listing_master` with revision `universe:listing_master_revision`.
+2. **Curated discovery seeds** — thematic lists such as `PENNY_DISCOVERY_SEEDS` and `LARGE_CAP_SEEDS` (not proof of current listing or sub-$5 status).
+3. **Runtime eligibility** — price, liquidity, and bucket rules in the scanner (`filter_universe_by_price`, screener modules).
+
+**Refresh:** listing master refreshes once daily via the scheduler daily pipeline and asynchronously on startup. Manual refresh: `POST /data/scheduler/refresh-listing-master` (optional `?force=true`). Inspect cache metadata: `GET /data/universe/listing-master`.
+
+**Fallback:** if listing validation is unavailable, `get_universe()` returns normalized curated seeds minus `STALE_OR_DELISTED` and sector ETFs. If refresh fails but a prior snapshot exists, the last-known-good listing master is kept (long TTL).
+
+**Aliases:** centralized in `TICKER_ALIASES` (e.g. `SQ` → `XYZ`). Class shares use dash form (`BRK-B`).
+
+**In-process cache:** `get_universe()` uses an LRU keyed by listing revision — refreshing the listing master invalidates cached universes without restarting Python.
+
+**Adding a thematic seed:** append symbols to the appropriate `_PENNY_*` group in `universe.py`; they are validated against the listing master at runtime. Multi-theme membership is tracked in `SYMBOL_THEMES`.
+
+Set `UNIVERSE_SCAN_BATCH_SIZE=0` in `.env` to scan the full list instead of the first N alphabetically.
+
+**Bulk scan fast path:** universe scans set `services.scan_context.set_bulk_scan(True)` for the job thread. While active, Stage B skips per-symbol reconcile, StockTwits/Finnhub sentiment, and OpenBB governance fetches. Single-symbol **Workspace → Analyze** keeps full depth. Set `OPENBB_ON_SCAN=false` as well for fastest scans.
+
+**UI poll window:** the scan page polls for up to 15 minutes (`SCAN_POLL_MAX_TICKS` × 1.5s in `frontend/src/lib/scanPoll.ts`). If you see a timeout message but the backend is still running, refresh and use **Load last scan**.
+
 These were previously hard-coded inside `backend/services/scan_manager.py`. They are now configurable:
 
 | Variable                          | Default                          | Effect                                                                                 |
 | --------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------- |
+| `UNIVERSE_SCAN_BATCH_SIZE`        | `100`                            | Cap Stage A symbols (`0` = full curated universe; recommended after expanding penny list). |
+| `MAX_CANDIDATES_PER_BUCKET`       | `25`                             | Hard cap on rows returned per scan (UI `max_results` cannot exceed this).              |
 | `SCAN_STAGE_B_TOP_N`              | `50`                             | Max candidates deep-scored per scan (`mode=deep`).                                     |
 | `SCAN_STAGE_B_TOP_N_FAST`         | `15`                             | Candidate cap when `ScanOptions.mode="fast"` — used for low-latency exploratory scans. |
 | `SCAN_PRICE_DOWNLOAD_MAX_SECONDS` | `45`                             | Hard cap (seconds) on the Stage A bulk OHLC provider fetch.                            |
+| `SCAN_STAGE_B_TIME_BUDGET_SECONDS`| `900`                            | Stop Stage B after this many seconds; return partial ranked results.                   |
 | `SCAN_RESULT_TTL_PENNY`           | inherits `SCAN_RESULT_TTL` (900) | TTL for `scan:latest:penny`.                                                           |
 | `SCAN_RESULT_TTL_COMPOUNDER`      | `86400`                          | TTL for `scan:latest:compounder`; compounder data changes slowly.                      |
 
@@ -136,6 +161,24 @@ These were previously hard-coded inside `backend/services/scan_manager.py`. They
 - `last_attempt_failed_at` / `last_attempt_error` (latest only): set when the most recent scan attempt failed. The previously cached successful results are **not** clobbered — they remain visible alongside the failure marker so the UI can render "showing prior results; last attempt failed at …".
 
 All new fields are nullable and backward-compatible — clients that ignore them keep working.
+
+### Canonical scoring entry point
+
+Every code path that needs a final score for a symbol should route through
+`services.scoring_facade.score_symbol_canonical(...)`. Scan Stage B, Watchlist,
+and Analyze all use it, so the same `CandidateContext` produces the same
+numeric score regardless of entry point. When `USE_SCORING_ENGINE_IN_SCAN`
+flips, both Scan and Watchlist switch to the ScoringEngine in lockstep — no
+more "same symbol, two scores" drift.
+
+### Auto-refresh slot reservation
+
+`services.refresh_orchestrator.try_begin_auto_refresh()` is the only correct
+way to start a stale-while-revalidate background refresh from a dashboard GET.
+It atomically (under a single lock acquire) checks running-status, checks the
+cooldown, reserves the slot, and stamps the cooldown — so concurrent dashboard
+loads cannot double-fire the refresh. Manual refresh (`POST /home/refresh`)
+still uses `start_home_refresh_async` and bypasses the cooldown when `force=true`.
 
 ---
 

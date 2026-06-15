@@ -10,12 +10,11 @@ from models.schemas import (
 )
 from services.home_dashboard_service import build_daily_dashboard
 from services.refresh_orchestrator import (
-    auto_refresh_allowed,
     get_active_home_job_id,
     get_refresh_job,
     is_home_refresh_running,
-    mark_auto_refresh_started,
     start_home_refresh_async,
+    try_begin_auto_refresh,
 )
 
 router = APIRouter(prefix="/home", tags=["home"])
@@ -39,12 +38,11 @@ def _attach_auto_refresh(dashboard: DailyDashboardResponse) -> DailyDashboardRes
     if not freshness.refresh_recommended:
         return dashboard
 
-    if not auto_refresh_allowed():
-        return dashboard
-
-    job_id = start_home_refresh_async(force=False)
+    # Atomic: check cooldown + reserve slot + stamp cooldown under a single
+    # lock. Prevents two near-simultaneous dashboard GETs from each thinking
+    # they should kick off an auto refresh.
+    job_id = try_begin_auto_refresh()
     if job_id:
-        mark_auto_refresh_started()
         freshness.refresh_job_id = job_id
         freshness.overall_status = "updating"
         freshness.refresh_in_progress = True

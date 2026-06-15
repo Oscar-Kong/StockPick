@@ -551,7 +551,7 @@ export const zh: Messages = {
     loadedResults: "已从最新筛选加载 {count} 条结果",
     noLatestScan: "未找到最新筛选数据",
     startingScan: "正在启动筛选...",
-    scanTimeout: "筛选超时。请减少结果数量后重试。",
+    scanTimeout: "服务器仍在筛选，但页面已停止等待。请刷新页面或加载最近一次筛选结果。",
     statusFetchFailed: "无法获取筛选状态",
     scanFailed: "筛选失败",
     filtersReset: "条件已恢复默认。",

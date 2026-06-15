@@ -15,6 +15,7 @@ import { fmt, useTranslation, useTRef } from "@/lib/i18n";
 import type { Bucket, SavedScanItem, ScanOptions, ScanParitySummary, StockResult } from "@/lib/types";
 import { formatDateTime } from "@/lib/datetime";
 import { isStaleTimestamp } from "@/lib/quantHealth";
+import { SCAN_POLL_INTERVAL_MS, SCAN_POLL_MAX_TICKS } from "@/lib/scanPoll";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ScanControls } from "./ScanControls";
@@ -42,8 +43,8 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
   const displayDescription = description ?? meta.description;
 
   const searchParams = useSearchParams();
-  const defaultOptions: ScanOptions = { max_results: 25 };
-  const [options, setOptions] = useState<ScanOptions>({ max_results: 25 });
+  const defaultOptions: ScanOptions = { max_results: 50 };
+  const [options, setOptions] = useState<ScanOptions>({ max_results: 50 });
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState("");
@@ -154,7 +155,7 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
         } else if (data.status === "failed") {
           setScanning(false);
           clearPoll();
-        } else if (ticks >= 120) {
+        } else if (ticks >= SCAN_POLL_MAX_TICKS) {
           setScanning(false);
           setStatus("failed");
           setMessage(t.scan.scanTimeout);
@@ -166,7 +167,7 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
         setMessage(t.scan.statusFetchFailed);
         clearPoll();
       }
-    }, 1500);
+    }, SCAN_POLL_INTERVAL_MS);
     pollRef.current = interval;
   }, [t, clearPoll]);
 

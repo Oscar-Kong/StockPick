@@ -68,7 +68,7 @@ class ScanStatusResponse(BaseModel):
 
 
 class ScanOptions(BaseModel):
-    max_results: int = 25
+    max_results: int = 50
     min_price: float | None = None
     max_price: float | None = None
     min_volume: float | None = None

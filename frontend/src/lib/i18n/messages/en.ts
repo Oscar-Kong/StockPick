@@ -558,7 +558,7 @@ export const en = {
     loadedResults: "Loaded {count} result(s) from latest scan",
     noLatestScan: "No latest scan data found",
     startingScan: "Starting scan...",
-    scanTimeout: "Scan timed out. Try again with fewer results.",
+    scanTimeout: "Scan is still running on the server but the UI stopped waiting. Refresh the page or load the latest scan.",
     statusFetchFailed: "Could not fetch scan status",
     scanFailed: "Scan failed",
     filtersReset: "Filters reset to default.",

@@ -89,6 +89,11 @@ def append_governance_signal(
     allow_fetch: bool | None = None,
 ) -> list:
     """Add a 5% governance leg and rescale existing signal weights (medium/compounder)."""
+    from services.scan_context import is_bulk_scan
+
+    if is_bulk_scan():
+        return signals
+
     from screeners.base import WeightedSignal
 
     gov = governance_signal_value(symbol, allow_fetch=allow_fetch)

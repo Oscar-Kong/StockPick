@@ -113,6 +113,32 @@ def trigger_fundamentals_refresh():
     return refresh_fundamentals()
 
 
+@router.post("/scheduler/refresh-listing-master")
+def trigger_listing_master_refresh(force: bool = Query(False)):
+    """Refresh Nasdaq Trader symbol directories into the listing master cache."""
+    from data.listing_master import refresh_listing_master
+
+    return refresh_listing_master(force=force)
+
+
+@router.get("/universe/listing-master")
+def get_listing_master_status():
+    """Inspect cached listing master snapshot metadata (not full symbol list)."""
+    from data.listing_master import CACHE_KEY_SNAPSHOT, get_listing_revision
+    from data.cache import Cache
+
+    snap = Cache().get(CACHE_KEY_SNAPSHOT)
+    if not snap:
+        return {"status": "missing", "revision": get_listing_revision()}
+    return {
+        "status": "cached",
+        "revision": get_listing_revision(),
+        "updated_at": snap.get("updated_at"),
+        "source": snap.get("source"),
+        "record_count": snap.get("record_count"),
+    }
+
+
 @router.post("/refresh")
 def data_refresh(scope: str = Query("home", description="home | portfolio | prices | penny_scan | all"), force: bool = False):
     from services.refresh_orchestrator import refresh_if_stale

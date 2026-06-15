@@ -215,6 +215,12 @@ MARKET_DATA_REFRESH_TZ = os.getenv("MARKET_DATA_REFRESH_TZ", "America/New_York")
 PENNY_SCAN_REFRESH_CRON = os.getenv("PENNY_SCAN_REFRESH_CRON", "*/30 9-16 * * 1-5")
 PENNY_SCAN_REFRESH_TZ = os.getenv("PENNY_SCAN_REFRESH_TZ", "America/New_York")
 
+# --- Official listing master (Nasdaq Trader symbol directories) ---
+LISTING_MASTER_ENABLED = _env_bool("LISTING_MASTER_ENABLED", "true")
+LISTING_MASTER_FETCH_TIMEOUT = float(os.getenv("LISTING_MASTER_FETCH_TIMEOUT", "20"))
+# Long TTL keeps last-known-good snapshot when a refresh fails.
+LISTING_MASTER_CACHE_TTL = float(os.getenv("LISTING_MASTER_CACHE_TTL", str(86400 * 365)))
+
 # --- LLM (Proxy-compatible) ---
 # Preferred custom proxy vars:
 # - GPT_PROXY_API_KEY
@@ -288,6 +294,8 @@ UNIVERSE_SCAN_BATCH_SIZE = int(os.getenv("UNIVERSE_SCAN_BATCH_SIZE", "100"))
 SCAN_STAGE_B_TOP_N = int(os.getenv("SCAN_STAGE_B_TOP_N", "50"))
 SCAN_STAGE_B_TOP_N_FAST = int(os.getenv("SCAN_STAGE_B_TOP_N_FAST", "15"))
 SCAN_PRICE_DOWNLOAD_MAX_SECONDS = float(os.getenv("SCAN_PRICE_DOWNLOAD_MAX_SECONDS", "45"))
+# Stop Stage B deep-scoring after this many seconds and return partial ranked results.
+SCAN_STAGE_B_TIME_BUDGET_SECONDS = float(os.getenv("SCAN_STAGE_B_TIME_BUDGET_SECONDS", "900"))
 
 # Per-bucket SCAN_RESULT_TTL overrides. Compounder data changes slowly, so we
 # allow operators to keep its "latest" payload warm for much longer than penny.

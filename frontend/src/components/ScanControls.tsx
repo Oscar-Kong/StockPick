@@ -58,7 +58,7 @@ export function ScanControls({
             type="number"
             min={5}
             max={50}
-            value={options.max_results ?? 25}
+            value={options.max_results ?? 50}
             onChange={(e) =>
               onChange({ ...options, max_results: Number(e.target.value) })
             }

@@ -14,6 +14,7 @@ from config import (
     SCAN_RESULT_TTL,
     SCAN_RESULT_TTL_COMPOUNDER,
     SCAN_RESULT_TTL_PENNY,
+    SCAN_STAGE_B_TIME_BUDGET_SECONDS,
     SCAN_STAGE_B_TOP_N,
     SCAN_STAGE_B_TOP_N_FAST,
     UNIVERSE_SCAN_BATCH_SIZE,
@@ -32,6 +33,7 @@ from screeners.base import BaseScreener
 from screeners.compounder import CompounderScreener
 from screeners.medium import MediumScreener
 from screeners.penny import PennyScreener
+from services.scan_context import set_bulk_scan
 from services.scan_display import enrich_scan_display, refresh_results_return_metrics
 
 logger = logging.getLogger(__name__)
@@ -135,6 +137,7 @@ class ScanManager:
         scan_started = time.monotonic()
         stage_a_started = scan_started
 
+        set_bulk_scan(True)
         try:
             # Stage A — bulk OHLC filter
             job.progress = 5.0
@@ -160,21 +163,35 @@ class ScanManager:
             stage_b_started = time.monotonic()
 
             for idx, symbol in enumerate(stage_b_symbols):
+                if (
+                    SCAN_STAGE_B_TIME_BUDGET_SECONDS > 0
+                    and (time.monotonic() - stage_b_started) >= SCAN_STAGE_B_TIME_BUDGET_SECONDS
+                ):
+                    job.message = (
+                        f"Stage B time budget reached; scored {len(candidates)} of {total}"
+                    )
+                    break
+
                 job.progress = 25.0 + round((idx / max(total, 1)) * 70, 1)
                 job.message = f"Scoring {symbol} ({idx + 1}/{total})"
 
                 try:
-                    ctx = screener.enrich(symbol)
+                    ctx = build_candidate(
+                        symbol,
+                        history_period=period,
+                        include_spy=job.bucket == Bucket.medium,
+                        reconcile=False,
+                        price_service=ps,
+                    )
                     if ctx is None:
                         hist = bulk_hist.get(symbol.upper())
                         if hist is None or hist.empty:
                             continue
-                        from screeners.base import CandidateContext
-
                         ctx = build_candidate(
                             symbol,
                             history_period=period,
                             include_spy=job.bucket == Bucket.medium,
+                            reconcile=False,
                             price_service=ps,
                         )
                         if ctx is None:
@@ -365,6 +382,8 @@ class ScanManager:
                     job.bucket.value,
                     marker_exc,
                 )
+        finally:
+            set_bulk_scan(False)
 
     def start_scan_async(self, bucket: Bucket, options: ScanOptions | None = None) -> ScanJob:
         job = self.create_job(bucket)

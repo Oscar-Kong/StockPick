@@ -33,6 +33,11 @@ def _lexicon_score(text: str) -> float:
 
 
 def fetch_stocktwits_sentiment(symbol: str) -> float:
+    from services.scan_context import is_bulk_scan
+
+    if is_bulk_scan():
+        return 50.0
+
     import os
 
     if os.getenv("IC_PANEL_OFFLINE", "").lower() in ("1", "true", "yes"):
@@ -105,6 +110,11 @@ def fetch_finnhub_sentiment(symbol: str) -> dict[str, Any]:
 
 def sentiment_polarity_scores(symbol: str) -> dict[str, float]:
     """Positive / negative buzz scores (0–100) from StockTwits messages."""
+    from services.scan_context import is_bulk_scan
+
+    if is_bulk_scan():
+        return {"combined": 50.0, "positive": 50.0, "negative": 50.0}
+
     import os
 
     if os.getenv("IC_PANEL_OFFLINE", "").lower() in ("1", "true", "yes"):
@@ -149,6 +159,11 @@ def sentiment_polarity_scores(symbol: str) -> dict[str, float]:
 
 
 def combined_sentiment_score(symbol: str, include_news: bool = False) -> dict[str, Any]:
+    from services.scan_context import is_bulk_scan
+
+    if is_bulk_scan():
+        return {"score": 50.0, "stocktwits": 50.0, "news": 50.0}
+
     stocktwits = fetch_stocktwits_sentiment(symbol)
     if not include_news:
         return {"score": stocktwits, "stocktwits": stocktwits, "news": 50.0}

@@ -68,9 +68,16 @@ class PennyScreener(BaseScreener):
             return False
 
         try:
-            rec = DataReconciler().reconcile(ctx.symbol)
-            if rec.quality_score < PENNY_MIN_DATA_QUALITY_SCORE:
+            dq = ctx.info.get("_reconcile_quality")
+            if dq is not None and dq < PENNY_MIN_DATA_QUALITY_SCORE:
                 return False
+            if dq is None:
+                from services.scan_context import is_bulk_scan
+
+                if not is_bulk_scan():
+                    rec = DataReconciler().reconcile(ctx.symbol)
+                    if rec.quality_score < PENNY_MIN_DATA_QUALITY_SCORE:
+                        return False
         except Exception:
             pass
 
@@ -90,15 +97,19 @@ class PennyScreener(BaseScreener):
 
         df = ctx.history
         warnings: list[str] = []
-        dq_score: float | None = None
-        try:
-            rec = DataReconciler().reconcile(ctx.symbol)
-            dq_score = rec.quality_score
-            for flag in rec.flags or []:
-                if "split" in flag.lower() or "dilut" in flag.lower():
-                    warnings.append(flag)
-        except Exception:
-            pass
+        dq_score: float | None = ctx.info.get("_reconcile_quality")
+        if dq_score is None:
+            from services.scan_context import is_bulk_scan
+
+            if not is_bulk_scan():
+                try:
+                    rec = DataReconciler().reconcile(ctx.symbol)
+                    dq_score = rec.quality_score
+                    for flag in rec.flags or []:
+                        if "split" in flag.lower() or "dilut" in flag.lower():
+                            warnings.append(flag)
+                except Exception:
+                    pass
 
         if SLEEVE_FACTORS_V3_ENABLED:
             from engines.factor.sleeve_signals import build_sleeve_signals

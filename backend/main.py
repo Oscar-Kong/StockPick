@@ -111,6 +111,15 @@ app.include_router(settings_router)
 def _deferred_startup() -> None:
     """Heavy work off the main thread so /health responds immediately."""
     try:
+        from config import LISTING_MASTER_ENABLED
+        from data.listing_master import refresh_listing_master_async
+
+        if LISTING_MASTER_ENABLED:
+            refresh_listing_master_async()
+    except Exception as exc:
+        logging.warning("Listing master startup refresh skipped: %s", exc)
+
+    try:
         from scripts.seed_universe import fetch_sp500_symbols
         from data.cache import Cache
 

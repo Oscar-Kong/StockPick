@@ -95,10 +95,21 @@ def refresh_fundamentals(symbols: list[str] | None = None, limit: int = 50) -> d
 
 
 def run_daily_pipeline() -> dict:
-    """Full daily update: quotes then fundamentals."""
+    """Full daily update: listing master, quotes, then fundamentals."""
+    listing_result: dict = {"status": "skipped"}
+    try:
+        from config import LISTING_MASTER_ENABLED
+        from data.listing_master import refresh_listing_master
+
+        if LISTING_MASTER_ENABLED:
+            listing_result = refresh_listing_master()
+    except Exception as exc:
+        logger.warning("Listing master refresh skipped: %s", exc)
+        listing_result = {"status": "failed", "error": str(exc)[:200]}
+
     quote_result = refresh_universe_quotes()
     fund_result = refresh_fundamentals(limit=50)
-    return {"quotes": quote_result, "fundamentals": fund_result}
+    return {"listing_master": listing_result, "quotes": quote_result, "fundamentals": fund_result}
 
 
 def _collect_all_symbols() -> list[str]:
