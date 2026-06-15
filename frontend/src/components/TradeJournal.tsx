@@ -17,6 +17,7 @@ import {
 } from "@/lib/datetime";
 import { useTranslation, useTRef } from "@/lib/i18n";
 import type { TradeCreateRequest, TradeItem, TradeStatsResponse } from "@/lib/types";
+import { MetricCard } from "@/components/ui/MetricCard";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:18731";
@@ -192,24 +193,28 @@ export function TradeJournal({ embedded = false }: { embedded?: boolean }) {
 
       {stats && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="surface-card p-3">
-            <p className="text-[11px] uppercase tracking-wide text-zinc-500">{t.journal.totalTrades}</p>
-            <p className="mt-1 text-xl font-semibold text-zinc-100">{stats.total_trades}</p>
-          </div>
-          <div className="surface-card p-3">
-            <p className="text-[11px] uppercase tracking-wide text-zinc-500">{t.journal.winRate}</p>
-            <p className="mt-1 text-xl font-semibold text-zinc-100">{stats.win_rate_pct}%</p>
-          </div>
-          <div className="surface-card p-3">
-            <p className="text-[11px] uppercase tracking-wide text-zinc-500">{t.journal.avgQuality}</p>
-            <p className="mt-1 text-xl font-semibold text-zinc-100">{stats.avg_quality_score}</p>
-          </div>
-          <div className="surface-card p-3 text-sm text-zinc-300">
-            <p className="text-[11px] uppercase tracking-wide text-zinc-500">{t.journal.strongProcess}</p>
-            <p className="mt-1 text-xl font-semibold text-zinc-100">
-              {stats.strong_process_rate_pct}%
-            </p>
-          </div>
+          <MetricCard
+            label={t.journal.totalTrades}
+            hint={t.journal.totalTradesHint}
+            value={<span className="tabular-nums">{stats.total_trades}</span>}
+          />
+          <MetricCard
+            label={t.journal.winRate}
+            hint={t.journal.winRateHint}
+            value={<span className="tabular-nums">{stats.win_rate_pct}%</span>}
+            tone={stats.win_rate_pct >= 50 ? "ok" : "default"}
+          />
+          <MetricCard
+            label={t.journal.avgQuality}
+            hint={t.journal.avgQualityHint}
+            value={<span className="tabular-nums">{stats.avg_quality_score}</span>}
+          />
+          <MetricCard
+            label={t.journal.strongProcess}
+            hint={t.journal.strongProcessHint}
+            value={<span className="tabular-nums">{stats.strong_process_rate_pct}%</span>}
+            tone={stats.strong_process_rate_pct >= 60 ? "ok" : "default"}
+          />
         </div>
       )}
 

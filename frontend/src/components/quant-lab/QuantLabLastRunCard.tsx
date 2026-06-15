@@ -1,6 +1,7 @@
 "use client";
 
 import { QuantLabTrustBadge } from "./QuantLabTrustBadge";
+import { StatTile } from "@/components/ui/StatTile";
 import {
   USER_TRIGGERED_LAST_RUN_IDS,
   formatEvidenceDate,
@@ -28,43 +29,48 @@ export function QuantLabLastRunCard({
     onRunNew && USER_TRIGGERED_LAST_RUN_IDS.has(summary.id as LastRunCardId);
 
   return (
-    <article className="app-card app-card--elevated flex flex-col p-4">
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+    <article className="app-card app-card--elevated flex flex-col p-4 sm:p-5">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
         <h3 className="text-sm font-semibold text-zinc-100">{title}</h3>
         <QuantLabTrustBadge indicator={summary.trust_indicator} />
       </div>
 
       {summary.available ? (
-        <dl className="mb-3 grid gap-2 text-sm sm:grid-cols-2">
-          <div className="flex justify-between gap-2 sm:flex-col sm:justify-start">
-            <dt className="text-tertiary">{t.quantLab.lastRunGenerated}</dt>
-            <dd className="finance-value text-secondary">{formatEvidenceDate(summary.generated_at)}</dd>
-          </div>
+        <dl className="mb-4 grid gap-3 sm:grid-cols-2">
+          <StatTile
+            label={t.quantLab.lastRunGenerated}
+            value={formatEvidenceDate(summary.generated_at)}
+          />
           {summary.sample_size != null && (
-            <div className="flex justify-between gap-2 sm:flex-col sm:justify-start">
-              <dt className="text-tertiary">{t.quantLab.lastRunSampleSize}</dt>
-              <dd className="finance-value text-zinc-100">{summary.sample_size}</dd>
-            </div>
-          )}
-          {summary.main_metric && (
-            <div className="flex justify-between gap-2 sm:col-span-2 sm:flex-col sm:justify-start">
-              <dt className="text-tertiary">{summary.main_metric.label}</dt>
-              <dd className="finance-value text-base font-semibold text-zinc-50">{summary.main_metric.value}</dd>
-            </div>
+            <StatTile
+              label={t.quantLab.lastRunSampleSize}
+              value={<span className="tabular-nums">{summary.sample_size}</span>}
+            />
           )}
           {summary.status && (
-            <div className="flex justify-between gap-2 sm:flex-col sm:justify-start">
-              <dt className="text-tertiary">{t.quantLab.runStatus}</dt>
-              <dd className="capitalize text-secondary">{summary.status}</dd>
-            </div>
+            <StatTile
+              label={t.quantLab.runStatus}
+              value={<span className="capitalize">{summary.status}</span>}
+            />
+          )}
+          {summary.main_metric && (
+            <StatTile
+              label={summary.main_metric.label}
+              value={
+                <span className="text-base font-semibold tabular-nums text-zinc-50">
+                  {summary.main_metric.value}
+                </span>
+              }
+              className={summary.status ? undefined : "sm:col-span-2"}
+            />
           )}
         </dl>
       ) : (
-        <p className="mb-3 text-sm text-secondary">{summary.reason ?? t.quantLab.trustNoSavedRun}</p>
+        <p className="mb-4 text-sm leading-relaxed text-secondary">{summary.reason ?? t.quantLab.trustNoSavedRun}</p>
       )}
 
       {(summary.stale || summary.warnings.length > 0) && (
-        <ul className="mb-3 space-y-1 text-xs text-amber-300">
+        <ul className="mb-4 space-y-1.5 text-xs leading-relaxed text-amber-300">
           {[
             ...new Set(
               [
@@ -79,7 +85,7 @@ export function QuantLabLastRunCard({
       )}
 
       {summary.research_only && (
-        <p className="mb-3 text-xs text-info">{t.quantLab.trustResearchOnly}</p>
+        <p className="mb-4 text-xs leading-relaxed text-info">{t.quantLab.trustResearchOnly}</p>
       )}
 
       <div className="mt-auto flex flex-wrap gap-2 pt-1">

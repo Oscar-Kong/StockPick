@@ -8,6 +8,8 @@ import { EvidenceToActionBoundary } from "./EvidenceToActionBoundary";
 
 vi.mock("@/lib/i18n", () => ({
   useTranslation: () => ({ t: en, locale: "en" }),
+  fmt: (template: string, vars: Record<string, string | number>) =>
+    template.replace(/\{(\w+)\}/g, (_, key) => String(vars[key] ?? "")),
 }));
 
 describe("ScanScoringNote", () => {
@@ -24,7 +26,7 @@ describe("ScanScoringNote", () => {
     );
     expect(screen.getByText(en.product.scanScoredTitle)).toBeInTheDocument();
     expect(screen.getByText(en.analysis.scoreSourceV2)).toBeInTheDocument();
-    expect(screen.getByText(en.product.parityAvailable)).toBeInTheDocument();
+    expect(screen.getByText(/Avg 1\.2/)).toBeInTheDocument();
     expect(screen.getByText(en.product.dataFresh)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: en.product.openQuantLabValidation })).toHaveAttribute(
       "href",

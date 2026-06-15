@@ -5,6 +5,7 @@ import { HomeQuickActions } from "@/components/dashboard/HomeQuickActions";
 import { HomeRegimeCard } from "@/components/dashboard/HomeRegimeCard";
 import { HomeScanSummary } from "@/components/dashboard/HomeScanSummary";
 import { HomePredictionCard } from "@/components/dashboard/HomePredictionCard";
+import { MetricCard } from "@/components/ui/MetricCard";
 import { QuantHealthCard } from "@/components/quant/QuantHealthCard";
 import { getSavedProgressSummary } from "@/lib/api";
 import type { SavedProgressSummary } from "@/lib/types";
@@ -110,16 +111,20 @@ export function HomeDashboard() {
       <div className="home-stats">
         {(
           [
-            [t.home.statScans, summary?.scan_count],
-            [t.home.statAnalyze, summary?.analyze_count],
-            [t.home.statReports, summary?.report_count],
-            [t.home.statTrades, summary?.trade_count],
+            [t.home.statScans, summary?.scan_count, t.home.statScansHint],
+            [t.home.statAnalyze, summary?.analyze_count, t.home.statAnalyzeHint],
+            [t.home.statReports, summary?.report_count, t.home.statReportsHint],
+            [t.home.statTrades, summary?.trade_count, t.home.statTradesHint],
           ] as const
-        ).map(([label, n]) => (
-          <div key={label} className="home-stat surface-card">
-            <p className="home-stat-label">{label}</p>
-            <p className="home-stat-value tabular-nums text-[#7dff8e]">{n ?? "—"}</p>
-          </div>
+        ).map(([label, n, hint]) => (
+          <MetricCard
+            key={label}
+            label={label}
+            value={<span className="tabular-nums">{n ?? "—"}</span>}
+            hint={hint}
+            tone={n != null && n > 0 ? "ok" : "default"}
+            className="home-stat"
+          />
         ))}
       </div>
 

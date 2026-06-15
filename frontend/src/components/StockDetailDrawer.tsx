@@ -24,6 +24,7 @@ import { UnifiedRiskPanel } from "./UnifiedRiskPanel";
 import { ValuationBadges } from "./ValuationBadges";
 import { DetailDrawer } from "./ui/DetailDrawer";
 import { EmptyState } from "./ui/EmptyState";
+import { StatTile } from "./ui/StatTile";
 import { NotFinancialAdviceFooter } from "./ui/NotFinancialAdviceFooter";
 import { ResearchWarning } from "./ui/ResearchWarning";
 import { SimilarSignalBlock } from "./SimilarSignalBlock";
@@ -225,14 +226,28 @@ export function StockDetailDrawer({
     >
       {tab === "summary" && (
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <ScoreBadge score={stock.score} />
-            <ScoreSourceBadge source={scoreSource} />
-            <RiskBadge level={stock.risk_level} />
+          <dl className="grid gap-3 sm:grid-cols-2">
+            <StatTile
+              label={t.common.score}
+              value={<ScoreBadge score={stock.score} />}
+            />
+            <StatTile
+              label={t.analysis.scoreSourceLabel}
+              value={<ScoreSourceBadge source={scoreSource} />}
+            />
+            <StatTile
+              label={t.analysis.riskLabel}
+              value={<RiskBadge level={stock.risk_level} />}
+            />
             {v2Score?.recommendation && (
-              <RecommendationBadge recommendation={v2Score.recommendation.recommendation} />
+              <StatTile
+                label={t.scanDrawer.recommendationLabel}
+                value={
+                  <RecommendationBadge recommendation={v2Score.recommendation.recommendation} />
+                }
+              />
             )}
-          </div>
+          </dl>
           <ValuationBadges
             warnings={detail?.valuation_warnings ?? stock.valuation_warnings}
             earningsSoon={detail?.earnings_soon ?? stock.earnings_soon}

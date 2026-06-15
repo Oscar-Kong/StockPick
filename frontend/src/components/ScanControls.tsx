@@ -13,6 +13,9 @@ interface ScanControlsProps {
   scanning: boolean;
 }
 
+const INPUT_CLASS =
+  "mt-1.5 w-full rounded-lg border border-zinc-700 bg-zinc-950/80 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-[#00c805]";
+
 export function ScanControls({
   bucketLabel,
   options,
@@ -23,16 +26,58 @@ export function ScanControls({
 }: ScanControlsProps) {
   const { t } = useTranslation();
 
+  const fields = [
+    {
+      key: "max_results",
+      label: t.scan.maxResults,
+      hint: t.scan.maxResultsHint,
+      type: "number",
+      min: 5,
+      max: 50,
+      value: options.max_results ?? 50,
+      onChange: (v: string) => onChange({ ...options, max_results: Number(v) }),
+    },
+    {
+      key: "min_price",
+      label: t.scan.minPrice,
+      hint: t.scan.minPriceHint,
+      type: "number",
+      step: "0.01",
+      value: options.min_price ?? "",
+      onChange: (v: string) =>
+        onChange({ ...options, min_price: v ? Number(v) : undefined }),
+    },
+    {
+      key: "max_price",
+      label: t.scan.maxPrice,
+      hint: t.scan.maxPriceHint,
+      type: "number",
+      step: "0.01",
+      value: options.max_price ?? "",
+      onChange: (v: string) =>
+        onChange({ ...options, max_price: v ? Number(v) : undefined }),
+    },
+    {
+      key: "min_volume",
+      label: t.scan.minVolume,
+      hint: t.scan.minVolumeHint,
+      type: "number",
+      value: options.min_volume ?? "",
+      onChange: (v: string) =>
+        onChange({ ...options, min_volume: v ? Number(v) : undefined }),
+    },
+  ] as const;
+
   return (
-    <div className="surface-card p-4">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div>
+    <div className="surface-card p-4 sm:p-5">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="max-w-xl">
           <h2 className="text-sm font-semibold text-zinc-100">
             {fmt(t.scan.filtersTitle, { label: bucketLabel })}
           </h2>
-          <p className="mt-0.5 text-xs text-zinc-500">{t.scan.filtersStep}</p>
+          <p className="mt-1 text-xs leading-relaxed text-zinc-500">{t.scan.filtersSubtitle}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
             onClick={onReset}
@@ -45,70 +90,29 @@ export function ScanControls({
             type="button"
             onClick={onScan}
             disabled={scanning}
-            className="btn-primary px-4 py-2 text-sm disabled:opacity-50"
+            className="btn-primary px-4 py-2.5 text-sm disabled:opacity-50"
           >
             {scanning ? t.common.scanning : t.scan.runScan}
           </button>
         </div>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <label className="text-xs text-zinc-500">
-          {t.scan.maxResults}
-          <input
-            type="number"
-            min={5}
-            max={50}
-            value={options.max_results ?? 50}
-            onChange={(e) =>
-              onChange({ ...options, max_results: Number(e.target.value) })
-            }
-            className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950/80 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-[#00c805]"
-          />
-        </label>
-        <label className="text-xs text-zinc-500">
-          {t.scan.minPrice}
-          <input
-            type="number"
-            step="0.01"
-            value={options.min_price ?? ""}
-            onChange={(e) =>
-              onChange({
-                ...options,
-                min_price: e.target.value ? Number(e.target.value) : undefined,
-              })
-            }
-            className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950/80 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-[#00c805]"
-          />
-        </label>
-        <label className="text-xs text-zinc-500">
-          {t.scan.maxPrice}
-          <input
-            type="number"
-            step="0.01"
-            value={options.max_price ?? ""}
-            onChange={(e) =>
-              onChange({
-                ...options,
-                max_price: e.target.value ? Number(e.target.value) : undefined,
-              })
-            }
-            className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950/80 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-[#00c805]"
-          />
-        </label>
-        <label className="text-xs text-zinc-500">
-          {t.scan.minVolume}
-          <input
-            type="number"
-            value={options.min_volume ?? ""}
-            onChange={(e) =>
-              onChange({
-                ...options,
-                min_volume: e.target.value ? Number(e.target.value) : undefined,
-              })
-            }
-            className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950/80 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-[#00c805]"
-          />
-        </label>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {fields.map((field) => (
+          <label key={field.key} className="block">
+            <span className="text-xs font-medium text-zinc-300">{field.label}</span>
+            <input
+              type={field.type}
+              min={"min" in field ? field.min : undefined}
+              max={"max" in field ? field.max : undefined}
+              step={"step" in field ? field.step : undefined}
+              value={field.value}
+              onChange={(e) => field.onChange(e.target.value)}
+              className={INPUT_CLASS}
+            />
+            <span className="mt-1.5 block text-[11px] leading-relaxed text-zinc-500">{field.hint}</span>
+          </label>
+        ))}
       </div>
     </div>
   );

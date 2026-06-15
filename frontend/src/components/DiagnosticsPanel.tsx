@@ -1,5 +1,6 @@
 "use client";
 
+import { StatTile } from "@/components/ui/StatTile";
 import { fmt, useTranslation } from "@/lib/i18n";
 import type { SymbolDiagnosticsResponse } from "@/lib/types";
 import clsx from "clsx";
@@ -32,6 +33,13 @@ function interpretationLabel(
   return map[key] ?? key;
 }
 
+function interpretationTone(key: string): string {
+  if (key === "high tail risk") return "text-red-300";
+  if (key === "possible momentum") return "text-emerald-300";
+  if (key === "possible mean reversion") return "text-sky-300";
+  return "text-zinc-200";
+}
+
 export function DiagnosticsPanel({ data, loading, error, onRetry }: DiagnosticsPanelProps) {
   const { t } = useTranslation();
 
@@ -46,75 +54,65 @@ export function DiagnosticsPanel({ data, loading, error, onRetry }: DiagnosticsP
       onRetry={onRetry}
     >
       {data && (
-        <div className="space-y-3 text-xs">
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={clsx(
-                "rounded-md border px-2 py-0.5 font-medium capitalize",
-                data.interpretation === "high tail risk"
-                  ? "border-red-500/40 text-red-300"
-                  : data.interpretation === "possible momentum"
-                    ? "border-emerald-500/30 text-emerald-300"
-                    : data.interpretation === "possible mean reversion"
-                      ? "border-sky-500/30 text-sky-300"
-                      : "border-zinc-600 text-zinc-300"
-              )}
-            >
-              {interpretationLabel(data.interpretation, t.diagnostics)}
-            </span>
-            <span className="text-zinc-500">
-              {fmt(t.diagnostics.observations, {
-                returns: data.return_bars,
-                prices: data.price_bars,
-              })}
-            </span>
+        <div className="space-y-4">
+          <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <StatTile
+              label={t.diagnostics.interpretationLabel}
+              value={
+                <span className={clsx("capitalize", interpretationTone(data.interpretation))}>
+                  {interpretationLabel(data.interpretation, t.diagnostics)}
+                </span>
+              }
+            />
+            <StatTile
+              label={t.diagnostics.observationsLabel}
+              value={
+                <span className="text-zinc-300">
+                  {fmt(t.diagnostics.observations, {
+                    returns: data.return_bars,
+                    prices: data.price_bars,
+                  })}
+                </span>
+              }
+            />
             {data.data_source !== "none" && (
-              <span className="text-[10px] text-zinc-600">{data.data_source}</span>
+              <StatTile label={t.diagnostics.dataSourceLabel} value={data.data_source} />
             )}
-          </div>
-
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
-            <div>
-              <dt className="text-zinc-500">{t.diagnostics.meanReturn}</dt>
-              <dd className="font-semibold tabular-nums text-zinc-100">{fmtNum(data.mean, 4)}</dd>
-            </div>
-            <div>
-              <dt className="text-zinc-500">{t.diagnostics.annVol}</dt>
-              <dd className="font-semibold tabular-nums text-zinc-100">
-                {fmtPct(data.annualized_volatility)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-zinc-500">{t.diagnostics.skewness}</dt>
-              <dd className="font-semibold tabular-nums text-zinc-100">{fmtNum(data.skewness, 3)}</dd>
-            </div>
-            <div>
-              <dt className="text-zinc-500">{t.diagnostics.excessKurtosis}</dt>
-              <dd className="font-semibold tabular-nums text-zinc-100">
-                {fmtNum(data.excess_kurtosis, 3)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-zinc-500">{t.diagnostics.autocorrLag1}</dt>
-              <dd className="font-semibold tabular-nums text-zinc-100">
-                {fmtNum(data.autocorrelation?.lag1 ?? null, 3)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-zinc-500">{t.diagnostics.stationarity}</dt>
-              <dd className="font-semibold text-zinc-100">
-                {Boolean(data.adf?.available)
+            <StatTile
+              label={t.diagnostics.meanReturn}
+              value={<span className="tabular-nums">{fmtNum(data.mean, 4)}</span>}
+            />
+            <StatTile
+              label={t.diagnostics.annVol}
+              value={<span className="tabular-nums">{fmtPct(data.annualized_volatility)}</span>}
+            />
+            <StatTile
+              label={t.diagnostics.skewness}
+              value={<span className="tabular-nums">{fmtNum(data.skewness, 3)}</span>}
+            />
+            <StatTile
+              label={t.diagnostics.excessKurtosis}
+              value={<span className="tabular-nums">{fmtNum(data.excess_kurtosis, 3)}</span>}
+            />
+            <StatTile
+              label={t.diagnostics.autocorrLag1}
+              value={<span className="tabular-nums">{fmtNum(data.autocorrelation?.lag1 ?? null, 3)}</span>}
+            />
+            <StatTile
+              label={t.diagnostics.stationarity}
+              value={
+                Boolean(data.adf?.available)
                   ? fmt(t.diagnostics.adfResult, {
                       stat: fmtNum(data.adf.statistic, 2),
                       p: fmtNum(data.adf.pvalue, 3),
                     })
-                  : t.diagnostics.adfUnavailable}
-              </dd>
-            </div>
+                  : t.diagnostics.adfUnavailable
+              }
+            />
           </dl>
 
           {Boolean(data.jarque_bera?.available) && (
-            <p className="text-zinc-500">
+            <p className="text-xs leading-relaxed text-zinc-500">
               {fmt(t.diagnostics.jarqueBera, {
                 p: fmtNum(data.jarque_bera.pvalue, 3),
               })}
@@ -122,7 +120,7 @@ export function DiagnosticsPanel({ data, loading, error, onRetry }: DiagnosticsP
           )}
 
           {data.notes.length > 0 && (
-            <ul className="list-inside list-disc text-zinc-600">
+            <ul className="list-inside list-disc space-y-1 text-xs leading-relaxed text-zinc-500">
               {data.notes.slice(0, 4).map((note, i) => (
                 <li key={i}>{note}</li>
               ))}

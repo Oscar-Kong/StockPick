@@ -16,10 +16,10 @@ import {
 import { getBucketMeta } from "@/lib/buckets";
 import { useTranslation, useTRef } from "@/lib/i18n";
 import type { AnalyzeSymbolResponse, Bucket, PositionSizingV2, StockResearchReport, SymbolDiagnosticsResponse, UnifiedRiskV2, V2ScoreResponse } from "@/lib/types";
-import clsx from "clsx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppTabBar, AppTabButton } from "./AppTabs";
 import { AnalysisAlerts } from "./AnalysisAlerts";
+import { AnalysisHeaderStats } from "./AnalysisHeaderStats";
 import { AnalysisSidebar } from "./AnalysisSidebar";
 import { BacktestPanel } from "./BacktestPanel";
 import { DataQualityBadge } from "./DataQualityBadge";
@@ -29,7 +29,6 @@ import { PriceChart } from "./PriceChart";
 import { ResearchReport } from "./ResearchReport";
 import { Round2Panel } from "./Round2Panel";
 import { ScoreBreakdown } from "./ScoreBreakdown";
-import { ScoreSourceBadge } from "./ScoreSourceBadge";
 import { UnifiedRiskPanel } from "./UnifiedRiskPanel";
 import { V2FallbackBanner } from "./V2FallbackBanner";
 import { FactorAttributionTable } from "./quant/FactorAttributionTable";
@@ -450,50 +449,37 @@ export function AnalysisPanel({
   return (
     <div className={shellClass}>
       <div className="analysis-toolbar shrink-0">
-        <div className="analysis-toolbar-left">
-          <h2 className="text-zinc-50">{data.symbol}</h2>
-          <div className="flex flex-wrap items-center gap-1 text-xs">
-            <span className="chip px-1.5 py-0.5 tabular-nums">${data.price.toFixed(2)}</span>
-            <span className="chip px-1.5 py-0.5 capitalize">
-              {bucketMeta[data.assigned_bucket as Bucket]?.label ?? data.assigned_bucket}
-            </span>
-            <span className="chip px-1.5 py-0.5 tabular-nums">
-              {t.analysis.scoreChip} {display.score.toFixed(1)}
-            </span>
-            <ScoreSourceBadge source={display.scoreSource} />
-            {showLegacyDiff && (
-              <span className="chip px-1.5 py-0.5 tabular-nums text-zinc-500" title={t.analysis.legacyScoreHint}>
-                {t.analysis.legacyScoreShort} {display.legacyScore.toFixed(1)}
-              </span>
-            )}
-            <span
-              className={clsx(
-                "chip px-1.5 py-0.5 capitalize",
-                display.riskLevel === "high" && "text-red-300",
-                display.riskLevel === "medium" && "text-amber-300",
-                display.riskLevel === "low" && "text-[#7dff8e]"
-              )}
-            >
-              {riskLabel(String(display.riskLevel))}
-            </span>
+        <div className="flex w-full flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-zinc-50">{data.symbol}</h2>
+            <AnalysisHeaderStats
+              price={data.price}
+              bucketLabel={bucketMeta[data.assigned_bucket as Bucket]?.label ?? data.assigned_bucket}
+              score={display.score}
+              scoreSource={display.scoreSource}
+              riskLevel={String(display.riskLevel)}
+              riskLabel={riskLabel(String(display.riskLevel))}
+              legacyScore={display.legacyScore}
+              showLegacyDiff={showLegacyDiff}
+            />
           </div>
-        </div>
-        <div className="analysis-toolbar-right">
-          <AppTabBar aria-label={t.analysis.viewsAria}>
-            {TABS.map((tabKey) => (
-              <AppTabButton key={tabKey} active={tab === tabKey} onClick={() => setTab(tabKey)}>
-                {tabLabels[tabKey]}
-              </AppTabButton>
-            ))}
-          </AppTabBar>
-          <button
-            type="button"
-            onClick={() => void refresh()}
-            disabled={loading}
-            className="btn-ghost shrink-0 px-2 py-1 text-xs"
-          >
-            {loading ? "…" : t.common.refresh}
-          </button>
+          <div className="analysis-toolbar-right">
+            <AppTabBar aria-label={t.analysis.viewsAria}>
+              {TABS.map((tabKey) => (
+                <AppTabButton key={tabKey} active={tab === tabKey} onClick={() => setTab(tabKey)}>
+                  {tabLabels[tabKey]}
+                </AppTabButton>
+              ))}
+            </AppTabBar>
+            <button
+              type="button"
+              onClick={() => void refresh()}
+              disabled={loading}
+              className="btn-ghost shrink-0 px-2 py-1 text-xs"
+            >
+              {loading ? "…" : t.common.refresh}
+            </button>
+          </div>
         </div>
       </div>
 

@@ -24,18 +24,27 @@ export function ScanProgress({ progress, message, status }: ScanProgressProps) {
   }
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
-      <div className="mb-2 flex items-center justify-between text-sm">
-        <span className="font-medium">{statusLabel[status] ?? status}</span>
-        <span className="text-zinc-500">{progress.toFixed(0)}%</span>
+    <div className="surface-card p-4 sm:p-5">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            {t.scan.progressLabel}
+          </p>
+          <p className="mt-1 text-sm font-semibold text-zinc-100">
+            {statusLabel[status] ?? status}
+          </p>
+        </div>
+        <p className="text-2xl font-semibold tabular-nums text-[#7dff8e]">{progress.toFixed(0)}%</p>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+      <div className="h-2.5 overflow-hidden rounded-full bg-zinc-800">
         <div
-          className="h-full rounded-full bg-zinc-900 transition-all dark:bg-zinc-100"
+          className="h-full rounded-full bg-[#00c805] transition-all"
           style={{ width: `${Math.min(progress, 100)}%` }}
         />
       </div>
-      <p className="mt-2 text-xs text-zinc-500">{message}</p>
+      {message && (
+        <p className="mt-3 text-xs leading-relaxed text-zinc-500">{message}</p>
+      )}
     </div>
   );
 }

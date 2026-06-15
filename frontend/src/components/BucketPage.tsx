@@ -13,7 +13,6 @@ import {
 import { getBucketMeta } from "@/lib/buckets";
 import { fmt, useTranslation, useTRef } from "@/lib/i18n";
 import type { Bucket, SavedScanItem, ScanOptions, ScanParitySummary, StockResult } from "@/lib/types";
-import { formatDateTime } from "@/lib/datetime";
 import { isStaleTimestamp } from "@/lib/quantHealth";
 import { SCAN_POLL_INTERVAL_MS, SCAN_POLL_MAX_TICKS } from "@/lib/scanPoll";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -21,11 +20,9 @@ import { useSearchParams } from "next/navigation";
 import { ScanControls } from "./ScanControls";
 import { ScanProgress } from "./ScanProgress";
 import { ScanScoringNote } from "./product/ScanScoringNote";
-import { ScanScoreMeta } from "./ScanScoreMeta";
-import { StaleDataBadge } from "./badges/StaleDataBadge";
+import { ScanStatusPanel } from "./ScanStatusPanel";
 import { StockDetailDrawer } from "./StockDetailDrawer";
 import { StockTable } from "./StockTable";
-import { StrategyVersionBadge } from "./DataQualityBadge";
 
 interface BucketPageProps {
   bucket: Bucket;
@@ -290,37 +287,20 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
         onReset={resetFilters}
         scanning={scanning}
       />
-      <div className="surface-card flex flex-wrap items-center gap-2 px-3 py-2 text-xs text-zinc-500">
-        {lastScanAt && (
-          <span className="chip px-2 py-1">
-            {t.scan.lastScan} {formatDateTime(lastScanAt)}
-          </span>
-        )}
-        <StrategyVersionBadge version={strategyVersion} />
-        <ScanScoreMeta
-          scoringEngineUsed={scoringEngineUsed}
-          paritySummary={paritySummary}
-        />
-        {scanStale && lastScanAt && <StaleDataBadge asOf={lastScanAt} />}
-        <button
-          type="button"
-          onClick={loadLatestScan}
-          className="btn-ghost px-2 py-1 hover:bg-zinc-900/70"
-        >
-          {t.scan.loadLastScan}
-        </button>
-        <button
-          type="button"
-          onClick={handleSaveCurrentScan}
-          disabled={savingScan || results.length === 0}
-          className="btn-ghost px-2 py-1 hover:bg-zinc-900/70"
-        >
-          {savingScan ? t.common.saving : t.scan.saveSnapshot}
-        </button>
-        {(bucket === "penny" || bucket === "medium") && (
-          <span className="text-amber-600 dark:text-amber-400">{t.scan.rescanHint}</span>
-        )}
-      </div>
+
+      <ScanStatusPanel
+        bucket={bucket}
+        lastScanAt={lastScanAt}
+        strategyVersion={strategyVersion}
+        scoringEngineUsed={scoringEngineUsed}
+        paritySummary={paritySummary}
+        scanStale={scanStale}
+        resultCount={results.length}
+        onLoadLatest={loadLatestScan}
+        onSaveSnapshot={handleSaveCurrentScan}
+        savingScan={savingScan}
+        canSave={results.length > 0}
+      />
       {saveMsg && (
         <p
           className={

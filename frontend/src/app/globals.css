@@ -299,10 +299,10 @@ body::before {
 
 .analysis-toolbar {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.5rem 0.75rem;
+  padding: 0.875rem 1rem;
   border-bottom: 1px solid var(--surface-border);
   background: color-mix(in oklab, var(--surface-muted) 55%, transparent);
 }
@@ -968,7 +968,7 @@ body::before {
 
 .home-stats {
   display: grid;
-  gap: 0.5rem;
+  gap: 0.75rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -979,7 +979,9 @@ body::before {
 }
 
 .home-stat {
-  padding: 0.75rem 1rem;
+  padding: 0;
+  border: none;
+  background: transparent;
 }
 
 .home-stat-label {

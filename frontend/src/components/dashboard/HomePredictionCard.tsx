@@ -3,6 +3,7 @@
 import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { SectionHeader } from "@/components/ui/SectionHeader";
+import { StatTile } from "@/components/ui/StatTile";
 import { isFeatureDisabledError, parseApiError } from "@/lib/apiError";
 import { getV2FeedbackSummary, getV2Predictions } from "@/lib/api";
 import type { FeedbackSummaryResponse, PredictionSnapshotItem } from "@/lib/types";
@@ -62,7 +63,7 @@ export function HomePredictionCard() {
   const stale = arePredictionOutcomesStale(predictions, feedback);
 
   return (
-    <section className="surface-card p-4">
+    <section className="surface-card p-4 sm:p-5">
       <SectionHeader
         title={t.home.predictionsTitle}
         subtitle={t.home.predictionsSubtitle}
@@ -80,22 +81,24 @@ export function HomePredictionCard() {
         <ErrorState message={error} onRetry={() => void load()} />
       )}
       {!loading && !disabled && !error && (
-        <dl className="grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <dt className="text-xs text-zinc-500">{t.home.unresolvedPredictions}</dt>
-            <dd className="text-xl font-semibold tabular-nums text-amber-200">{unresolved}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-zinc-500">{t.home.resolvedRecent}</dt>
-            <dd className="text-xl font-semibold tabular-nums text-[#7dff8e]">{resolved}</dd>
-          </div>
+        <dl className="grid gap-3 sm:grid-cols-2">
+          <StatTile
+            label={t.home.unresolvedPredictions}
+            value={<span className="tabular-nums text-amber-200">{unresolved}</span>}
+            hint={t.home.unresolvedPredictionsHint}
+          />
+          <StatTile
+            label={t.home.resolvedRecent}
+            value={<span className="tabular-nums text-[#7dff8e]">{resolved}</span>}
+            hint={t.home.resolvedRecentHint}
+          />
         </dl>
       )}
       {stale && !loading && !disabled && (
-        <p className="mt-2 text-xs text-amber-300/90">{t.home.outcomesStale}</p>
+        <p className="mt-3 text-xs leading-relaxed text-amber-300/90">{t.home.outcomesStale}</p>
       )}
       {latestResolved && !loading && !disabled && (
-        <p className="mt-2 text-xs text-zinc-500">
+        <p className="mt-3 text-xs leading-relaxed text-zinc-500">
           {t.home.latestOutcome}: {latestResolved.symbol}{" "}
           {(() => {
             const ret = predictionReturnPct(latestResolved, 60);
