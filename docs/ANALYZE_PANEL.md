@@ -108,11 +108,11 @@ The **headline score** can differ slightly from the sum of bars because steps 3�
 
 ## Views (when to use each)
 
-Current Analyze tabs (left panel):
+Current Analyze tabs (grouped **Core / Research / Workspace** in the toolbar; each tab shows a one-line hint):
 
 | Tab | Use for |
 |-----|---------|
-| **Overview** | v2 recommendation, valuation, earnings, sizing, chart, similar-signal summary |
+| **Overview** | Price chart (left), v2 recommendation + position sizing (right) |
 | **Score breakdown** | Factor table + contribution bars — which inputs drove the score |
 | **Risk** | Volatility, liquidity, macro, event risk, risk index |
 | **Diagnostics** | Return distribution stats (momentum vs mean reversion vs noise) |
@@ -122,7 +122,11 @@ Current Analyze tabs (left panel):
 | **Report** | LLM structured memo; save to Library |
 | **Notes** | Your watchlist notes |
 
-**Sidebar (desktop):** technicals, data quality, bucket fit, and signal weights — visible on all tabs.
+**Navigation:** ← / → (or `[` / `]`) moves through the watchlist without leaving Analyze.
+
+**Sidebar (desktop):** collapsible sections for technicals, quality/timing, bucket fit, signals, fundamentals — visible on all tabs.
+
+**Mobile / narrow:** tap **Insights** to open the same sidebar in a slide-over sheet.
 
 See [ANALYZE_PANEL_STATS_GUIDE.md](ANALYZE_PANEL_STATS_GUIDE.md) for field-by-field definitions.
 

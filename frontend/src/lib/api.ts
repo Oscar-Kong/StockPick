@@ -102,19 +102,44 @@ import { normalizeLastRunSummary, normalizeQuantLabEvidence } from "./quantLabLa
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:18731";
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...init?.headers,
-    },
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || `Request failed: ${res.status}`);
+const DEFAULT_REQUEST_TIMEOUT_MS = 45_000;
+const ANALYZE_REQUEST_TIMEOUT_MS = 40_000;
+
+async function request<T>(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<T> {
+  const { timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS, signal: callerSignal, ...rest } = init ?? {};
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  if (callerSignal) {
+    if (callerSignal.aborted) {
+      controller.abort();
+    } else {
+      callerSignal.addEventListener("abort", () => controller.abort(), { once: true });
+    }
   }
-  return res.json() as Promise<T>;
+
+  try {
+    const res = await fetch(`${API_URL}${path}`, {
+      ...rest,
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...rest.headers,
+      },
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || `Request failed: ${res.status}`);
+    }
+    return res.json() as Promise<T>;
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error(`Request timed out after ${Math.round(timeoutMs / 1000)}s`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 export function startScan(bucket: Bucket, options?: ScanOptions): Promise<ScanJobResponse> {
@@ -426,14 +451,20 @@ export function getAnalyzeSymbol(
   if (options?.refresh) params.set("refresh", "1");
   if (options?.includeBucketFit) params.set("include_bucket_fit", "1");
   const qs = params.toString();
-  return request(`/analyze/${symbol}${qs ? `?${qs}` : ""}`, { signal: options?.signal });
+  return request(`/analyze/${symbol}${qs ? `?${qs}` : ""}`, {
+    signal: options?.signal,
+    timeoutMs: ANALYZE_REQUEST_TIMEOUT_MS,
+  });
 }
 
 export function getAnalyzeBucketFit(
   symbol: string,
   options?: { signal?: AbortSignal }
 ): Promise<AnalyzeSymbolResponse["bucket_fit"]> {
-  return request(`/analyze/${symbol}/bucket-fit`, { signal: options?.signal });
+  return request(`/analyze/${symbol}/bucket-fit`, {
+    signal: options?.signal,
+    timeoutMs: ANALYZE_REQUEST_TIMEOUT_MS,
+  });
 }
 
 export function getAnalyzeCompare(symbols: string[]): Promise<AnalyzeCompareResponse> {

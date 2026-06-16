@@ -17,10 +17,11 @@ import { getBucketMeta } from "@/lib/buckets";
 import { useTranslation, useTRef } from "@/lib/i18n";
 import type { AnalyzeSymbolResponse, Bucket, PositionSizingV2, StockResearchReport, SymbolDiagnosticsResponse, UnifiedRiskV2, V2ScoreResponse } from "@/lib/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppTabBar, AppTabButton } from "./AppTabs";
 import { AnalysisAlerts } from "./AnalysisAlerts";
 import { AnalysisHeaderStats } from "./AnalysisHeaderStats";
 import { AnalysisSidebar } from "./AnalysisSidebar";
+import { AnalysisSymbolNav } from "./AnalysisSymbolNav";
+import { AnalysisTabNav, type AnalysisTabConfig, type AnalysisTabId } from "./AnalysisTabNav";
 import { BacktestPanel } from "./BacktestPanel";
 import { DataQualityBadge } from "./DataQualityBadge";
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
@@ -43,25 +44,15 @@ import {
   type V2UnavailableReason,
 } from "@/lib/v2Score";
 
-const TABS = [
-  "overview",
-  "score",
-  "risk",
-  "diagnostics",
-  "valuation",
-  "backtest",
-  "similar",
-  "report",
-  "notes",
-] as const;
-type Tab = (typeof TABS)[number];
-
 interface AnalysisPanelProps {
   symbol: string;
   bucket?: Bucket;
   initialNotes?: string;
   /** Fills workspace frame without extra outer card */
   embedded?: boolean;
+  prevSymbol?: string | null;
+  nextSymbol?: string | null;
+  onNavigateSymbol?: (symbol: string) => void;
 }
 
 function AnalysisLoading({ symbol, embedded }: { symbol: string; embedded?: boolean }) {
@@ -99,23 +90,80 @@ export function AnalysisPanel({
   bucket,
   initialNotes = "",
   embedded = false,
+  prevSymbol = null,
+  nextSymbol = null,
+  onNavigateSymbol,
 }: AnalysisPanelProps) {
   const { t } = useTranslation();
   const tRef = useTRef();
   const bucketMeta = getBucketMeta(t);
 
-  const tabLabels = useMemo(
-    (): Record<Tab, string> => ({
-      overview: t.analysis.tabOverview,
-      score: t.analysis.tabScoreBreakdown,
-      risk: t.analysis.tabRisk,
-      diagnostics: t.analysis.tabDiagnostics,
-      valuation: t.analysis.tabValuation,
-      backtest: t.analysis.tabBacktest,
-      similar: t.analysis.tabSimilar,
-      report: t.analysis.tabReport,
-      notes: t.analysis.tabNotes,
-    }),
+  const tabConfigs = useMemo(
+    (): AnalysisTabConfig[] => [
+      {
+        id: "overview",
+        label: t.analysis.tabOverview,
+        shortLabel: t.analysis.tabOverviewShort,
+        hint: t.analysis.tabOverviewHint,
+        group: "core",
+      },
+      {
+        id: "score",
+        label: t.analysis.tabScoreBreakdown,
+        shortLabel: t.analysis.tabScoreShort,
+        hint: t.analysis.tabScoreHint,
+        group: "core",
+      },
+      {
+        id: "risk",
+        label: t.analysis.tabRisk,
+        shortLabel: t.analysis.tabRiskShort,
+        hint: t.analysis.tabRiskHint,
+        group: "core",
+      },
+      {
+        id: "diagnostics",
+        label: t.analysis.tabDiagnostics,
+        shortLabel: t.analysis.tabDiagnosticsShort,
+        hint: t.analysis.tabDiagnosticsHint,
+        group: "research",
+      },
+      {
+        id: "valuation",
+        label: t.analysis.tabValuation,
+        shortLabel: t.analysis.tabValuationShort,
+        hint: t.analysis.tabValuationHint,
+        group: "research",
+      },
+      {
+        id: "backtest",
+        label: t.analysis.tabBacktest,
+        shortLabel: t.analysis.tabBacktestShort,
+        hint: t.analysis.tabBacktestHint,
+        group: "research",
+      },
+      {
+        id: "similar",
+        label: t.analysis.tabSimilar,
+        shortLabel: t.analysis.tabSimilarShort,
+        hint: t.analysis.tabSimilarHint,
+        group: "research",
+      },
+      {
+        id: "report",
+        label: t.analysis.tabReport,
+        shortLabel: t.analysis.tabReportShort,
+        hint: t.analysis.tabReportHint,
+        group: "workspace",
+      },
+      {
+        id: "notes",
+        label: t.analysis.tabNotes,
+        shortLabel: t.analysis.tabNotesShort,
+        hint: t.analysis.tabNotesHint,
+        group: "workspace",
+      },
+    ],
     [t]
   );
 
@@ -128,7 +176,8 @@ export function AnalysisPanel({
     [t]
   );
 
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTab] = useState<AnalysisTabId>("overview");
+  const [insightsOpen, setInsightsOpen] = useState(false);
   const [data, setData] = useState<AnalyzeSymbolResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -169,6 +218,7 @@ export function AnalysisPanel({
     setLoading(true);
     setNotes(initialNotes);
     setTab("overview");
+    setInsightsOpen(false);
     setBucketFit(null);
     setBucketFitLoading(false);
     setReport(null);
@@ -449,37 +499,56 @@ export function AnalysisPanel({
   return (
     <div className={shellClass}>
       <div className="analysis-toolbar shrink-0">
-        <div className="flex w-full flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-          <div className="min-w-0 flex-1">
-            <h2 className="text-zinc-50">{data.symbol}</h2>
-            <AnalysisHeaderStats
-              price={data.price}
-              bucketLabel={bucketMeta[data.assigned_bucket as Bucket]?.label ?? data.assigned_bucket}
-              score={display.score}
-              scoreSource={display.scoreSource}
-              riskLevel={String(display.riskLevel)}
-              riskLabel={riskLabel(String(display.riskLevel))}
-              legacyScore={display.legacyScore}
-              showLegacyDiff={showLegacyDiff}
-            />
+        <div className="flex w-full flex-col gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-3">
+                <AnalysisSymbolNav
+                  symbol={data.symbol}
+                  prevSymbol={prevSymbol}
+                  nextSymbol={nextSymbol}
+                  onNavigate={onNavigateSymbol}
+                />
+                {!onNavigateSymbol && <h2 className="text-zinc-50">{data.symbol}</h2>}
+              </div>
+              {onNavigateSymbol && (prevSymbol || nextSymbol) && (
+                <p className="mt-1 text-[10px] text-zinc-600">{t.analysis.symbolNavHint}</p>
+              )}
+              <AnalysisHeaderStats
+                price={data.price}
+                bucketLabel={bucketMeta[data.assigned_bucket as Bucket]?.label ?? data.assigned_bucket}
+                score={display.score}
+                scoreSource={display.scoreSource}
+                riskLevel={String(display.riskLevel)}
+                riskLabel={riskLabel(String(display.riskLevel))}
+                legacyScore={display.legacyScore}
+                showLegacyDiff={showLegacyDiff}
+              />
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setInsightsOpen(true)}
+                className="analysis-insights-toggle lg:hidden"
+              >
+                {t.analysis.openInsights}
+              </button>
+              <button
+                type="button"
+                onClick={() => void refresh()}
+                disabled={loading}
+                className="btn-ghost shrink-0 px-2 py-1 text-xs"
+              >
+                {loading ? "…" : t.common.refresh}
+              </button>
+            </div>
           </div>
-          <div className="analysis-toolbar-right">
-            <AppTabBar aria-label={t.analysis.viewsAria}>
-              {TABS.map((tabKey) => (
-                <AppTabButton key={tabKey} active={tab === tabKey} onClick={() => setTab(tabKey)}>
-                  {tabLabels[tabKey]}
-                </AppTabButton>
-              ))}
-            </AppTabBar>
-            <button
-              type="button"
-              onClick={() => void refresh()}
-              disabled={loading}
-              className="btn-ghost shrink-0 px-2 py-1 text-xs"
-            >
-              {loading ? "…" : t.common.refresh}
-            </button>
-          </div>
+          <AnalysisTabNav
+            tabs={tabConfigs}
+            active={tab}
+            onChange={setTab}
+            ariaLabel={t.analysis.viewsAria}
+          />
         </div>
       </div>
 
@@ -496,25 +565,31 @@ export function AnalysisPanel({
               {!v2Loading && !v2Score && v2UnavailableReason && (
                 <V2FallbackBanner reason={v2UnavailableReason} />
               )}
-              {v2Score ? (
-                <Round2Panel score={v2Score} />
-              ) : (
-                !v2Loading && (
+              <div className="analysis-overview-grid">
+                <div className="analysis-overview-chart analysis-block p-2">
+                  <h3 className="label-caps mb-2">{t.analysis.priceChartTitle}</h3>
+                  <PriceChart ohlc={data.ohlc} />
+                </div>
+                <div className="analysis-overview-side space-y-4">
+                  {v2Score ? (
+                    <Round2Panel score={v2Score} />
+                  ) : (
+                    !v2Loading && (
+                      <div className="analysis-block">
+                        <h3 className="label-caps mb-2">{t.analysis.summary}</h3>
+                        <p className="text-sm leading-relaxed text-zinc-300">{display.summary}</p>
+                      </div>
+                    )
+                  )}
                   <div className="analysis-block">
-                    <p className="text-sm text-zinc-300">{display.summary}</p>
+                    <h3 className="label-caps mb-2">{t.analysis.positionSizing}</h3>
+                    <PositionSizingBlock
+                      sizing={positionSizing ?? v2Score?.position_sizing ?? null}
+                      loading={sizingLoading}
+                      error={sizingError}
+                    />
                   </div>
-                )
-              )}
-              <div className="analysis-block">
-                <h3 className="label-caps mb-2">{t.analysis.positionSizing}</h3>
-                <PositionSizingBlock
-                  sizing={positionSizing ?? v2Score?.position_sizing ?? null}
-                  loading={sizingLoading}
-                  error={sizingError}
-                />
-              </div>
-              <div className="analysis-block p-2">
-                <PriceChart ohlc={data.ohlc} />
+                </div>
               </div>
             </div>
           )}
@@ -637,6 +712,38 @@ export function AnalysisPanel({
           />
         </aside>
       </div>
+
+      {insightsOpen && (
+        <div className="analysis-insights-backdrop lg:hidden" role="presentation">
+          <button
+            type="button"
+            className="analysis-insights-backdrop-hit"
+            aria-label={t.common.close}
+            onClick={() => setInsightsOpen(false)}
+          />
+          <div className="analysis-insights-sheet" role="dialog" aria-modal="true" aria-label={t.analysis.insightsPanelTitle}>
+            <div className="analysis-insights-sheet-header">
+              <h3 className="text-sm font-semibold text-zinc-100">{t.analysis.insightsPanelTitle}</h3>
+              <button
+                type="button"
+                className="btn-ghost px-2 py-1 text-xs"
+                onClick={() => setInsightsOpen(false)}
+              >
+                {t.common.close}
+              </button>
+            </div>
+            <div className="analysis-insights-sheet-body">
+              <AnalysisSidebar
+                data={data}
+                bucketFit={activeBucketFit}
+                bucketFitLoading={bucketFitLoading}
+                display={display}
+                v2Score={v2Score}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

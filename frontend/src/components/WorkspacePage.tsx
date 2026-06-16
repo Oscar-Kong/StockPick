@@ -42,6 +42,14 @@ function WorkspaceContent() {
   const [msg, setMsg] = useState<string | null>(null);
   const autoPickedRef = useRef(false);
 
+  const symbolOrder = useMemo(() => items.map((i) => i.symbol.toUpperCase()), [items]);
+  const selectedIndex = selected ? symbolOrder.indexOf(selected.toUpperCase()) : -1;
+  const prevSymbol = selectedIndex > 0 ? symbolOrder[selectedIndex - 1] : null;
+  const nextSymbol =
+    selectedIndex >= 0 && selectedIndex < symbolOrder.length - 1
+      ? symbolOrder[selectedIndex + 1]
+      : null;
+
   const matrixBySymbol = useMemo(
     () => new Map(matrix.map((r) => [r.symbol, r])),
     [matrix]
@@ -256,6 +264,9 @@ function WorkspaceContent() {
                     bucket={selectedBucket}
                     initialNotes={selectedNotes}
                     embedded
+                    prevSymbol={prevSymbol}
+                    nextSymbol={nextSymbol}
+                    onNavigateSymbol={selectSymbol}
                   />
                 ) : (
                   <div className="flex flex-1 items-center justify-center p-10 text-center text-sm text-zinc-500">

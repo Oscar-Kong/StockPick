@@ -106,7 +106,16 @@ def build_daily_dashboard(*, include_freshness: bool = False) -> DailyDashboardR
     closed = [ClosedPositionItem(**c) if isinstance(c, dict) else c for c in closed_raw]
 
     if decision:
-        invested = float(decision.invested_value or 0)
+        by_sym = {i.symbol: i for i in decision.items}
+        invested = 0.0
+        for h in holdings:
+            item = by_sym.get(h["symbol"])
+            if item and item.price_available and (item.market_value or 0) > 0:
+                invested += float(item.market_value)
+            else:
+                invested += float(h.get("shares", 0)) * float(h.get("avg_cost", 0))
+        if not holdings:
+            invested = float(decision.invested_value or 0)
     elif holdings:
         invested = sum(h.get("shares", 0) * h.get("avg_cost", 0) for h in holdings)
     else:

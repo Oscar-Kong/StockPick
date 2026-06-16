@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 TICKER_ALIASES: dict[str, str] = {
     "SQ": "XYZ",
     "FREY": "TE",
+    "SPACEX": "SPCX",
 }
 
 STALE_OR_DELISTED: set[str] = {

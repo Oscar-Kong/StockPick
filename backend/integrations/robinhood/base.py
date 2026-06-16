@@ -25,6 +25,8 @@ _COMPOUNDER_ALLOWLIST = frozenset(
     {
         "AAPL", "MSFT", "GOOGL", "GOOG", "AMZN", "NVDA", "META", "BRK.B", "BRK.A",
         "V", "MA", "COST", "JPM", "UNH", "HD", "PG", "KO", "PEP", "MRK", "LLY",
+        "SPACEX",  # legacy manual import alias
+        "SPCX",  # SpaceX (NASDAQ, IPO 2026-06-12)
     }
 )
 

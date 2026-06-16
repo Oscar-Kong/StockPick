@@ -5,8 +5,8 @@ import { RecommendationBadge } from "@/components/badges/RecommendationBadge";
 import { RiskBadge } from "@/components/badges/RiskBadge";
 import { ScoreBadge } from "@/components/badges/ScoreBadge";
 import { ScoreSourceBadge } from "@/components/ScoreSourceBadge";
-import { useTranslation } from "@/lib/i18n";
-import type { StockResult } from "@/lib/types";
+import { fmt, useTranslation } from "@/lib/i18n";
+import type { HeldPositionSummary, StockResult } from "@/lib/types";
 import clsx from "clsx";
 import { ScanPickSummaryCell } from "./ScanPickSummaryCell";
 
@@ -16,6 +16,7 @@ interface StockTableProps {
   onAddWatchlist: (stock: StockResult) => void;
   watchlistAdded?: Set<string>;
   watchlistPending?: string | null;
+  heldPositions?: ReadonlyMap<string, HeldPositionSummary>;
   scoringEngineUsed?: boolean | null;
 }
 
@@ -49,12 +50,34 @@ function topWarnings(stock: StockResult, n: number) {
     .slice(0, n);
 }
 
+function HeldBadge({
+  position,
+}: {
+  position: HeldPositionSummary;
+}) {
+  const { t } = useTranslation();
+  const sharesLabel =
+    position.shares % 1 === 0
+      ? String(position.shares)
+      : position.shares.toFixed(2).replace(/\.?0+$/, "");
+
+  return (
+    <span
+      className="mt-1 inline-flex items-center rounded-md border border-sky-500/40 bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-sky-200"
+      title={fmt(t.scan.heldTooltip, { shares: sharesLabel })}
+    >
+      {fmt(t.scan.heldBadge, { shares: sharesLabel })}
+    </span>
+  );
+}
+
 export function StockTable({
   results,
   onSelect,
   onAddWatchlist,
   watchlistAdded,
   watchlistPending,
+  heldPositions,
   scoringEngineUsed,
 }: StockTableProps) {
   const { t } = useTranslation();
@@ -64,6 +87,10 @@ export function StockTable({
       : scoringEngineUsed === false
         ? "legacy_screener"
         : null;
+
+  const heldCount = heldPositions
+    ? results.filter((r) => heldPositions.has(r.symbol.toUpperCase())).length
+    : 0;
 
   if (results.length === 0) {
     return (
@@ -75,9 +102,14 @@ export function StockTable({
 
   return (
     <div className="surface-card overflow-hidden">
-      <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-2 text-xs text-zinc-500">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 px-4 py-2 text-xs text-zinc-500">
         <span>
           {results.length} {t.scan.candidatesRanked}
+          {heldCount > 0 ? (
+            <span className="ml-2 text-sky-300/90">
+              · {fmt(t.scan.heldInResults, { count: heldCount })}
+            </span>
+          ) : null}
         </span>
         <span>{t.scan.tableHint}</span>
       </div>
@@ -103,6 +135,7 @@ export function StockTable({
             {results.map((stock, idx) => {
               const added = watchlistAdded?.has(stock.symbol);
               const pending = watchlistPending === stock.symbol;
+              const held = heldPositions?.get(stock.symbol.toUpperCase());
               const m = stock.metrics ?? {};
               const rec = m.recommendation as string | undefined;
               const factors = topFactors(stock, 2);
@@ -111,12 +144,16 @@ export function StockTable({
               return (
                 <tr
                   key={stock.symbol}
-                  className="cursor-pointer transition-colors hover:bg-[#00c805]/10"
+                  className={clsx(
+                    "cursor-pointer transition-colors hover:bg-[#00c805]/10",
+                    held && "bg-sky-500/[0.04]"
+                  )}
                   onClick={() => onSelect(stock)}
                 >
                   <td className="px-3 py-3 text-zinc-500">{idx + 1}</td>
                   <td className="px-3 py-3">
                     <span className="font-semibold tracking-wide text-zinc-100">{stock.symbol}</span>
+                    {held && <HeldBadge position={held} />}
                     {rec && (
                       <div className="mt-1">
                         <RecommendationBadge recommendation={rec} />

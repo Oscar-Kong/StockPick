@@ -80,6 +80,9 @@ def _score_context(symbol: str, sleeve: str, ps: PriceService) -> dict:
             "error": score_res.get("error"),
             "alpha": 50.0,
             "risk_index": 50.0,
+            "target_weight": SLEEVE_MAX_WEIGHT.get(sleeve, 0.05),
+            "dq": None,
+            "risk_flags": ["score_unavailable"],
             "momentum": _momentum_score(symbol, ps),
             "liquidity": _liquidity_score(symbol, ps),
         }
@@ -152,14 +155,14 @@ def run_portfolio_daily_decision(body: PortfolioDecisionRequest) -> PortfolioDec
             }
         )
 
-    invested = sum(p["market_value"] for p in priced if p["latest_price"])
-    total_value = cash + reserved + invested
+    invested_mv = sum(
+        p["market_value"] if p["latest_price"] else p["avg_cost"] * p["shares"] for p in priced
+    )
+    total_value = cash + reserved + invested_mv
     if total_value <= 0 and not priced:
         raise ValueError("Portfolio value must be positive")
 
-    # If all prices missing, use cost basis only for display total — decisions still REVIEW
-    if total_value <= 0:
-        total_value = cash + reserved + sum(p["avg_cost"] * p["shares"] for p in priced)
+    invested = invested_mv
 
     def _item_for_row(row: dict) -> tuple[PortfolioDecisionItem, str | None]:
         sym = row["symbol"]

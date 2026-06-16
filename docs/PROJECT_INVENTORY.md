@@ -9,8 +9,8 @@ Last reviewed against the repo layout, UI routes, and API surface. Use this with
 | Route | What it is |
 |-------|------------|
 | `/` | Home hub — ticker jump, links to Scan / Workspace / Library, saved counts, resume links |
-| `/scan` | Scan hub — penny, medium, compounder tabs |
-| `/workspace` | Watchlist rail + **Research** (analyze), **Compare**, **Trade journal** |
+| `/scan` | Scan hub — penny, medium, compounder tabs; results show **Held** badge when ticker is in Home portfolio |
+| `/workspace` | Watchlist rail + **Research** (grouped analyze tabs, ←/→ symbols, mobile Insights sheet), Compare, journal |
 | `/library` | Saved scans, reports, analyze snapshots |
 | `/portfolio` | Basket weight optimize + rebalance policy backtest |
 | `/trader-intel` | Trader style profiles and presets |

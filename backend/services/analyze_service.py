@@ -5,9 +5,12 @@ import logging
 from utils.datetime_util import utc_iso_z, utc_now
 from typing import Any
 
+import pandas as pd
+
 from data import cache as cache_module
 from data.cache import Cache
 from data.price_service import PERIOD_LIMIT, PriceService, _rows_to_dataframe
+from data.candidate_builder import _load_cached_fundamentals
 from data.reconciler import DataReconciler
 from config import ANALYZE_RESULT_TTL
 from models.schemas import Bucket, ScanOptions
@@ -23,6 +26,7 @@ from screeners.penny import PennyScreener
 from services.alerts import _is_stale, compute_alerts
 from services.market_context import enrich_metrics
 from services.watchlist_scanner import analyze_symbol
+from utils.pydantic_util import json_safe, model_to_dict
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +45,26 @@ def get_cached_symbol_analysis(symbol: str, bucket: Bucket) -> dict[str, Any] | 
     return Cache().get(_analysis_cache_key(symbol, bucket))
 
 
+def _quick_technicals_from_hist(
+    hist: pd.DataFrame,
+    spy: pd.DataFrame | None = None,
+) -> dict[str, Any]:
+    if hist.empty:
+        return {}
+    close = float(hist["close"].iloc[-1])
+    high_52 = float(hist["high"].max())
+    low_52 = float(hist["low"].min())
+    pct_from_high = ((close / high_52) - 1) * 100 if high_52 else 0
+    rs = relative_strength_vs_spy(hist, spy, days=20) if spy is not None and not spy.empty else None
+    return {
+        "trend_score": round(trend_score(hist), 1),
+        "breakout_score": round(breakout_score(hist), 1),
+        "rs_vs_spy": round(rs, 1) if rs is not None else None,
+        "pct_from_52w_high": round(pct_from_high, 1),
+        "price": close,
+    }
+
+
 def _quick_technicals(symbol: str, ps: PriceService, *, db_only: bool = False) -> dict[str, Any]:
     if db_only:
         rows = ps.store.get_quotes(symbol.upper(), limit=PERIOD_LIMIT.get("1y", 280))
@@ -54,18 +78,7 @@ def _quick_technicals(symbol: str, ps: PriceService, *, db_only: bool = False) -
         spy = ps.get_spy_history(period="1y")
     if hist.empty:
         return {}
-    close = float(hist["close"].iloc[-1])
-    high_52 = float(hist["high"].max())
-    low_52 = float(hist["low"].min())
-    pct_from_high = ((close / high_52) - 1) * 100 if high_52 else 0
-    rs = relative_strength_vs_spy(hist, spy, days=20) if not spy.empty else None
-    return {
-        "trend_score": round(trend_score(hist), 1),
-        "breakout_score": round(breakout_score(hist), 1),
-        "rs_vs_spy": round(rs, 1) if rs is not None else None,
-        "pct_from_52w_high": round(pct_from_high, 1),
-        "price": close,
-    }
+    return _quick_technicals_from_hist(hist, spy)
 
 
 def score_all_buckets(symbol: str, ps: PriceService | None = None) -> dict[str, Any]:
@@ -118,8 +131,15 @@ def build_symbol_analysis(
     if error or result is None:
         return {"symbol": sym, "error": error or "Analysis failed"}
 
-    rec = DataReconciler().reconcile(sym)
-    technicals = _quick_technicals(sym, ps)
+    cached_info, _cached_fund, cached_rec = _load_cached_fundamentals(sym)
+    if cached_rec and cached_rec.quality_score > 0:
+        rec = cached_rec
+    else:
+        rec = DataReconciler().reconcile(sym)
+
+    hist = ps.get_history(sym, period="1y")
+    spy = ps.get_spy_history(period="1y")
+    technicals = _quick_technicals_from_hist(hist, spy)
     if include_bucket_fit:
         bucket_fit = score_all_buckets(sym, ps)
     else:
@@ -161,7 +181,7 @@ def build_symbol_analysis(
         "score": result.score,
         "risk_level": result.risk_level.value,
         "summary": result.summary,
-        "signals": [s.model_dump() for s in result.signals],
+        "signals": [model_to_dict(s) for s in result.signals],
         "metrics": metrics,
         "valuation_warnings": result.valuation_warnings,
         "earnings_date": result.earnings_date,
@@ -175,7 +195,7 @@ def build_symbol_analysis(
         "ohlc": ohlc,
         "fundamentals": {**result.metrics, **rec.canonical},
     }
-    Cache().set(_analysis_cache_key(sym, bucket), payload, ANALYZE_RESULT_TTL)
+    Cache().set(_analysis_cache_key(sym, bucket), json_safe(payload), ANALYZE_RESULT_TTL)
 
     try:
         from services.quant_v2_service import maybe_persist_from_analysis

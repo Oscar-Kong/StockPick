@@ -26,17 +26,7 @@ export function ScanControls({
 }: ScanControlsProps) {
   const { t } = useTranslation();
 
-  const fields = [
-    {
-      key: "max_results",
-      label: t.scan.maxResults,
-      hint: t.scan.maxResultsHint,
-      type: "number",
-      min: 5,
-      max: 50,
-      value: options.max_results ?? 50,
-      onChange: (v: string) => onChange({ ...options, max_results: Number(v) }),
-    },
+  const advancedFields = [
     {
       key: "min_price",
       label: t.scan.minPrice,
@@ -75,7 +65,7 @@ export function ScanControls({
           <h2 className="text-sm font-semibold text-zinc-100">
             {fmt(t.scan.filtersTitle, { label: bucketLabel })}
           </h2>
-          <p className="mt-1 text-xs leading-relaxed text-zinc-500">{t.scan.filtersSubtitle}</p>
+          <p className="mt-1 text-xs leading-relaxed text-zinc-500">{t.scan.filtersSubtitleSimple}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <button
@@ -97,23 +87,44 @@ export function ScanControls({
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {fields.map((field) => (
-          <label key={field.key} className="block">
-            <span className="text-xs font-medium text-zinc-300">{field.label}</span>
-            <input
-              type={field.type}
-              min={"min" in field ? field.min : undefined}
-              max={"max" in field ? field.max : undefined}
-              step={"step" in field ? field.step : undefined}
-              value={field.value}
-              onChange={(e) => field.onChange(e.target.value)}
-              className={INPUT_CLASS}
-            />
-            <span className="mt-1.5 block text-[11px] leading-relaxed text-zinc-500">{field.hint}</span>
-          </label>
-        ))}
+      <div className="grid gap-4 sm:max-w-xs">
+        <label className="block">
+          <span className="text-xs font-medium text-zinc-300">{t.scan.maxResults}</span>
+          <input
+            type="number"
+            min={5}
+            max={50}
+            value={options.max_results ?? 50}
+            onChange={(e) => onChange({ ...options, max_results: Number(e.target.value) })}
+            className={INPUT_CLASS}
+          />
+          <span className="mt-1.5 block text-[11px] leading-relaxed text-zinc-500">
+            {t.scan.maxResultsHint}
+          </span>
+        </label>
       </div>
+
+      <details className="mt-4 rounded-lg border border-zinc-800/80 bg-zinc-950/40 px-3 py-2">
+        <summary className="cursor-pointer select-none text-xs font-medium text-zinc-400 hover:text-zinc-200">
+          {t.scan.advancedFilters}
+        </summary>
+        <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">{t.scan.advancedFiltersHint}</p>
+        <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {advancedFields.map((field) => (
+            <label key={field.key} className="block">
+              <span className="text-xs font-medium text-zinc-300">{field.label}</span>
+              <input
+                type={field.type}
+                step={"step" in field ? field.step : undefined}
+                value={field.value}
+                onChange={(e) => field.onChange(e.target.value)}
+                className={INPUT_CLASS}
+              />
+              <span className="mt-1.5 block text-[11px] leading-relaxed text-zinc-500">{field.hint}</span>
+            </label>
+          ))}
+        </div>
+      </details>
     </div>
   );
 }

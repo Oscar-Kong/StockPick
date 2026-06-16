@@ -48,6 +48,45 @@ export function filterActiveDecisionItems(items: PortfolioDecisionItem[]): Portf
   return items.filter((i) => i.bucket !== "medium");
 }
 
+/** Ensure every open holding appears in the decision table (fallback when decision run is stale). */
+export function mergeHoldingsWithDecisionItems(
+  holdings: DailyDashboardResponse["holdings"],
+  items: PortfolioDecisionItem[]
+): PortfolioDecisionItem[] {
+  const active = filterActiveDecisionItems(items);
+  const bySym = new Map(active.map((i) => [i.symbol, i]));
+  const extras: PortfolioDecisionItem[] = [];
+
+  for (const h of holdings) {
+    if (h.bucket === "medium" || bySym.has(h.symbol)) continue;
+    const mv = h.shares * h.avg_cost;
+    extras.push({
+      symbol: h.symbol,
+      bucket: h.bucket,
+      price: 0,
+      price_available: false,
+      shares: h.shares,
+      avg_cost: h.avg_cost,
+      market_value: mv,
+      pl_pct: null,
+      current_weight: 0,
+      target_weight: 0,
+      buy_pct: 0,
+      keep_pct: 100,
+      sell_pct: 0,
+      decision: "review",
+      suggested_action: "Review — run Refresh data now to score this holding",
+      score: 50,
+      risk_index: 50,
+      suggested_dollar_action: 0,
+      reasons: ["Missing from latest decision run"],
+      risk_flags: ["decision_stale"],
+    });
+  }
+
+  return [...active, ...extras];
+}
+
 export function buildActionQueue(items: PortfolioDecisionItem[]): PortfolioDecisionItem[] {
   return filterActiveDecisionItems(items)
     .filter((i) => getDecisionPriority(i.decision) < 3)

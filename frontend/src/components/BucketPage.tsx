@@ -4,6 +4,7 @@
 import {
   addToWatchlist,
   deleteSavedScan,
+  getDailyDashboard,
   getLatestScan,
   getScanStatus,
   listSavedScans,
@@ -12,7 +13,14 @@ import {
 } from "@/lib/api";
 import { getBucketMeta } from "@/lib/buckets";
 import { fmt, useTranslation, useTRef } from "@/lib/i18n";
-import type { Bucket, SavedScanItem, ScanOptions, ScanParitySummary, StockResult } from "@/lib/types";
+import type {
+  Bucket,
+  HeldPositionSummary,
+  SavedScanItem,
+  ScanOptions,
+  ScanParitySummary,
+  StockResult,
+} from "@/lib/types";
 import { isStaleTimestamp } from "@/lib/quantHealth";
 import { SCAN_POLL_INTERVAL_MS, SCAN_POLL_MAX_TICKS } from "@/lib/scanPoll";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -40,8 +48,8 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
   const displayDescription = description ?? meta.description;
 
   const searchParams = useSearchParams();
-  const defaultOptions: ScanOptions = { max_results: 50 };
-  const [options, setOptions] = useState<ScanOptions>({ max_results: 50 });
+  const defaultOptions: ScanOptions = { max_results: 50, mode: "fast" };
+  const [options, setOptions] = useState<ScanOptions>(defaultOptions);
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState("");
@@ -58,6 +66,7 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
   const [savingScan, setSavingScan] = useState(false);
   const [watchlistAdded, setWatchlistAdded] = useState<Set<string>>(() => new Set());
   const [watchlistPending, setWatchlistPending] = useState<string | null>(null);
+  const [heldPositions, setHeldPositions] = useState<Map<string, HeldPositionSummary>>(() => new Map());
   const latestScanLoadedRef = useRef(false);
   const presetLoadedRef = useRef(false);
   // Owns the scan-status polling interval so we can guarantee teardown on
@@ -129,6 +138,20 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
   useEffect(() => {
     void loadSavedScans();
   }, [loadSavedScans]);
+
+  useEffect(() => {
+    void getDailyDashboard({ skipAutoRefresh: true })
+      .then((data) => {
+        const map = new Map<string, HeldPositionSummary>();
+        for (const h of data.holdings) {
+          if (h.shares > 0) {
+            map.set(h.symbol.toUpperCase(), { shares: h.shares, avgCost: h.avg_cost });
+          }
+        }
+        setHeldPositions(map);
+      })
+      .catch(() => setHeldPositions(new Map()));
+  }, []);
 
   const pollScan = useCallback(async (jobId: string) => {
     // If a previous scan poll is still running (e.g. user double-clicked Scan),
@@ -339,6 +362,7 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
         onAddWatchlist={handleWatchlist}
         watchlistAdded={watchlistAdded}
         watchlistPending={watchlistPending}
+        heldPositions={heldPositions}
         scoringEngineUsed={scoringEngineUsed}
       />
 

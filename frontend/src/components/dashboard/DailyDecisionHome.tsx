@@ -14,7 +14,7 @@ import {
   runDailyDecisionNow,
   setBuyingPower,
 } from "@/lib/api";
-import { filterActiveDecisionItems } from "@/lib/dailyDecisionUtils";
+import { filterActiveDecisionItems, mergeHoldingsWithDecisionItems } from "@/lib/dailyDecisionUtils";
 import type { BrokerageCsvImportResponse, DailyDashboardResponse } from "@/lib/types";
 import { useTranslation, useTRef } from "@/lib/i18n";
 import { ActiveHoldingsDecisionTable } from "./daily-decision/ActiveHoldingsDecisionTable";
@@ -218,7 +218,10 @@ export function DailyDecisionHome() {
   };
 
   const hasHoldings = (data?.holdings.length ?? 0) > 0;
-  const items = filterActiveDecisionItems(data?.decision?.items ?? []);
+  const items = mergeHoldingsWithDecisionItems(
+    data?.holdings ?? [],
+    filterActiveDecisionItems(data?.decision?.items ?? [])
+  );
   const showPennyOps =
     !data?.is_demo_data && hasHoldings && (data?.top_penny_opportunities.length ?? 0) > 0;
 

@@ -52,9 +52,11 @@ def analyze_symbol(
     symbol: str,
     bucket_choice: BucketChoice = "auto",
 ) -> tuple[StockResult | None, str | None]:
+    ps = PriceService()
+    ctx = None
     bucket: Bucket
+
     if bucket_choice == "auto":
-        ps = PriceService()
         ctx = build_candidate(symbol, history_period="3mo", reconcile=True, price_service=ps)
         if ctx is None:
             return None, f"No market data found for {symbol}"
@@ -66,8 +68,17 @@ def analyze_symbol(
         bucket = bucket_choice
 
     screener = _SCREENERS[bucket]()
+    if hasattr(screener, "ps"):
+        screener.ps = ps
     try:
-        ctx = screener.enrich(symbol)
+        if ctx is None:
+            history_period = "6mo" if bucket == Bucket.penny else "1y"
+            ctx = build_candidate(
+                symbol,
+                history_period=history_period,
+                reconcile=True,
+                price_service=ps,
+            )
         if ctx is None:
             return None, f"Could not load data for {symbol}"
 

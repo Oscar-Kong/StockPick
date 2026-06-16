@@ -35,6 +35,7 @@ from screeners.medium import MediumScreener
 from screeners.penny import PennyScreener
 from services.scan_context import set_bulk_scan
 from services.scan_display import enrich_scan_display, refresh_results_return_metrics
+from utils.pydantic_util import model_to_dict, models_to_dicts
 
 logger = logging.getLogger(__name__)
 
@@ -343,7 +344,7 @@ class ScanManager:
 
             cache_module.save_scan_results(
                 job.bucket.value,
-                [r.model_dump(mode="json") for r in job.results],
+                models_to_dicts(job.results),
                 job.completed_at.isoformat(),
                 _ttl_for_bucket(job.bucket),
                 strategy_version=strategy.version_id,
@@ -351,8 +352,8 @@ class ScanManager:
             )
             cache_module.save_scan_snapshot(
                 bucket=job.bucket.value,
-                results=[r.model_dump(mode="json") for r in job.results],
-                options=options.model_dump(mode="json"),
+                results=models_to_dicts(job.results),
+                options=model_to_dict(options),
                 name=f"{job.bucket.value.title()} auto scan",
                 strategy_version=strategy.version_id,
                 completed_at=job.completed_at,

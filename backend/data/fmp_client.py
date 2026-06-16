@@ -23,12 +23,24 @@ def _redact_secrets(message: str) -> str:
 
 
 class FMPClient:
+    # Process-wide: after a 403 (tier/key block), skip FMP for remaining calls.
+    _access_denied: bool = False
+
     def __init__(self, api_key: str | None = None, cache: Cache | None = None):
         self.api_key = api_key or FMP_API_KEY
         self.cache = cache or Cache()
 
+    @classmethod
+    def is_disabled(cls) -> bool:
+        return cls._access_denied
+
+    @classmethod
+    def reset_access_denied(cls) -> None:
+        """Test helper — restore FMP after circuit-breaker trips."""
+        cls._access_denied = False
+
     def _get(self, path: str, params: dict | None = None) -> Any:
-        if not self.api_key:
+        if not self.api_key or FMPClient._access_denied:
             return None
         params = dict(params or {})
         params["apikey"] = self.api_key
@@ -36,8 +48,24 @@ class FMPClient:
             r = requests.get(f"{BASE}{path}", params=params, timeout=15)
             r.raise_for_status()
             return r.json()
+        except requests.HTTPError as exc:
+            if exc.response is not None and exc.response.status_code == 403:
+                FMPClient._access_denied = True
+                logger.warning(
+                    "FMP access denied (403) — disabling FMP for this process; using yfinance fallback"
+                )
+            else:
+                logger.warning("FMP %s failed: %s", path, _redact_secrets(str(exc)))
+            return None
         except Exception as exc:
-            logger.warning("FMP %s failed: %s", path, _redact_secrets(str(exc)))
+            msg = str(exc)
+            if "403" in msg:
+                FMPClient._access_denied = True
+                logger.warning(
+                    "FMP access denied (403) — disabling FMP for this process; using yfinance fallback"
+                )
+            else:
+                logger.warning("FMP %s failed: %s", path, _redact_secrets(msg))
             return None
 
     def get_profile(self, symbol: str) -> dict[str, Any]:

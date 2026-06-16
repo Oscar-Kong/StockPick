@@ -83,7 +83,11 @@ def build_candidate(
         else:
             info, fundamentals, rec = DataReconciler().get_canonical_fundamentals(sym)
     else:
-        info = ps.yf.get_info(sym)
+        info = ps.market.get_info(sym)
+        if not info.get("currentPrice") and not info.get("marketCap"):
+            yf_info = yf_client.get_info(sym)
+            if yf_info:
+                info = {**yf_info, **info}
 
     # Price: prefer reconciled, then last bar (most accurate for screening)
     last_close = float(hist["close"].iloc[-1])

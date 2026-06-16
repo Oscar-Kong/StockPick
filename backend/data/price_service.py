@@ -4,6 +4,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from typing import Any
+
 import pandas as pd
 
 from data.historical_store import HistoricalStore
@@ -88,6 +90,9 @@ class PriceService:
 
     def get_spy_history(self, period: str = "1y") -> pd.DataFrame:
         return self.get_history("SPY", period=period)
+
+    def get_info(self, symbol: str) -> dict[str, Any]:
+        return self.market.get_info(symbol.upper())
 
     def download_batch(
         self,

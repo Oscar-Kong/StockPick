@@ -90,6 +90,13 @@ export interface ScanOptions {
   max_price?: number;
   min_volume?: number;
   exclude_sectors?: string[];
+  mode?: "deep" | "fast";
+}
+
+/** Active Home portfolio row — used to mark scan hits you already own. */
+export interface HeldPositionSummary {
+  shares: number;
+  avgCost?: number;
 }
 
 export interface OHLCPoint {

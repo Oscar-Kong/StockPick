@@ -723,6 +723,220 @@ body::before {
   border-radius: 0.75rem;
 }
 
+.analysis-tab-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  min-width: 0;
+}
+
+.analysis-tab-nav-scroll {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding-bottom: 0.125rem;
+  scrollbar-width: thin;
+  scroll-snap-type: x proximity;
+}
+
+.analysis-tab-group {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.analysis-tab-group-label {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--foreground) 38%, transparent);
+  padding-right: 0.25rem;
+}
+
+.analysis-tab-group-items {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.125rem;
+  border-radius: 0.625rem;
+  border: 1px solid var(--surface-border);
+  background: color-mix(in oklab, var(--background) 88%, transparent);
+}
+
+.analysis-tab-pill {
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  border-radius: 0.5rem;
+  padding: 0.375rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: color 0.12s ease, background 0.12s ease;
+  white-space: nowrap;
+}
+
+.analysis-tab-pill:hover {
+  color: var(--foreground);
+  background: color-mix(in oklab, var(--foreground) 6%, transparent);
+}
+
+.analysis-tab-pill--active {
+  background: color-mix(in oklab, var(--brand) 18%, transparent);
+  color: var(--brand);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--brand) 45%, transparent);
+}
+
+.analysis-tab-hint {
+  font-size: 0.6875rem;
+  line-height: 1.45;
+  color: color-mix(in oklab, var(--foreground) 48%, transparent);
+}
+
+.analysis-symbol-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 0.625rem;
+  border: 1px solid var(--surface-border);
+  background: color-mix(in oklab, var(--background) 90%, transparent);
+  padding: 0.125rem;
+}
+
+.analysis-symbol-nav-btn {
+  min-width: 1.75rem;
+  border-radius: 0.45rem;
+  padding: 0.25rem 0.375rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.analysis-symbol-nav-btn:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--brand) 12%, transparent);
+  color: var(--brand);
+}
+
+.analysis-symbol-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.analysis-symbol-nav-current {
+  min-width: 3.5rem;
+  padding: 0 0.375rem;
+  text-align: center;
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--foreground);
+}
+
+.analysis-overview-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 1024px) {
+  .analysis-overview-grid {
+    grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr);
+    align-items: start;
+  }
+}
+
+.analysis-overview-chart {
+  min-height: 280px;
+}
+
+.analysis-insights-toggle {
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in oklab, var(--brand) 35%, transparent);
+  background: color-mix(in oklab, var(--brand) 10%, transparent);
+  padding: 0.375rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--brand);
+}
+
+.analysis-insights-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.analysis-insights-backdrop-hit {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 0.55);
+  border: none;
+}
+
+.analysis-insights-sheet {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: min(100%, 22rem);
+  max-width: 100%;
+  flex-direction: column;
+  background: color-mix(in oklab, var(--surface) 96%, black 4%);
+  border-left: 1px solid var(--surface-border);
+  box-shadow: -8px 0 32px rgb(0 0 0 / 0.35);
+  animation: analysis-sheet-in 0.2s ease-out;
+}
+
+@keyframes analysis-sheet-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.analysis-insights-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--surface-border);
+  padding: 0.75rem 1rem;
+}
+
+.analysis-insights-sheet-body {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.analysis-sidebar-section {
+  border: 1px solid var(--surface-border);
+  border-radius: 0.65rem;
+  background: color-mix(in oklab, var(--background) 88%, transparent);
+  overflow: hidden;
+}
+
+.analysis-sidebar-section-summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--foreground) 55%, transparent);
+}
+
+.analysis-sidebar-section-summary::-webkit-details-marker {
+  display: none;
+}
+
+.analysis-sidebar-section-body {
+  padding: 0 0.75rem 0.75rem;
+}
+
 /* Compare table — metric column is primary reading target */
 .compare-table-wrap {
   font-size: 1rem;

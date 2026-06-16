@@ -17,6 +17,23 @@ interface AnalysisSidebarProps {
   v2Score?: V2ScoreResponse | null;
 }
 
+function SidebarSection({
+  title,
+  defaultOpen = true,
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="analysis-sidebar-section" open={defaultOpen}>
+      <summary className="analysis-sidebar-section-summary">{title}</summary>
+      <div className="analysis-sidebar-section-body">{children}</div>
+    </details>
+  );
+}
+
 function StatCell({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="analysis-stat">
@@ -134,36 +151,30 @@ export function AnalysisSidebar({
   }
 
   return (
-    <div className="space-y-3 p-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <p className="text-[10px] text-zinc-600">{t.analysis.sidebarInsightsHint}</p>
+    <div className="space-y-2 p-3">
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-800/80 bg-zinc-950/40 px-2.5 py-2">
         <ScoreSourceBadge source={scoreSource} />
+        <p className="text-[10px] leading-relaxed text-zinc-500">{t.analysis.sidebarInsightsHint}</p>
       </div>
 
-      <section>
-        <h3 className="label-caps mb-2">{t.analysis.technicals}</h3>
+      <SidebarSection title={t.analysis.technicals}>
         <div className="grid grid-cols-2 gap-1.5">
           <StatCell label={t.analysis.trend} value={tech.trend_score ?? "—"} />
           <StatCell label={t.analysis.rsVsSpy} value={tech.rs_vs_spy ?? "—"} />
           <StatCell label={t.analysis.breakout} value={tech.breakout_score ?? "—"} />
           <StatCell
             label={t.analysis.high52w}
-            value={
-              tech.pct_from_52w_high != null ? `${tech.pct_from_52w_high}%` : "—"
-            }
+            value={tech.pct_from_52w_high != null ? `${tech.pct_from_52w_high}%` : "—"}
           />
         </div>
-      </section>
+      </SidebarSection>
 
-      <section>
-        <h3 className="label-caps mb-2">{t.analysis.qualityTiming}</h3>
+      <SidebarSection title={t.analysis.qualityTiming}>
         <div className="grid grid-cols-2 gap-1.5">
           <StatCell
             label={t.analysis.dataQuality}
             value={
-              data.data_quality_score != null
-                ? `${data.data_quality_score.toFixed(0)}%`
-                : "—"
+              data.data_quality_score != null ? `${data.data_quality_score.toFixed(0)}%` : "—"
             }
           />
           <StatCell
@@ -183,27 +194,27 @@ export function AnalysisSidebar({
             daysUntil={data.days_until_earnings ?? undefined}
           />
         </div>
-      </section>
+      </SidebarSection>
 
-      <section>
-        <h3 className="label-caps mb-2">{t.analysis.bucketFit}</h3>
+      <SidebarSection title={t.analysis.bucketFit}>
         <BucketFitMini
           scores={scores}
           assigned={data.assigned_bucket}
           loading={bucketFitLoading}
         />
-      </section>
+      </SidebarSection>
 
-      <section>
-        <h3 className="label-caps mb-2">
-          {scoreSource === "scoring_engine_v2" ? t.analysis.factorAttribution : t.analysis.signalWeights}
-        </h3>
+      <SidebarSection
+        title={
+          scoreSource === "scoring_engine_v2" ? t.analysis.factorAttribution : t.analysis.signalWeights
+        }
+        defaultOpen={false}
+      >
         <SignalsList signals={primarySignals} />
-      </section>
+      </SidebarSection>
 
       {fundEntries.length > 0 && (
-        <section>
-          <h3 className="label-caps mb-2">{t.analysis.fundamentals}</h3>
+        <SidebarSection title={t.analysis.fundamentals} defaultOpen={false}>
           <dl className="space-y-1.5">
             {fundEntries.map(({ label, value }) => (
               <div key={label} className="flex justify-between gap-2 text-xs">
@@ -212,7 +223,7 @@ export function AnalysisSidebar({
               </div>
             ))}
           </dl>
-        </section>
+        </SidebarSection>
       )}
     </div>
   );

@@ -40,6 +40,7 @@ class AkShareClient:
             return ak
         except Exception as exc:
             logger.warning("AkShare import failed: %s", exc)
+            self._mark_globally_blocked(f"import:{exc}")
             return None
 
     def _global_fail_key(self) -> str:

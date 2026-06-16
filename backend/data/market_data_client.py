@@ -25,6 +25,7 @@ from data.av_client import AlphaVantageClient
 from data.cache import Cache
 from data.finnhub_client import FinnhubClient
 from data.fmp_client import FMPClient
+from data import yfinance_client as yf_client
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +137,26 @@ class MarketDataClient:
             logger.warning("Alpha Vantage history fetch failed for %s: %s", symbol, exc)
             return pd.DataFrame()
 
+    def _get_history_yfinance(self, symbol: str, period: str) -> pd.DataFrame:
+        return yf_client.get_history(symbol, period=period)
+
+    def _history_providers(self) -> list:
+        """Ordered OHLC providers — yfinance first when FMP is blocked or not primary."""
+        providers: list = []
+        if PRIMARY_PRICE_SOURCE == "akshare":
+            providers.append(self._get_history_akshare)
+        if PRIMARY_PRICE_SOURCE == "fmp" and self.fmp and not FMPClient.is_disabled():
+            providers.append(self._get_history_fmp)
+        if PRIMARY_PRICE_SOURCE not in ("akshare", "fmp"):
+            providers.append(self._get_history_yfinance)
+        if self._get_history_yfinance not in providers:
+            providers.append(self._get_history_yfinance)
+        if self.fmp and not FMPClient.is_disabled() and self._get_history_fmp not in providers:
+            providers.append(self._get_history_fmp)
+        if self.ak and self._get_history_akshare not in providers:
+            providers.append(self._get_history_akshare)
+        return providers
+
     def get_history(
         self,
         symbol: str,
@@ -151,14 +172,11 @@ class MarketDataClient:
                 df["date"] = pd.to_datetime(df["date"])
                 return df
 
-        if PRIMARY_PRICE_SOURCE == "akshare":
-            df = self._get_history_akshare(sym, period=period)
-            if df.empty:
-                df = self._get_history_fmp(sym, period=period)
-        else:
-            df = self._get_history_fmp(sym, period=period)
-            if df.empty:
-                df = self._get_history_akshare(sym, period=period)
+        df = pd.DataFrame()
+        for provider in self._history_providers():
+            df = provider(sym, period=period)
+            if not df.empty:
+                break
         if df.empty and allow_alpha_vantage_fallback:
             df = self._get_history_alpha_vantage(sym, period=period)
         df = _normalize_hist_frame(df)
@@ -292,9 +310,30 @@ class MarketDataClient:
     ) -> dict[str, pd.DataFrame]:
         result: dict[str, pd.DataFrame] = {}
         unique = list(dict.fromkeys(s.upper() for s in symbols if s))
-        batch_size = max(1, chunk_size)
+        if not unique:
+            return result
+
         start = time.time()
-        for i in range(0, len(unique), batch_size):
+        missing = list(unique)
+
+        # Fast path: bulk yfinance when FMP is blocked or not the primary price source.
+        use_yf_bulk = PRIMARY_PRICE_SOURCE != "fmp" or FMPClient.is_disabled()
+        if use_yf_bulk and missing:
+            yf_batch = yf_client.download_batch(missing, period=period)
+            for sym, df in yf_batch.items():
+                if not df.empty:
+                    result[sym] = df
+            missing = [s for s in missing if s not in result]
+            if result:
+                logger.info(
+                    "Batch history: yfinance returned %s/%s symbols (%s)",
+                    len(result),
+                    len(unique),
+                    period,
+                )
+
+        batch_size = max(1, chunk_size)
+        for i in range(0, len(missing), batch_size):
             if max_runtime_seconds > 0 and (time.time() - start) >= max_runtime_seconds:
                 logger.warning(
                     "Batch history fetch reached %ss runtime cap; returning partial results (%s/%s symbols)",
@@ -303,7 +342,7 @@ class MarketDataClient:
                     len(unique),
                 )
                 break
-            chunk = unique[i : i + batch_size]
+            chunk = missing[i : i + batch_size]
             for sym in chunk:
                 try:
                     df = self.get_history(
@@ -315,10 +354,9 @@ class MarketDataClient:
                         result[sym] = df
                 except Exception as exc:
                     logger.warning("Batch history failed for %s: %s", sym, exc)
-            time.sleep(0.15)
+            time.sleep(0.05)
 
-        # If FMP access is blocked (e.g., 403 tier restrictions), probe a few symbols via AV
-        # so scans can still produce partial but usable results.
+        # If all providers failed, probe a few symbols via Alpha Vantage.
         if not result and not use_alpha_vantage_fallback and self.av and alpha_vantage_probe_symbols > 0:
             probes = unique[:alpha_vantage_probe_symbols]
             logger.info(

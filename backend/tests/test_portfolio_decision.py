@@ -12,12 +12,13 @@ def test_daily_decision_returns_items():
     body = PortfolioDecisionRequest(cash=1000, holdings=[holding])
 
     fake_ctx = {
-        "score": 72.0,
+        "alpha": 72.0,
         "risk_index": 45.0,
         "target_weight": 0.02,
         "dq": 80.0,
         "risk_flags": [],
-        "recommendation": None,
+        "momentum": 50.0,
+        "liquidity": 60.0,
     }
 
     with patch("services.portfolio_decision_service._last_price", return_value=180.0):

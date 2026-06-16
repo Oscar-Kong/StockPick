@@ -680,6 +680,44 @@ def ledger_has_row_hash(row_hash: str, account_id: int = DEFAULT_ACCOUNT_ID) -> 
         session.close()
 
 
+def rename_holding_symbol(old_symbol: str, new_symbol: str, account_id: int = DEFAULT_ACCOUNT_ID) -> int:
+    """Rename a symbol across ledger rows and saved holdings."""
+    old = (old_symbol or "").upper().strip()
+    new = (new_symbol or "").upper().strip()
+    if not old or not new or old == new:
+        return 0
+    session = SessionLocal()
+    updated = 0
+    try:
+        for row in session.query(TradeHistory).filter(
+            TradeHistory.account_id == account_id, TradeHistory.symbol == old
+        ):
+            row.symbol = new
+            updated += 1
+        holding = (
+            session.query(PortfolioHoldingRow)
+            .filter(PortfolioHoldingRow.account_id == account_id, PortfolioHoldingRow.symbol == old)
+            .first()
+        )
+        if holding:
+            conflict = (
+                session.query(PortfolioHoldingRow)
+                .filter(PortfolioHoldingRow.account_id == account_id, PortfolioHoldingRow.symbol == new)
+                .first()
+            )
+            if conflict:
+                conflict.shares = float(conflict.shares) + float(holding.shares)
+                session.delete(holding)
+            else:
+                holding.symbol = new
+            updated += 1
+        if updated:
+            session.commit()
+        return updated
+    finally:
+        session.close()
+
+
 def get_current_holdings(account_id: int = DEFAULT_ACCOUNT_ID) -> list[dict]:
     session = SessionLocal()
     try:
