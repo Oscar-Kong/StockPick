@@ -297,6 +297,52 @@ def upsert_trades(
         session.close()
 
 
+def _parsed_from_trade_history(r: TradeHistory) -> "ParsedCsvRow":
+    from integrations.robinhood.models import ParsedCsvRow
+
+    row_type = r.side if r.side in ("buy", "sell", "cash", "income") else "excluded"
+    qty = None if r.side in ("cash", "income") and (r.quantity or 0) == 0 else r.quantity
+    price = None if r.side in ("cash", "income") and (r.price or 0) == 0 else r.price
+    return ParsedCsvRow(
+        activity_date=r.activity_date or "",
+        process_date=r.process_date or "",
+        instrument=r.symbol or "",
+        description=r.description or "",
+        trans_code=(r.trans_code or r.side or "").upper(),
+        quantity=qty,
+        price=price,
+        amount=float(r.amount or 0),
+        row_type=row_type,  # type: ignore[arg-type]
+        row_hash=r.row_hash,
+        executed_at=r.executed_at,
+    )
+
+
+def repair_ledger_fill_prices(account_id: int = DEFAULT_ACCOUNT_ID) -> int:
+    """Persist Amount/Quantity fill prices for rows with wrong Robinhood Price column."""
+    from integrations.robinhood.ledger_dedupe import apply_effective_fill_price
+
+    session = SessionLocal()
+    updated = 0
+    try:
+        rows = (
+            session.query(TradeHistory)
+            .filter(TradeHistory.account_id == account_id, TradeHistory.side.in_(("buy", "sell")))
+            .all()
+        )
+        for r in rows:
+            parsed = apply_effective_fill_price(_parsed_from_trade_history(r))
+            corrected = float(parsed.price or 0)
+            if corrected > 0 and abs(corrected - float(r.price or 0)) > 1e-6:
+                r.price = corrected
+                updated += 1
+        if updated:
+            session.commit()
+        return updated
+    finally:
+        session.close()
+
+
 def upsert_ledger_rows(
     account_id: int,
     rows: list,
@@ -305,13 +351,19 @@ def upsert_ledger_rows(
 ) -> tuple[int, int]:
     """Insert all parsed CSV rows (buy/sell/cash/income) by row_hash and semantic key."""
     from integrations.robinhood.models import ParsedCsvRow
-    from integrations.robinhood.ledger_dedupe import dedupe_parsed_rows, is_incomplete_ghost_row, semantic_ledger_key
+    from integrations.robinhood.ledger_dedupe import (
+        apply_effective_fill_price,
+        dedupe_parsed_rows,
+        is_incomplete_ghost_row,
+        semantic_ledger_key,
+    )
 
     rows, _ = dedupe_parsed_rows([r for r in rows if isinstance(r, ParsedCsvRow)])
 
     session = SessionLocal()
     imported = 0
     skipped = 0
+    updated = 0
     try:
         now = _utcnow()
         existing_hashes = {
@@ -321,29 +373,15 @@ def upsert_ledger_rows(
             .all()
             if h
         }
-        existing_semantic: set[tuple] = set()
+        existing_semantic: dict[tuple, TradeHistory] = {}
         for r in session.query(TradeHistory).filter(TradeHistory.account_id == account_id).all():
-            row_type = r.side if r.side in ("buy", "sell", "cash", "income") else "excluded"
-            qty = None if r.side in ("cash", "income") and (r.quantity or 0) == 0 else r.quantity
-            price = None if r.side in ("cash", "income") and (r.price or 0) == 0 else r.price
-            parsed = ParsedCsvRow(
-                activity_date=r.activity_date or "",
-                process_date=r.process_date or "",
-                instrument=r.symbol or "",
-                description=r.description or "",
-                trans_code=(r.trans_code or r.side or "").upper(),
-                quantity=qty,
-                price=price,
-                amount=float(r.amount or 0),
-                row_type=row_type,  # type: ignore[arg-type]
-                row_hash=r.row_hash,
-                executed_at=r.executed_at,
-            )
-            existing_semantic.add(semantic_ledger_key(parsed))
+            parsed = apply_effective_fill_price(_parsed_from_trade_history(r))
+            existing_semantic[semantic_ledger_key(parsed)] = r
 
         for r in rows:
             if not isinstance(r, ParsedCsvRow):
                 continue
+            apply_effective_fill_price(r)
             if is_incomplete_ghost_row(r):
                 skipped += 1
                 continue
@@ -351,7 +389,12 @@ def upsert_ledger_rows(
                 skipped += 1
                 continue
             sem_key = semantic_ledger_key(r)
-            if sem_key in existing_semantic:
+            existing = existing_semantic.get(sem_key)
+            if existing is not None:
+                corrected = float(r.price or 0)
+                if corrected > 0 and abs(corrected - float(existing.price or 0)) > 1e-6:
+                    existing.price = corrected
+                    updated += 1
                 skipped += 1
                 continue
             side = r.row_type if r.row_type in ("cash", "income") else r.row_type
@@ -376,9 +419,9 @@ def upsert_ledger_rows(
                 )
             )
             existing_hashes.add(r.row_hash)
-            existing_semantic.add(sem_key)
             imported += 1
-        session.commit()
+        if imported or updated:
+            session.commit()
         return imported, skipped
     finally:
         session.close()
@@ -387,7 +430,12 @@ def upsert_ledger_rows(
 def purge_duplicate_trades(account_id: int = DEFAULT_ACCOUNT_ID) -> int:
     """Remove duplicate ledger rows from DB, keeping the most complete row per trade."""
     from integrations.robinhood.models import ParsedCsvRow
-    from integrations.robinhood.ledger_dedupe import _row_completeness, is_incomplete_ghost_row, semantic_ledger_key
+    from integrations.robinhood.ledger_dedupe import (
+        _row_completeness,
+        apply_effective_fill_price,
+        is_incomplete_ghost_row,
+        semantic_ledger_key,
+    )
 
     session = SessionLocal()
     try:
@@ -399,22 +447,7 @@ def purge_duplicate_trades(account_id: int = DEFAULT_ACCOUNT_ID) -> int:
         )
         best_id: dict[tuple, tuple[int, ParsedCsvRow]] = {}
         for r in db_rows:
-            row_type = r.side if r.side in ("buy", "sell", "cash", "income") else "excluded"
-            qty = None if r.side in ("cash", "income") and (r.quantity or 0) == 0 else r.quantity
-            price = None if r.side in ("cash", "income") and (r.price or 0) == 0 else r.price
-            parsed = ParsedCsvRow(
-                activity_date=r.activity_date or "",
-                process_date=r.process_date or "",
-                instrument=r.symbol or "",
-                description=r.description or "",
-                trans_code=(r.trans_code or r.side or "").upper(),
-                quantity=qty,
-                price=price,
-                amount=float(r.amount or 0),
-                row_type=row_type,  # type: ignore[arg-type]
-                row_hash=r.row_hash,
-                executed_at=r.executed_at,
-            )
+            parsed = apply_effective_fill_price(_parsed_from_trade_history(r))
             if is_incomplete_ghost_row(parsed):
                 continue
             key = semantic_ledger_key(parsed)
@@ -425,22 +458,7 @@ def purge_duplicate_trades(account_id: int = DEFAULT_ACCOUNT_ID) -> int:
         keep_ids = {v[0] for v in best_id.values()}
         removed = 0
         for r in db_rows:
-            row_type = r.side if r.side in ("buy", "sell", "cash", "income") else "excluded"
-            qty = None if r.side in ("cash", "income") and (r.quantity or 0) == 0 else r.quantity
-            price = None if r.side in ("cash", "income") and (r.price or 0) == 0 else r.price
-            parsed = ParsedCsvRow(
-                activity_date=r.activity_date or "",
-                process_date=r.process_date or "",
-                instrument=r.symbol or "",
-                description=r.description or "",
-                trans_code=(r.trans_code or r.side or "").upper(),
-                quantity=qty,
-                price=price,
-                amount=float(r.amount or 0),
-                row_type=row_type,  # type: ignore[arg-type]
-                row_hash=r.row_hash,
-                executed_at=r.executed_at,
-            )
+            parsed = apply_effective_fill_price(_parsed_from_trade_history(r))
             if is_incomplete_ghost_row(parsed) or int(r.id) not in keep_ids:
                 session.delete(r)
                 removed += 1
@@ -468,7 +486,7 @@ def clear_trade_ledger(account_id: int = DEFAULT_ACCOUNT_ID) -> int:
 
 def load_all_ledger_rows(account_id: int = DEFAULT_ACCOUNT_ID) -> list:
     from integrations.robinhood.models import ParsedCsvRow
-    from integrations.robinhood.ledger_dedupe import dedupe_parsed_rows
+    from integrations.robinhood.ledger_dedupe import apply_effective_fill_price, dedupe_parsed_rows
 
     session = SessionLocal()
     try:
@@ -479,30 +497,8 @@ def load_all_ledger_rows(account_id: int = DEFAULT_ACCOUNT_ID) -> list:
             .all()
         )
         out: list[ParsedCsvRow] = []
-        from integrations.robinhood.csv_importer import _effective_fill_price
-
         for r in rows:
-            row_type = r.side if r.side in ("buy", "sell", "cash", "income") else "excluded"
-            qty = None if r.side in ("cash", "income") and (r.quantity or 0) == 0 else r.quantity
-            price = None if r.side in ("cash", "income") and (r.price or 0) == 0 else r.price
-            amount = float(r.amount or 0)
-            if row_type in ("buy", "sell") and qty and amount:
-                price = _effective_fill_price(price=price, quantity=float(qty), amount=amount)
-            out.append(
-                ParsedCsvRow(
-                    activity_date=r.activity_date or "",
-                    process_date=r.process_date or "",
-                    instrument=r.symbol or "",
-                    description=r.description or "",
-                    trans_code=(r.trans_code or r.side or "").upper(),
-                    quantity=qty,
-                    price=price,
-                    amount=amount,
-                    row_type=row_type,  # type: ignore[arg-type]
-                    row_hash=r.row_hash,
-                    executed_at=r.executed_at,
-                )
-            )
+            out.append(apply_effective_fill_price(_parsed_from_trade_history(r)))
         deduped, _ = dedupe_parsed_rows(out)
         return deduped
     finally:
@@ -605,6 +601,7 @@ def list_uploads(account_id: int = DEFAULT_ACCOUNT_ID, limit: int = 20) -> list[
 
 def load_all_trades(account_id: int = DEFAULT_ACCOUNT_ID) -> list:
     from integrations.robinhood.models import ParsedTrade
+    from integrations.robinhood.ledger_dedupe import apply_effective_fill_price
 
     session = SessionLocal()
     try:
@@ -613,22 +610,25 @@ def load_all_trades(account_id: int = DEFAULT_ACCOUNT_ID) -> list:
             .filter(TradeHistory.account_id == account_id, TradeHistory.side.in_(("buy", "sell")))
             .all()
         )
-        return [
-            ParsedTrade(
-                symbol=r.symbol,
-                side=r.side,
-                quantity=float(r.quantity or 0),
-                price=float(r.price or 0),
-                fees=r.fees,
-                executed_at=r.executed_at,
-                order_id=r.order_id,
-                row_hash=r.row_hash,
-                trans_code=r.trans_code or "",
-                amount=float(r.amount or 0),
-                description=r.description or "",
+        out: list[ParsedTrade] = []
+        for r in rows:
+            parsed = apply_effective_fill_price(_parsed_from_trade_history(r))
+            out.append(
+                ParsedTrade(
+                    symbol=r.symbol,
+                    side=r.side,
+                    quantity=float(parsed.quantity or 0),
+                    price=float(parsed.price or 0),
+                    fees=r.fees,
+                    executed_at=r.executed_at,
+                    order_id=r.order_id,
+                    row_hash=r.row_hash,
+                    trans_code=r.trans_code or "",
+                    amount=float(r.amount or 0),
+                    description=r.description or "",
+                )
             )
-            for r in rows
-        ]
+        return out
     finally:
         session.close()
 

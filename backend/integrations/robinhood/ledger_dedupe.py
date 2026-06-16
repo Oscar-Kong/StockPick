@@ -1,6 +1,7 @@
 """Detect and collapse duplicate Robinhood ledger rows (e.g. re-imports with missing dates)."""
 from __future__ import annotations
 
+from integrations.robinhood.csv_importer import _effective_fill_price
 from integrations.robinhood.models import ParsedCsvRow
 
 
@@ -19,6 +20,17 @@ def _row_completeness(row: ParsedCsvRow) -> int:
     return score
 
 
+def apply_effective_fill_price(row: ParsedCsvRow) -> ParsedCsvRow:
+    """Use signed Amount / Quantity when Robinhood's Price column is wrong."""
+    if row.row_type in ("buy", "sell") and row.quantity and row.amount:
+        row.price = _effective_fill_price(
+            price=row.price,
+            quantity=float(row.quantity),
+            amount=float(row.amount),
+        )
+    return row
+
+
 def semantic_ledger_key(row: ParsedCsvRow) -> tuple:
     if row.row_type in ("cash", "income"):
         return (
@@ -27,8 +39,8 @@ def semantic_ledger_key(row: ParsedCsvRow) -> tuple:
             round(float(row.amount or 0), 2),
         )
     qty = round(float(row.quantity or 0), 6)
-    price = round(float(row.price or 0), 6)
-    return (row.row_type, (row.instrument or "").upper(), qty, price)
+    amount = round(float(row.amount or 0), 2)
+    return (row.row_type, (row.instrument or "").upper(), qty, amount)
 
 
 def is_incomplete_ghost_row(row: ParsedCsvRow) -> bool:
@@ -47,6 +59,7 @@ def dedupe_parsed_rows(rows: list[ParsedCsvRow]) -> tuple[list[ParsedCsvRow], in
     best: dict[tuple, ParsedCsvRow] = {}
     order: list[tuple] = []
     for row in filtered:
+        apply_effective_fill_price(row)
         key = semantic_ledger_key(row)
         existing = best.get(key)
         if existing is None:

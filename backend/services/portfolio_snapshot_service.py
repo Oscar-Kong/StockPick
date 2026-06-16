@@ -17,6 +17,7 @@ from data.portfolio_store import (
     clear_trade_ledger,
     purge_duplicate_trades,
     record_upload,
+    repair_ledger_fill_prices,
     save_holdings,
     save_portfolio_snapshot,
     set_account_cash,
@@ -42,6 +43,39 @@ DISCLAIMER = (
 def _rebuild_from_store(account_id: int = DEFAULT_ACCOUNT_ID):
     rows = load_all_ledger_rows(account_id)
     return rebuild_portfolio(rows)
+
+
+def _holdings_drift_from_ledger(account_id: int = DEFAULT_ACCOUNT_ID) -> bool:
+    """True when saved holdings disagree with ledger reconstruction."""
+    account = get_or_create_account()
+    if account.get("source") not in ("csv", "snaptrade"):
+        return False
+    rows = load_all_ledger_rows(account_id)
+    if not rows:
+        return False
+    rebuilt = {h.symbol: h for h in rebuild_portfolio(rows).open_holdings}
+    saved = {h["symbol"]: h for h in get_current_holdings(account_id)}
+    if set(rebuilt) != set(saved):
+        return True
+    for sym, lot in rebuilt.items():
+        row = saved.get(sym)
+        if not row:
+            return True
+        if abs(float(row["shares"]) - lot.shares) > 1e-4:
+            return True
+        if abs(float(row["avg_cost"]) - lot.avg_cost) > 0.005:
+            return True
+    return False
+
+
+def ensure_holdings_reconciled(account_id: int = DEFAULT_ACCOUNT_ID) -> bool:
+    """Repair ledger fill prices and rebuild holdings when reconstruction drifts."""
+    repaired = repair_ledger_fill_prices(account_id)
+    drift = _holdings_drift_from_ledger(account_id)
+    if repaired or drift:
+        refresh_holdings_snapshot()
+        return True
+    return False
 
 
 def import_robinhood_csv(content: str | bytes, filename: str, *, cash: float | None = None, replace: bool = False) -> dict:
@@ -366,6 +400,7 @@ def sync_brokerage_if_configured() -> dict:
 
 def refresh_holdings_snapshot() -> dict:
     account = get_or_create_account()
+    repaired = repair_ledger_fill_prices(DEFAULT_ACCOUNT_ID)
     removed = purge_duplicate_trades(DEFAULT_ACCOUNT_ID)
     rebuild = _rebuild_from_store()
     saved = save_holdings(DEFAULT_ACCOUNT_ID, rebuild.open_holdings, source=account["source"])
@@ -382,7 +417,14 @@ def refresh_holdings_snapshot() -> dict:
     ]
     total_est = sum(h["shares"] * h["avg_cost"] for h in saved) + cash
     snap = save_portfolio_snapshot(DEFAULT_ACCOUNT_ID, cash, total_est, saved, account["source"], closed_positions=closed)
-    return {"holdings": saved, "cash": cash, "closed_positions": closed, "snapshot": snap, "duplicates_removed": removed}
+    return {
+        "holdings": saved,
+        "cash": cash,
+        "closed_positions": closed,
+        "snapshot": snap,
+        "duplicates_removed": removed,
+        "prices_repaired": repaired,
+    }
 
 
 def estimate_ledger_cash(account_id: int = DEFAULT_ACCOUNT_ID) -> float:
@@ -478,6 +520,7 @@ def holdings_to_request() -> tuple[float, float, list[PortfolioHolding]]:
 
 
 def get_current_portfolio() -> dict:
+    ensure_holdings_reconciled()
     account = get_or_create_account()
     holdings = get_current_holdings()
     snap = get_latest_portfolio_snapshot()

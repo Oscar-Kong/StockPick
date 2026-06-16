@@ -809,6 +809,7 @@ export const en = {
     lastRunJobs: "Latest quant jobs",
     lastRunGenerated: "Generated",
     lastRunSampleSize: "Sample size",
+    lastRunMetricFallback: "Metric",
     viewDetails: "View details",
     runNewResearch: "Run new research",
     trustFresh: "Fresh",

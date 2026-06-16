@@ -795,6 +795,7 @@ export const zh: Messages = {
     lastRunJobs: "最新量化任务",
     lastRunGenerated: "生成时间",
     lastRunSampleSize: "样本量",
+    lastRunMetricFallback: "指标",
     viewDetails: "查看详情",
     runNewResearch: "运行新研究",
     trustFresh: "新鲜",

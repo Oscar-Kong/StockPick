@@ -13,7 +13,7 @@ It combines rule-based screening, data reconciliation, optional OpenBB governanc
 
 From one UI, you can:
 
-1. **Home** — daily buy/keep/sell dashboard for your Robinhood holdings (`/`). Import Robinhood CSV or log a **manual journal trade** (with quantity) to rebuild positions. Shows the latest saved snapshot immediately; if holdings, prices, or decisions are stale, the UI marks status as **Updating** and refreshes in the background (holdings → prices → daily decision; penny scan runs async). Use **Refresh data now** to force a sync.
+1. **Home** — daily buy/keep/sell dashboard for your Robinhood holdings (`/`). Import Robinhood CSV or log a **manual journal trade** (with quantity) to rebuild positions. When Robinhood's **Price** column disagrees with **Amount ÷ Quantity** (e.g. Price $1.19 vs $19.10 ÷ 10 = **$1.91**), the importer and ledger repair use the cash amount as the fill price and rebuild average cost. Shows the latest saved snapshot immediately; if holdings, prices, or decisions are stale, the UI marks status as **Updating** and refreshes in the background (holdings → prices → daily decision; penny scan runs async). Use **Refresh data now** to force a sync.
 2. **Scan** a bucket and rank candidates (`/scan`)
 3. **Workspace** — watchlist, single-symbol analyze (primary score from `/api/v2/score` when enabled), compare peers, trade journal (`/workspace`)
 4. **Portfolio** — basket optimization, rebalance policy backtests (research; daily decisions live on Home) (`/portfolio`)

@@ -28,72 +28,91 @@ export function QuantLabLastRunCard({
   const showRunNew =
     onRunNew && USER_TRIGGERED_LAST_RUN_IDS.has(summary.id as LastRunCardId);
 
+  const warnings = [
+    ...new Set(
+      [
+        summary.stale && summary.stale_reason ? summary.stale_reason : null,
+        ...summary.warnings,
+      ].filter(Boolean) as string[]
+    ),
+  ];
+
   return (
-    <article className="app-card app-card--elevated flex flex-col p-4 sm:p-5">
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
-        <h3 className="text-sm font-semibold text-zinc-100">{title}</h3>
+    <article className="app-card app-card--elevated flex h-full min-h-0 flex-col p-4 sm:p-5">
+      <div className="mb-4 flex min-w-0 items-start justify-between gap-2">
+        <h3 className="min-w-0 text-sm font-semibold leading-snug text-zinc-100">{title}</h3>
         <QuantLabTrustBadge indicator={summary.trust_indicator} />
       </div>
 
-      {summary.available ? (
-        <dl className="mb-4 grid gap-3 sm:grid-cols-2">
-          <StatTile
-            label={t.quantLab.lastRunGenerated}
-            value={formatEvidenceDate(summary.generated_at)}
-          />
-          {summary.sample_size != null && (
+      <div className="flex min-h-0 flex-1 flex-col gap-3">
+        {summary.available ? (
+          <dl className="grid min-w-0 grid-cols-2 gap-3">
+            <StatTile
+              label={t.quantLab.lastRunGenerated}
+              value={formatEvidenceDate(summary.generated_at)}
+            />
             <StatTile
               label={t.quantLab.lastRunSampleSize}
-              value={<span className="tabular-nums">{summary.sample_size}</span>}
+              value={
+                summary.sample_size != null ? (
+                  <span className="tabular-nums">{summary.sample_size}</span>
+                ) : (
+                  "—"
+                )
+              }
             />
-          )}
-          {summary.status && (
             <StatTile
               label={t.quantLab.runStatus}
-              value={<span className="capitalize">{summary.status}</span>}
-            />
-          )}
-          {summary.main_metric && (
-            <StatTile
-              label={summary.main_metric.label}
               value={
-                <span className="text-base font-semibold tabular-nums text-zinc-50">
-                  {summary.main_metric.value}
-                </span>
+                summary.status ? (
+                  <span className="capitalize">{summary.status}</span>
+                ) : (
+                  "—"
+                )
               }
-              className={summary.status ? undefined : "sm:col-span-2"}
             />
-          )}
-        </dl>
-      ) : (
-        <p className="mb-4 text-sm leading-relaxed text-secondary">{summary.reason ?? t.quantLab.trustNoSavedRun}</p>
-      )}
+            <StatTile
+              label={summary.main_metric?.label ?? t.quantLab.lastRunMetricFallback}
+              value={
+                summary.main_metric ? (
+                  <span className="text-base font-semibold tabular-nums text-zinc-50">
+                    {summary.main_metric.value}
+                  </span>
+                ) : (
+                  "—"
+                )
+              }
+              truncateTitle={summary.main_metric?.value}
+            />
+          </dl>
+        ) : (
+          <p className="text-sm leading-relaxed text-secondary">
+            {summary.reason ?? t.quantLab.trustNoSavedRun}
+          </p>
+        )}
 
-      {(summary.stale || summary.warnings.length > 0) && (
-        <ul className="mb-4 space-y-1.5 text-xs leading-relaxed text-amber-300">
-          {[
-            ...new Set(
-              [
-                summary.stale && summary.stale_reason ? summary.stale_reason : null,
-                ...summary.warnings,
-              ].filter(Boolean) as string[]
-            ),
-          ].map((w) => (
-            <li key={w}>{w}</li>
-          ))}
-        </ul>
-      )}
+        {(warnings.length > 0 || summary.research_only) && (
+          <div className="space-y-1.5">
+            {warnings.length > 0 && (
+              <ul className="space-y-1 text-xs leading-relaxed text-amber-300">
+                {warnings.map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+              </ul>
+            )}
+            {summary.research_only && (
+              <p className="text-xs leading-relaxed text-info">{t.quantLab.trustResearchOnly}</p>
+            )}
+          </div>
+        )}
+      </div>
 
-      {summary.research_only && (
-        <p className="mb-4 text-xs leading-relaxed text-info">{t.quantLab.trustResearchOnly}</p>
-      )}
-
-      <div className="mt-auto flex flex-wrap gap-2 pt-1">
-        <SecondaryButton size="sm" onClick={onViewDetails} className="rounded-lg">
+      <div className="mt-4 flex shrink-0 flex-col gap-2 border-t border-zinc-800/60 pt-4 sm:flex-row sm:flex-wrap">
+        <SecondaryButton size="sm" onClick={onViewDetails} className="w-full rounded-lg sm:w-auto">
           {t.quantLab.viewDetails}
         </SecondaryButton>
         {showRunNew && (
-          <PrimaryButton size="sm" onClick={onRunNew} className="rounded-lg">
+          <PrimaryButton size="sm" onClick={onRunNew} className="w-full rounded-lg sm:w-auto">
             {t.quantLab.runNewResearch}
           </PrimaryButton>
         )}
