@@ -35,7 +35,7 @@ export default function RootLayout({
     >
       <body
         suppressHydrationWarning
-        className="font-sans flex min-h-dvh flex-col text-sm text-zinc-100"
+        className="font-sans flex min-h-dvh flex-col text-base text-zinc-100"
       >
         <Providers>
           <Nav />

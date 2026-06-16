@@ -1,10 +1,10 @@
 "use client";
 
+import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ApiSettingsPanel } from "@/components/ApiSettingsPanel";
 import { LanguageSettingsPanel } from "@/components/LanguageSettingsPanel";
 import { QuantHealthCard } from "@/components/quant/QuantHealthCard";
-import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { GhostButton } from "@/components/ui/buttons";
 import { useTranslation } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
@@ -31,7 +31,7 @@ export default function SettingsPage() {
   }, [close]);
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 pb-8">
+    <PageContainer className="flex flex-1 flex-col gap-5 pb-8">
       <PageHeader
         title={t.settings.pageTitle}
         subtitle={t.settings.pageSubtitle}
@@ -41,14 +41,36 @@ export default function SettingsPage() {
           </GhostButton>
         }
       />
-      <LanguageSettingsPanel />
-      <CollapsibleSection title={t.settings.quantHealthSection} defaultOpen>
-        <QuantHealthCard />
-      </CollapsibleSection>
-      <section>
-        <h2 className="mb-3 text-sm font-semibold text-zinc-100">{t.settings.apiSection}</h2>
-        <ApiSettingsPanel />
-      </section>
-    </div>
+
+      <div className="settings-layout">
+        <nav className="settings-nav" aria-label={t.settings.pageTitle}>
+          <a href="#settings-language" className="settings-nav__link settings-nav__link--active">
+            {t.settings.languageSection}
+          </a>
+          <a href="#settings-quant" className="settings-nav__link">
+            {t.settings.quantHealthSection}
+          </a>
+          <a href="#settings-api" className="settings-nav__link">
+            {t.settings.apiSection}
+          </a>
+        </nav>
+
+        <div className="min-w-0 space-y-6">
+          <section id="settings-language" className="settings-section">
+            <LanguageSettingsPanel />
+          </section>
+
+          <section id="settings-quant" className="settings-section">
+            <h2 className="settings-section__title">{t.settings.quantHealthSection}</h2>
+            <QuantHealthCard />
+          </section>
+
+          <section id="settings-api" className="settings-section">
+            <h2 className="settings-section__title">{t.settings.apiSection}</h2>
+            <ApiSettingsPanel />
+          </section>
+        </div>
+      </div>
+    </PageContainer>
   );
 }

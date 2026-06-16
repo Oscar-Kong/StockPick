@@ -18,7 +18,7 @@ export function ConfidenceBadge({ value, className }: ConfidenceBadgeProps) {
         : "border-zinc-600 text-zinc-400";
 
   return (
-    <span className={clsx("chip px-1.5 py-0.5 text-[10px] font-medium tabular-nums", color, className)}>
+    <span className={clsx("chip px-1.5 py-0.5 text-xs font-medium tabular-nums", color, className)}>
       {fmt(t.quant.confidenceShort, { value: value.toFixed(0) })}
     </span>
   );

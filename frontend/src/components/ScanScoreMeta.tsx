@@ -32,7 +32,7 @@ export function ScanScoreMeta({ scoringEngineUsed, paritySummary }: ScanScoreMet
               diffs: String(paritySummary.recommendation_bucket_diffs ?? 0),
             })}
             tooltip={t.product.parityDeltaTooltip}
-            className="chip px-2 py-1 text-[10px] tabular-nums text-zinc-500"
+            className="chip px-2 py-1 text-xs tabular-nums text-zinc-500"
           />
         )}
     </div>

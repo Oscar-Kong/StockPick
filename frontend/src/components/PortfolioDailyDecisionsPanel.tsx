@@ -27,7 +27,7 @@ function DecisionBadge({ decision }: { decision: string }) {
   };
   return (
     <span
-      className={`inline-block rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase ${colors[decision] ?? colors.keep}`}
+      className={`inline-block rounded border px-1.5 py-0.5 text-xs font-medium uppercase ${colors[decision] ?? colors.keep}`}
     >
       {decision}
     </span>
@@ -253,7 +253,7 @@ export function PortfolioDailyDecisionsPanel() {
             </table>
           </div>
           {result.notes.length > 0 && (
-            <ul className="list-inside list-disc text-[10px] text-zinc-600">
+            <ul className="list-inside list-disc text-xs text-zinc-600">
               {result.notes.map((n) => (
                 <li key={n}>{n}</li>
               ))}

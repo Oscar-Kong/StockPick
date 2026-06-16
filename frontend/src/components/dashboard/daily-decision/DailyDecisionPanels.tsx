@@ -17,7 +17,7 @@ export function EmptyPortfolioState({ onImportClick }: { onImportClick: () => vo
           {t.home.dailyImportCsv}
         </PrimaryButton>
       </div>
-      <p className="mt-5 text-xs text-tertiary">{t.home.dailyCsvWhereHint}</p>
+      <p className="mt-5 text-sm text-secondary">{t.home.dailyCsvWhereHint}</p>
     </AppCard>
   );
 }
@@ -65,9 +65,21 @@ export function CsvImportPanel({
   const hasIpoOrder = ipoSharesInput.trim() !== "" && ipoListPriceInput.trim() !== "" && ipoShares > 0 && ipoListPrice > 0;
   const bufferedReserved = hasIpoOrder ? Math.round(ipoShares * ipoListPrice * 1.2 * 100) / 100 : null;
   return (
-    <SectionCard title={t.home.dailyImportPanelTitle} subtitle={t.home.dailyImportPanelHint} variant="muted">
+    <details className="data-panel data-panel--padded group">
+      <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <h2 className="data-panel-title">{t.home.dailyImportPanelTitle}</h2>
+            <p className="data-panel-subtitle">{t.home.dailyImportPanelHint}</p>
+          </div>
+          <span className="text-sm text-secondary group-open:rotate-180 transition-transform" aria-hidden>
+            ▾
+          </span>
+        </div>
+      </summary>
+      <div className="mt-4 border-t border-zinc-800/80 pt-4">
       {(csvRowsLoaded != null || ledgerRowsCount != null) && (
-        <p className="mb-3 text-xs leading-relaxed text-secondary">
+        <p className="mb-3 text-sm leading-relaxed text-secondary">
           {t.home.dailyImportLoadedStats
             .replace("{csvRows}", String(csvRowsLoaded ?? "—"))
             .replace("{ledgerRows}", String(ledgerRowsCount ?? "—"))}
@@ -167,7 +179,8 @@ export function CsvImportPanel({
           </div>
         </dl>
       )}
-    </SectionCard>
+      </div>
+    </details>
   );
 }
 

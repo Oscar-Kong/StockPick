@@ -13,7 +13,7 @@ export function TooltipLabel({ label, tooltip, className }: TooltipLabelProps) {
     <span className={clsx("inline-flex items-center gap-1", className)}>
       <span>{label}</span>
       <span
-        className="cursor-help rounded-full border border-zinc-700 px-1 text-[10px] leading-none text-zinc-500"
+        className="cursor-help rounded-full border border-zinc-700 px-1 text-xs leading-none text-zinc-500"
         title={tooltip}
         aria-label={tooltip}
       >

@@ -59,10 +59,10 @@ export function ValuationBlock({ data }: { data: ValuationV2 }) {
       </div>
       {hasGrid && (
         <div className="overflow-x-auto pt-1">
-          <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-500">
+          <p className="mb-1 text-xs uppercase tracking-wide text-zinc-500">
             {t.quant.dcfSensitivity}
           </p>
-          <table className="w-full min-w-[240px] text-[10px] tabular-nums">
+          <table className="w-full min-w-[240px] text-xs tabular-nums">
             <thead>
               <tr className="text-zinc-500">
                 <th className="py-0.5 pr-1 text-left">{t.quant.waccG}</th>

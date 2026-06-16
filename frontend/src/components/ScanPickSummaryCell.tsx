@@ -64,7 +64,7 @@ export function ScanPickSummaryCell({ stock, variant = "table" }: ScanPickSummar
   return (
     <div ref={panelRef} className={clsx("relative", isDrawer && "space-y-2")}>
       {!isDrawer && (
-        <p className="mb-1.5 line-clamp-1 text-[11px] leading-snug text-zinc-500">{blurb(stock)}</p>
+        <p className="mb-1.5 line-clamp-1 text-sm leading-snug text-zinc-500">{blurb(stock)}</p>
       )}
       <button
         type="button"
@@ -113,20 +113,20 @@ export function ScanPickSummaryCell({ stock, variant = "table" }: ScanPickSummar
           {data && !error && (
             <div className="space-y-2.5 text-xs leading-relaxed text-zinc-400">
               <div>
-                <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                <p className="mb-0.5 text-xs font-medium uppercase tracking-wide text-zinc-500">
                   {t.scan.background}
                 </p>
                 <p>{data.background}</p>
               </div>
               <div>
-                <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                <p className="mb-0.5 text-xs font-medium uppercase tracking-wide text-zinc-500">
                   {t.scan.whyRanked}
                 </p>
                 <p>{data.why_picked}</p>
               </div>
             </div>
           )}
-          <p className="mt-2 text-[10px] text-zinc-600">{t.scan.disclaimer}</p>
+          <p className="mt-2 text-xs text-zinc-600">{t.scan.disclaimer}</p>
         </div>
       )}
     </div>

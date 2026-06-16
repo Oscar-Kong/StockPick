@@ -75,7 +75,7 @@ export function Nav() {
           <div className="app-nav-actions">
             <Link
               href="/trader-intel"
-              className="hidden rounded-lg px-2 py-1.5 text-xs text-zinc-500 transition hover:bg-zinc-900 hover:text-zinc-200 md:inline"
+              className="hidden rounded-lg px-2.5 py-1.5 text-sm text-zinc-400 transition hover:bg-zinc-900 hover:text-zinc-200 md:inline"
             >
               {t.nav.traderIntel}
             </Link>

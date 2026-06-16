@@ -26,7 +26,7 @@ function PositionCell({ item }: { item: PortfolioDecisionItem }) {
       <div className="flex items-center gap-2">
         <p className="text-base font-semibold text-zinc-50">{item.symbol}</p>
         {bucketLabel && (
-          <span className="rounded-md border border-white/5 bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-zinc-300">
+          <span className="rounded-md border border-white/5 bg-zinc-800 px-1.5 py-0.5 text-xs font-medium text-zinc-300">
             {bucketLabel}
           </span>
         )}

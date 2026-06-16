@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { SectionCard } from "@/components/ui/AppCard";
+import { PageContainer } from "@/components/ui/PageContainer";
 import {
   getDailyDashboard,
   getHomeRefreshStatus,
@@ -226,7 +227,7 @@ export function DailyDecisionHome() {
     !data?.is_demo_data && hasHoldings && (data?.top_penny_opportunities.length ?? 0) > 0;
 
   return (
-    <div className="home mx-auto max-w-6xl">
+    <PageContainer className="home">
       <input
         ref={fileRef}
         type="file"
@@ -282,7 +283,7 @@ export function DailyDecisionHome() {
                     subtitle={t.home.dailyHoldingsSubtitle}
                     variant="elevated"
                     action={
-                      <Link href="/scan?bucket=penny" className="text-xs font-medium text-brand hover:underline">
+                      <Link href="/scan?bucket=penny" className="text-sm font-medium text-brand hover:underline">
                         {t.home.dailyPennyScan}
                       </Link>
                     }
@@ -324,9 +325,9 @@ export function DailyDecisionHome() {
             </>
           )}
 
-          <p className="text-center text-xs leading-relaxed text-tertiary">{data.disclaimer || t.home.dailyDisclaimer}</p>
+          <p className="text-center text-sm leading-relaxed text-secondary">{data.disclaimer || t.home.dailyDisclaimer}</p>
         </>
       ) : null}
-    </div>
+    </PageContainer>
   );
 }

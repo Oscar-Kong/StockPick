@@ -26,7 +26,7 @@ export function QuantLabTrustBadge({ indicator }: { indicator: QuantLabTrustIndi
   };
   return (
     <span
-      className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${TRUST_STYLES[indicator]}`}
+      className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium uppercase tracking-wide ${TRUST_STYLES[indicator]}`}
     >
       {labels[indicator]}
     </span>

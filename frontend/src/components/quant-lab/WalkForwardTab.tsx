@@ -218,7 +218,7 @@ export function WalkForwardTab() {
               data-testid="walk-forward-overfitting-warnings"
             >
               <h4 className="text-xs font-semibold text-amber-200">{t.quantLab.overfittingTitle}</h4>
-              <p className="mt-1 text-[10px] text-amber-200/70">
+              <p className="mt-1 text-xs text-amber-200/70">
                 PBO: {overfitting.pbo_available ? "yes" : "no"} —{" "}
                 {translateReliabilityList([overfitting.pbo_warning], "warnings", t)[0]}
               </p>

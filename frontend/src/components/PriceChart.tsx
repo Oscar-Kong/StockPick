@@ -47,7 +47,7 @@ export function PriceChart({
   return (
     <div className={clsx("space-y-2", className)}>
       {showSnapshot && snapshot && (
-        <div className="flex flex-wrap gap-x-4 gap-y-1 px-1 text-[11px] tabular-nums text-zinc-500">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 px-1 text-sm tabular-nums text-zinc-500">
           <span>
             Close{" "}
             <span className="font-medium text-[#7dff8e]">${snapshot.close.toFixed(2)}</span>
@@ -100,7 +100,7 @@ export function PriceChart({
                 height={28}
                 iconType="plainline"
                 formatter={(value) => (
-                  <span className="text-[11px] text-zinc-400">{value}</span>
+                  <span className="text-sm text-zinc-400">{value}</span>
                 )}
               />
             )}

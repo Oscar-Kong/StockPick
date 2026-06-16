@@ -120,7 +120,7 @@ export function HomeScanSummary() {
                   {stale && data?.completed_at && <StaleDataBadge asOf={data.completed_at} />}
                   {source && <ScoreSourceBadge source={source} />}
                   {!stale && data?.completed_at && (
-                    <span className="text-[11px] text-emerald-300/80">{t.product.dataFresh}</span>
+                    <span className="text-sm text-emerald-300/80">{t.product.dataFresh}</span>
                   )}
                 </div>
               </article>

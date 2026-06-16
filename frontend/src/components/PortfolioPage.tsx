@@ -19,6 +19,7 @@ import { AppTabBar, AppTabButton } from "./AppTabs";
 import { ChartMount } from "./ChartMount";
 import { DarkChartTooltip, darkTooltipCursor } from "./DarkChartTooltip";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { PageContainer } from "@/components/ui/PageContainer";
 import { PortfolioFactorExposurePanel } from "./PortfolioFactorExposurePanel";
 import { PortfolioAllocationPanel } from "./PortfolioAllocationPanel";
 import { PortfolioDailyDecisionsPanel } from "./PortfolioDailyDecisionsPanel";
@@ -198,7 +199,7 @@ export function PortfolioPage() {
     })) ?? [];
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
+    <PageContainer className="space-y-4">
       <PageHeader
         title={t.portfolio.title}
         subtitle={t.portfolio.subtitle}
@@ -665,7 +666,7 @@ export function PortfolioPage() {
       {panel === "allocation" && <PortfolioAllocationPanel symbols={symbols} />}
       {panel === "daily" && <PortfolioDailyDecisionsPanel />}
 
-      <p className="text-xs text-zinc-600">{t.portfolio.quantHint}</p>
-    </div>
+      <p className="text-sm text-secondary">{t.portfolio.quantHint}</p>
+    </PageContainer>
   );
 }

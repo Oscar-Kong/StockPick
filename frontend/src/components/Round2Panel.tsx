@@ -19,7 +19,7 @@ export function Round2Panel({ score }: { score: V2ScoreResponse }) {
         <span className="text-xs text-zinc-500">{t.analysis.scoreChip}</span>
         <ScoreSourceBadge source="scoring_engine_v2" />
         {score.market_regime && (
-          <span className="chip px-1.5 py-0.5 text-[10px] capitalize text-zinc-400">{score.market_regime}</span>
+          <span className="chip px-1.5 py-0.5 text-xs capitalize text-zinc-400">{score.market_regime}</span>
         )}
       </div>
       {score.recommendation && <RecommendationBlock data={score.recommendation} />}

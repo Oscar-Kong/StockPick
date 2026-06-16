@@ -27,7 +27,7 @@ export function HealthStatusBadge({ severity, label, className }: HealthStatusBa
         : t.quantHealth.statusError);
 
   return (
-    <span className={clsx("chip px-2 py-0.5 text-[10px] font-medium uppercase", STYLE[severity], className)}>
+    <span className={clsx("chip px-2 py-0.5 text-xs font-medium uppercase", STYLE[severity], className)}>
       {text}
     </span>
   );

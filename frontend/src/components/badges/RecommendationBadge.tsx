@@ -26,7 +26,7 @@ export function RecommendationBadge({ recommendation, className }: Recommendatio
   return (
     <span
       className={clsx(
-        "chip px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+        "chip px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide",
         style,
         className
       )}

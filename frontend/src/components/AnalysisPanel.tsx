@@ -512,7 +512,7 @@ export function AnalysisPanel({
                 {!onNavigateSymbol && <h2 className="text-zinc-50">{data.symbol}</h2>}
               </div>
               {onNavigateSymbol && (prevSymbol || nextSymbol) && (
-                <p className="mt-1 text-[10px] text-zinc-600">{t.analysis.symbolNavHint}</p>
+                <p className="mt-1 text-xs text-zinc-600">{t.analysis.symbolNavHint}</p>
               )}
               <AnalysisHeaderStats
                 price={data.price}

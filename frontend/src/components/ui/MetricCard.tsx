@@ -19,10 +19,10 @@ const TONE: Record<NonNullable<MetricCardProps["tone"]>, string> = {
 
 export function MetricCard({ label, value, hint, tone = "default", className }: MetricCardProps) {
   return (
-    <div className={clsx("app-card p-4", className)}>
-      <p className="text-label-caps">{label}</p>
-      <p className={clsx("finance-value mt-2 text-lg font-semibold", TONE[tone])}>{value}</p>
-      {hint && <p className="mt-1 text-xs text-tertiary">{hint}</p>}
+    <div className={clsx("metric-tile", className)}>
+      <p className="metric-tile__label">{label}</p>
+      <p className={clsx("metric-tile__value finance-value", TONE[tone])}>{value}</p>
+      {hint && <p className="metric-tile__hint">{hint}</p>}
     </div>
   );
 }

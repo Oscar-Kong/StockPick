@@ -8,11 +8,13 @@ Last reviewed against the repo layout, UI routes, and API surface. Use this with
 
 | Route | What it is |
 |-------|------------|
-| `/` | Home hub — ticker jump, links to Scan / Workspace / Library, saved counts, resume links |
-| `/scan` | Scan hub — penny, medium, compounder tabs; results show **Held** badge when ticker is in Home portfolio |
-| `/workspace` | Watchlist rail + **Research** (grouped analyze tabs, ←/→ symbols, mobile Insights sheet), Compare, journal |
-| `/library` | Saved scans, reports, analyze snapshots |
-| `/portfolio` | Basket weight optimize + rebalance policy backtest |
+| `/` | Home — daily decision cockpit (portfolio summary strip, action queue, holdings); compact header + collapsible CSV import |
+| `/scan` | Scan hub — dense results table, unified toolbar; **Held** badge when ticker is in Home portfolio |
+| `/workspace` | Full-width research terminal — watchlist rail + grouped analyze tabs, symbol nav, mobile Insights sheet |
+| `/library` | Saved scans, reports, analyze snapshots — split list/detail layout |
+| `/portfolio` | Basket optimize + policy backtest — expanded ~1520px layout |
+| `/quant-lab` | Factor research tabs first; evidence/scan relationship in collapsible panels below |
+| `/settings` | Two-column settings — language, quant health, API integrations |
 | `/trader-intel` | Trader style profiles and presets |
 
 **Redirects (bookmarks still work):**
@@ -27,7 +29,17 @@ Last reviewed against the repo layout, UI routes, and API surface. Use this with
 
 ---
 
-## Features with API but no dedicated UI
+## Frontend design system (Dense Research Workbench)
+
+Shared layout and typography live in `frontend/src/app/globals.css` and `frontend/src/components/ui/`:
+
+- **Page width:** `PageContainer` (~1520px max) for data-heavy modules; workspace uses full shell width
+- **Typography:** 15px body, 13px+ persistent labels, tabular nums on financial values
+- **Primitives:** `DataPanel`, `SummaryStrip`, `ModuleToolbar`, `DenseTable`, `StatTile`, `MetricCard`
+- **Tables:** sticky headers, right-aligned numeric columns, 14px row text
+- **Colors:** dark shell preserved; green/orange/keep semantic colors unchanged
+
+---
 
 These work via API / scripts / future UI; documented so nothing is “missing” silently.
 

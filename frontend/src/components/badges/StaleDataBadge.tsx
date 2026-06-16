@@ -13,7 +13,7 @@ export function StaleDataBadge({ asOf, className }: StaleDataBadgeProps) {
   return (
     <span
       className={clsx(
-        "chip border-amber-600/40 bg-amber-950/30 px-1.5 py-0.5 text-[10px] font-medium text-amber-200",
+        "chip border-amber-600/40 bg-amber-950/30 px-1.5 py-0.5 text-xs font-medium text-amber-200",
         className
       )}
       title={asOf ? `${t.common.staleData}: ${asOf}` : t.common.staleData}

@@ -79,7 +79,7 @@ export function PortfolioFactorExposurePanel({
             <div className="overflow-x-auto">
               <table className="w-full min-w-[280px] text-sm">
                 <thead>
-                  <tr className="text-left text-[10px] uppercase text-zinc-500">
+                  <tr className="text-left text-xs uppercase text-zinc-500">
                     <th className="py-1 pr-2">{t.common.symbol}</th>
                     {pcKeys.map((k) => (
                       <th key={k} className="py-1 pr-2">
@@ -126,7 +126,7 @@ export function PortfolioFactorExposurePanel({
             </ul>
           )}
 
-          <p className="text-[10px] text-zinc-600">
+          <p className="text-xs text-zinc-600">
             {t.portfolio.exposureDiagnosticOnly} · key={symbolsKey}
           </p>
         </div>

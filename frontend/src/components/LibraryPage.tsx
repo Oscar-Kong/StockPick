@@ -170,7 +170,7 @@ function LibraryContent() {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <h2 className="text-lg font-semibold">{selectedScan.name}</h2>
-                      <p className="text-xs text-zinc-500">
+                      <p className="text-sm text-secondary">
                         {fmt(t.library.resultCount, {
                           bucket: selectedScan.bucket,
                           count: selectedScan.result_count,

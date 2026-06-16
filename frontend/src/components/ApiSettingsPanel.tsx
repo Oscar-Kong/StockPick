@@ -60,14 +60,14 @@ function SettingRow({
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium text-zinc-100">{item.label}</span>
           {item.overridden && (
-            <span className="rounded bg-amber-950/50 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-amber-300">
+            <span className="rounded bg-amber-950/50 px-1.5 py-0.5 text-xs uppercase tracking-wide text-amber-300">
               {t.settings.overridden}
             </span>
           )}
           {needsKey && (
             <span
               className={clsx(
-                "rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide",
+                "rounded px-1.5 py-0.5 text-xs uppercase tracking-wide",
                 item.configured ? "bg-emerald-950/50 text-emerald-300" : "bg-zinc-800 text-zinc-500"
               )}
             >
@@ -75,7 +75,7 @@ function SettingRow({
             </span>
           )}
           {!needsKey && active && (
-            <span className="rounded bg-emerald-950/50 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-emerald-300">
+            <span className="rounded bg-emerald-950/50 px-1.5 py-0.5 text-xs uppercase tracking-wide text-emerald-300">
               {t.settings.active}
             </span>
           )}

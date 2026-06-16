@@ -15,7 +15,7 @@ export function DecisionBadge({ decision, size = "sm" }: { decision: string; siz
       className={clsx(
         "inline-flex items-center rounded-md border font-semibold uppercase tracking-wide",
         STYLES[tone],
-        size === "md" ? "px-2.5 py-1 text-xs" : "px-2 py-0.5 text-[11px]"
+        size === "md" ? "px-2.5 py-1 text-xs" : "px-2 py-0.5 text-sm"
       )}
     >
       {formatDecision(decision)}

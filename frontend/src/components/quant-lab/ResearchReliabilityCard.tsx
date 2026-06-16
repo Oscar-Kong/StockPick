@@ -49,7 +49,7 @@ export function ResearchReliabilityCard({ score, maxReasons = 3 }: ResearchRelia
         </h4>
         <div className="flex items-center gap-2">
           <span
-            className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${STATUS_STYLES[score.status]}`}
+            className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium uppercase tracking-wide ${STATUS_STYLES[score.status]}`}
             data-testid="research-reliability-badge"
           >
             {statusLabels[score.status]}
@@ -65,7 +65,7 @@ export function ResearchReliabilityCard({ score, maxReasons = 3 }: ResearchRelia
 
       {reasons.length > 0 && (
         <div>
-          <p className="text-[10px] font-medium uppercase text-zinc-500">{t.reliability.reasonsLabel}</p>
+          <p className="text-xs font-medium uppercase text-zinc-500">{t.reliability.reasonsLabel}</p>
           <ul className="mt-1 list-inside list-disc text-xs text-zinc-400">
             {reasons.slice(0, maxReasons).map((line, i) => (
               <li key={i}>{line}</li>
@@ -76,7 +76,7 @@ export function ResearchReliabilityCard({ score, maxReasons = 3 }: ResearchRelia
 
       {warnings.length > 0 && (
         <div>
-          <p className="text-[10px] font-medium uppercase text-amber-600/80">{t.reliability.warningsLabel}</p>
+          <p className="text-xs font-medium uppercase text-amber-600/80">{t.reliability.warningsLabel}</p>
           <ul className="mt-1 list-inside list-disc text-xs text-amber-200/90">
             {warnings.map((line, i) => (
               <li key={i}>{line}</li>
@@ -87,7 +87,7 @@ export function ResearchReliabilityCard({ score, maxReasons = 3 }: ResearchRelia
 
       {blockers.length > 0 && (
         <div>
-          <p className="text-[10px] font-medium uppercase text-rose-600/80">{t.reliability.blockersLabel}</p>
+          <p className="text-xs font-medium uppercase text-rose-600/80">{t.reliability.blockersLabel}</p>
           <ul className="mt-1 list-inside list-disc text-xs text-rose-200/90">
             {blockers.map((line, i) => (
               <li key={i}>{line}</li>

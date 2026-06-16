@@ -311,7 +311,7 @@ export function TradeJournal({ embedded = false }: { embedded?: boolean }) {
                 }
                 className={inputClass}
               />
-              <span className="mt-1 block text-[11px] text-zinc-600">{t.journal.quantityPortfolioHint}</span>
+              <span className="mt-1 block text-sm text-zinc-600">{t.journal.quantityPortfolioHint}</span>
             </label>
             <label className="text-xs text-zinc-500">
               {t.journal.stopLoss}

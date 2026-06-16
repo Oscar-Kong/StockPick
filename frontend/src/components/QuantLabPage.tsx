@@ -12,7 +12,9 @@ import { AppTabBar, AppTabButton } from "@/components/AppTabs";
 import { QuantLabEvidencePanel } from "@/components/quant-lab/QuantLabEvidencePanel";
 import { QuantLabScanRelationshipPanel } from "@/components/product/QuantLabScanRelationshipPanel";
 import { EvidenceToActionBoundary } from "@/components/product/EvidenceToActionBoundary";
+import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { ResearchWarning } from "@/components/ui/ResearchWarning";
 import { useTranslation } from "@/lib/i18n";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -59,14 +61,8 @@ function QuantLabContent() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4">
+    <PageContainer className="flex flex-1 flex-col gap-3">
       <PageHeader title={t.quantLab.title} subtitle={t.quantLab.subtitle} />
-      <EvidenceToActionBoundary />
-      <ResearchWarning message={t.quantLab.validationCopy} />
-
-      <QuantLabScanRelationshipPanel />
-
-      <QuantLabEvidencePanel onNavigateTab={setTab} />
 
       <AppTabBar aria-label={t.quantLab.tabsAria} className="overflow-x-auto">
         {TABS.map((key) => (
@@ -76,7 +72,7 @@ function QuantLabContent() {
         ))}
       </AppTabBar>
 
-      <div className="app-card p-5">
+      <div className="data-panel data-panel--padded min-h-[12rem]">
         {tab === "factor-performance" && <FactorPerformanceTab />}
         {tab === "walk-forward" && <WalkForwardTab />}
         {tab === "predictions" && <PredictionsTab />}
@@ -84,7 +80,19 @@ function QuantLabContent() {
         {tab === "data-quality" && <DataQualityTab />}
         {tab === "model-admin" && <ModelAdminTab />}
       </div>
-    </div>
+
+      <ResearchWarning message={t.quantLab.validationCopy} />
+
+      <CollapsibleSection title={t.quantLab.evidenceTitle} defaultOpen={false}>
+        <QuantLabEvidencePanel onNavigateTab={setTab} />
+      </CollapsibleSection>
+
+      <CollapsibleSection title={t.product.quantLabAffectsScanTitle} defaultOpen={false}>
+        <QuantLabScanRelationshipPanel />
+      </CollapsibleSection>
+
+      <EvidenceToActionBoundary />
+    </PageContainer>
   );
 }
 

@@ -98,7 +98,7 @@ export function ScanControls({
             onChange={(e) => onChange({ ...options, max_results: Number(e.target.value) })}
             className={INPUT_CLASS}
           />
-          <span className="mt-1.5 block text-[11px] leading-relaxed text-zinc-500">
+          <span className="mt-1.5 block text-sm leading-relaxed text-zinc-500">
             {t.scan.maxResultsHint}
           </span>
         </label>
@@ -108,7 +108,7 @@ export function ScanControls({
         <summary className="cursor-pointer select-none text-xs font-medium text-zinc-400 hover:text-zinc-200">
           {t.scan.advancedFilters}
         </summary>
-        <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">{t.scan.advancedFiltersHint}</p>
+        <p className="mt-2 text-sm leading-relaxed text-zinc-500">{t.scan.advancedFiltersHint}</p>
         <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {advancedFields.map((field) => (
             <label key={field.key} className="block">
@@ -120,7 +120,7 @@ export function ScanControls({
                 onChange={(e) => field.onChange(e.target.value)}
                 className={INPUT_CLASS}
               />
-              <span className="mt-1.5 block text-[11px] leading-relaxed text-zinc-500">{field.hint}</span>
+              <span className="mt-1.5 block text-sm leading-relaxed text-zinc-500">{field.hint}</span>
             </label>
           ))}
         </div>

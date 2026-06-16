@@ -13,8 +13,8 @@ export function SectionHeader({ title, subtitle, action, className }: SectionHea
   return (
     <div className={clsx("mb-3 flex flex-wrap items-start justify-between gap-2", className)}>
       <div className="min-w-0">
-        <h2 className="text-sm font-semibold text-zinc-200">{title}</h2>
-        {subtitle && <p className="mt-0.5 text-xs text-zinc-500">{subtitle}</p>}
+        <h2 className="section-title">{title}</h2>
+        {subtitle && <p className="section-subtitle mt-0.5">{subtitle}</p>}
       </div>
       {action}
     </div>

@@ -60,7 +60,7 @@ function SignalsList({ signals }: { signals: Signal[] }) {
               style={{ width: `${Math.min(100, s.contribution)}%` }}
             />
           </div>
-          <p className="mt-0.5 text-[10px] text-zinc-600">
+          <p className="mt-0.5 text-xs text-zinc-600">
             {fmt(t.analysis.signalValue, { value: s.value.toFixed(1) })}
           </p>
         </li>
@@ -95,7 +95,7 @@ function BucketFitMini({
               active ? "border-[#00c805]/40 bg-[#00c805]/10" : "border-zinc-800"
             )}
           >
-            <p className="text-[10px] capitalize text-zinc-500">
+            <p className="text-xs capitalize text-zinc-500">
               {b === "medium" ? `${b.slice(0, 4)}*` : b.slice(0, 4)}
             </p>
             <p className="text-sm font-semibold tabular-nums text-zinc-100">
@@ -154,7 +154,7 @@ export function AnalysisSidebar({
     <div className="space-y-2 p-3">
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-800/80 bg-zinc-950/40 px-2.5 py-2">
         <ScoreSourceBadge source={scoreSource} />
-        <p className="text-[10px] leading-relaxed text-zinc-500">{t.analysis.sidebarInsightsHint}</p>
+        <p className="text-xs leading-relaxed text-zinc-500">{t.analysis.sidebarInsightsHint}</p>
       </div>
 
       <SidebarSection title={t.analysis.technicals}>

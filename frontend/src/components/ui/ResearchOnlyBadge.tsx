@@ -14,7 +14,7 @@ export function ResearchOnlyBadge({ tooltip, className }: ResearchOnlyBadgeProps
   return (
     <span
       className={clsx(
-        "inline-flex rounded-full border border-sky-900/50 bg-sky-950/40 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-sky-200/90",
+        "inline-flex rounded-full border border-sky-900/50 bg-sky-950/40 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-sky-200/90",
         className
       )}
       title={title}

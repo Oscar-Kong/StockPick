@@ -22,7 +22,7 @@ export function RiskBadge({ level, className }: RiskBadgeProps) {
   const style = STYLE[level.toLowerCase()] ?? STYLE.medium;
 
   return (
-    <span className={clsx("chip px-1.5 py-0.5 text-[10px] font-medium uppercase", style, className)}>
+    <span className={clsx("chip px-1.5 py-0.5 text-xs font-medium uppercase", style, className)}>
       {label}
     </span>
   );

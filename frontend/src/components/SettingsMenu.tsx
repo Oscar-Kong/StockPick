@@ -57,14 +57,14 @@ export function SettingsMenu() {
             strokeLinejoin="round"
           />
         </svg>
-        <span className="hidden text-[10px] font-medium uppercase tracking-wide sm:inline">
+        <span className="hidden text-xs font-medium uppercase tracking-wide sm:inline">
           {locale === "zh" ? "中" : "EN"}
         </span>
       </button>
 
       {open && (
         <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-lg border border-zinc-700 bg-zinc-950 py-1 shadow-xl">
-          <p className="px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+          <p className="px-3 py-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
             {t.settings.language}
           </p>
           <div className="flex gap-1 px-2 pb-2">

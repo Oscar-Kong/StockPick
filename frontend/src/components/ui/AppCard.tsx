@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 
-type AppCardVariant = "default" | "elevated" | "muted" | "ghost";
+export type AppCardVariant = "default" | "elevated" | "muted" | "ghost";
 
 const VARIANT: Record<AppCardVariant, string> = {
   default: "app-card",
@@ -33,11 +33,11 @@ interface SectionCardProps {
 
 export function SectionCard({ title, subtitle, action, children, className, variant = "default" }: SectionCardProps) {
   return (
-    <AppCard variant={variant} className={clsx("p-5", className)} as="section">
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+    <AppCard variant={variant} className={clsx("data-panel data-panel--padded", className)} as="section">
+      <div className="data-panel-header">
         <div className="min-w-0">
-          <h2 className="text-base font-semibold tracking-tight text-zinc-50">{title}</h2>
-          {subtitle && <p className="section-subtitle">{subtitle}</p>}
+          <h2 className="data-panel-title">{title}</h2>
+          {subtitle && <p className="data-panel-subtitle">{subtitle}</p>}
         </div>
         {action}
       </div>

@@ -17,7 +17,7 @@ export function ScoreSourceBadge({ source, className }: ScoreSourceBadgeProps) {
   return (
     <span
       className={clsx(
-        "chip px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+        "chip px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide",
         isV2 ? "border-emerald-500/30 text-emerald-300" : "border-zinc-600 text-zinc-400",
         className
       )}

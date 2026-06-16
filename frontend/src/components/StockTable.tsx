@@ -5,6 +5,7 @@ import { RecommendationBadge } from "@/components/badges/RecommendationBadge";
 import { RiskBadge } from "@/components/badges/RiskBadge";
 import { ScoreBadge } from "@/components/badges/ScoreBadge";
 import { ScoreSourceBadge } from "@/components/ScoreSourceBadge";
+import { DenseTable, DenseTableToolbar } from "@/components/ui/DenseTable";
 import { fmt, useTranslation } from "@/lib/i18n";
 import type { HeldPositionSummary, StockResult } from "@/lib/types";
 import clsx from "clsx";
@@ -50,11 +51,7 @@ function topWarnings(stock: StockResult, n: number) {
     .slice(0, n);
 }
 
-function HeldBadge({
-  position,
-}: {
-  position: HeldPositionSummary;
-}) {
+function HeldBadge({ position }: { position: HeldPositionSummary }) {
   const { t } = useTranslation();
   const sharesLabel =
     position.shares % 1 === 0
@@ -63,7 +60,7 @@ function HeldBadge({
 
   return (
     <span
-      className="mt-1 inline-flex items-center rounded-md border border-sky-500/40 bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-sky-200"
+      className="mt-1 inline-flex items-center rounded-md border border-sky-500/40 bg-sky-500/10 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-sky-200"
       title={fmt(t.scan.heldTooltip, { shares: sharesLabel })}
     >
       {fmt(t.scan.heldBadge, { shares: sharesLabel })}
@@ -94,7 +91,7 @@ export function StockTable({
 
   if (results.length === 0) {
     return (
-      <div className="surface-card border-dashed p-10 text-center text-sm text-zinc-500">
+      <div className="surface-card border-dashed p-8 text-center text-sm text-secondary">
         {t.scan.noResults}
       </div>
     );
@@ -102,7 +99,7 @@ export function StockTable({
 
   return (
     <div className="surface-card overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 px-4 py-2 text-xs text-zinc-500">
+      <DenseTableToolbar>
         <span>
           {results.length} {t.scan.candidatesRanked}
           {heldCount > 0 ? (
@@ -112,106 +109,102 @@ export function StockTable({
           ) : null}
         </span>
         <span>{t.scan.tableHint}</span>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-zinc-200 text-sm dark:divide-zinc-800">
-          <thead className="sticky top-0 z-10 bg-zinc-950/95 backdrop-blur">
-            <tr>
-              <th className="px-3 py-3 text-left font-medium">#</th>
-              <th className="px-3 py-3 text-left font-medium">{t.scan.symbol}</th>
-              <th className="px-3 py-3 text-left font-medium">{t.scan.price}</th>
-              <th className="px-3 py-3 text-left font-medium">{t.scan.score}</th>
-              <th className="hidden px-3 py-3 text-left font-medium lg:table-cell">{t.scanDrawer.source}</th>
-              <th className="px-3 py-3 text-left font-medium">{t.scan.risk}</th>
-              <th className="hidden px-3 py-3 text-left font-medium xl:table-cell">{t.scanDrawer.topFactors}</th>
-              <th className="px-3 py-3 text-center font-medium" title={t.scan.dayPct}>
-                {t.scan.dayPct}
-              </th>
-              <th className="px-3 py-3 text-left font-medium w-[120px]">{t.scan.summary}</th>
-              <th className="px-3 py-3 text-left font-medium">{t.scan.watchlist}</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-900 bg-transparent">
-            {results.map((stock, idx) => {
-              const added = watchlistAdded?.has(stock.symbol);
-              const pending = watchlistPending === stock.symbol;
-              const held = heldPositions?.get(stock.symbol.toUpperCase());
-              const m = stock.metrics ?? {};
-              const rec = m.recommendation as string | undefined;
-              const factors = topFactors(stock, 2);
-              const warnings = topWarnings(stock, 1);
+      </DenseTableToolbar>
+      <DenseTable caption={t.scan.candidatesRanked}>
+        <thead>
+          <tr>
+            <th className="col-num">#</th>
+            <th>{t.scan.symbol}</th>
+            <th className="col-num">{t.scan.price}</th>
+            <th className="col-num">{t.scan.score}</th>
+            <th className="hidden lg:table-cell">{t.scanDrawer.source}</th>
+            <th>{t.scan.risk}</th>
+            <th className="hidden xl:table-cell">{t.scanDrawer.topFactors}</th>
+            <th className="col-num" title={t.scan.dayPct}>
+              {t.scan.dayPct}
+            </th>
+            <th className="w-[120px]">{t.scan.summary}</th>
+            <th>{t.scan.watchlist}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {results.map((stock, idx) => {
+            const added = watchlistAdded?.has(stock.symbol);
+            const pending = watchlistPending === stock.symbol;
+            const held = heldPositions?.get(stock.symbol.toUpperCase());
+            const m = stock.metrics ?? {};
+            const rec = m.recommendation as string | undefined;
+            const factors = topFactors(stock, 2);
+            const warnings = topWarnings(stock, 1);
 
-              return (
-                <tr
-                  key={stock.symbol}
-                  className={clsx(
-                    "cursor-pointer transition-colors hover:bg-[#00c805]/10",
-                    held && "bg-sky-500/[0.04]"
+            return (
+              <tr
+                key={stock.symbol}
+                className={clsx("cursor-pointer", held && "is-selected")}
+                onClick={() => onSelect(stock)}
+              >
+                <td className="col-num text-secondary">{idx + 1}</td>
+                <td>
+                  <span className="font-semibold tracking-wide text-zinc-100">{stock.symbol}</span>
+                  {held && <HeldBadge position={held} />}
+                  {rec && (
+                    <div className="mt-1">
+                      <RecommendationBadge recommendation={rec} />
+                    </div>
                   )}
-                  onClick={() => onSelect(stock)}
-                >
-                  <td className="px-3 py-3 text-zinc-500">{idx + 1}</td>
-                  <td className="px-3 py-3">
-                    <span className="font-semibold tracking-wide text-zinc-100">{stock.symbol}</span>
-                    {held && <HeldBadge position={held} />}
-                    {rec && (
-                      <div className="mt-1">
-                        <RecommendationBadge recommendation={rec} />
-                      </div>
+                </td>
+                <td className="col-num finance-value">${stock.price.toFixed(2)}</td>
+                <td className="col-num">
+                  <ScoreBadge score={stock.score} />
+                </td>
+                <td className="hidden lg:table-cell">
+                  {scoreSource && <ScoreSourceBadge source={scoreSource} />}
+                </td>
+                <td>
+                  <RiskBadge level={stock.risk_level} />
+                </td>
+                <td className="hidden text-sm text-secondary xl:table-cell">
+                  {factors.map((f) => (
+                    <div key={f.name}>{f.name}</div>
+                  ))}
+                  {warnings.map((f) => (
+                    <div key={f.name} className="text-amber-300/90">
+                      ⚠ {f.name}
+                    </div>
+                  ))}
+                </td>
+                <td className={clsx("col-num finance-value", changeClass(m.change_pct_1d))}>
+                  {changeCell(m.change_pct_1d)}
+                </td>
+                <td className="align-top">
+                  <ScanPickSummaryCell stock={stock} />
+                </td>
+                <td>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!added && !pending) onAddWatchlist(stock);
+                    }}
+                    disabled={added || pending}
+                    aria-label={`${t.scan.addWatchlist} ${stock.symbol}`}
+                    className={clsx(
+                      "min-h-[2.5rem] min-w-[5.5rem] rounded-lg px-2.5 py-1.5 text-sm font-medium transition",
+                      added
+                        ? "border border-[#00c805]/50 bg-[#00c805]/20 text-[#7dff8e]"
+                        : pending
+                          ? "border border-zinc-700 bg-zinc-900 text-zinc-400"
+                          : "btn-ghost border border-zinc-700 hover:border-[#00c805]/50 hover:bg-[#00c805]/10 hover:text-[#7dff8e]"
                     )}
-                  </td>
-                  <td className="px-3 py-3 tabular-nums">${stock.price.toFixed(2)}</td>
-                  <td className="px-3 py-3">
-                    <ScoreBadge score={stock.score} />
-                  </td>
-                  <td className="hidden px-3 py-3 lg:table-cell">
-                    {scoreSource && <ScoreSourceBadge source={scoreSource} />}
-                  </td>
-                  <td className="px-3 py-3">
-                    <RiskBadge level={stock.risk_level} />
-                  </td>
-                  <td className="hidden px-3 py-3 text-xs text-zinc-500 xl:table-cell">
-                    {factors.map((f) => (
-                      <div key={f.name}>{f.name}</div>
-                    ))}
-                    {warnings.map((f) => (
-                      <div key={f.name} className="text-amber-300/80">
-                        ⚠ {f.name}
-                      </div>
-                    ))}
-                  </td>
-                  <td className={clsx("px-3 py-3 text-center tabular-nums", changeClass(m.change_pct_1d))}>
-                    {changeCell(m.change_pct_1d)}
-                  </td>
-                  <td className="px-3 py-3 align-top">
-                    <ScanPickSummaryCell stock={stock} />
-                  </td>
-                  <td className="px-3 py-3">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!added && !pending) onAddWatchlist(stock);
-                      }}
-                      disabled={added || pending}
-                      className={clsx(
-                        "min-w-[88px] rounded-lg px-2 py-1.5 text-xs font-medium transition",
-                        added
-                          ? "border border-[#00c805]/50 bg-[#00c805]/20 text-[#7dff8e]"
-                          : pending
-                            ? "border border-zinc-700 bg-zinc-900 text-zinc-400"
-                            : "btn-ghost border border-zinc-700 hover:border-[#00c805]/50 hover:bg-[#00c805]/10 hover:text-[#7dff8e]"
-                      )}
-                    >
-                      {pending ? t.scan.adding : added ? t.scan.added : t.scan.addWatchlist}
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                  >
+                    {pending ? t.scan.adding : added ? t.scan.added : t.scan.addWatchlist}
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </DenseTable>
     </div>
   );
 }

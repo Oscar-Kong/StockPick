@@ -22,7 +22,7 @@ export function FactorLifecycleBadge({ status }: { status: FactorLifecycleStatus
   };
   return (
     <span
-      className={`inline-flex shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${LIFECYCLE_STYLES[status]}`}
+      className={`inline-flex shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium uppercase tracking-wide ${LIFECYCLE_STYLES[status]}`}
       data-testid={`factor-lifecycle-${status}`}
     >
       {labels[status]}

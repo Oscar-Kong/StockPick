@@ -19,7 +19,7 @@ export function ScoreBadge({ score, className }: ScoreBadgeProps) {
 
   return (
     <span
-      className={clsx("chip px-1.5 py-0.5 text-[10px] font-semibold tabular-nums", color, className)}
+      className={clsx("chip px-1.5 py-0.5 text-xs font-semibold tabular-nums", color, className)}
       title={t.common.score}
     >
       {score.toFixed(0)}
