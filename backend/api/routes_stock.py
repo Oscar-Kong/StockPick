@@ -15,7 +15,7 @@ from ml.backtest_medium import run_medium_backtest
 from models.schemas import Bucket, OHLCPoint, StockDetail
 from scoring.valuation import valuation_warnings
 from screeners.compounder import CompounderScreener
-from screeners.medium import MediumScreener
+from screeners.penny import PennyScreener
 from screeners.penny import PennyScreener
 from services.llm_explainer import generate_explanation
 from services.market_context import enrich_metrics
@@ -25,7 +25,7 @@ _EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix="stock-routes")
 
 SCREENERS = {
     Bucket.penny: PennyScreener,
-    Bucket.medium: MediumScreener,
+    Bucket.medium: PennyScreener,
     Bucket.compounder: CompounderScreener,
 }
 

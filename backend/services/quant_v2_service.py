@@ -38,7 +38,7 @@ from engines.scoring.liquidity import liquidity_penalty
 from engines.store import persist_risk_score, persist_score_attribution
 from models.schemas import Bucket
 from screeners.compounder import CompounderScreener
-from screeners.medium import MediumScreener
+from screeners.penny import PennyScreener
 from screeners.penny import PennyScreener
 from services.market_context import enrich_metrics
 from services.watchlist_scanner import analyze_symbol
@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 
 _SCREENERS = {
     "penny": PennyScreener,
-    "medium": MediumScreener,
+    "medium": PennyScreener,
     "compounder": CompounderScreener,
 }
 

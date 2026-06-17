@@ -1,406 +1,239 @@
-"""Structured 8-section stock research report."""
+"""Structured AI research report — quant v2 pipeline with narrative generation."""
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
-from config import FMP_API_KEY, FINNHUB_API_KEY, FRED_API_KEY, PRIMARY_FUNDAMENTALS_SOURCE
+from config import AI_REPORT_SCHEMA, FACTOR_MODEL_VERSION, POSITION_SIZING_V2, STRATEGY_VERSION
+from core.sleeve import normalize_sleeve
 from data.cache import Cache
-from data.earnings import get_next_earnings_date
-from data.finnhub_client import FinnhubClient
-from data.fmp_client import FMPClient
-from data.fred_client import FredClient
 from data.price_service import PriceService
 from data.reconciler import DataReconciler
 from models.schemas import Bucket
-from scoring.sector_strength import sector_relative_strength
-from scoring.structure_analysis import fair_value_zones, long_term_structure
-from scoring.technical import relative_strength_vs_spy, trend_score
+from scoring.structure_analysis import long_term_structure
+from scoring.technical import breakout_score, relative_strength_vs_spy, trend_score
 from scoring.valuation import valuation_warnings
-from services.alerts import compute_alerts
+from services.quant_risk_sizing_service import build_position_sizing, build_unified_risk
+from services.quant_v2_service import build_v2_score
+from services.report_llm_context import build_quant_report_context, system_rating_from_score, _serialize
+from services.report_narrative import DISCLAIMER_FOOTER, generate_report_narrative
 
 logger = logging.getLogger(__name__)
-
-REPORT_CACHE_TTL = 86400 * 3
-
-
-def _safe(v: Any, default: float | None = None) -> float | None:
-    if v is None:
-        return default
-    try:
-        f = float(v)
-        return None if f != f else f
-    except (TypeError, ValueError):
-        return default
+REPORT_CACHE_TTL = 86400 * 2
 
 
-def _fetch_full_info(symbol: str) -> dict[str, Any]:
-    info: dict[str, Any] = {}
-    rec_info, _, _ = DataReconciler().get_canonical_fundamentals(symbol)
-    info.update(rec_info)
-    if FMP_API_KEY and PRIMARY_FUNDAMENTALS_SOURCE == "fmp":
-        fmp = FMPClient().get_fundamentals_bundle(symbol)
-        info = {**info, **fmp}
-    return info
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def _industry_positioning(info: dict, rev_growth: float | None, rs_spy: float | None) -> dict:
-    rg = rev_growth if rev_growth is not None else _safe(info.get("revenueGrowth"))
-    if rg is None:
-        growth_stage = "unknown"
-    elif rg > 0.15:
-        growth_stage = "growth"
-    elif rg > 0.03:
-        growth_stage = "mature"
-    else:
-        growth_stage = "declining"
-
-    mcap = _safe(info.get("marketCap")) or 0
-    margin = _safe(info.get("profitMargins")) or _safe(info.get("profit_margin")) or 0
-    if mcap > 50e9 and margin > 0.15:
-        competitive = "leader"
-    elif mcap > 5e9:
-        competitive = "mid-tier"
-    else:
-        competitive = "niche"
-
-    sector_strength = "neutral"
-    if rs_spy is not None:
-        if rs_spy >= 60:
-            sector_strength = "strong_vs_market"
-        elif rs_spy <= 40:
-            sector_strength = "weak_vs_market"
-
-    macro = "Macro data not configured (add FRED_API_KEY for regime context)."
-    if FRED_API_KEY:
-        score = FredClient().macro_regime_score()
-        if score >= 60:
-            macro = "Supportive macro backdrop (rates/growth regime score favorable)."
-        elif score <= 40:
-            macro = "Challenging macro backdrop — tighter conditions for risk assets."
-        else:
-            macro = "Mixed macro backdrop — sector selection matters more than beta."
-
-    sector = info.get("sector") or info.get("industry") or "Unknown"
-    trending = sector_strength in ("strong_vs_market",) and growth_stage == "growth"
-
-    return {
-        "industry_growth_stage": growth_stage,
-        "competitive_position": competitive,
-        "sector": sector,
-        "sector_strength_vs_market": sector_strength,
-        "sector_on_trend": trending,
-        "macro_background": macro,
-    }
+def _horizon_for_sleeve(sleeve: str) -> str:
+    return {"penny": "3-10 days", "compounder": "3-10+ years"}.get(sleeve, "3-10 days")
 
 
-def _fundamentals_section(info: dict, fundamentals: dict, warnings: list[str]) -> dict:
-    pe = _safe(info.get("trailingPE")) or _safe(fundamentals.get("pe_ratio"))
-    pb = _safe(fundamentals.get("price_to_book")) or _safe(info.get("priceToBook"))
-    roe = _safe(info.get("returnOnEquity")) or _safe(fundamentals.get("roe"))
-    gross = _safe(info.get("grossMargins"))
-    margin = _safe(info.get("profitMargins")) or _safe(fundamentals.get("profit_margin"))
-    rev_g = _safe(info.get("revenueGrowth"))
-    eps_g = _safe(info.get("earningsGrowth"))
-    fcf = _safe(info.get("freeCashflow"))
-    debt = _safe(info.get("totalDebt"))
-    cash = _safe(info.get("totalCash"))
-
-    pe_note = "Compare to industry average when FMP/AV keys enabled for peer data."
-    if pe is not None:
-        if pe > 40:
-            pe_note = "Above typical market multiple — growth must justify."
-        elif 12 <= pe <= 25:
-            pe_note = "Within a reasonable range vs broad market norms."
-        elif pe < 0:
-            pe_note = "Negative earnings — P/E not meaningful."
-
-    return {
-        "valuation": {
-            "pe": pe,
-            "pb": pb,
-            "pe_vs_history_note": pe_note,
-            "peg": _safe(fundamentals.get("peg_ratio")),
-        },
-        "profitability": {
-            "roe": roe,
-            "gross_margin": gross,
-            "net_margin": margin,
-        },
-        "growth": {
-            "revenue_yoy": rev_g,
-            "earnings_yoy": eps_g,
-        },
-        "financial_health": {
-            "free_cash_flow": fcf,
-            "total_debt": debt,
-            "cash": cash,
-            "debt_to_equity": _safe(info.get("debtToEquity")) or _safe(fundamentals.get("debt_to_equity")),
-        },
-        "flags": warnings,
-    }
-
-
-def _institutional_section(info: dict, df) -> dict:
-    inst_pct = _safe(info.get("heldPercentInstitutions"))
-    if inst_pct is not None and inst_pct <= 1:
-        inst_pct = inst_pct * 100
-
-    flow = "unknown"
-    if df is not None and not df.empty and len(df) >= 40:
-        ret_30 = float(df["close"].iloc[-1] / df["close"].iloc[-30] - 1)
-        vol_r = float(df["volume"].tail(30).mean())
-        vol_p = float(df["volume"].iloc[-60:-30].mean())
-        if ret_30 > 0.05 and vol_r > vol_p:
-            flow = "positive_30d"
-        elif ret_30 < -0.05 and vol_r > vol_p:
-            flow = "distribution_30d"
-        else:
-            flow = "mixed_30d"
-
-    return {
-        "institutional_ownership_pct": round(inst_pct, 1) if inst_pct is not None else None,
-        "institutional_activity_note": (
-            "Detailed 13F buy/sell requires premium data feed — using price/volume proxy."
-        ),
-        "capital_flow_30d": flow,
-        "liquidity_note": "See volume_signal in technical structure for accumulation/distribution.",
-    }
-
-
-def _sentiment_section(info: dict, metrics: dict, news_headlines: list[str]) -> dict:
-    target = _safe(info.get("targetMeanPrice"))
-    price = _safe(info.get("currentPrice")) or _safe(info.get("price"))
-    rec = info.get("recommendationKey") or "none"
-    analysts = info.get("numberOfAnalystOpinions")
-
-    target_range = None
-    if target and price:
-        target_range = f"Consensus ~${target:.2f} vs price ${price:.2f} ({((target/price)-1)*100:+.1f}%)"
-
-    rsi_proxy = metrics.get("news_score", 50)
-    if isinstance(rsi_proxy, (int, float)):
-        if rsi_proxy >= 65:
-            sentiment = "overheated"
-        elif rsi_proxy <= 35:
-            sentiment = "oversold"
-        else:
-            sentiment = "neutral"
-    else:
-        sentiment = "neutral"
-
-    return {
-        "earnings_date": metrics.get("earnings_date"),
-        "days_until_earnings": metrics.get("days_until_earnings"),
-        "news_headlines": news_headlines[:5],
-        "analyst_consensus": rec,
-        "analyst_count": analysts,
-        "price_target_note": target_range,
-        "market_sentiment": sentiment,
-    }
-
-
-def _strategic_outlook(
-    bucket: str,
-    score: float,
-    zones: dict,
-    structure: dict,
-    risks: list[str],
-    warnings: list[str],
-) -> dict:
-    """Summarize quant/system view — does not invent an independent trade recommendation."""
-    top_risks = risks[:3]
-    while len(top_risks) < 3:
-        top_risks.append("Insufficient data — refresh after API keys configured.")
-
-    zone = zones.get("current_zone", "fair")
-    weekly = structure.get("weekly_trend", "sideways")
-
-    if score >= 65:
-        system_view = "quant_supportive"
-    elif score >= 45:
-        system_view = "quant_mixed"
-    else:
-        system_view = "quant_weak"
-
-    return {
-        "top_risks": top_risks,
-        "conclusion": system_view,
-        "strategy_guidance": (
-            "Research-only outlook derived from quant score, valuation zones, and structure — "
-            "not an independent buy/sell call. See assigned bucket and quant_score for system view."
-        ),
-        "assigned_bucket": bucket,
-        "quant_score": score,
-        "valuation_zone": zone,
-        "weekly_structure": weekly,
-        "data_flags": warnings[:5],
-    }
-
-
-def build_research_report(symbol: str, bucket: Bucket | None = None) -> dict[str, Any]:
-    from services.watchlist_scanner import analyze_symbol
+def build_research_report(
+    symbol: str,
+    sleeve: str | Bucket | None = None,
+    *,
+    portfolio_symbols: list[str] | None = None,
+) -> dict[str, Any]:
+    if AI_REPORT_SCHEMA != "v2":
+        return {"error": "AI_REPORT_SCHEMA is not v2", "schema_version": AI_REPORT_SCHEMA}
 
     sym = symbol.upper()
+    raw = sleeve.value if isinstance(sleeve, Bucket) else sleeve
+    sleeve_val = normalize_sleeve(raw)
+    score = build_v2_score(sym, sleeve_val, validate_parity=False)
+    if isinstance(score, dict) and score.get("error"):
+        return {"symbol": sym, "error": score["error"]}
+
+    rec = DataReconciler().reconcile(sym)
+    info, fundamentals, _ = DataReconciler().get_canonical_fundamentals(sym)
     ps = PriceService()
-    info = _fetch_full_info(sym)
-    info_rec, fundamentals, rec = DataReconciler().get_canonical_fundamentals(sym)
-
-    assigned_bucket = bucket
-    bucket_choice: Bucket | str = assigned_bucket if assigned_bucket else "auto"
-    result, err = analyze_symbol(sym, bucket_choice)
-    if err or result is None:
-        return {"symbol": sym, "error": err or "Could not analyze symbol", "generated_at": _now()}
-
-    assigned = result.bucket
-    metrics = result.metrics or {}
-    warnings = valuation_warnings(info_rec, fundamentals) + list(result.valuation_warnings or [])
-
     hist = ps.get_history(sym, period="2y")
     spy = ps.get_spy_history(period="1y")
     structure = long_term_structure(hist)
-    rs = relative_strength_vs_spy(hist, spy) if not hist.empty and not spy.empty else None
+    tech = {
+        "trend_score": round(trend_score(hist), 1) if not hist.empty else None,
+        "breakout_score": round(breakout_score(hist), 1) if not hist.empty else None,
+        "rs_vs_spy": round(relative_strength_vs_spy(hist, spy), 1)
+        if not hist.empty and not spy.empty
+        else None,
+    }
+    warnings = valuation_warnings(info, fundamentals)
 
-    pe = _safe(info.get("trailingPE")) or _safe(fundamentals.get("pe_ratio"))
-    rev_g = _safe(info.get("revenueGrowth"))
-    zones = fair_value_zones(
-        structure.get("price", result.price),
-        structure.get("low_52w", result.price * 0.8),
-        structure.get("high_52w", result.price * 1.2),
-        pe,
-        rev_g,
+    final_rating = system_rating_from_score(score, sleeve=sleeve_val)
+    final_rating["horizon"] = _horizon_for_sleeve(sleeve_val)
+
+    risk_v2 = build_unified_risk(sym, sleeve_val, score_result=score)
+    sizing_v2 = score.position_sizing if score.position_sizing else (
+        build_position_sizing(sym, sleeve_val, score_result=score) if POSITION_SIZING_V2 else None
     )
 
-    news_headlines: list[str] = metrics.get("news_headlines") or []
-    if FINNHUB_API_KEY and not news_headlines:
-        news_headlines = FinnhubClient().news_summary(sym).get("headlines", [])
+    factors = [
+        {
+            "factor_id": f.factor_id,
+            "value": f.norm_score,
+            "weight": f.weight,
+            "contribution": f.contribution,
+            "ic_30d": None,
+            "status": "active",
+        }
+        for f in score.factors
+    ]
 
-    industry = _industry_positioning(info, rev_g, rs)
-    fundamentals_block = _fundamentals_section(info, fundamentals, warnings)
-    institutional = _institutional_section(info, hist)
-
-    risk_pool = list(warnings)
-    if industry["industry_growth_stage"] == "declining":
-        risk_pool.append("Industry/growth: declining revenue trend")
-    if structure.get("ma200_position") == "below":
-        risk_pool.append("Technical: trading below 200-day MA")
-    if rec.quality_score < 50:
-        risk_pool.append("Data: limited cross-source verification")
-
-    try:
-        from services.openbb_integration import enrich_research_risks
-
-        risk_pool = enrich_research_risks(sym, risk_pool)
-    except Exception as exc:
-        logger.debug("OpenBB research risks skipped for %s: %s", sym, exc)
-
-    outlook = _strategic_outlook(
-        assigned.value,
-        result.score,
-        zones,
-        structure,
-        risk_pool,
-        warnings,
+    llm_context = build_quant_report_context(
+        score,
+        sleeve=sleeve_val,
+        reconcile=rec,
+        portfolio_symbols=portfolio_symbols,
     )
-
-    alerts = compute_alerts(
-        sym,
-        bucket=assigned.value,
-        score=result.score,
-        days_until_earnings=metrics.get("days_until_earnings"),
-        valuation_warnings=warnings,
-        data_quality_score=rec.quality_score,
-        reconcile_flags=rec.flags,
-        last_scanned_at=datetime.utcnow().isoformat(),
-        openbb_risk_flags=metrics.get("openbb_risk_flags"),
-        openbb_governance_score=metrics.get("openbb_governance_score"),
-    )
+    narrative = generate_report_narrative(llm_context)
 
     report = {
+        "schema_version": "2.0.0",
         "symbol": sym,
-        "generated_at": _now(),
-        "assigned_bucket": assigned.value,
-        "quant_score": result.score,
-        "1_overview": {
-            "symbol": sym,
-            "company_name": info.get("shortName") or info.get("name") or fundamentals.get("name"),
-            "sector": info.get("sector") or fundamentals.get("sector"),
-            "industry": info.get("industry") or fundamentals.get("industry"),
-            "price": result.price,
-            "market_cap": _safe(info.get("marketCap")) or _safe(fundamentals.get("market_cap")),
-            "high_52w": structure.get("high_52w"),
-            "low_52w": structure.get("low_52w"),
-            "business_summary": (info.get("longBusinessSummary") or "")[:1200] or (
-                f"{info.get('shortName', sym)} — summary unavailable without extended data fetch."
-            ),
+        "sleeve": sleeve_val,
+        "as_of": _now_iso(),
+        "final_rating": {
+            "action": final_rating["action"],
+            "conviction": final_rating["conviction"],
+            "composite_score": final_rating["composite_score"],
+            "horizon": final_rating["horizon"],
+            "system_label": final_rating.get("system_label"),
+            "gates": final_rating.get("gates", []),
         },
-        "2_industry_positioning": industry,
-        "3_fundamentals": fundamentals_block,
-        "4_technical_structure": {
-            **structure,
-            "daily_trend_score": round(trend_score(hist), 1) if not hist.empty else None,
-            "rs_vs_spy": round(rs, 1) if rs is not None else None,
+        "executive_summary": narrative["executive_summary"],
+        "investment_thesis": narrative["investment_thesis"],
+        "uncertainty": narrative.get("uncertainty", []),
+        "what_would_change_my_mind": narrative.get("what_would_change_my_mind", []),
+        "data_quality_limitations": narrative.get("data_quality_limitations", []),
+        "key_catalysts": _catalysts(score.metrics, sleeve_val),
+        "risks": {
+            "risk_score": risk_v2.risk_index if not isinstance(risk_v2, dict) else score.risk.deduction_pts,
+            "macro": risk_v2.macro if not isinstance(risk_v2, dict) else [],
+            "company": risk_v2.company if not isinstance(risk_v2, dict) else [],
+            "events": risk_v2.events if not isinstance(risk_v2, dict) else [],
+            "score_deductions": risk_v2.score_deductions if not isinstance(risk_v2, dict) else [],
         },
-        "5_institutional_liquidity": institutional,
-        "6_news_sentiment": _sentiment_section(info, metrics, news_headlines),
-        "7_valuation_zones": zones,
-        "8_risk_outlook": outlook,
-        "alerts": alerts,
-        "data_quality_score": rec.quality_score,
-        "data_quality_limitations": _data_quality_limitations(rec, warnings),
-        "what_would_change_my_mind": _what_would_change_mind(result.score, risk_pool, zones),
-        "disclaimer": (
-            "Not financial advice. This report summarizes quantitative and fundamental data for research "
-            "workflows only. It does not constitute a recommendation to buy, sell, or hold any security."
-        ),
-        "alignment_notes": _alignment_checklist(),
+        "quantitative_analysis": {
+            "composite_score": score.score,
+            "raw_score": score.attribution.raw_score,
+            "data_quality_score": rec.quality_score if rec else None,
+            "regime": score.market_regime or "neutral",
+            "factor_contributions": factors,
+            "attribution": _serialize(score.attribution) or {},
+        },
+        "fundamental_analysis": {
+            "revenue_growth_ttm": info.get("revenueGrowth"),
+            "eps_growth_ttm": info.get("earningsGrowth"),
+            "roic": info.get("returnOnEquity"),
+            "fcf_yield": None,
+            "debt_to_equity": info.get("debtToEquity"),
+            "adjusted_earnings_flag": True,
+            "industry_percentile_summary": info.get("sector") or "Sector data from provider snapshot",
+        },
+        "technical_analysis": {
+            **tech,
+            "pct_from_52w_high": structure.get("pct_from_high"),
+            "structure": structure.get("weekly_trend") or structure.get("ma200_position"),
+        },
+        "valuation_analysis": {
+            "pe_percentile_5y": fundamentals.get("pe_ratio"),
+            "pb_percentile_5y": fundamentals.get("pb_ratio"),
+            "ps_percentile_5y": fundamentals.get("ps_ratio"),
+            "vs_industry": "heuristic band — enable FMP peers for industry ranks",
+            "warnings": warnings,
+            **(_serialize(score.valuation) or {}),
+        },
+        "diagnostics_summary": llm_context.get("diagnostics_summary"),
+        "backtest_summary": llm_context.get("backtest_summary"),
+        "factor_exposure_summary": llm_context.get("factor_exposure_summary"),
+        "earnings_setup": score.earnings_setup or {},
+        "similar_signal_backtest": _serialize(score.similar_signal),
+        "recommendation": _serialize(score.recommendation),
+        "position_sizing": _sizing_dict(sizing_v2),
+        "metadata": {
+            "model_version": FACTOR_MODEL_VERSION,
+            "strategy_version": STRATEGY_VERSION,
+            "data_sources": ["quant_v2", "reconciled_fundamentals", "price_history"],
+            "llm_model": narrative.get("llm_model"),
+            "narrative_source": narrative.get("source", "rules"),
+            "disclaimer": narrative.get("disclaimer") or DISCLAIMER_FOOTER,
+            "rating_source": final_rating.get("source"),
+        },
+        "legacy_bucket": raw if isinstance(raw, str) else (sleeve.value if isinstance(sleeve, Bucket) else None),
+        "v1_score": score.score,
     }
 
-    Cache().set(f"report:{sym}", report, REPORT_CACHE_TTL)
+    Cache().set(_cache_key(sym, sleeve_val), report, REPORT_CACHE_TTL)
     return report
 
 
-def _data_quality_limitations(rec, warnings: list[str]) -> list[str]:
-    items: list[str] = []
-    if rec and rec.quality_score < 70:
-        items.append(f"Reconcile quality score {rec.quality_score:.0f}/100 — limited cross-source verification.")
-    for flag in rec.flags if rec else []:
-        items.append(str(flag))
-    for w in warnings[:3]:
-        items.append(w)
-    if not items:
-        items.append("Standard provider snapshot; no additional reconcile flags.")
-    return items
+def _cache_key(symbol: str, sleeve: str) -> str:
+    return f"report:{symbol}:{sleeve}"
 
 
-def _what_would_change_mind(score: float, risks: list[str], zones: dict) -> list[str]:
-    items = [
-        f"Quant score moves materially above/below current {score:.0f} on next scan.",
-        f"Valuation zone shifts from {zones.get('current_zone', 'unknown')}.",
-    ]
-    if risks:
-        items.append(f"Top risk clears: {risks[0]}")
-    items.append("Fresh earnings or guidance changes fundamental growth assumptions.")
-    return items
+def _catalysts(metrics: dict, sleeve: str) -> list[dict]:
+    out: list[dict] = []
+    days = metrics.get("days_until_earnings")
+    if days is not None and days <= 30:
+        out.append(
+            {
+                "event": "Earnings report",
+                "timing": f"~{int(days)} days",
+                "impact": "high" if days <= 7 else "medium",
+            }
+        )
+    if sleeve == "penny" and metrics.get("volume_ratio"):
+        out.append(
+            {
+                "event": "Volume activity vs baseline",
+                "timing": "near-term",
+                "impact": "medium",
+            }
+        )
+    if not out:
+        out.append({"event": "Monitor price/volume confirmation", "timing": "ongoing", "impact": "low"})
+    return out
 
 
-def _alignment_checklist() -> dict[str, str]:
+def _sizing_dict(sizing: Any) -> dict:
+    if sizing is None or isinstance(sizing, dict):
+        return {
+            "recommended_weight_pct": 0.0,
+            "max_weight_pct": 0.0,
+            "stop_loss_pct": 0.0,
+            "portfolio_allocation_pct": 0.0,
+            "rationale": "Enable POSITION_SIZING_V2 for allocation guidance",
+            "kelly_fraction": None,
+        }
     return {
-        "1_overview": "covered",
-        "2_industry": "heuristic (full peer data needs FMP)",
-        "3_fundamentals": "covered; industry avg PE needs FMP",
-        "4_technical": "daily+weekly+monthly; use chart for visual confirm",
-        "5_institutional": "ownership signal from provider aggregate; 13F detail needs paid feed",
-        "6_news": "headlines+earnings; analyst targets when available",
-        "7_zones": "range-based zones — not exact entries",
-        "8_outlook": "quant-derived system view — not independent trade advice",
+        "recommended_weight_pct": sizing.recommended_weight_pct,
+        "max_weight_pct": sizing.max_weight_pct,
+        "stop_loss_pct": sizing.stop_loss_pct,
+        "portfolio_allocation_pct": sizing.portfolio_allocation_pct,
+        "rationale": sizing.rationale,
+        "kelly_fraction": None,
     }
 
 
-def _now() -> str:
-    return datetime.utcnow().isoformat() + "Z"
+def get_cached_report(symbol: str, sleeve: str | Bucket | None = None) -> dict | None:
+    sym = symbol.upper()
+    raw = sleeve.value if isinstance(sleeve, Bucket) else sleeve
+    sleeve_val = normalize_sleeve(raw)
+    cached = Cache().get(_cache_key(sym, sleeve_val))
+    if cached:
+        return cached
+    # Legacy cache keys from pre-consolidation reports
+    legacy = Cache().get(f"report_v2:{sym}:{sleeve_val}")
+    if legacy:
+        return legacy
+    if raw and str(raw).lower() == "medium":
+        return Cache().get(f"report_v2:{sym}:medium") or Cache().get(f"report:{sym}:penny")
+    return None
 
 
-def get_cached_report(symbol: str) -> dict | None:
-    return Cache().get(f"report:{symbol.upper()}")
+# Temporary aliases for callers not yet updated
+build_research_report_v2 = build_research_report
+get_cached_report_v2 = get_cached_report

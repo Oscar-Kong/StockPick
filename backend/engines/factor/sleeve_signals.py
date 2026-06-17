@@ -24,7 +24,7 @@ from scoring.technical import (
 from scoring.sector_strength import sector_relative_strength
 from scoring.ml_signal import ml_medium_horizon_score
 from screeners.base import CandidateContext, WeightedSignal
-from screeners.medium import MediumScreener
+from screeners.penny import PennyScreener
 from services.openbb_integration import append_governance_signal
 from services.qlib_integration import get_symbol_alpha_score
 
@@ -45,7 +45,7 @@ def build_medium_signals(ctx: CandidateContext) -> list[WeightedSignal]:
     df = ctx.history
     spy = ctx.spy_history
     if spy is None or getattr(spy, "empty", True):
-        spy = MediumScreener()._spy()
+        spy = PennyScreener()._spy()
     sentiment_data = combined_sentiment_score(ctx.symbol, include_news=True)
     rs = relative_strength_vs_spy(df, spy, days=20)
     technical = (macd_score(df) + breakout_score(df) + trend_score(df)) / 3
@@ -53,7 +53,7 @@ def build_medium_signals(ctx: CandidateContext) -> list[WeightedSignal]:
     qlib_signal, qlib_source = get_symbol_alpha_score(Bucket.medium, ctx.symbol, ml_proxy)
     sector = ctx.info.get("sector")
     sector_strength = sector_relative_strength(
-        df, sector, spy, MediumScreener().ps.market, days=20
+        df, sector, spy, PennyScreener().ps.market, days=20
     )
     signals = [
         WeightedSignal("20d momentum vs SPY", rs, 0.22, "Relative strength vs benchmark"),

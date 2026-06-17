@@ -8,7 +8,7 @@ from scoring.penny_factors import penny_expanded_scores
 from scoring.technical import relative_strength_vs_spy
 from scoring.sector_strength import sector_relative_strength
 from screeners.base import CandidateContext, WeightedSignal
-from screeners.medium import MediumScreener
+from screeners.penny import PennyScreener
 from services.openbb_integration import append_governance_signal
 from engines.factor.catalog_v3 import FACTOR_CATALOG_V3
 
@@ -42,12 +42,12 @@ def build_medium_signals_v3(ctx: CandidateContext) -> list[WeightedSignal]:
     df = ctx.history
     spy = ctx.spy_history
     if spy is None or getattr(spy, "empty", True):
-        spy = MediumScreener()._spy()
+        spy = PennyScreener()._spy()
     expanded = medium_expanded_scores(ctx.symbol, df, ctx.info, ctx.fundamentals)
     rs = relative_strength_vs_spy(df, spy, days=20)
     sector = ctx.info.get("sector")
     sector_strength = sector_relative_strength(
-        df, sector, spy, MediumScreener().ps.market, days=20
+        df, sector, spy, PennyScreener().ps.market, days=20
     )
     specs = {s.factor_id.split("_", 1)[1]: s for s in FACTOR_CATALOG_V3["medium"]}
     signals = [

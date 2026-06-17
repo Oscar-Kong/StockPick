@@ -18,7 +18,7 @@ from data.candidate_builder import build_candidate
 from data.price_service import PriceService
 from models.schemas import Bucket, ScanOptions, StockResult
 from screeners.compounder import CompounderScreener
-from screeners.medium import MediumScreener
+from screeners.penny import PennyScreener
 from screeners.penny import PennyScreener
 from services.symbol_parser import parse_symbols
 
@@ -29,7 +29,7 @@ BucketChoice = Bucket | Literal["auto"]
 
 _SCREENERS = {
     Bucket.penny: PennyScreener,
-    Bucket.medium: MediumScreener,
+    Bucket.medium: PennyScreener,
     Bucket.compounder: CompounderScreener,
 }
 

@@ -37,9 +37,9 @@ export function ModelAdminTab() {
 
     const [v, w, a, fa] = await Promise.allSettled([
       getV2Version(),
-      getV2SleeveWeights("medium"),
+      getV2SleeveWeights("penny"),
       getV2Audit({ limit: 10 }),
-      getV2FactorsAdmin("medium"),
+      getV2FactorsAdmin("penny"),
     ]);
 
     const errors: Record<string, string> = {};

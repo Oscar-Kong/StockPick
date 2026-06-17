@@ -21,7 +21,6 @@ from scoring.technical import (
     trend_score,
 )
 from screeners.compounder import CompounderScreener
-from screeners.medium import MediumScreener
 from screeners.penny import PennyScreener
 from services.alerts import _is_stale, compute_alerts
 from services.market_context import enrich_metrics
@@ -32,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 _SCREENERS = {
     Bucket.penny: PennyScreener,
-    Bucket.medium: MediumScreener,
+    Bucket.medium: PennyScreener,
     Bucket.compounder: CompounderScreener,
 }
 

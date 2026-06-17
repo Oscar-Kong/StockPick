@@ -10,7 +10,7 @@ from config import AI_REPORT_SCHEMA, BACKTEST_INSTITUTIONAL, POSITION_SIZING_V2,
 from models.schemas_v2 import MarketRegimeV2, PositionSizingV2, QuantLabEvidenceResponse, SleeveWeightsV2, UnifiedRiskV2, V2ScoreResponse
 from services.institutional_backtest_service import run_portfolio_backtest
 from services.quant_risk_sizing_service import build_position_sizing, build_unified_risk
-from services.research_report_v2 import build_research_report_v2, get_cached_report_v2
+from services.research_report import build_research_report, get_cached_report
 from engines.weighting.regime_classifier import classify_spy
 from engines.weighting.weight_store import WeightStore
 from services.quant_jobs import run_daily_quant_jobs
@@ -187,10 +187,10 @@ def get_report_v2(
     sleeve_val = sleeve.value if sleeve else None
     sym = symbol.upper()
     if not refresh:
-        cached = get_cached_report_v2(sym, sleeve_val or DEFAULT_BUCKET)
+        cached = get_cached_report(sym, sleeve_val or DEFAULT_BUCKET)
         if cached:
             return cached
-    data = build_research_report_v2(sym, sleeve_val)
+    data = build_research_report(sym, sleeve_val)
     if data.get("error"):
         raise HTTPException(status_code=404, detail=data["error"])
     return data

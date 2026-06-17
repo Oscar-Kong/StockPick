@@ -354,7 +354,6 @@ export function DailyDecisionHome() {
             </>
           )}
 
-          <p className="text-center text-sm leading-relaxed text-secondary">{data.disclaimer || t.home.dailyDisclaimer}</p>
         </>
       ) : null}
     </PageContainer>

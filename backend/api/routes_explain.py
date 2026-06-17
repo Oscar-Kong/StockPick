@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException
 
 from models.schemas import Bucket, ExplainRequest, ExplainResponse
 from screeners.compounder import CompounderScreener
-from screeners.medium import MediumScreener
+from screeners.penny import PennyScreener
 from screeners.penny import PennyScreener
 from services.llm_explainer import generate_explanation
 from services.market_context import enrich_metrics
@@ -12,7 +12,7 @@ router = APIRouter(prefix="/explain", tags=["explain"])
 
 SCREENERS = {
     Bucket.penny: PennyScreener,
-    Bucket.medium: MediumScreener,
+    Bucket.medium: PennyScreener,
     Bucket.compounder: CompounderScreener,
 }
 
@@ -21,7 +21,7 @@ SCREENERS = {
 def explain_stock(body: ExplainRequest):
     symbol = body.symbol.upper()
     bucket = body.bucket or Bucket.penny
-    screener = SCREENERS.get(bucket, MediumScreener)()
+    screener = SCREENERS.get(bucket, PennyScreener)()
 
     ctx = screener.enrich(symbol)
     if ctx is None:

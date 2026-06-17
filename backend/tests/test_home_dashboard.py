@@ -41,7 +41,7 @@ def test_risk_alerts_tolerates_legacy_snapshot_fields():
 def test_build_daily_dashboard_does_not_crash():
     result = build_daily_dashboard(include_freshness=False)
     assert result.portfolio_value >= 0
-    assert result.disclaimer
+    assert result.disclaimer == ""
     assert result.freshness is None
 
 

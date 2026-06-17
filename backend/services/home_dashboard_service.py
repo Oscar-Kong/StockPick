@@ -11,7 +11,7 @@ from models.schemas import (
 from data.portfolio_store import get_latest_decision, get_latest_portfolio_snapshot, list_uploads, load_all_ledger_rows
 from integrations.robinhood.portfolio_rebuilder import rebuild_portfolio
 from services.data_freshness_service import assess_all_freshness, assess_freshness
-from services.portfolio_snapshot_service import DISCLAIMER, estimate_ledger_cash, get_current_portfolio
+from services.portfolio_snapshot_service import estimate_ledger_cash, get_current_portfolio
 from services.refresh_orchestrator import get_active_home_job_id, is_home_refresh_running
 from services.scan_manager import scan_manager
 
@@ -183,7 +183,7 @@ def build_daily_dashboard(*, include_freshness: bool = False) -> DailyDashboardR
         top_penny_opportunities=_top_penny_opportunities(cash=cash, allow_new_buys=allow_buys),
         risk_alerts=_risk_alerts(decision, portfolio),
         portfolio_warnings=warnings,
-        disclaimer=DISCLAIMER,
+        disclaimer="",
         freshness=freshness,
         decision_stale_warning=decision_stale_warning,
         csv_rows_loaded=csv_rows_loaded,

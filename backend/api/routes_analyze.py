@@ -89,50 +89,23 @@ def analyze_symbol_diagnostics(
 
 @router.get("/{symbol}/report")
 def analyze_symbol_report(symbol: str, bucket: Bucket | None = None):
-    from config import AI_REPORT_SCHEMA
+    from services.research_report import build_research_report, get_cached_report
 
     sym = symbol.upper()
     if sym == "COMPARE":
         raise HTTPException(status_code=404, detail="Invalid symbol")
 
-    if AI_REPORT_SCHEMA == "v2":
-        from services.research_report_v2 import build_research_report_v2, get_cached_report_v2
-
-        sleeve = bucket.value if bucket else "medium"
-        cached = get_cached_report_v2(sym, sleeve)
-        if cached and not bucket:
-            return cached
-        try:
-            data = _run_with_timeout(
-                build_research_report_v2,
-                sym,
-                bucket.value if bucket else None,
-                timeout_seconds=REPORT_ROUTE_TIMEOUT_SECONDS,
-            )
-        except FuturesTimeout as exc:
-            if cached:
-                return cached
-            raise HTTPException(status_code=504, detail="Report v2 timed out") from exc
-        if data.get("error"):
-            if cached:
-                return cached
-            raise HTTPException(status_code=404, detail=data["error"])
-        cache_module.save_report_snapshot(
-            symbol=sym,
-            bucket=bucket.value if bucket else None,
-            report=data,
-            title=f"{sym} report v2",
-            notes="Auto-saved v2 report",
-        )
-        return data
-
-    from services.research_report import build_research_report, get_cached_report
-
-    cached = get_cached_report(sym)
+    sleeve = bucket.value if bucket else None
+    cached = get_cached_report(sym, sleeve)
     if cached and not bucket:
         return cached
     try:
-        data = _run_with_timeout(build_research_report, sym, bucket, timeout_seconds=REPORT_ROUTE_TIMEOUT_SECONDS)
+        data = _run_with_timeout(
+            build_research_report,
+            sym,
+            bucket,
+            timeout_seconds=REPORT_ROUTE_TIMEOUT_SECONDS,
+        )
     except FuturesTimeout as exc:
         if cached:
             return cached
@@ -141,12 +114,11 @@ def analyze_symbol_report(symbol: str, bucket: Bucket | None = None):
         if cached:
             return cached
         raise HTTPException(status_code=404, detail=data["error"])
-    # Persist successful reports so progress survives restarts without manual saving.
     cache_module.save_report_snapshot(
         symbol=sym,
         bucket=bucket.value if bucket else None,
         report=data,
-        title=f"{sym} auto report",
+        title=f"{sym} report",
         notes="Auto-saved from /analyze/{symbol}/report",
     )
     return data

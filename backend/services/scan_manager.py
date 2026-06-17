@@ -30,8 +30,8 @@ from data.universe_builder import filter_universe_by_price
 from models.schemas import Bucket, RiskLevel, ScanOptions, ScanStatus, StockResult
 from scoring.data_quality import should_exclude_low_quality
 from screeners.base import BaseScreener
+from core.sleeve import normalize_sleeve
 from screeners.compounder import CompounderScreener
-from screeners.medium import MediumScreener
 from screeners.penny import PennyScreener
 from services.scan_context import set_bulk_scan
 from services.scan_display import enrich_scan_display, refresh_results_return_metrics
@@ -108,11 +108,10 @@ class ScanManager:
         return None
 
     def _get_screener(self, bucket: Bucket) -> BaseScreener:
-        if bucket == Bucket.penny:
-            return PennyScreener()
-        if bucket == Bucket.medium:
-            return MediumScreener()
-        return CompounderScreener()
+        sleeve = normalize_sleeve(bucket.value)
+        if sleeve == "compounder":
+            return CompounderScreener()
+        return PennyScreener()
 
     def run_scan(self, job_id: str, options: ScanOptions | None = None) -> None:
         options = options or ScanOptions()
