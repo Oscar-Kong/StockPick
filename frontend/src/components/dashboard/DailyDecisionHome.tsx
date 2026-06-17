@@ -23,12 +23,12 @@ import { DailyActionQueue } from "./daily-decision/DailyActionQueue";
 import { DailyDecisionHero, PortfolioSummaryStrip } from "./daily-decision/DailyDecisionHero";
 import {
   ClosedPositionsPanel,
-  CsvImportPanel,
   EmptyPortfolioState,
   PennyOpportunitiesPanel,
 } from "./daily-decision/DailyDecisionPanels";
 import { DataFreshnessBanner } from "./daily-decision/DataFreshnessBanner";
 import { DemoDataBanner } from "./daily-decision/DemoDataBanner";
+import { HomeJournalPanel } from "./HomeJournalPanel";
 import { RiskAlertsPanel } from "./daily-decision/RiskAlertsPanel";
 
 const POLL_MS = 5000;
@@ -80,6 +80,16 @@ export function DailyDecisionHome() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (loading) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("journal") === "1" || window.location.hash === "#home-journal") {
+      requestAnimationFrame(() => {
+        document.getElementById("home-journal")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+  }, [loading, data]);
 
   useEffect(() => {
     if (data?.cash != null && data.cash > 0 && !cashInput.trim()) {
@@ -226,6 +236,26 @@ export function DailyDecisionHome() {
   const showPennyOps =
     !data?.is_demo_data && hasHoldings && (data?.top_penny_opportunities.length ?? 0) > 0;
 
+  const csvImportProps = {
+    cashInput,
+    onCashChange: setCashInput,
+    ipoSharesInput,
+    onIpoSharesChange: setIpoSharesInput,
+    ipoListPriceInput,
+    onIpoListPriceChange: setIpoListPriceInput,
+    reservedInput,
+    onReservedChange: setReservedInput,
+    replaceImport,
+    onReplaceChange: setReplaceImport,
+    onImportClick: triggerImport,
+    onSaveBuyingPower: () => void saveBuyingPower(),
+    savingCash,
+    importing,
+    lastImport,
+    csvRowsLoaded: data?.csv_rows_loaded,
+    ledgerRowsCount: data?.ledger_rows_count,
+  };
+
   return (
     <PageContainer className="home">
       <input
@@ -271,7 +301,10 @@ export function DailyDecisionHome() {
           {hasHoldings && <PortfolioSummaryStrip data={data} />}
 
           {!hasHoldings ? (
-            <EmptyPortfolioState onImportClick={triggerImport} />
+            <>
+              <EmptyPortfolioState onImportClick={triggerImport} />
+              <HomeJournalPanel csvImport={csvImportProps} />
+            </>
           ) : (
             <>
               <DailyActionQueue items={items} />
@@ -301,25 +334,7 @@ export function DailyDecisionHome() {
 
                 <aside className="space-y-5 lg:col-span-4">
                   <RiskAlertsPanel alerts={data.risk_alerts ?? []} />
-                  <CsvImportPanel
-                    cashInput={cashInput}
-                    onCashChange={setCashInput}
-                    ipoSharesInput={ipoSharesInput}
-                    onIpoSharesChange={setIpoSharesInput}
-                    ipoListPriceInput={ipoListPriceInput}
-                    onIpoListPriceChange={setIpoListPriceInput}
-                    reservedInput={reservedInput}
-                    onReservedChange={setReservedInput}
-                    replaceImport={replaceImport}
-                    onReplaceChange={setReplaceImport}
-                    onImportClick={triggerImport}
-                    onSaveBuyingPower={() => void saveBuyingPower()}
-                    savingCash={savingCash}
-                    importing={importing}
-                    lastImport={lastImport}
-                    csvRowsLoaded={data.csv_rows_loaded}
-                    ledgerRowsCount={data.ledger_rows_count}
-                  />
+                  <HomeJournalPanel csvImport={csvImportProps} />
                 </aside>
               </div>
             </>

@@ -173,6 +173,7 @@ def analyze_symbol_route(
             selected_bucket,
             timeout_seconds=ANALYZE_ROUTE_TIMEOUT_SECONDS,
             include_bucket_fit=include_bucket_fit,
+            force_refresh=refresh,
         )
     except FuturesTimeout as exc:
         cached = get_cached_symbol_analysis(symbol, selected_bucket)

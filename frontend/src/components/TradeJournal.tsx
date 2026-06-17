@@ -18,6 +18,8 @@ import {
 import { useTranslation, useTRef } from "@/lib/i18n";
 import type { TradeCreateRequest, TradeItem, TradeStatsResponse } from "@/lib/types";
 import { MetricCard } from "@/components/ui/MetricCard";
+import { DenseTable } from "@/components/ui/DenseTable";
+import clsx from "clsx";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:18731";
@@ -55,7 +57,16 @@ function portfolioSyncBadgeClass(status: TradeItem["portfolio_sync_status"]): st
 type TradeSortField = "updated" | "quality" | "pnl";
 type SortDirection = "asc" | "desc";
 
-export function TradeJournal({ embedded = false }: { embedded?: boolean }) {
+const compactInputClass =
+  "h-9 w-full min-w-0 rounded-md border border-zinc-700 bg-zinc-950/80 px-2.5 text-sm text-zinc-100 outline-none focus:border-[#00c805]";
+
+export function TradeJournal({
+  embedded = false,
+  compact = false,
+}: {
+  embedded?: boolean;
+  compact?: boolean;
+}) {
   const { t } = useTranslation();
   const tRef = useTRef();
   const [trades, setTrades] = useState<TradeItem[]>([]);
@@ -83,22 +94,36 @@ export function TradeJournal({ embedded = false }: { embedded?: boolean }) {
   }, [reload]);
 
   const submitManual = async () => {
-    if (!manual.symbol || !manual.entry_price) {
+    if (!manual.symbol.trim()) {
       setStatusTone("error");
       setStatus(t.journal.symbolRequired);
       return;
     }
-    if (!manual.quantity || manual.quantity <= 0) {
-      setStatusTone("error");
-      setStatus(t.journal.quantityRequired);
-      return;
+    if (!compact) {
+      if (!manual.entry_price) {
+        setStatusTone("error");
+        setStatus(t.journal.entryPriceRequired);
+        return;
+      }
+      if (!manual.quantity || manual.quantity <= 0) {
+        setStatusTone("error");
+        setStatus(t.journal.quantityRequired);
+        return;
+      }
     }
+    const entryPrice = manual.entry_price && manual.entry_price > 0 ? manual.entry_price : 0;
+    const exitPrice = manual.exit_price && manual.exit_price > 0 ? manual.exit_price : null;
+    const quantity = manual.quantity && manual.quantity > 0 ? manual.quantity : null;
     try {
       setStatusTone("neutral");
       setStatus(t.journal.saving);
       const saved = await createTradeManual({
         ...manual,
+        side: "long",
         symbol: manual.symbol.toUpperCase(),
+        entry_price: entryPrice,
+        exit_price: exitPrice,
+        quantity,
         setup_tags: (manual.setup_tags || []).filter(Boolean),
         entry_time: fromDatetimeLocalValue(manual.entry_time).toISOString(),
         exit_time: manual.exit_time ? fromDatetimeLocalValue(manual.exit_time).toISOString() : null,
@@ -181,6 +206,187 @@ export function TradeJournal({ embedded = false }: { embedded?: boolean }) {
     });
     return rows;
   }, [trades, sortField, sortDirection]);
+
+  const recentTrades = useMemo(() => sortedTrades.slice(0, 8), [sortedTrades]);
+
+  const syncTrade = async (trade: TradeItem) => {
+    try {
+      setSyncingTradeId(trade.id);
+      setStatusTone("neutral");
+      setStatus(t.journal.syncingPortfolio);
+      const res = await syncTradeToPortfolio(trade.id);
+      await reload();
+      setStatusTone("success");
+      setStatus(
+        res.portfolio_synced
+          ? t.journal.syncPortfolioDone
+          : res.portfolio_message || t.journal.syncPortfolioFailed
+      );
+    } catch (err) {
+      setStatusTone("error");
+      setStatus(err instanceof Error ? err.message : t.journal.syncPortfolioFailed);
+    } finally {
+      setSyncingTradeId(null);
+    }
+  };
+
+  const removeTrade = async (tradeId: number) => {
+    try {
+      await deleteTrade(tradeId);
+      await reload();
+      setStatusTone("success");
+      setStatus(`${t.common.delete} #${tradeId}`);
+    } catch (err) {
+      setStatusTone("error");
+      setStatus(err instanceof Error ? err.message : t.journal.saveFailed);
+    }
+  };
+
+  if (compact) {
+    return (
+      <div className="home-journal-panel">
+        <div className="home-journal-panel__header">
+          <div>
+            <h2 id="home-journal-title" className="data-panel-title">
+              {t.home.journalTitle}
+            </h2>
+            <p className="data-panel-subtitle">{t.home.journalSubtitle}</p>
+          </div>
+        </div>
+
+        <div className="home-journal-quick">
+          <label className="home-journal-quick__field">
+            <span className="home-journal-quick__label">{t.common.symbol}</span>
+            <input
+              value={manual.symbol}
+              onChange={(e) => setManual((p) => ({ ...p, symbol: e.target.value.toUpperCase() }))}
+              placeholder={t.journal.symbolPlaceholder}
+              className={compactInputClass}
+            />
+          </label>
+          <label className="home-journal-quick__field home-journal-quick__field--narrow">
+            <span className="home-journal-quick__label">{t.home.journalQtyOptional}</span>
+            <input
+              type="number"
+              step="0.01"
+              min={0}
+              value={manual.quantity ?? ""}
+              onChange={(e) =>
+                setManual((p) => ({ ...p, quantity: e.target.value ? Number(e.target.value) : null }))
+              }
+              className={compactInputClass}
+            />
+          </label>
+          <label className="home-journal-quick__field home-journal-quick__field--narrow">
+            <span className="home-journal-quick__label">{t.home.journalEntryOptional}</span>
+            <input
+              type="number"
+              step="0.0001"
+              min={0}
+              value={manual.entry_price > 0 ? manual.entry_price : ""}
+              onChange={(e) =>
+                setManual((p) => ({ ...p, entry_price: e.target.value ? Number(e.target.value) : 0 }))
+              }
+              placeholder="—"
+              className={compactInputClass}
+            />
+          </label>
+          <label className="home-journal-quick__field home-journal-quick__field--narrow">
+            <span className="home-journal-quick__label">{t.home.journalExitOptional}</span>
+            <input
+              type="number"
+              step="0.0001"
+              min={0}
+              value={manual.exit_price && manual.exit_price > 0 ? manual.exit_price : ""}
+              onChange={(e) =>
+                setManual((p) => ({ ...p, exit_price: e.target.value ? Number(e.target.value) : null }))
+              }
+              placeholder="—"
+              className={compactInputClass}
+            />
+          </label>
+          <button type="button" onClick={() => void submitManual()} className="btn-primary home-journal-quick__save">
+            {t.journal.saveTrade}
+          </button>
+        </div>
+
+        <label className="home-journal-notes">
+          <span className="home-journal-quick__label">{t.journal.notes}</span>
+          <input
+            value={manual.notes}
+            onChange={(e) => setManual((p) => ({ ...p, notes: e.target.value }))}
+            placeholder={t.home.journalNotesPlaceholder}
+            className={compactInputClass}
+          />
+        </label>
+
+        {status && (
+          <p
+            className={clsx(
+              "home-journal-panel__status",
+              statusTone === "success" && "home-journal-panel__status--success",
+              statusTone === "error" && "home-journal-panel__status--error"
+            )}
+            role="status"
+          >
+            {status}
+          </p>
+        )}
+
+        {recentTrades.length > 0 && (
+          <details className="home-journal-recent">
+            <summary className="home-journal-recent__summary">
+              {t.home.journalRecent} ({recentTrades.length})
+            </summary>
+            <DenseTable caption={t.home.journalRecent} className="home-journal-recent__table">
+              <thead>
+                <tr>
+                  <th>{t.common.symbol}</th>
+                  <th className="col-num">{t.journal.entryPrice}</th>
+                  <th className="col-num">{t.journal.exitPrice}</th>
+                  <th>{t.home.journalRowActions}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentTrades.map((trade) => (
+                  <tr key={trade.id}>
+                    <td className="font-semibold">{trade.symbol}</td>
+                    <td className="col-num finance-value">
+                      {trade.entry_price > 0 ? trade.entry_price.toFixed(2) : "—"}
+                    </td>
+                    <td className="col-num finance-value">
+                      {trade.exit_price != null && trade.exit_price > 0 ? trade.exit_price.toFixed(2) : "—"}
+                    </td>
+                    <td>
+                      <div className="flex justify-end gap-1">
+                        {trade.portfolio_sync_status !== "synced" && (
+                          <button
+                            type="button"
+                            disabled={syncingTradeId === trade.id || trade.portfolio_sync_status === "needs_quantity"}
+                            onClick={() => void syncTrade(trade)}
+                            className="home-journal-row-action"
+                          >
+                            {t.journal.syncToPortfolio}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => void removeTrade(trade.id)}
+                          className="home-journal-row-action home-journal-row-action--danger"
+                        >
+                          {t.common.delete}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </DenseTable>
+          </details>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

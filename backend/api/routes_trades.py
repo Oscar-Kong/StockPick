@@ -194,16 +194,14 @@ def list_trades(symbol: str | None = None, limit: int = Query(default=100, ge=1,
 
 @router.post("/manual", response_model=TradeManualResponse)
 def create_trade_manual(body: TradeCreateRequest):
-    if body.quantity is None or float(body.quantity) <= 0:
-        raise HTTPException(
-            status_code=400,
-            detail="Quantity is required — journal trades need share count to update the Home portfolio",
-        )
+    qty = float(body.quantity) if body.quantity is not None else None
+    if qty is not None and qty <= 0:
+        qty = None
     review = _build_review(
         side=body.side,
         entry_price=body.entry_price,
         exit_price=body.exit_price,
-        quantity=body.quantity,
+        quantity=qty,
         stop_loss=body.stop_loss,
         take_profit=body.take_profit,
         thesis=body.thesis,
@@ -216,7 +214,7 @@ def create_trade_manual(body: TradeCreateRequest):
         exit_time=body.exit_time,
         entry_price=body.entry_price,
         exit_price=body.exit_price,
-        quantity=body.quantity,
+        quantity=qty,
         stop_loss=body.stop_loss,
         take_profit=body.take_profit,
         setup_tags=body.setup_tags,

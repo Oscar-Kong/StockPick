@@ -163,14 +163,16 @@ class MarketDataClient:
         period: str = "1y",
         *,
         allow_alpha_vantage_fallback: bool = True,
+        skip_cache: bool = False,
     ) -> pd.DataFrame:
         sym = symbol.upper()
-        cached = self.cache.get_price_cache(sym)
-        if cached and cached.get("period") == period:
-            df = pd.DataFrame(cached["rows"])
-            if not df.empty:
-                df["date"] = pd.to_datetime(df["date"])
-                return df
+        if not skip_cache:
+            cached = self.cache.get_price_cache(sym)
+            if cached and cached.get("period") == period:
+                df = pd.DataFrame(cached["rows"])
+                if not df.empty:
+                    df["date"] = pd.to_datetime(df["date"])
+                    return df
 
         df = pd.DataFrame()
         for provider in self._history_providers():

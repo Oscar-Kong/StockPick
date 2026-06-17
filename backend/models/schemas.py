@@ -906,6 +906,11 @@ class AnalyzeSymbolResponse(BaseModel):
     ohlc: list[dict[str, Any]] = []
     fundamentals: dict[str, Any] = {}
     error: str | None = None
+    price_history_last_date: str | None = None
+    price_history_source: str | None = None
+    price_history_is_stale: bool = False
+    price_history_refreshed_at: str | None = None
+    price_history_bar_count: int = 0
 
 
 class AnalyzeCompareEntry(BaseModel):
@@ -1101,6 +1106,8 @@ class BrokerageCsvImportResponse(BaseModel):
     trades_skipped: int = 0
     holdings_count: int = 0
     holdings: list[dict[str, Any]] = []
+    misc_events: list[dict[str, Any]] = []
+    journal_verification: list[dict[str, Any]] = []
     warnings: list[str] = []
     account: dict[str, Any] = {}
 

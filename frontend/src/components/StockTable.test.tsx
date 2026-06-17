@@ -11,6 +11,10 @@ vi.mock("@/lib/i18n", () => ({
     template.replace(/\{(\w+)\}/g, (_, key) => String(vars[key] ?? "")),
 }));
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
 const sample: StockResult = {
   symbol: "LIDR",
   price: 1.61,
@@ -30,7 +34,6 @@ describe("StockTable holdings badge", () => {
     render(
       <StockTable
         results={[sample]}
-        onSelect={() => {}}
         onAddWatchlist={() => {}}
         heldPositions={held}
       />
@@ -43,7 +46,6 @@ describe("StockTable holdings badge", () => {
     render(
       <StockTable
         results={[sample]}
-        onSelect={() => {}}
         onAddWatchlist={() => {}}
         heldPositions={new Map()}
       />

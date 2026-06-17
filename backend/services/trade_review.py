@@ -58,14 +58,18 @@ def review_trade(
 
     pnl_pct = None
     pnl_abs = None
-    if exit_price is not None:
+    if exit_price is not None and entry_price and entry_price > 0:
         pnl_pct = _safe_div((exit_price - entry_price) * direction, entry_price)
         if pnl_pct is not None:
             pnl_pct *= 100.0
         if quantity is not None:
             pnl_abs = (exit_price - entry_price) * direction * quantity
 
-    planned_rr = _calc_planned_rr(clean_side, entry_price, stop_loss, take_profit)
+    planned_rr = (
+        _calc_planned_rr(clean_side, entry_price, stop_loss, take_profit)
+        if entry_price and entry_price > 0
+        else None
+    )
 
     score = 50.0
     flags: list[str] = []

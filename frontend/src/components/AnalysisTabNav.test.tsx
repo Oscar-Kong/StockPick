@@ -10,32 +10,23 @@ vi.mock("@/lib/i18n", () => ({
 }));
 
 const tabs: AnalysisTabConfig[] = [
-  {
-    id: "overview",
-    label: "Overview",
-    shortLabel: "Ovw",
-    hint: "Overview hint",
-    group: "core",
-  },
-  {
-    id: "score",
-    label: "Score",
-    shortLabel: "Score",
-    hint: "Score hint",
-    group: "core",
-  },
+  { id: "overview", label: "Overview", shortLabel: "Ovw", hint: "Overview hint" },
+  { id: "score", label: "Score", shortLabel: "Score", hint: "Score hint" },
+  { id: "report", label: "AI Report", shortLabel: "Rpt", hint: "Report hint" },
 ];
 
 describe("AnalysisTabNav", () => {
   afterEach(() => cleanup());
 
-  it("shows active tab hint and switches tabs", () => {
+  it("renders one continuous tab bar without group labels or hint row", () => {
     const onChange = vi.fn();
     render(
       <AnalysisTabNav tabs={tabs} active="overview" onChange={onChange} ariaLabel="Views" />
     );
-    expect(screen.getByText("Overview hint")).toBeInTheDocument();
-    fireEvent.click(screen.getByTitle("Score hint"));
+    expect(screen.queryByText(en.analysis.tabGroupCore)).not.toBeInTheDocument();
+    expect(screen.queryByText("Overview hint")).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("tab", { name: "Score" }));
     expect(onChange).toHaveBeenCalledWith("score");
   });
 });

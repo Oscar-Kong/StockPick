@@ -4,12 +4,12 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from typing import Any
-
 import pandas as pd
 
 from data.historical_store import HistoricalStore
+from data.history_freshness import assess_history_freshness, merge_history_frames
 from data.market_data_client import MarketDataClient
+from utils.datetime_util import utc_iso_z, utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -73,23 +73,71 @@ class PriceService:
         self.store = store or HistoricalStore()
         self.market = market or MarketDataClient()
 
-    def get_history(self, symbol: str, period: str = "1y") -> pd.DataFrame:
+    def get_history(
+        self,
+        symbol: str,
+        period: str = "1y",
+        *,
+        force_refresh: bool = False,
+    ) -> pd.DataFrame:
+        df, _meta = self.get_history_with_meta(symbol, period=period, force_refresh=force_refresh)
+        return df
+
+    def get_history_with_meta(
+        self,
+        symbol: str,
+        period: str = "1y",
+        *,
+        force_refresh: bool = False,
+    ) -> tuple[pd.DataFrame, dict[str, Any]]:
         sym = symbol.upper()
         min_bars = PERIOD_MIN_BARS.get(period, 200)
         limit = PERIOD_LIMIT.get(period, 500)
 
         rows = self.store.get_quotes(sym, limit=limit)
-        df = _rows_to_dataframe(rows)
-        if len(df) >= min_bars:
-            return self._trim_period(df, period)
+        local_df = _rows_to_dataframe(rows)
+        local_info = assess_history_freshness(local_df, min_bars, source="local")
 
-        df = self.market.get_history(sym, period=period)
-        if not df.empty:
-            self._persist(sym, df)
-        return df
+        use_local = (
+            not force_refresh
+            and local_info.is_sufficient
+            and local_info.is_fresh
+        )
+        if use_local:
+            trimmed = self._trim_period(local_df, period)
+            meta = local_info.to_metadata()
+            meta["price_history_refreshed_at"] = None
+            return trimmed, meta
 
-    def get_spy_history(self, period: str = "1y") -> pd.DataFrame:
-        return self.get_history("SPY", period=period)
+        provider_df = self.market.get_history(
+            sym,
+            period=period,
+            skip_cache=force_refresh,
+        )
+        refreshed_at = utc_iso_z(utc_now()) if not provider_df.empty else None
+
+        if provider_df.empty:
+            if not local_df.empty:
+                trimmed = self._trim_period(local_df, period)
+                stale_meta = assess_history_freshness(trimmed, min_bars, source="local_stale")
+                meta = stale_meta.to_metadata()
+                meta["price_history_refreshed_at"] = None
+                meta["price_history_is_stale"] = True
+                return trimmed, meta
+            empty_meta = assess_history_freshness(local_df, min_bars, source="none").to_metadata()
+            empty_meta["price_history_refreshed_at"] = None
+            return local_df, empty_meta
+
+        merged = merge_history_frames(local_df, provider_df)
+        self._persist(sym, merged)
+        trimmed = self._trim_period(merged, period)
+        merged_info = assess_history_freshness(trimmed, min_bars, source="provider")
+        meta = merged_info.to_metadata()
+        meta["price_history_refreshed_at"] = refreshed_at
+        return trimmed, meta
+
+    def get_spy_history(self, period: str = "1y", *, force_refresh: bool = False) -> pd.DataFrame:
+        return self.get_history("SPY", period=period, force_refresh=force_refresh)
 
     def get_info(self, symbol: str) -> dict[str, Any]:
         return self.market.get_info(symbol.upper())
@@ -111,7 +159,8 @@ class PriceService:
         for sym in unique:
             rows = self.store.get_quotes(sym, limit=PERIOD_LIMIT.get(period, 500))
             df = _rows_to_dataframe(rows)
-            if len(df) >= min_bars:
+            info = assess_history_freshness(df, min_bars)
+            if info.is_sufficient and info.is_fresh:
                 result[sym] = self._trim_period(df, period)
             else:
                 missing.append(sym)

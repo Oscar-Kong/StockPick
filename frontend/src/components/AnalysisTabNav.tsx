@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { useTranslation } from "@/lib/i18n";
+import { useCallback, useEffect, useRef } from "react";
 
 export type AnalysisTabId =
   | "overview"
@@ -19,7 +19,7 @@ export interface AnalysisTabConfig {
   label: string;
   shortLabel: string;
   hint: string;
-  group: "core" | "research" | "workspace";
+  group?: "core" | "research" | "workspace";
 }
 
 interface AnalysisTabNavProps {
@@ -30,48 +30,57 @@ interface AnalysisTabNavProps {
 }
 
 export function AnalysisTabNav({ tabs, active, onChange, ariaLabel }: AnalysisTabNavProps) {
-  const { t } = useTranslation();
-  const activeTab = tabs.find((tab) => tab.id === active);
-  const groupLabels: Record<AnalysisTabConfig["group"], string> = {
-    core: t.analysis.tabGroupCore,
-    research: t.analysis.tabGroupResearch,
-    workspace: t.analysis.tabGroupWorkspace,
-  };
-  const groups = ["core", "research", "workspace"] as const;
+  const tabRefs = useRef<Map<AnalysisTabId, HTMLButtonElement>>(new Map());
+
+  const onKeyDown = useCallback(
+    (e: React.KeyboardEvent, index: number) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      e.preventDefault();
+      const delta = e.key === "ArrowRight" ? 1 : -1;
+      const next = tabs[(index + delta + tabs.length) % tabs.length];
+      if (next) {
+        onChange(next.id);
+        tabRefs.current.get(next.id)?.focus();
+      }
+    },
+    [onChange, tabs]
+  );
+
+  useEffect(() => {
+    tabRefs.current.get(active)?.scrollIntoView({ inline: "nearest", block: "nearest" });
+  }, [active]);
 
   return (
-    <div className="analysis-tab-nav">
-      <nav className="analysis-tab-nav-scroll" aria-label={ariaLabel}>
-        {groups.map((group) => {
-          const groupTabs = tabs.filter((t) => t.group === group);
-          if (groupTabs.length === 0) return null;
-          return (
-            <div key={group} className="analysis-tab-group" role="presentation">
-              <span className="analysis-tab-group-label">{groupLabels[group]}</span>
-              <div className="analysis-tab-group-items">
-                {groupTabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => onChange(tab.id)}
-                    aria-current={active === tab.id ? "page" : undefined}
-                    className={clsx("analysis-tab-pill", active === tab.id && "analysis-tab-pill--active")}
-                    title={tab.hint}
-                  >
-                    <span className="hidden sm:inline">{tab.label}</span>
-                    <span className="sm:hidden">{tab.shortLabel}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </nav>
-      {activeTab && (
-        <p className="analysis-tab-hint" aria-live="polite">
-          {activeTab.hint}
-        </p>
-      )}
-    </div>
+    <nav className="analysis-tab-strip" aria-label={ariaLabel}>
+      {tabs.map((tab, index) => {
+        const isWorkspaceTab = tab.id === "report" || tab.id === "notes";
+        const prevTab = tabs[index - 1];
+        const showDivider =
+          isWorkspaceTab && prevTab && prevTab.id !== "report" && prevTab.id !== "notes" && tab.id === "report";
+
+        return (
+          <span key={tab.id} className="analysis-tab-strip__item">
+            {showDivider && <span className="analysis-tab-strip__divider" aria-hidden />}
+            <button
+              ref={(el) => {
+                if (el) tabRefs.current.set(tab.id, el);
+                else tabRefs.current.delete(tab.id);
+              }}
+              type="button"
+              role="tab"
+              aria-selected={active === tab.id}
+              aria-current={active === tab.id ? "page" : undefined}
+              tabIndex={active === tab.id ? 0 : -1}
+              onClick={() => onChange(tab.id)}
+              onKeyDown={(e) => onKeyDown(e, index)}
+              title={tab.hint}
+              className={clsx("analysis-tab-strip__tab", active === tab.id && "analysis-tab-strip__tab--active")}
+            >
+              {tab.label}
+            </button>
+          </span>
+        );
+      })}
+    </nav>
   );
 }

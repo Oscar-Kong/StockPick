@@ -65,7 +65,7 @@ class TradeHistory(PortfolioBase):
     id = Column(Integer, primary_key=True, autoincrement=True)
     account_id = Column(Integer, nullable=False, index=True)
     symbol = Column(String, nullable=False, default="", index=True)
-    side = Column(String, nullable=False)  # buy | sell | cash | income
+    side = Column(String, nullable=False)  # buy | sell | event (legacy: cash | income)
     quantity = Column(Float, nullable=True)
     price = Column(Float, nullable=True)
     fees = Column(Float, nullable=False, default=0.0)
@@ -298,11 +298,11 @@ def upsert_trades(
 
 
 def _parsed_from_trade_history(r: TradeHistory) -> "ParsedCsvRow":
-    from integrations.robinhood.models import ParsedCsvRow
+    from integrations.robinhood.models import ParsedCsvRow, normalize_row_type
 
-    row_type = r.side if r.side in ("buy", "sell", "cash", "income") else "excluded"
-    qty = None if r.side in ("cash", "income") and (r.quantity or 0) == 0 else r.quantity
-    price = None if r.side in ("cash", "income") and (r.price or 0) == 0 else r.price
+    row_type = normalize_row_type(r.side)
+    qty = None if row_type == "event" and (r.quantity or 0) == 0 else r.quantity
+    price = None if row_type == "event" and (r.price or 0) == 0 else r.price
     return ParsedCsvRow(
         activity_date=r.activity_date or "",
         process_date=r.process_date or "",
@@ -312,7 +312,7 @@ def _parsed_from_trade_history(r: TradeHistory) -> "ParsedCsvRow":
         quantity=qty,
         price=price,
         amount=float(r.amount or 0),
-        row_type=row_type,  # type: ignore[arg-type]
+        row_type=row_type,
         row_hash=r.row_hash,
         executed_at=r.executed_at,
     )
@@ -397,7 +397,9 @@ def upsert_ledger_rows(
                     updated += 1
                 skipped += 1
                 continue
-            side = r.row_type if r.row_type in ("cash", "income") else r.row_type
+            side = "event" if r.row_type == "event" else r.row_type
+            if side in ("cash", "income"):
+                side = "event"
             qty = r.quantity if r.quantity is not None else 0.0
             pr = r.price if r.price is not None else 0.0
             session.add(
@@ -470,7 +472,7 @@ def purge_duplicate_trades(account_id: int = DEFAULT_ACCOUNT_ID) -> int:
 
 
 def clear_trade_ledger(account_id: int = DEFAULT_ACCOUNT_ID) -> int:
-    """Remove all ledger rows for an account (used before full CSV replace import)."""
+    """Remove all ledger rows for an account (full reset)."""
     session = SessionLocal()
     try:
         removed = (
@@ -480,6 +482,30 @@ def clear_trade_ledger(account_id: int = DEFAULT_ACCOUNT_ID) -> int:
         )
         session.commit()
         return int(removed or 0)
+    finally:
+        session.close()
+
+
+def clear_csv_sourced_ledger(account_id: int = DEFAULT_ACCOUNT_ID) -> int:
+    """Remove CSV-imported ledger rows; keep manual journal entries."""
+    from integrations.robinhood.journal_verifier import is_manual_journal_ledger_row
+
+    session = SessionLocal()
+    try:
+        rows = session.query(TradeHistory).filter(TradeHistory.account_id == account_id).all()
+        removed = 0
+        for r in rows:
+            if is_manual_journal_ledger_row(
+                trans_code=r.trans_code,
+                description=r.description,
+                row_hash=r.row_hash,
+            ):
+                continue
+            session.delete(r)
+            removed += 1
+        if removed:
+            session.commit()
+        return removed
     finally:
         session.close()
 
@@ -755,14 +781,17 @@ def get_latest_portfolio_snapshot(account_id: int = DEFAULT_ACCOUNT_ID) -> dict 
         if isinstance(data, list):
             holdings = data
             closed = []
+            misc_events = []
         else:
             holdings = data.get("holdings") or []
             closed = data.get("closed_positions") or []
+            misc_events = data.get("misc_events") or []
         return {
             "cash": float(row.cash),
             "total_value": float(row.total_value),
             "holdings": holdings,
             "closed_positions": closed,
+            "misc_events": misc_events,
             "source": row.source,
             "created_at": utc_iso_z(row.created_at),
         }

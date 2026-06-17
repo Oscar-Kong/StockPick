@@ -23,7 +23,6 @@ import { AnalysisSidebar } from "./AnalysisSidebar";
 import { AnalysisSymbolNav } from "./AnalysisSymbolNav";
 import { AnalysisTabNav, type AnalysisTabConfig, type AnalysisTabId } from "./AnalysisTabNav";
 import { BacktestPanel } from "./BacktestPanel";
-import { DataQualityBadge } from "./DataQualityBadge";
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
 import { PositionSizingBlock } from "./PositionSizingBlock";
 import { PriceChart } from "./PriceChart";
@@ -499,63 +498,70 @@ export function AnalysisPanel({
   return (
     <div className={shellClass}>
       <div className="analysis-toolbar shrink-0">
-        <div className="flex w-full flex-col gap-3">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-3">
-                <AnalysisSymbolNav
-                  symbol={data.symbol}
-                  prevSymbol={prevSymbol}
-                  nextSymbol={nextSymbol}
-                  onNavigate={onNavigateSymbol}
-                />
-                {!onNavigateSymbol && <h2 className="text-zinc-50">{data.symbol}</h2>}
-              </div>
-              {onNavigateSymbol && (prevSymbol || nextSymbol) && (
-                <p className="mt-1 text-xs text-zinc-600">{t.analysis.symbolNavHint}</p>
-              )}
-              <AnalysisHeaderStats
-                price={data.price}
-                bucketLabel={bucketMeta[data.assigned_bucket as Bucket]?.label ?? data.assigned_bucket}
-                score={display.score}
-                scoreSource={display.scoreSource}
-                riskLevel={String(display.riskLevel)}
-                riskLabel={riskLabel(String(display.riskLevel))}
-                legacyScore={display.legacyScore}
-                showLegacyDiff={showLegacyDiff}
-              />
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setInsightsOpen(true)}
-                className="analysis-insights-toggle lg:hidden"
-              >
-                {t.analysis.openInsights}
-              </button>
-              <button
-                type="button"
-                onClick={() => void refresh()}
-                disabled={loading}
-                className="btn-ghost shrink-0 px-2 py-1 text-xs"
-              >
-                {loading ? "…" : t.common.refresh}
-              </button>
-            </div>
+        <div className="analysis-toolbar__head">
+          <div className="analysis-toolbar__identity">
+            <AnalysisSymbolNav
+              symbol={data.symbol}
+              prevSymbol={prevSymbol}
+              nextSymbol={nextSymbol}
+              onNavigate={onNavigateSymbol}
+            />
+            {!onNavigateSymbol && (
+              <h2 className="analysis-toolbar__symbol-title">{data.symbol}</h2>
+            )}
           </div>
-          <AnalysisTabNav
-            tabs={tabConfigs}
-            active={tab}
-            onChange={setTab}
-            ariaLabel={t.analysis.viewsAria}
-          />
+          <div className="analysis-toolbar__actions">
+            <button
+              type="button"
+              onClick={() => setInsightsOpen(true)}
+              className="analysis-insights-toggle lg:hidden"
+              hidden={tab === "overview"}
+            >
+              {t.analysis.openInsights}
+            </button>
+            <button
+              type="button"
+              onClick={() => void refresh()}
+              disabled={loading}
+              className="btn-ghost shrink-0 px-3 py-1.5 text-sm"
+            >
+              {loading ? "…" : t.common.refresh}
+            </button>
+          </div>
         </div>
+
+        <AnalysisHeaderStats
+          price={data.price}
+          changePct1d={(() => {
+            const n = Number(data.metrics?.change_pct_1d);
+            return Number.isFinite(n) ? n : null;
+          })()}
+          recommendation={(data.metrics?.recommendation as string) ?? null}
+          bucketLabel={bucketMeta[data.assigned_bucket as Bucket]?.label ?? data.assigned_bucket}
+          score={display.score}
+          scoreSource={display.scoreSource}
+          riskLevel={String(display.riskLevel)}
+          riskLabel={riskLabel(String(display.riskLevel))}
+          dataQualityScore={data.data_quality_score}
+          priceHistoryLastDate={data.price_history_last_date}
+          priceHistoryIsStale={data.price_history_is_stale}
+          legacyScore={display.legacyScore}
+          showLegacyDiff={showLegacyDiff}
+        />
+
+        <AnalysisTabNav
+          tabs={tabConfigs}
+          active={tab}
+          onChange={setTab}
+          ariaLabel={t.analysis.viewsAria}
+        />
       </div>
 
-      <div className="analysis-meta shrink-0">
-        <DataQualityBadge score={data.data_quality_score} flags={[]} />
-        <AnalysisAlerts alerts={data.alerts} />
-      </div>
+      {data.alerts.length > 0 && (
+        <div className="analysis-meta shrink-0">
+          <AnalysisAlerts alerts={data.alerts} />
+        </div>
+      )}
 
       <div className="analysis-grid min-h-0 flex-1 overflow-hidden">
         <div className="analysis-primary p-3 lg:p-4">
@@ -566,31 +572,50 @@ export function AnalysisPanel({
                 <V2FallbackBanner reason={v2UnavailableReason} />
               )}
               <div className="analysis-overview-grid">
-                <div className="analysis-overview-chart analysis-block p-2">
-                  <h3 className="label-caps mb-2">{t.analysis.priceChartTitle}</h3>
-                  <PriceChart ohlc={data.ohlc} />
+                <div className="analysis-overview-chart">
+                  <PriceChart
+                    ohlc={data.ohlc}
+                    priceHistoryLastDate={data.price_history_last_date}
+                    priceHistoryIsStale={data.price_history_is_stale}
+                    priceHistoryRefreshedAt={data.price_history_refreshed_at}
+                  />
                 </div>
-                <div className="analysis-overview-side space-y-4">
+                <div className="analysis-overview-side">
                   {v2Score ? (
                     <Round2Panel score={v2Score} />
                   ) : (
                     !v2Loading && (
-                      <div className="analysis-block">
-                        <h3 className="label-caps mb-2">{t.analysis.summary}</h3>
-                        <p className="text-sm leading-relaxed text-zinc-300">{display.summary}</p>
+                      <div className="analysis-section">
+                        <h3 className="analysis-section__title">{t.analysis.summary}</h3>
+                        <p className="text-sm leading-relaxed text-secondary">{display.summary}</p>
                       </div>
                     )
                   )}
-                  <div className="analysis-block">
-                    <h3 className="label-caps mb-2">{t.analysis.positionSizing}</h3>
+                  <div className="analysis-section">
+                    <h3 className="analysis-section__title">{t.analysis.positionSizing}</h3>
                     <PositionSizingBlock
                       sizing={positionSizing ?? v2Score?.position_sizing ?? null}
                       loading={sizingLoading}
                       error={sizingError}
                     />
                   </div>
+                  {data.valuation_warnings?.length > 0 && (
+                    <div className="analysis-section">
+                      <h3 className="analysis-section__title">{t.analysis.tabValuation}</h3>
+                      <ul className="space-y-1 text-sm text-amber-200/90">
+                        {data.valuation_warnings.map((w) => (
+                          <li key={w}>{w}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               </div>
+              {v2Score?.factors && v2Score.factors.length > 0 && (
+                <div className="analysis-section mt-3">
+                  <FactorAttributionTable factors={v2Score.factors} />
+                </div>
+              )}
             </div>
           )}
 
@@ -702,15 +727,18 @@ export function AnalysisPanel({
           )}
         </div>
 
-        <aside className="analysis-rail hidden lg:block">
-          <AnalysisSidebar
-            data={data}
-            bucketFit={activeBucketFit}
-            bucketFitLoading={bucketFitLoading}
-            display={display}
-            v2Score={v2Score}
-          />
-        </aside>
+        {tab !== "overview" && (
+          <aside className="analysis-rail hidden lg:block">
+            <AnalysisSidebar
+              data={data}
+              bucketFit={activeBucketFit}
+              bucketFitLoading={bucketFitLoading}
+              display={display}
+              v2Score={v2Score}
+              compact
+            />
+          </aside>
+        )}
       </div>
 
       {insightsOpen && (

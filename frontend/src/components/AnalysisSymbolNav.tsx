@@ -50,7 +50,10 @@ export function AnalysisSymbolNav({
   if (!onNavigate || (!prevSymbol && !nextSymbol)) return null;
 
   return (
-    <div className={clsx("analysis-symbol-nav", className)}>
+    <div
+      className={clsx("analysis-symbol-nav", className)}
+      title={t.analysis.symbolNavHint}
+    >
       <button
         type="button"
         disabled={!prevSymbol}

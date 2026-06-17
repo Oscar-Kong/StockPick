@@ -9,7 +9,7 @@ Last reviewed against the repo layout, UI routes, and API surface. Use this with
 | Route | What it is |
 |-------|------------|
 | `/` | Home — daily decision cockpit (portfolio summary strip, action queue, holdings); compact header + collapsible CSV import |
-| `/scan` | Scan hub — dense results table, unified toolbar; **Held** badge when ticker is in Home portfolio |
+| `/scan` | Scan hub — compact command bar, inline status, dense results table; **Held** badge when ticker is in Home portfolio |
 | `/workspace` | Full-width research terminal — watchlist rail + grouped analyze tabs, symbol nav, mobile Insights sheet |
 | `/library` | Saved scans, reports, analyze snapshots — split list/detail layout |
 | `/portfolio` | Basket optimize + policy backtest — expanded ~1520px layout |
@@ -23,9 +23,30 @@ Last reviewed against the repo layout, UI routes, and API surface. Use this with
 |-----------|---------|
 | `/penny`, `/medium`, `/compounder` | `/scan?bucket=…` |
 | `/watchlist`, `/analyze` | `/workspace` (analyze keeps `?symbol=`) |
-| `/trades` | `/workspace?tab=journal` |
+| `/trades` | `/?journal=1#home-journal` (compact journal on Home) |
 | `/reports` | `/library?tab=reports` |
 | `/scans` | `/library?tab=scans` |
+
+---
+
+## Robinhood CSV import (backend)
+
+Simple three-step flow in `portfolio_snapshot_service.import_robinhood_csv`:
+
+1. **Parse & store** — `csv_importer.parse_robinhood_csv` → upsert all rows into `trade_history` ledger
+2. **Verify journal** — `journal_verifier.verify_journal_trades_against_ledger` checks manual Home journal trades against the new CSV (warnings on mismatch)
+3. **Rebuild portfolio** — `portfolio_rebuilder.rebuild_portfolio` from full ledger → save holdings snapshot
+
+**Row types:**
+
+| Type | Examples | Affects |
+|------|----------|---------|
+| `buy` / `sell` | Stock trades | Open holdings, closed positions, cash |
+| `event` | RTP, SLIP, DIV, unknown misc | Cash only — stored in snapshot `misc_events` (separate from position buckets) |
+
+**Replace import** clears CSV-sourced ledger rows only (`clear_csv_sourced_ledger`); manual journal rows (`trans_code=MANUAL` or `[journal #]`) are kept.
+
+Key files: `backend/integrations/robinhood/csv_importer.py`, `portfolio_rebuilder.py`, `journal_verifier.py`, `backend/services/portfolio_snapshot_service.py`, `POST /brokerage/import/robinhood-csv`.
 
 ---
 

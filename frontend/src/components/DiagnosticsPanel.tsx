@@ -55,7 +55,7 @@ export function DiagnosticsPanel({ data, loading, error, onRetry }: DiagnosticsP
     >
       {data && (
         <div className="space-y-4">
-          <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <dl className="stat-tile-grid grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             <StatTile
               label={t.diagnostics.interpretationLabel}
               value={
@@ -112,7 +112,7 @@ export function DiagnosticsPanel({ data, loading, error, onRetry }: DiagnosticsP
           </dl>
 
           {Boolean(data.jarque_bera?.available) && (
-            <p className="text-xs leading-relaxed text-zinc-500">
+            <p className="text-[0.6875rem] leading-relaxed text-zinc-500">
               {fmt(t.diagnostics.jarqueBera, {
                 p: fmtNum(data.jarque_bera.pvalue, 3),
               })}
@@ -120,7 +120,7 @@ export function DiagnosticsPanel({ data, loading, error, onRetry }: DiagnosticsP
           )}
 
           {data.notes.length > 0 && (
-            <ul className="list-inside list-disc space-y-1 text-xs leading-relaxed text-zinc-500">
+            <ul className="list-inside list-disc space-y-1 text-[0.6875rem] leading-relaxed text-zinc-500">
               {data.notes.slice(0, 4).map((note, i) => (
                 <li key={i}>{note}</li>
               ))}

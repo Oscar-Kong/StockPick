@@ -14,7 +14,7 @@ from data.portfolio_store import (
     list_uploads,
     load_all_ledger_rows,
     mark_sync,
-    clear_trade_ledger,
+    clear_csv_sourced_ledger,
     purge_duplicate_trades,
     record_upload,
     repair_ledger_fill_prices,
@@ -27,6 +27,8 @@ from data.portfolio_store import (
     upsert_ledger_rows,
 )
 from integrations.robinhood.csv_importer import parse_robinhood_csv
+from integrations.robinhood.journal_verifier import verify_journal_trades_against_ledger
+from integrations.robinhood.models import MiscEventRow, PortfolioRebuildResult
 from integrations.robinhood.portfolio_rebuilder import rebuild_portfolio, validation_report
 from integrations.robinhood.snaptrade_client import SnapTradeClient
 from models.schemas import Bucket, PortfolioHolding
@@ -40,9 +42,82 @@ DISCLAIMER = (
 )
 
 
-def _rebuild_from_store(account_id: int = DEFAULT_ACCOUNT_ID):
+def _rebuild_from_store(account_id: int = DEFAULT_ACCOUNT_ID) -> PortfolioRebuildResult:
     rows = load_all_ledger_rows(account_id)
     return rebuild_portfolio(rows)
+
+
+def _misc_events_payload(events: list[MiscEventRow]) -> list[dict]:
+    return [
+        {
+            "activity_date": e.activity_date,
+            "trans_code": e.trans_code,
+            "description": e.description,
+            "amount": e.amount,
+            "instrument": e.instrument,
+        }
+        for e in events
+    ]
+
+
+def _apply_ledger_to_portfolio(
+    account_id: int,
+    rebuild: PortfolioRebuildResult,
+    *,
+    source: str,
+    cash_override: float | None = None,
+) -> dict:
+    """Persist holdings + event ledger + closed positions from a rebuild."""
+    saved = save_holdings(account_id, rebuild.open_holdings, source=source)
+    closed = [
+        {
+            "symbol": c.symbol,
+            "total_bought": c.total_bought,
+            "total_sold": c.total_sold,
+            "realized_pl": c.realized_pl,
+            "last_activity": c.last_activity,
+        }
+        for c in rebuild.closed_positions
+    ]
+    misc_events = _misc_events_payload(rebuild.event_ledger)
+
+    if cash_override is not None:
+        final_cash = float(cash_override)
+    else:
+        final_cash = max(0.0, rebuild.cash_delta)
+
+    set_account_cash(account_id, final_cash)
+    total_est = sum(h["shares"] * h["avg_cost"] for h in saved) + final_cash
+    save_portfolio_snapshot(
+        account_id,
+        final_cash,
+        total_est,
+        saved,
+        source,
+        closed_positions=closed,
+        extra={"misc_events": misc_events},
+    )
+    return {
+        "holdings": saved,
+        "closed_positions": closed,
+        "misc_events": misc_events,
+        "cash": final_cash,
+        "holdings_count": len(saved),
+    }
+
+
+def _verify_journal_after_import(account_id: int, csv_rows) -> list[dict]:
+    from data.cache import list_trades
+    from data.portfolio_store import ledger_has_row_hash
+
+    return verify_journal_trades_against_ledger(
+        account_id,
+        csv_rows=csv_rows,
+        journal_ledger_hash_fn=_journal_ledger_hash,
+        ledger_has_hash_fn=ledger_has_row_hash,
+        list_journal_trades_fn=list_trades,
+        load_ledger_rows_fn=load_all_ledger_rows,
+    )
 
 
 def _holdings_drift_from_ledger(account_id: int = DEFAULT_ACCOUNT_ID) -> bool:
@@ -79,51 +154,39 @@ def ensure_holdings_reconciled(account_id: int = DEFAULT_ACCOUNT_ID) -> bool:
 
 
 def import_robinhood_csv(content: str | bytes, filename: str, *, cash: float | None = None, replace: bool = False) -> dict:
+    """
+    Simple CSV import:
+    1. Parse CSV → store all rows in the ledger (positions + misc events)
+    2. Verify manual journal trades against the new CSV
+    3. Rebuild holdings from the full ledger and save snapshot
+    """
     rows, warnings = parse_robinhood_csv(content)
     account = get_or_create_account()
     account_id = account["id"]
 
     if replace:
-        cleared = clear_trade_ledger(account_id)
+        cleared = clear_csv_sourced_ledger(account_id)
         if cleared:
-            warnings = list(warnings) + [f"Replaced prior ledger ({cleared} rows cleared)"]
+            warnings = list(warnings) + [f"Replaced {cleared} CSV ledger rows (manual journal entries kept)"]
 
     file_id = record_upload(account_id, filename, len(rows), 0, warnings)
-    purge_duplicate_trades(account_id)
     imported, skipped = upsert_ledger_rows(account_id, rows, source_file_id=file_id)
     purge_duplicate_trades(account_id)
 
+    journal_verification = _verify_journal_after_import(account_id, rows)
+    for check in journal_verification:
+        if check.get("status") == "missing":
+            warnings.append(f"Journal #{check['trade_id']} {check['symbol']}: {check['message']}")
+
     rebuild = _rebuild_from_store(account_id)
-    saved = save_holdings(account_id, rebuild.open_holdings, source="csv")
-
-    closed = [
-        {
-            "symbol": c.symbol,
-            "total_bought": c.total_bought,
-            "total_sold": c.total_sold,
-            "realized_pl": c.realized_pl,
-            "last_activity": c.last_activity,
-        }
-        for c in rebuild.closed_positions
-    ]
-
-    if cash is not None:
-        final_cash = float(cash)
-    else:
-        final_cash = max(0.0, rebuild.cash_delta)
-
-    set_account_cash(account_id, final_cash)
-    acct = update_account_source("csv", cash=final_cash)
-
-    total_est = sum(h["shares"] * h["avg_cost"] for h in saved) + final_cash
-    save_portfolio_snapshot(
+    persisted = _apply_ledger_to_portfolio(
         account_id,
-        final_cash,
-        total_est,
-        saved,
-        "csv",
-        closed_positions=closed,
+        rebuild,
+        source="csv",
+        cash_override=cash,
     )
+    acct = update_account_source("csv", cash=persisted["cash"])
+
     mark_sync(
         account_id,
         "csv",
@@ -134,7 +197,7 @@ def import_robinhood_csv(content: str | bytes, filename: str, *, cash: float | N
 
     from data.freshness_store import clear_freshness_flag, mark_freshness_updated
 
-    mark_freshness_updated("portfolio_holdings", source="csv_import", extra={"holdings": len(saved)})
+    mark_freshness_updated("portfolio_holdings", source="csv_import", extra={"holdings": persisted["holdings_count"]})
     mark_freshness_updated("closed_positions", source="csv_import")
     clear_freshness_flag("portfolio_holdings", "holdings_dirty")
     clear_freshness_flag("closed_positions", "needs_refresh")
@@ -144,10 +207,12 @@ def import_robinhood_csv(content: str | bytes, filename: str, *, cash: float | N
         "trades_parsed": len(rows),
         "trades_imported": imported,
         "trades_skipped": skipped,
-        "holdings_count": len(saved),
-        "holdings": saved,
-        "closed_positions": closed,
-        "cash": final_cash,
+        "holdings_count": persisted["holdings_count"],
+        "holdings": persisted["holdings"],
+        "closed_positions": persisted["closed_positions"],
+        "misc_events": persisted["misc_events"],
+        "journal_verification": journal_verification,
+        "cash": persisted["cash"],
         "cash_delta_from_csv": rebuild.cash_delta,
         "warnings": warnings + rebuild.warnings,
         "account": acct,
@@ -164,6 +229,7 @@ def validate_robinhood_csv(content: str | bytes) -> dict:
         "excluded_rows": rebuild.excluded_rows,
         "unknown_trans_codes": rebuild.unknown_trans_codes,
         "cash_impact": rebuild.cash_delta,
+        "misc_events": _misc_events_payload(rebuild.event_ledger),
         "open_holdings": [
             {
                 "symbol": h.symbol,
@@ -343,27 +409,17 @@ def apply_manual_trade_to_portfolio(
     if source == "manual" and rebuild.open_holdings:
         update_account_source("csv")
         source = "csv"
-    saved = save_holdings(account_id, rebuild.open_holdings, source=source)
-    closed = [
-        {
-            "symbol": c.symbol,
-            "total_bought": c.total_bought,
-            "total_sold": c.total_sold,
-            "realized_pl": c.realized_pl,
-            "last_activity": c.last_activity,
-        }
-        for c in rebuild.closed_positions
-    ]
-    cash = get_account_cash()
-    total_est = sum(h["shares"] * h["avg_cost"] for h in saved) + cash
-    save_portfolio_snapshot(account_id, cash, total_est, saved, source, closed_positions=closed)
+    persisted = _apply_ledger_to_portfolio(account_id, rebuild, source=source)
+    saved = persisted["holdings"]
+    closed = persisted["closed_positions"]
 
     portfolio_result: dict = {
         "imported": imported,
         "skipped": skipped,
-        "holdings_count": len(saved),
+        "holdings_count": persisted["holdings_count"],
         "holdings": saved,
         "closed_positions": closed,
+        "misc_events": persisted["misc_events"],
         "message": "Portfolio updated from journal trade"
         if imported > 0
         else ("Portfolio refreshed (trade already synced)" if already_synced else "No ledger changes"),
@@ -403,25 +459,20 @@ def refresh_holdings_snapshot() -> dict:
     repaired = repair_ledger_fill_prices(DEFAULT_ACCOUNT_ID)
     removed = purge_duplicate_trades(DEFAULT_ACCOUNT_ID)
     rebuild = _rebuild_from_store()
-    saved = save_holdings(DEFAULT_ACCOUNT_ID, rebuild.open_holdings, source=account["source"])
     cash = get_account_cash()
-    closed = [
-        {
-            "symbol": c.symbol,
-            "total_bought": c.total_bought,
-            "total_sold": c.total_sold,
-            "realized_pl": c.realized_pl,
-            "last_activity": c.last_activity,
-        }
-        for c in rebuild.closed_positions
-    ]
-    total_est = sum(h["shares"] * h["avg_cost"] for h in saved) + cash
-    snap = save_portfolio_snapshot(DEFAULT_ACCOUNT_ID, cash, total_est, saved, account["source"], closed_positions=closed)
+    persisted = _apply_ledger_to_portfolio(
+        DEFAULT_ACCOUNT_ID,
+        rebuild,
+        source=account["source"],
+        cash_override=cash,
+    )
+    snap = get_latest_portfolio_snapshot()
     return {
-        "holdings": saved,
-        "cash": cash,
-        "closed_positions": closed,
-        "snapshot": snap,
+        "holdings": persisted["holdings"],
+        "cash": persisted["cash"],
+        "closed_positions": persisted["closed_positions"],
+        "misc_events": persisted["misc_events"],
+        "snapshot": snap or {},
         "duplicates_removed": removed,
         "prices_repaired": repaired,
     }
@@ -525,6 +576,7 @@ def get_current_portfolio() -> dict:
     holdings = get_current_holdings()
     snap = get_latest_portfolio_snapshot()
     closed = (snap or {}).get("closed_positions") or []
+    misc_events = (snap or {}).get("misc_events") or []
     cash, cash_source = resolve_portfolio_cash()
     reserved_cash = get_reserved_cash()
     return {
@@ -536,6 +588,7 @@ def get_current_portfolio() -> dict:
         "ipo_list_price": account.get("ipo_list_price"),
         "holdings": holdings,
         "closed_positions": closed,
+        "misc_events": misc_events,
         "data_source": account["source"],
         "disclaimer": DISCLAIMER,
         "is_demo_data": account["source"] == "demo",

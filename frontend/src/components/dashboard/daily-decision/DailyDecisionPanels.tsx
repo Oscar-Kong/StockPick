@@ -22,25 +22,7 @@ export function EmptyPortfolioState({ onImportClick }: { onImportClick: () => vo
   );
 }
 
-export function CsvImportPanel({
-  cashInput,
-  onCashChange,
-  ipoSharesInput,
-  onIpoSharesChange,
-  ipoListPriceInput,
-  onIpoListPriceChange,
-  reservedInput,
-  onReservedChange,
-  replaceImport,
-  onReplaceChange,
-  onImportClick,
-  onSaveBuyingPower,
-  savingCash,
-  importing,
-  lastImport,
-  csvRowsLoaded,
-  ledgerRowsCount,
-}: {
+export type CsvImportFooterProps = {
   cashInput: string;
   onCashChange: (v: string) => void;
   ipoSharesInput: string;
@@ -58,35 +40,44 @@ export function CsvImportPanel({
   lastImport: BrokerageCsvImportResponse | null;
   csvRowsLoaded?: number | null;
   ledgerRowsCount?: number | null;
-}) {
+};
+
+function CsvImportOptions({
+  cashInput,
+  onCashChange,
+  ipoSharesInput,
+  onIpoSharesChange,
+  ipoListPriceInput,
+  onIpoListPriceChange,
+  reservedInput,
+  onReservedChange,
+  replaceImport,
+  onReplaceChange,
+  onSaveBuyingPower,
+  savingCash,
+  importing,
+  lastImport,
+  csvRowsLoaded,
+  ledgerRowsCount,
+}: Omit<CsvImportFooterProps, "onImportClick">) {
   const { t } = useTranslation();
   const ipoShares = Number(ipoSharesInput);
   const ipoListPrice = Number(ipoListPriceInput);
-  const hasIpoOrder = ipoSharesInput.trim() !== "" && ipoListPriceInput.trim() !== "" && ipoShares > 0 && ipoListPrice > 0;
+  const hasIpoOrder =
+    ipoSharesInput.trim() !== "" && ipoListPriceInput.trim() !== "" && ipoShares > 0 && ipoListPrice > 0;
   const bufferedReserved = hasIpoOrder ? Math.round(ipoShares * ipoListPrice * 1.2 * 100) / 100 : null;
+
   return (
-    <details className="data-panel data-panel--padded group">
-      <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <h2 className="data-panel-title">{t.home.dailyImportPanelTitle}</h2>
-            <p className="data-panel-subtitle">{t.home.dailyImportPanelHint}</p>
-          </div>
-          <span className="text-sm text-secondary group-open:rotate-180 transition-transform" aria-hidden>
-            ▾
-          </span>
-        </div>
-      </summary>
-      <div className="mt-4 border-t border-zinc-800/80 pt-4">
+    <div className="home-journal-import__options-body">
       {(csvRowsLoaded != null || ledgerRowsCount != null) && (
-        <p className="mb-3 text-sm leading-relaxed text-secondary">
+        <p className="mb-3 text-xs leading-relaxed text-secondary">
           {t.home.dailyImportLoadedStats
             .replace("{csvRows}", String(csvRowsLoaded ?? "—"))
             .replace("{ledgerRows}", String(ledgerRowsCount ?? "—"))}
         </p>
       )}
       <label className="block">
-        <span className="text-label-caps">{t.home.dailyCashOnImport}</span>
+        <span className="home-journal-quick__label">{t.home.dailyCashOnImport}</span>
         <input
           type="number"
           min={0}
@@ -94,13 +85,12 @@ export function CsvImportPanel({
           value={cashInput}
           onChange={(e) => onCashChange(e.target.value)}
           placeholder={t.home.dailyCashAutoPlaceholder}
-          className="input-field mt-2 finance-value"
+          className="input-field mt-1.5 finance-value"
         />
-        <span className="mt-1 block text-xs text-tertiary">{t.home.dailyCashBuyingPowerHint}</span>
       </label>
-      <div className="mt-3 grid grid-cols-2 gap-3">
+      <div className="mt-2 grid grid-cols-2 gap-2">
         <label className="block">
-          <span className="text-label-caps">{t.home.dailyIpoShares}</span>
+          <span className="home-journal-quick__label">{t.home.dailyIpoShares}</span>
           <input
             type="number"
             min={0}
@@ -108,11 +98,11 @@ export function CsvImportPanel({
             value={ipoSharesInput}
             onChange={(e) => onIpoSharesChange(e.target.value)}
             placeholder="5"
-            className="input-field mt-2 finance-value"
+            className="input-field mt-1.5 finance-value"
           />
         </label>
         <label className="block">
-          <span className="text-label-caps">{t.home.dailyIpoListPrice}</span>
+          <span className="home-journal-quick__label">{t.home.dailyIpoListPrice}</span>
           <input
             type="number"
             min={0}
@@ -120,7 +110,7 @@ export function CsvImportPanel({
             value={ipoListPriceInput}
             onChange={(e) => onIpoListPriceChange(e.target.value)}
             placeholder="135"
-            className="input-field mt-2 finance-value"
+            className="input-field mt-1.5 finance-value"
           />
         </label>
       </div>
@@ -132,8 +122,8 @@ export function CsvImportPanel({
             .replace("{reserved}", formatCurrency(bufferedReserved))}
         </p>
       )}
-      <label className="mt-3 block">
-        <span className="text-label-caps">{t.home.dailyReservedOnImport}</span>
+      <label className="mt-2 block">
+        <span className="home-journal-quick__label">{t.home.dailyReservedOnImport}</span>
         <input
           type="number"
           min={0}
@@ -142,11 +132,10 @@ export function CsvImportPanel({
           onChange={(e) => onReservedChange(e.target.value)}
           placeholder="0"
           readOnly={hasIpoOrder}
-          className="input-field mt-2 finance-value"
+          className="input-field mt-1.5 finance-value"
         />
-        <span className="mt-1 block text-xs text-tertiary">{t.home.dailyReservedIpoHint}</span>
       </label>
-      <label className="mt-3 flex cursor-pointer items-start gap-2.5 text-sm text-secondary">
+      <label className="mt-2 flex cursor-pointer items-start gap-2 text-xs text-secondary">
         <input
           type="checkbox"
           checked={replaceImport}
@@ -155,20 +144,15 @@ export function CsvImportPanel({
         />
         <span>{t.home.dailyImportReplaceLabel}</span>
       </label>
-      <div className="mt-3 flex flex-col gap-2">
-        <GhostButton
-          onClick={onSaveBuyingPower}
-          disabled={savingCash || importing || !cashInput.trim()}
-          className="w-full rounded-xl"
-        >
-          {savingCash ? t.common.running : t.home.dailySaveBuyingPower}
-        </GhostButton>
-        <GhostButton onClick={onImportClick} disabled={importing} className="w-full rounded-xl">
-          {importing ? t.common.running : t.home.dailyImportCsv}
-        </GhostButton>
-      </div>
+      <GhostButton
+        onClick={onSaveBuyingPower}
+        disabled={savingCash || importing || !cashInput.trim()}
+        className="mt-2 w-full rounded-lg px-3 py-1.5 text-xs"
+      >
+        {savingCash ? t.common.running : t.home.dailySaveBuyingPower}
+      </GhostButton>
       {lastImport && (
-        <dl className="mt-4 space-y-2 border-t border-white/5 pt-4 text-sm text-secondary">
+        <dl className="mt-3 space-y-1 border-t border-white/5 pt-3 text-xs text-secondary">
           <div className="flex justify-between gap-3">
             <dt>{t.home.dailyImportRows}</dt>
             <dd className="finance-value text-zinc-200">{lastImport.trades_parsed}</dd>
@@ -179,9 +163,37 @@ export function CsvImportPanel({
           </div>
         </dl>
       )}
-      </div>
-    </details>
+    </div>
   );
+}
+
+/** Compact CSV import row — lives below the home trade journal. */
+export function CsvImportFooter(props: CsvImportFooterProps) {
+  const { t } = useTranslation();
+  const { onImportClick, importing } = props;
+
+  return (
+    <div className="home-journal-import">
+      <div className="home-journal-import__row">
+        <GhostButton
+          onClick={onImportClick}
+          disabled={importing}
+          className="home-journal-import__btn rounded-lg px-3 py-1.5 text-xs"
+        >
+          {importing ? t.common.running : t.home.dailyImportCsv}
+        </GhostButton>
+        <details className="home-journal-import__details">
+          <summary className="home-journal-import__summary">{t.home.journalImportOptions}</summary>
+          <CsvImportOptions {...props} />
+        </details>
+      </div>
+      <p className="home-journal-import__hint">{t.home.dailyCsvWhereHint}</p>
+    </div>
+  );
+}
+
+export function CsvImportPanel(props: CsvImportFooterProps) {
+  return <CsvImportFooter {...props} />;
 }
 
 export function PennyOpportunitiesPanel({ items }: { items: PennyOpportunityItem[] }) {

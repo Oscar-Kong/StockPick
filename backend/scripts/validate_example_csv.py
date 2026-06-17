@@ -79,7 +79,7 @@ def main() -> None:
                 "description": r.description,
             }
             for r in rows
-            if r.row_type in ("cash", "income")
+            if r.row_type == "event"
         ],
         "net_cash_delta": rebuild.cash_delta,
         "reconstructed_open_holdings": base["open_holdings"],

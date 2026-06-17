@@ -41,18 +41,18 @@ The product focuses on **Penny** (default) and **Compounder**. Legacy **Medium**
 
 ## 3. The five places that matter (UI map)
 
-You only need **five routes** for 90% of work:
+You only need **four routes** for 90% of work:
 
 ```
-Home (/)           → **Daily Decision cockpit** — Robinhood holdings, buy/keep/sell, CSV import
+Home (/)           → **Daily Decision cockpit** — Robinhood holdings, buy/keep/sell, CSV import, compact trade journal
 Screen (/scan)     → discover ranked candidates (Penny + Compounder)
-Research (/workspace) → watchlist + deep dive + journal
-Compare (/workspace?tab=compare) → peer metrics (also in top nav)
-Journal (/workspace?tab=journal) → trade log (also in top nav)
+Research (/workspace) → watchlist + deep dive
 Library (/library) → saved scans & reports
 Portfolio (/portfolio) → basket optimization & policy backtest (research; not daily workflow)
 Quant Lab (/quant-lab) → validation & factor research (not daily workflow)
 ```
+
+Trade journal (log + Robinhood CSV import): **Home** sidebar → `/?journal=1#home-journal`
 
 Inside **Research → Analyze**, use **Overview** for v2 recommendation, valuation, similar-signal, and position sizing (visible on all screen sizes; the right sidebar keeps technicals and factor weights).
 
@@ -84,25 +84,20 @@ Everything else is **secondary**:
 2. Select symbol → read **Overview**, **Quant**, **Report** tab if needed.
 3. Save notes; optional **Generate narrative** if LLM is on.
 
-### C. “I want to compare peers” (10 min)
+### C. “I traded — log it” (5 min)
 
-1. **Research** → **Compare** tab.
-2. Pick 2–4 symbols → read the metrics table.
-
-### D. “I traded — log it” (5 min)
-
-1. **Research** → **Journal** tab.
-2. Manual entry or screenshot upload — **quantity is required** so the trade can sync to **Home** holdings.
+1. **Home** → open the **Journal** panel (`/?journal=1#home-journal`).
+2. Manual entry or Robinhood CSV import — **quantity is optional** for manual rows; CSV rebuilds holdings on Home.
 3. Check the badge on each saved trade: **On Home** (in portfolio ledger) vs **Not on Home** (use **Sync to Home**).
 4. Review process-quality score (not just PnL).
 
-### E. “I want portfolio-level math” (advanced)
+### D. “I want portfolio-level math” (advanced)
 
 1. **Portfolio** → **Daily decisions** — enter cash + holdings (penny or compounder tags) for rule-based buy/keep/trim/sell guidance.
 2. **Optimize weights** or **Policy backtest** for basket-level math (optional).
 3. Decision percentages are **model outputs, not financial advice** — see Portfolio tab disclaimer.
 
-### F. “I want to research new factors” (offline)
+### E. “I want to research new factors” (offline)
 
 See [OPENALPHA_INTEGRATION.md](OPENALPHA_INTEGRATION.md) — batch IC eval, combo optimizer, optional live toggle.
 
@@ -143,13 +138,12 @@ The score is a **weighted blend** of factors (momentum, volume, RS vs SPY, senti
 
 ### Problem: Sector / industry everywhere
 
-Sector appears in: scan metrics, analyze sidebar, compare table, reports, factor IC by sector.
+Sector appears in: scan metrics, analyze sidebar, reports, factor IC by sector.
 
 **Simplify:**
 
 - **Screening:** sector is a filter hint, not a hard rule.
 - **Analyze:** use sector for **context** (“is this a hot sector?”), not as a second score.
-- **Compare:** only matters when peers are in the **same industry**.
 
 ### Problem: Too many docs
 

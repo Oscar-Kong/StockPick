@@ -634,6 +634,11 @@ export interface AnalyzeSymbolResponse {
   alerts: AnalyzeAlert[];
   ohlc: OHLCPoint[];
   fundamentals: Record<string, unknown>;
+  price_history_last_date?: string | null;
+  price_history_source?: string | null;
+  price_history_is_stale?: boolean;
+  price_history_refreshed_at?: string | null;
+  price_history_bar_count?: number;
 }
 
 export interface PositionSizingV2 {

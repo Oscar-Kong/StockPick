@@ -6,7 +6,7 @@ import type { AnalyzeSymbolResponse, Bucket, Signal, V2ScoreResponse } from "@/l
 import { bucketFitDisplayOrder } from "@/lib/buckets";
 import type { AnalysisDisplay } from "@/lib/v2Score";
 import clsx from "clsx";
-import { ScoreSourceBadge } from "./ScoreSourceBadge";
+import { StatTile } from "./ui/StatTile";
 import { ValuationBadges } from "./ValuationBadges";
 
 interface AnalysisSidebarProps {
@@ -15,6 +15,7 @@ interface AnalysisSidebarProps {
   bucketFitLoading?: boolean;
   display?: AnalysisDisplay;
   v2Score?: V2ScoreResponse | null;
+  compact?: boolean;
 }
 
 function SidebarSection({
@@ -35,12 +36,7 @@ function SidebarSection({
 }
 
 function StatCell({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="analysis-stat">
-      <dt className="text-xs font-medium uppercase tracking-wide text-zinc-400">{label}</dt>
-      <dd className="mt-1 text-base font-semibold tabular-nums text-zinc-50">{value}</dd>
-    </div>
-  );
+  return <StatTile label={label} value={value} />;
 }
 
 function SignalsList({ signals }: { signals: Signal[] }) {
@@ -131,6 +127,12 @@ export function AnalysisSidebar({
   const scores = bucketFit?.scores ?? {};
   const primarySignals = display?.signals ?? data.signals;
   const scoreSource = display?.scoreSource ?? (v2Score ? "scoring_engine_v2" : "legacy_screener");
+  const scoreSourceLabel =
+    scoreSource === "scoring_engine_v2"
+      ? t.analysis.scoreSourceV2Short
+      : t.analysis.scoreSourceLegacyShort;
+  const scoreSourceTone =
+    scoreSource === "scoring_engine_v2" ? "text-emerald-300" : "text-secondary";
 
   const fundEntries: { label: string; value: string }[] = [];
   const labelsUsed = new Set<string>();
@@ -153,12 +155,14 @@ export function AnalysisSidebar({
   return (
     <div className="space-y-2 p-3">
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-800/80 bg-zinc-950/40 px-2.5 py-2">
-        <ScoreSourceBadge source={scoreSource} />
-        <p className="text-xs leading-relaxed text-zinc-500">{t.analysis.sidebarInsightsHint}</p>
+        <span className={clsx("text-[0.6875rem] font-semibold uppercase tracking-wide", scoreSourceTone)}>
+          {scoreSourceLabel}
+        </span>
+        <p className="text-[0.6875rem] leading-relaxed text-zinc-500">{t.analysis.sidebarInsightsHint}</p>
       </div>
 
       <SidebarSection title={t.analysis.technicals}>
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="stat-tile-grid grid grid-cols-2 gap-1.5">
           <StatCell label={t.analysis.trend} value={tech.trend_score ?? "—"} />
           <StatCell label={t.analysis.rsVsSpy} value={tech.rs_vs_spy ?? "—"} />
           <StatCell label={t.analysis.breakout} value={tech.breakout_score ?? "—"} />
@@ -170,7 +174,7 @@ export function AnalysisSidebar({
       </SidebarSection>
 
       <SidebarSection title={t.analysis.qualityTiming}>
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="stat-tile-grid grid grid-cols-2 gap-1.5">
           <StatCell
             label={t.analysis.dataQuality}
             value={

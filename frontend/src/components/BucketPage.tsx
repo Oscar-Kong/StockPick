@@ -12,6 +12,7 @@ import {
   startScan,
 } from "@/lib/api";
 import { getBucketMeta } from "@/lib/buckets";
+import { formatDateTime } from "@/lib/datetime";
 import { fmt, useTranslation, useTRef } from "@/lib/i18n";
 import type {
   Bucket,
@@ -25,22 +26,32 @@ import { isStaleTimestamp } from "@/lib/quantHealth";
 import { SCAN_POLL_INTERVAL_MS, SCAN_POLL_MAX_TICKS } from "@/lib/scanPoll";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ScanControls } from "./ScanControls";
-import { ScanProgress } from "./ScanProgress";
 import { ScanScoringNote } from "./product/ScanScoringNote";
-import { ScanStatusPanel } from "./ScanStatusPanel";
-import { StockDetailDrawer } from "./StockDetailDrawer";
+import { countAdvancedFilters, ScanCommandBar } from "./scan/ScanCommandBar";
+import { ScanInlineStatus, ScanProgressBar } from "./scan/ScanInlineStatus";
+import { SavedScansMenu } from "./scan/SavedScansMenu";
 import { StockTable } from "./StockTable";
+import { StaleDataBadge } from "./badges/StaleDataBadge";
+import clsx from "clsx";
 
 interface BucketPageProps {
   bucket: Bucket;
   title?: string;
   description?: string;
-  /** When true, parent page renders the main heading and bucket tabs. */
   embedded?: boolean;
+  onMetaChange?: (meta: ScanPageMeta) => void;
 }
 
-export function BucketPage({ bucket, title, description, embedded }: BucketPageProps) {
+export interface ScanPageMeta {
+  bucket: Bucket;
+  bucketLabel: string;
+  description: string;
+  lastScanAt: string | null;
+  scanStale: boolean;
+  resultCount: number;
+}
+
+export function BucketPage({ bucket, title, description, embedded, onMetaChange }: BucketPageProps) {
   const { t } = useTranslation();
   const tRef = useTRef();
   const meta = getBucketMeta(t)[bucket];
@@ -55,7 +66,6 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState("idle");
   const [results, setResults] = useState<StockResult[]>([]);
-  const [selected, setSelected] = useState<StockResult | null>(null);
   const [lastScanAt, setLastScanAt] = useState<string | null>(null);
   const [strategyVersion, setStrategyVersion] = useState<string | null>(null);
   const [scoringEngineUsed, setScoringEngineUsed] = useState<boolean | null>(null);
@@ -69,8 +79,6 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
   const [heldPositions, setHeldPositions] = useState<Map<string, HeldPositionSummary>>(() => new Map());
   const latestScanLoadedRef = useRef(false);
   const presetLoadedRef = useRef(false);
-  // Owns the scan-status polling interval so we can guarantee teardown on
-  // unmount, on a second handleScan(), or once the job reaches a terminal state.
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const clearPoll = useCallback(() => {
@@ -80,9 +88,20 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
     }
   }, []);
 
-  // Always clear any outstanding scan-poll interval when the component unmounts
-  // so a navigated-away page does not keep firing requests at the backend.
   useEffect(() => clearPoll, [clearPoll]);
+
+  const scanStale = isStaleTimestamp(lastScanAt, 24 * 60 * 60 * 1000);
+
+  useEffect(() => {
+    onMetaChange?.({
+      bucket,
+      bucketLabel: meta.label,
+      description: displayDescription,
+      lastScanAt,
+      scanStale,
+      resultCount: results.length,
+    });
+  }, [bucket, meta.label, displayDescription, lastScanAt, scanStale, results.length, onMetaChange]);
 
   const loadSavedScans = useCallback(async () => {
     try {
@@ -106,7 +125,7 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
     } catch {
       setMessage(tRef.current.scan.noLatestScan);
     }
-  }, [bucket]);
+  }, [bucket, tRef]);
 
   useEffect(() => {
     if (latestScanLoadedRef.current) return;
@@ -133,7 +152,7 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
       setMessage(tRef.current.scan.presetLoaded);
       presetLoadedRef.current = true;
     }
-  }, [bucket, options, searchParams]);
+  }, [bucket, options, searchParams, tRef]);
 
   useEffect(() => {
     void loadSavedScans();
@@ -153,50 +172,50 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
       .catch(() => setHeldPositions(new Map()));
   }, []);
 
-  const pollScan = useCallback(async (jobId: string) => {
-    // If a previous scan poll is still running (e.g. user double-clicked Scan),
-    // tear it down before starting a new interval so we never run two at once.
-    clearPoll();
-    let ticks = 0;
-    const interval = setInterval(async () => {
-      ticks += 1;
-      try {
-        const data = await getScanStatus(jobId);
-        setProgress(data.progress);
-        setMessage(data.message);
-        setStatus(data.status);
-        if (data.status === "completed") {
-          setResults(data.results);
-          setLastScanAt(data.completed_at ?? new Date().toISOString());
-          setScoringEngineUsed(data.scoring_engine_used ?? null);
-          setParitySummary(data.parity_summary ?? null);
-          setScanning(false);
-          clearPoll();
-        } else if (data.status === "failed") {
-          setScanning(false);
-          clearPoll();
-        } else if (ticks >= SCAN_POLL_MAX_TICKS) {
+  const pollScan = useCallback(
+    async (jobId: string) => {
+      clearPoll();
+      let ticks = 0;
+      const interval = setInterval(async () => {
+        ticks += 1;
+        try {
+          const data = await getScanStatus(jobId);
+          setProgress(data.progress);
+          setMessage(data.message);
+          setStatus(data.status);
+          if (data.status === "completed") {
+            setResults(data.results);
+            setLastScanAt(data.completed_at ?? new Date().toISOString());
+            setScoringEngineUsed(data.scoring_engine_used ?? null);
+            setParitySummary(data.parity_summary ?? null);
+            setScanning(false);
+            clearPoll();
+          } else if (data.status === "failed") {
+            setScanning(false);
+            clearPoll();
+          } else if (ticks >= SCAN_POLL_MAX_TICKS) {
+            setScanning(false);
+            setStatus("failed");
+            setMessage(t.scan.scanTimeout);
+            clearPoll();
+          }
+        } catch {
           setScanning(false);
           setStatus("failed");
-          setMessage(t.scan.scanTimeout);
+          setMessage(t.scan.statusFetchFailed);
           clearPoll();
         }
-      } catch {
-        setScanning(false);
-        setStatus("failed");
-        setMessage(t.scan.statusFetchFailed);
-        clearPoll();
-      }
-    }, SCAN_POLL_INTERVAL_MS);
-    pollRef.current = interval;
-  }, [t, clearPoll]);
+      }, SCAN_POLL_INTERVAL_MS);
+      pollRef.current = interval;
+    },
+    [t, clearPoll]
+  );
 
   const handleScan = async () => {
     setScanning(true);
     setStatus("running");
     setProgress(0);
     setMessage(t.scan.startingScan);
-    setSelected(null);
     setScoringEngineUsed(null);
     setParitySummary(null);
     try {
@@ -214,8 +233,6 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
     setMessage(t.scan.filtersReset);
   };
 
-  const scanStale = isStaleTimestamp(lastScanAt, 24 * 60 * 60 * 1000);
-
   const handleWatchlist = async (stock: StockResult) => {
     const sym = stock.symbol.toUpperCase();
     if (watchlistAdded.has(sym)) return;
@@ -227,11 +244,7 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
       setSaveMsg(fmt(t.scan.watchlistAdded, { symbol: sym }));
       setSaveMsgSuccess(true);
     } catch (err) {
-      setSaveMsg(
-        err instanceof Error
-          ? err.message
-          : fmt(t.scan.watchlistAddFailed, { symbol: sym })
-      );
+      setSaveMsg(err instanceof Error ? err.message : fmt(t.scan.watchlistAddFailed, { symbol: sym }));
       setSaveMsgSuccess(false);
     } finally {
       setWatchlistPending(null);
@@ -276,21 +289,31 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
     await loadSavedScans();
   };
 
+  const advancedCount = countAdvancedFilters(options);
+
   return (
-    <div className="space-y-6">
+    <div className="scan-workspace flex min-h-0 flex-1 flex-col gap-2">
       {!embedded && (
-        <div className="surface-card p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-zinc-100">{displayTitle}</h1>
-              <p className="mt-1 text-sm text-zinc-500">{displayDescription}</p>
-              <p className="mt-1 text-xs text-zinc-500">{t.scan.workflow}</p>
-            </div>
-            <div className="chip px-3 py-2 text-xs text-zinc-300">
-              {fmt(t.scan.bucketChip, { bucket: meta.label })}
-            </div>
+        <header className="scan-page-header">
+          <div>
+            <h1 className="scan-page-header__title">{displayTitle}</h1>
+            <p className="scan-page-header__desc">{displayDescription}</p>
           </div>
-        </div>
+          <div className="scan-page-header__meta">
+            <span className="chip px-2 py-0.5 text-sm">{meta.label}</span>
+            {lastScanAt && (
+              <span className="text-sm text-secondary">
+                {t.scan.lastScanLabel} {formatDateTime(lastScanAt)}
+              </span>
+            )}
+            {lastScanAt &&
+              (scanStale ? <StaleDataBadge asOf={lastScanAt} /> : <span className="text-sm text-brand">{t.product.dataFresh}</span>)}
+            <span className="text-sm text-secondary">
+              {t.scan.resultCountLabel}{" "}
+              <span className="finance-value text-brand">{results.length || "—"}</span>
+            </span>
+          </div>
+        </header>
       )}
 
       {embedded && (
@@ -302,75 +325,61 @@ export function BucketPage({ bucket, title, description, embedded }: BucketPageP
         />
       )}
 
-      <ScanControls
-        bucketLabel={displayTitle}
+      <ScanCommandBar
         options={options}
         onChange={setOptions}
         onScan={handleScan}
         onReset={resetFilters}
         scanning={scanning}
+        advancedFilterCount={advancedCount}
+        savedScansSlot={
+          <SavedScansMenu scans={savedScans} onLoad={handleLoadSavedScan} onDelete={handleDeleteSavedScan} />
+        }
+        saveSlot={
+          <button
+            type="button"
+            onClick={() => void handleSaveCurrentScan()}
+            disabled={savingScan || results.length === 0}
+            className="scan-command-bar__btn"
+          >
+            {savingScan ? t.common.saving : t.scan.saveSnapshot}
+          </button>
+        }
+        overflowSlot={
+          <button type="button" onClick={() => void loadLatestScan()} className="scan-command-bar__btn">
+            {t.scan.loadLastScan}
+          </button>
+        }
       />
 
-      <ScanStatusPanel
-        bucket={bucket}
+      <ScanInlineStatus
+        status={status}
+        scanning={scanning}
+        progress={progress}
+        message={message}
         lastScanAt={lastScanAt}
         strategyVersion={strategyVersion}
         scoringEngineUsed={scoringEngineUsed}
         paritySummary={paritySummary}
         scanStale={scanStale}
         resultCount={results.length}
-        onLoadLatest={loadLatestScan}
-        onSaveSnapshot={handleSaveCurrentScan}
-        savingScan={savingScan}
-        canSave={results.length > 0}
       />
+
+      {(scanning || status === "running") && <ScanProgressBar progress={progress} message={message} />}
+
       {saveMsg && (
-        <p
-          className={
-            saveMsgSuccess ? "text-xs text-[#7dff8e]" : "text-xs text-amber-400"
-          }
-        >
+        <p className={clsx("text-sm", saveMsgSuccess ? "text-brand" : "text-amber-300")} role="status">
           {saveMsg}
         </p>
       )}
 
-      {savedScans.length > 0 && (
-        <div className="surface-card space-y-2 px-3 py-2">
-          <p className="text-xs font-medium text-zinc-400">{t.scan.savedScans}</p>
-          <div className="flex flex-wrap gap-2">
-            {savedScans.slice(0, 8).map((s) => (
-              <div key={s.id} className="flex items-center gap-1 rounded-lg border border-zinc-800 px-2 py-1 text-xs">
-                <button type="button" onClick={() => handleLoadSavedScan(s)} className="underline">
-                  {s.name} ({s.result_count})
-                </button>
-                <button type="button" onClick={() => handleDeleteSavedScan(s.id)} className="text-zinc-500">
-                  ✕
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {(scanning || status === "running") && (
-        <ScanProgress progress={progress} message={message} status={status} />
-      )}
-
       <StockTable
         results={results}
-        onSelect={setSelected}
         onAddWatchlist={handleWatchlist}
         watchlistAdded={watchlistAdded}
         watchlistPending={watchlistPending}
         heldPositions={heldPositions}
         scoringEngineUsed={scoringEngineUsed}
-      />
-
-      <StockDetailDrawer
-        stock={selected}
-        bucket={bucket}
-        scoringEngineUsed={scoringEngineUsed}
-        onClose={() => setSelected(null)}
       />
     </div>
   );

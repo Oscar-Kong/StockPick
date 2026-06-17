@@ -6,7 +6,17 @@ from datetime import datetime
 from typing import Any, Literal
 
 BrokerageSource = Literal["manual", "csv", "snaptrade", "demo"]
-RowType = Literal["buy", "sell", "cash", "income", "excluded"]
+RowType = Literal["buy", "sell", "event", "excluded"]
+# Legacy DB rows may still use side cash | income — normalized to "event" on read.
+
+
+def normalize_row_type(row_type: str | None) -> RowType:
+    rt = (row_type or "excluded").lower()
+    if rt in ("cash", "income"):
+        return "event"
+    if rt in ("buy", "sell", "event", "excluded"):
+        return rt  # type: ignore[return-value]
+    return "excluded"
 
 
 @dataclass
@@ -67,12 +77,24 @@ class ClosedPosition:
 
 
 @dataclass
+class MiscEventRow:
+    """Non-position cash activity (deposits, dividends, lending, etc.)."""
+
+    activity_date: str
+    trans_code: str
+    description: str
+    amount: float
+    instrument: str = ""
+
+
+@dataclass
 class PortfolioRebuildResult:
     """Weighted-average-cost reconstruction (documented method)."""
 
     open_holdings: list[ReconstructedHolding]
     closed_positions: list[ClosedPosition]
     cash_delta: float
+    event_ledger: list[MiscEventRow]
     excluded_rows: list[dict[str, Any]]
     unknown_trans_codes: list[str]
     warnings: list[str]

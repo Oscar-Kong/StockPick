@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function TradesRedirect() {
-  redirect("/workspace?tab=journal");
+  redirect("/?journal=1#home-journal");
 }

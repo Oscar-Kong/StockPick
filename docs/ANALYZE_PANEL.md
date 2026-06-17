@@ -130,7 +130,7 @@ Current Analyze tabs (grouped **Core / Research / Workspace** in the toolbar; ea
 
 See [ANALYZE_PANEL_STATS_GUIDE.md](ANALYZE_PANEL_STATS_GUIDE.md) for field-by-field definitions.
 
-**Compare** (Workspace tab) ranks 2–4 tickers quickly; **Analyze** is full underwriting for one name.
+**Analyze** is full underwriting for one name at a time — use the watchlist rail to step through symbols.
 
 ---
 

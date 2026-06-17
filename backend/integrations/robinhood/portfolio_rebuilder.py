@@ -1,10 +1,8 @@
 """Rebuild open holdings, closed positions, and cash from parsed CSV rows.
 
 Cost basis method: **weighted average cost**.
-- Buys increase share count and total cost basis.
-- Sells reduce shares proportionally; cost basis of sold shares uses current average.
-- Remaining shares keep the same average cost per share (not reset).
-- Realized P/L on sells = proceeds - (avg_cost * shares_sold).
+Position rows (buy/sell) update holdings. Event rows (deposits, dividends, etc.)
+live in a separate event ledger and only affect cash.
 """
 from __future__ import annotations
 
@@ -12,29 +10,28 @@ from datetime import datetime
 
 from integrations.robinhood.models import (
     ClosedPosition,
+    MiscEventRow,
     ParsedCsvRow,
     PortfolioRebuildResult,
     ReconstructedHolding,
+    normalize_row_type,
 )
 
 MIN_OPEN_SHARES = 1e-4
 
 
 def _cash_impact(row: ParsedCsvRow) -> float:
-    """Signed cash flow: deposits/income positive, purchases negative."""
-    if row.row_type == "cash":
-        # RTP deposits: amount is positive in Robinhood exports
+    """Signed cash flow from a ledger row."""
+    rt = normalize_row_type(row.row_type)
+    if rt == "event":
         return float(row.amount)
-    if row.row_type == "income":
-        return abs(float(row.amount))
-    if row.row_type == "buy":
-        # Buy amount often negative in CSV; ensure outflow
+    if rt == "buy":
         if row.amount != 0:
-            return float(row.amount)  # already signed from parser
+            return float(row.amount)
         qty = float(row.quantity or 0)
         price = float(row.price or 0)
         return -(qty * price)
-    if row.row_type == "sell":
+    if rt == "sell":
         if row.amount != 0:
             return float(row.amount)
         qty = float(row.quantity or 0)
@@ -43,11 +40,22 @@ def _cash_impact(row: ParsedCsvRow) -> float:
     return 0.0
 
 
+def _event_row(row: ParsedCsvRow) -> MiscEventRow:
+    return MiscEventRow(
+        activity_date=row.activity_date,
+        trans_code=row.trans_code,
+        description=(row.description or "")[:200],
+        amount=round(float(row.amount), 2),
+        instrument=row.instrument or "",
+    )
+
+
 def rebuild_portfolio(rows: list[ParsedCsvRow]) -> PortfolioRebuildResult:
     warnings: list[str] = []
     excluded: list[dict] = []
     unknown: list[str] = []
     cash_delta = 0.0
+    event_ledger: list[MiscEventRow] = []
 
     lots: dict[str, dict] = {}
     closed: dict[str, ClosedPosition] = {}
@@ -62,17 +70,20 @@ def rebuild_portfolio(rows: list[ParsedCsvRow]) -> PortfolioRebuildResult:
     )
 
     for row in sorted_rows:
-        if row.row_type == "excluded":
+        row_type = normalize_row_type(row.row_type)
+
+        if row_type == "excluded":
             excluded.append({"trans_code": row.trans_code, "description": row.description[:120]})
             if row.trans_code:
                 unknown.append(row.trans_code)
             continue
 
-        if row.row_type in ("cash", "income"):
+        if row_type == "event":
             cash_delta += _cash_impact(row)
+            event_ledger.append(_event_row(row))
             continue
 
-        if row.row_type not in ("buy", "sell"):
+        if row_type not in ("buy", "sell"):
             continue
 
         sym = row.instrument.upper()
@@ -98,7 +109,7 @@ def rebuild_portfolio(rows: list[ParsedCsvRow]) -> PortfolioRebuildResult:
         lot = lots[sym]
         lot["last"] = row.activity_date or lot["last"]
 
-        if row.row_type == "buy":
+        if row_type == "buy":
             cost_add = qty * price
             lot["shares"] += qty
             lot["cost"] += cost_add
@@ -153,6 +164,7 @@ def rebuild_portfolio(rows: list[ParsedCsvRow]) -> PortfolioRebuildResult:
         open_holdings=open_holdings,
         closed_positions=sorted(closed.values(), key=lambda c: c.symbol),
         cash_delta=round(cash_delta, 2),
+        event_ledger=event_ledger,
         excluded_rows=excluded,
         unknown_trans_codes=sorted(set(unknown)),
         warnings=warnings,
@@ -164,7 +176,7 @@ def validation_report(rows: list[ParsedCsvRow], rebuild: PortfolioRebuildResult)
     by_sym: dict[str, dict] = {}
 
     for row in rows:
-        if row.row_type not in ("buy", "sell"):
+        if normalize_row_type(row.row_type) not in ("buy", "sell"):
             continue
         sym = row.instrument.upper()
         if not sym:
@@ -180,7 +192,7 @@ def validation_report(rows: list[ParsedCsvRow], rebuild: PortfolioRebuildResult)
                 "cash_impact": 0.0,
             }
         qty = abs(float(row.quantity or 0))
-        if row.row_type == "buy":
+        if normalize_row_type(row.row_type) == "buy":
             by_sym[sym]["total_bought_shares"] += qty
         else:
             by_sym[sym]["total_sold_shares"] += qty

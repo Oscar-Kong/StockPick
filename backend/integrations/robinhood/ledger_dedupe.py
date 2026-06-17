@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from integrations.robinhood.csv_importer import _effective_fill_price
-from integrations.robinhood.models import ParsedCsvRow
+from integrations.robinhood.models import ParsedCsvRow, normalize_row_type
 
 
 def _row_completeness(row: ParsedCsvRow) -> int:
@@ -32,15 +32,16 @@ def apply_effective_fill_price(row: ParsedCsvRow) -> ParsedCsvRow:
 
 
 def semantic_ledger_key(row: ParsedCsvRow) -> tuple:
-    if row.row_type in ("cash", "income"):
+    rt = normalize_row_type(row.row_type)
+    if rt == "event":
         return (
-            row.row_type,
+            "event",
             (row.trans_code or "").upper(),
             round(float(row.amount or 0), 2),
         )
     qty = round(float(row.quantity or 0), 6)
     amount = round(float(row.amount or 0), 2)
-    return (row.row_type, (row.instrument or "").upper(), qty, amount)
+    return (rt, (row.instrument or "").upper(), qty, amount)
 
 
 def is_incomplete_ghost_row(row: ParsedCsvRow) -> bool:

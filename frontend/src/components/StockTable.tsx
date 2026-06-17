@@ -2,24 +2,71 @@
 "use client";
 
 import { RecommendationBadge } from "@/components/badges/RecommendationBadge";
-import { RiskBadge } from "@/components/badges/RiskBadge";
 import { ScoreBadge } from "@/components/badges/ScoreBadge";
 import { ScoreSourceBadge } from "@/components/ScoreSourceBadge";
 import { DenseTable, DenseTableToolbar } from "@/components/ui/DenseTable";
 import { fmt, useTranslation } from "@/lib/i18n";
 import type { HeldPositionSummary, StockResult } from "@/lib/types";
 import clsx from "clsx";
-import { ScanPickSummaryCell } from "./ScanPickSummaryCell";
+import { useRouter } from "next/navigation";
+import { useMemo, useState, type ReactNode } from "react";
 
 interface StockTableProps {
   results: StockResult[];
-  onSelect: (stock: StockResult) => void;
   onAddWatchlist: (stock: StockResult) => void;
   watchlistAdded?: Set<string>;
   watchlistPending?: string | null;
   heldPositions?: ReadonlyMap<string, HeldPositionSummary>;
   scoringEngineUsed?: boolean | null;
 }
+
+type ColumnId =
+  | "rank"
+  | "symbol"
+  | "recommendation"
+  | "score"
+  | "price"
+  | "change"
+  | "factor"
+  | "warning"
+  | "thesis"
+  | "watchlist"
+  | "source";
+
+const DEFAULT_COLUMNS: ColumnId[] = [
+  "rank",
+  "symbol",
+  "recommendation",
+  "score",
+  "price",
+  "change",
+  "factor",
+  "warning",
+  "thesis",
+  "watchlist",
+];
+
+const OPTIONAL_COLUMNS: ColumnId[] = ["source"];
+
+/** Shared width hints — thead/tbody/colgroup must stay in lockstep. */
+const COLUMN_WIDTH: Record<ColumnId, string> = {
+  rank: "2.75rem",
+  symbol: "6.5rem",
+  recommendation: "3.25rem",
+  score: "4rem",
+  price: "4.75rem",
+  change: "4.25rem",
+  factor: "7rem",
+  warning: "7rem",
+  thesis: "auto",
+  watchlist: "3.25rem",
+  source: "5.5rem",
+};
+
+/** Compact columns — centered header + cell (often "—"). */
+const CENTER_COLUMNS = new Set<ColumnId>(["recommendation", "factor", "warning", "source"]);
+
+const ALL_COLUMNS: ColumnId[] = [...DEFAULT_COLUMNS, ...OPTIONAL_COLUMNS];
 
 function changeCell(value: unknown): string {
   if (value == null || value === "") return "—";
@@ -37,18 +84,22 @@ function changeClass(value: unknown): string {
   return "text-zinc-400";
 }
 
-function topFactors(stock: StockResult, n: number) {
+function topFactor(stock: StockResult) {
   return [...stock.signals]
     .filter((s) => s.contribution > 0)
-    .sort((a, b) => b.contribution - a.contribution)
-    .slice(0, n);
+    .sort((a, b) => b.contribution - a.contribution)[0];
 }
 
-function topWarnings(stock: StockResult, n: number) {
+function topWarning(stock: StockResult) {
   return [...stock.signals]
     .filter((s) => s.contribution < 0)
-    .sort((a, b) => a.contribution - b.contribution)
-    .slice(0, n);
+    .sort((a, b) => a.contribution - b.contribution)[0];
+}
+
+function thesisText(stock: StockResult): string {
+  const s = stock.summary?.trim();
+  if (s) return s.length > 120 ? `${s.slice(0, 117)}…` : s;
+  return "—";
 }
 
 function HeldBadge({ position }: { position: HeldPositionSummary }) {
@@ -60,7 +111,7 @@ function HeldBadge({ position }: { position: HeldPositionSummary }) {
 
   return (
     <span
-      className="mt-1 inline-flex items-center rounded-md border border-sky-500/40 bg-sky-500/10 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-sky-200"
+      className="ml-1.5 inline-flex items-center rounded border border-sky-500/40 bg-sky-500/10 px-1 py-0.5 text-xs font-semibold uppercase text-sky-200"
       title={fmt(t.scan.heldTooltip, { shares: sharesLabel })}
     >
       {fmt(t.scan.heldBadge, { shares: sharesLabel })}
@@ -70,7 +121,6 @@ function HeldBadge({ position }: { position: HeldPositionSummary }) {
 
 export function StockTable({
   results,
-  onSelect,
   onAddWatchlist,
   watchlistAdded,
   watchlistPending,
@@ -78,6 +128,10 @@ export function StockTable({
   scoringEngineUsed,
 }: StockTableProps) {
   const { t } = useTranslation();
+  const router = useRouter();
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  const [visible, setVisible] = useState<Set<ColumnId>>(() => new Set(DEFAULT_COLUMNS));
+
   const scoreSource =
     scoringEngineUsed === true
       ? "scoring_engine_v2"
@@ -89,16 +143,58 @@ export function StockTable({
     ? results.filter((r) => heldPositions.has(r.symbol.toUpperCase())).length
     : 0;
 
+  const columnLabels: Record<ColumnId, string> = useMemo(
+    () => ({
+      rank: "#",
+      symbol: t.scan.symbol,
+      recommendation: t.scan.recommendationCol,
+      score: t.scan.score,
+      price: t.scan.price,
+      change: t.scan.dayPct,
+      factor: t.scan.mainFactorCol,
+      warning: t.scan.mainWarningCol,
+      thesis: t.scan.summary,
+      watchlist: t.scan.watchlist,
+      source: t.scanDrawer.source,
+    }),
+    [t]
+  );
+
+  const show = (id: ColumnId) => visible.has(id);
+
+  const visibleColumns = ALL_COLUMNS.filter((id) => show(id));
+
+  const thClass = (id: ColumnId) =>
+    clsx(
+      id === "rank" || id === "score" || id === "price" || id === "change" ? "col-num" : "",
+      CENTER_COLUMNS.has(id) && "scan-col-center",
+      id === "thesis" && "scan-col-thesis",
+      id === "watchlist" && "scan-col-watchlist"
+    );
+
+  const tdClass = (id: ColumnId) => thClass(id);
+
+  const emptyCell = <span className="scan-empty-cell">—</span>;
+
+  const toggleColumn = (id: ColumnId) => {
+    setVisible((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   if (results.length === 0) {
     return (
-      <div className="surface-card border-dashed p-8 text-center text-sm text-secondary">
+      <div className="scan-results-empty surface-card border-dashed p-6 text-center text-sm text-secondary">
         {t.scan.noResults}
       </div>
     );
   }
 
   return (
-    <div className="surface-card overflow-hidden">
+    <div className="scan-results-table surface-card flex min-h-0 flex-1 flex-col overflow-hidden">
       <DenseTableToolbar>
         <span>
           {results.length} {t.scan.candidatesRanked}
@@ -108,78 +204,104 @@ export function StockTable({
             </span>
           ) : null}
         </span>
-        <span>{t.scan.tableHint}</span>
+        <div className="relative">
+          <button
+            type="button"
+            className="scan-command-bar__btn"
+            onClick={() => setColumnsOpen((o) => !o)}
+            aria-expanded={columnsOpen}
+          >
+            {t.scan.columnsMenu}
+          </button>
+          {columnsOpen && (
+            <div className="scan-columns-menu">
+              {[...DEFAULT_COLUMNS, ...OPTIONAL_COLUMNS].map((id) => (
+                <label key={id} className="scan-columns-menu__item">
+                  <input
+                    type="checkbox"
+                    checked={visible.has(id)}
+                    onChange={() => toggleColumn(id)}
+                    disabled={id === "rank" || id === "symbol"}
+                  />
+                  {columnLabels[id]}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
       </DenseTableToolbar>
-      <DenseTable caption={t.scan.candidatesRanked}>
-        <thead>
-          <tr>
-            <th className="col-num">#</th>
-            <th>{t.scan.symbol}</th>
-            <th className="col-num">{t.scan.price}</th>
-            <th className="col-num">{t.scan.score}</th>
-            <th className="hidden lg:table-cell">{t.scanDrawer.source}</th>
-            <th>{t.scan.risk}</th>
-            <th className="hidden xl:table-cell">{t.scanDrawer.topFactors}</th>
-            <th className="col-num" title={t.scan.dayPct}>
-              {t.scan.dayPct}
-            </th>
-            <th className="w-[120px]">{t.scan.summary}</th>
-            <th>{t.scan.watchlist}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {results.map((stock, idx) => {
-            const added = watchlistAdded?.has(stock.symbol);
-            const pending = watchlistPending === stock.symbol;
-            const held = heldPositions?.get(stock.symbol.toUpperCase());
-            const m = stock.metrics ?? {};
-            const rec = m.recommendation as string | undefined;
-            const factors = topFactors(stock, 2);
-            const warnings = topWarnings(stock, 1);
+      <div className="scan-results-table__scroll min-h-0 flex-1 overflow-auto">
+        <DenseTable caption={t.scan.candidatesRanked} className="scan-results-table__grid">
+          <colgroup>
+            {visibleColumns.map((id) => (
+              <col
+                key={id}
+                className={CENTER_COLUMNS.has(id) ? "scan-col-center" : undefined}
+                style={id === "thesis" ? undefined : { width: COLUMN_WIDTH[id] }}
+              />
+            ))}
+          </colgroup>
+          <thead>
+            <tr>
+              {visibleColumns.map((id) => (
+                <th key={id} className={thClass(id)}>
+                  {columnLabels[id]}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {results.map((stock, idx) => {
+              const added = watchlistAdded?.has(stock.symbol);
+              const pending = watchlistPending === stock.symbol;
+              const held = heldPositions?.get(stock.symbol.toUpperCase());
+              const m = stock.metrics ?? {};
+              const rec = m.recommendation as string | undefined;
+              const factor = topFactor(stock);
+              const warning = topWarning(stock);
+              const thesis = thesisText(stock);
 
-            return (
-              <tr
-                key={stock.symbol}
-                className={clsx("cursor-pointer", held && "is-selected")}
-                onClick={() => onSelect(stock)}
-              >
-                <td className="col-num text-secondary">{idx + 1}</td>
-                <td>
-                  <span className="font-semibold tracking-wide text-zinc-100">{stock.symbol}</span>
-                  {held && <HeldBadge position={held} />}
-                  {rec && (
-                    <div className="mt-1">
-                      <RecommendationBadge recommendation={rec} />
-                    </div>
-                  )}
-                </td>
-                <td className="col-num finance-value">${stock.price.toFixed(2)}</td>
-                <td className="col-num">
-                  <ScoreBadge score={stock.score} />
-                </td>
-                <td className="hidden lg:table-cell">
-                  {scoreSource && <ScoreSourceBadge source={scoreSource} />}
-                </td>
-                <td>
-                  <RiskBadge level={stock.risk_level} />
-                </td>
-                <td className="hidden text-sm text-secondary xl:table-cell">
-                  {factors.map((f) => (
-                    <div key={f.name}>{f.name}</div>
-                  ))}
-                  {warnings.map((f) => (
-                    <div key={f.name} className="text-amber-300/90">
-                      ⚠ {f.name}
-                    </div>
-                  ))}
-                </td>
-                <td className={clsx("col-num finance-value", changeClass(m.change_pct_1d))}>
-                  {changeCell(m.change_pct_1d)}
-                </td>
-                <td className="align-top">
-                  <ScanPickSummaryCell stock={stock} />
-                </td>
-                <td>
+              const cells: Record<ColumnId, ReactNode> = {
+                rank: <span className="text-secondary">{idx + 1}</span>,
+                symbol: (
+                  <>
+                    <span className="font-semibold tracking-wide text-zinc-100">{stock.symbol}</span>
+                    {held && <HeldBadge position={held} />}
+                  </>
+                ),
+                recommendation: rec ? (
+                  <RecommendationBadge recommendation={rec} />
+                ) : (
+                  emptyCell
+                ),
+                score: <ScoreBadge score={stock.score} />,
+                price: <span className="finance-value">${stock.price.toFixed(2)}</span>,
+                change: (
+                  <span className={clsx("finance-value", changeClass(m.change_pct_1d))}>
+                    {changeCell(m.change_pct_1d)}
+                  </span>
+                ),
+                factor: factor?.name ? (
+                  <span className="block truncate text-sm text-secondary" title={factor.name}>
+                    {factor.name}
+                  </span>
+                ) : (
+                  emptyCell
+                ),
+                warning: warning?.name ? (
+                  <span className="block truncate text-sm text-amber-300/90" title={warning.name}>
+                    ⚠ {warning.name}
+                  </span>
+                ) : (
+                  emptyCell
+                ),
+                thesis: (
+                  <span className="block text-sm leading-snug text-secondary line-clamp-2" title={stock.summary}>
+                    {thesis === "—" ? emptyCell : thesis}
+                  </span>
+                ),
+                source: scoreSource ? <ScoreSourceBadge source={scoreSource} /> : emptyCell,
+                watchlist: (
                   <button
                     type="button"
                     onClick={(e) => {
@@ -188,23 +310,35 @@ export function StockTable({
                     }}
                     disabled={added || pending}
                     aria-label={`${t.scan.addWatchlist} ${stock.symbol}`}
+                    title={added ? t.scan.added : t.scan.addWatchlist}
                     className={clsx(
-                      "min-h-[2.5rem] min-w-[5.5rem] rounded-lg px-2.5 py-1.5 text-sm font-medium transition",
-                      added
-                        ? "border border-[#00c805]/50 bg-[#00c805]/20 text-[#7dff8e]"
-                        : pending
-                          ? "border border-zinc-700 bg-zinc-900 text-zinc-400"
-                          : "btn-ghost border border-zinc-700 hover:border-[#00c805]/50 hover:bg-[#00c805]/10 hover:text-[#7dff8e]"
+                      "scan-watchlist-btn",
+                      added && "scan-watchlist-btn--added",
+                      pending && "scan-watchlist-btn--pending"
                     )}
                   >
-                    {pending ? t.scan.adding : added ? t.scan.added : t.scan.addWatchlist}
+                    {pending ? "…" : added ? "✓" : "+"}
                   </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </DenseTable>
+                ),
+              };
+
+              return (
+                <tr
+                  key={stock.symbol}
+                  className={clsx("scan-results-row scan-results-row--link", held && "is-held")}
+                  onClick={() => router.push(`/workspace?symbol=${encodeURIComponent(stock.symbol)}`)}
+                >
+                  {visibleColumns.map((id) => (
+                    <td key={id} className={tdClass(id)}>
+                      {cells[id]}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </DenseTable>
+      </div>
     </div>
   );
 }

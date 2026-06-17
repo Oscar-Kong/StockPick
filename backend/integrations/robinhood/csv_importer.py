@@ -94,11 +94,8 @@ def _classify_trans_code(code: str) -> RowType:
         return "buy"
     if c in _SELL_CODES or c == "SELL":
         return "sell"
-    if c in _CASH_CODES or "RTP" in c or "ACH" in c:
-        return "cash"
-    if c in _INCOME_CODES:
-        return "income"
-    # Partial match
+    if c in _CASH_CODES or c in _INCOME_CODES or "RTP" in c or "ACH" in c:
+        return "event"
     if "BUY" in c:
         return "buy"
     if "SELL" in c:
@@ -194,9 +191,13 @@ def parse_robinhood_csv(content: str | bytes) -> tuple[list[ParsedCsvRow], list[
         amount = _parse_amount(raw_row.get(c_amount) if c_amount else None)
 
         if row_type == "excluded" and trans_upper:
-            unknown_codes.add(trans_upper)
-            logger.info("Unknown Trans Code at line %s: %s", line_no, trans_upper)
-            continue
+            if amount != 0:
+                row_type = "event"
+                logger.info("Misc Trans Code at line %s: %s (stored as event)", line_no, trans_upper)
+            else:
+                unknown_codes.add(trans_upper)
+                logger.info("Unknown Trans Code at line %s: %s", line_no, trans_upper)
+                continue
 
         symbol = _extract_symbol(instrument, description)
 

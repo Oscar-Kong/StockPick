@@ -122,6 +122,7 @@ def build_symbol_analysis(
     bucket: Bucket | None = None,
     *,
     include_bucket_fit: bool = False,
+    force_refresh: bool = False,
 ) -> dict[str, Any]:
     sym = symbol.upper()
     bucket = bucket or Bucket.penny
@@ -137,8 +138,8 @@ def build_symbol_analysis(
     else:
         rec = DataReconciler().reconcile(sym)
 
-    hist = ps.get_history(sym, period="1y")
-    spy = ps.get_spy_history(period="1y")
+    hist, price_meta = ps.get_history_with_meta(sym, period="1y", force_refresh=force_refresh)
+    spy, _spy_meta = ps.get_history_with_meta("SPY", period="1y", force_refresh=force_refresh)
     technicals = _quick_technicals_from_hist(hist, spy)
     if include_bucket_fit:
         bucket_fit = score_all_buckets(sym, ps)
@@ -159,10 +160,9 @@ def build_symbol_analysis(
         openbb_governance_score=metrics.get("openbb_governance_score"),
     )
 
-    hist = ps.get_history(sym, period="1y")
     ohlc = []
     if not hist.empty:
-        for _, r in hist.tail(252).iterrows():
+        for _, r in hist.tail(400).iterrows():
             ohlc.append(
                 {
                     "date": r["date"].strftime("%Y-%m-%d"),
@@ -194,6 +194,7 @@ def build_symbol_analysis(
         "alerts": alerts,
         "ohlc": ohlc,
         "fundamentals": {**result.metrics, **rec.canonical},
+        **price_meta,
     }
     Cache().set(_analysis_cache_key(sym, bucket), json_safe(payload), ANALYZE_RESULT_TTL)
 

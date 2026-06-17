@@ -396,7 +396,6 @@ Hard filters may exclude names from a sleeve’s normal universe even if a score
 | Route | Relationship |
 |-------|--------------|
 | **Screen** | Where candidates get initial scores before Analyze |
-| **Compare** | Side-by-side peer table — faster, less depth than Analyze |
 | **Quant Lab** | Validates whether factors and weights are trustworthy |
 | **Portfolio** | Basket-level risk and optimization |
 

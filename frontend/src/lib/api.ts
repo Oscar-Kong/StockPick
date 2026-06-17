@@ -74,6 +74,7 @@ import type {
   SavedScanCreateRequest,
   SavedScanItem,
   TradeCreateRequest,
+  TradeManualResponse,
   TraderPresetResponse,
   TraderProfileListResponse,
   TraderQuickCompareResponse,
@@ -83,7 +84,6 @@ import type {
   WatchlistImportResponse,
   WatchlistItem,
   WatchlistRefreshResponse,
-  AnalyzeCompareResponse,
   AnalyzeSymbolResponse,
   AnalyzeWatchlistResponse,
 } from "./types";
@@ -315,7 +315,7 @@ export async function setBuyingPower(
     const text = await res.text();
     throw new Error(text || `Update buying power failed: ${res.status}`);
   }
-  return res.json() as Promise<{ cash: number }>;
+  return res.json() as Promise<{ cash: number; reserved_cash: number }>;
 }
 
 export function runV2PortfolioBacktest(
@@ -465,10 +465,6 @@ export function getAnalyzeBucketFit(
     signal: options?.signal,
     timeoutMs: ANALYZE_REQUEST_TIMEOUT_MS,
   });
-}
-
-export function getAnalyzeCompare(symbols: string[]): Promise<AnalyzeCompareResponse> {
-  return request(`/analyze/compare?symbols=${symbols.join(",")}`);
 }
 
 export function getDataQuality(symbol: string) {

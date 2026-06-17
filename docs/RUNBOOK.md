@@ -66,10 +66,9 @@ Open: `http://127.0.0.1:18730`
 | Scan      | `/scan` → run one bucket                        |
 | Workspace | Add ticker to watchlist → open Research         |
 | Analyze   | Quant tab shows signal bars; Refresh works      |
-| Compare   | Workspace → Compare tab, 2+ symbols             |
 | Portfolio | `/portfolio` — optimize weights on 2+ symbols   |
 | Library   | Save a scan or report, visible under `/library` |
-| Journal   | Workspace → Journal tab                         |
+| Journal   | Home → Journal panel (`/?journal=1#home-journal`) |
 
 Investor guide for Analyze: [ANALYZE_PANEL.md](ANALYZE_PANEL.md)
 
@@ -116,6 +115,8 @@ Important for local dev:
 Primary data roles default to **finnhub** for quotes and **FMP** for fundamentals (`PRIMARY_PRICE_SOURCE`, `PRIMARY_FUNDAMENTALS_SOURCE`). Set API keys for Finnhub, FMP, AV as needed.
 
 **FMP 403 / blocked history:** if FMP returns HTTP 403 (common on free-tier keys), the backend trips a process-wide circuit breaker and falls back to **yfinance** for OHLC during scans and analyze. Install `yfinance` (`pip install yfinance`) — it is listed in `backend/requirements.txt`. Logs will show `FMP access denied (403) — disabling FMP for this process`. Restart the backend to retry FMP after fixing the key or tier.
+
+**Analyze OHLC freshness:** `PriceService.get_history()` now checks the **last bar date**, not only row count. Stale SQLite history triggers a provider fetch, merge, and persist. `GET /analyze/{symbol}?refresh=true` bypasses the analysis cache **and** forces a price-history refresh. The response includes `price_history_last_date`, `price_history_is_stale`, `price_history_refreshed_at`, and `price_history_bar_count`.
 
 **Scan default in UI:** bucket scans now default to `mode=fast` (15 deep-scored candidates). Use deep mode from the API (`POST /scan/{bucket}` with `"mode":"deep"`) when you want the full Stage B cap (`SCAN_STAGE_B_TOP_N`, default 50).
 

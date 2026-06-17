@@ -159,16 +159,6 @@ def build_daily_dashboard(*, include_freshness: bool = False) -> DailyDashboardR
         ledger_rows = load_all_ledger_rows()
         ledger_rows_count = len(ledger_rows)
         ledger_cash_estimate = round(estimate_ledger_cash(), 2)
-        if csv_rows_loaded is not None and csv_rows_loaded < 50:
-            warnings = list(
-                dict.fromkeys(
-                    warnings
-                    + [
-                        f"Incomplete CSV history loaded ({csv_rows_loaded} rows). "
-                        "A full Robinhood export usually has hundreds of rows — re-import with Replace checked."
-                    ]
-                )
-            )
 
     return DailyDashboardResponse(
         portfolio_value=round(total_value, 2),
