@@ -13,6 +13,9 @@ interface AsyncSectionProps {
   onRetry?: () => void;
   children: React.ReactNode;
   className?: string;
+  /** When true, keep showing children during loading (e.g. refresh) with a subtle banner. */
+  preserveOnRefresh?: boolean;
+  refreshing?: boolean;
 }
 
 export function AsyncSection({
@@ -23,8 +26,18 @@ export function AsyncSection({
   onRetry,
   children,
   className,
+  preserveOnRefresh = false,
+  refreshing = false,
 }: AsyncSectionProps) {
   const { t } = useTranslation();
+  if (state === "loading" && preserveOnRefresh && refreshing) {
+    return (
+      <div className={className}>
+        <p className="mb-2 text-xs text-zinc-500">{loadingText}</p>
+        {children}
+      </div>
+    );
+  }
   if (state === "loading") {
     return <p className={clsx("text-xs text-zinc-500", className)}>{loadingText}</p>;
   }

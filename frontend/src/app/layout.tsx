@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ApiStatus } from "@/components/ApiStatus";
 import { Nav } from "@/components/Nav";
+import { PublicDemoBanner } from "@/components/PublicDemoBanner";
 import { Providers } from "@/components/Providers";
 import "./globals.css";
 
@@ -39,6 +40,7 @@ export default function RootLayout({
       >
         <Providers>
           <Nav />
+          <PublicDemoBanner />
           <main className="app-main mx-auto flex w-full min-h-0 max-w-[1920px] flex-1 flex-col">
             {children}
           </main>

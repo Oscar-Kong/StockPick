@@ -42,7 +42,7 @@ export function HomeScanSummary() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tRef]);
 
   useEffect(() => {
     void load();

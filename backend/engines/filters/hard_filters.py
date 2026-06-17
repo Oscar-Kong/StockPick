@@ -38,7 +38,7 @@ def _penny_delisting(ctx: CandidateContext, _options: ScanOptions) -> tuple[bool
     if df is None or df.empty or len(df) < 30:
         return True, ""
     tail = df["close"].tail(30)
-    if (tail < PENNY_PRICE_MIN).all():
+    if (tail < 1.0).all():
         return False, "Price below $1 (delisting risk) for 30 sessions"
     return True, ""
 

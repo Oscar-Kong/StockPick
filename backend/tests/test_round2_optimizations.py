@@ -97,10 +97,13 @@ def test_no_sizing_recursion():
 
 
 def test_trading_calendar_session_forward():
+    import pytest
     from datetime import date
 
-    from utils.trading_calendar import forward_return_sessions, session_index_for_date
+    from utils.trading_calendar import calendar_available, session_index_for_date
 
+    if not calendar_available():
+        pytest.skip("exchange_calendars not installed")
     idx = session_index_for_date(date(2024, 1, 2))
     assert idx is not None and idx >= 0
 

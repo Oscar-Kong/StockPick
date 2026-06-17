@@ -16,12 +16,14 @@ from models.schemas import (
 )
 from services.scan_manager import scan_manager
 from services.scan_pick_summary import generate_scan_pick_summary
+from utils.demo_guard import enforce_scan_options
 
 router = APIRouter(prefix="/scan", tags=["scan"])
 
 
 @router.post("/penny", response_model=ScanJobResponse)
 def scan_penny(options: ScanOptions | None = None):
+    options = enforce_scan_options(options)
     job = scan_manager.start_scan_async(Bucket.penny, options)
     return ScanJobResponse(job_id=job.job_id, bucket=Bucket.penny, status=job.status)
 
@@ -36,6 +38,7 @@ def scan_medium(options: ScanOptions | None = None):
 
 @router.post("/compounder", response_model=ScanJobResponse)
 def scan_compounder(options: ScanOptions | None = None):
+    options = enforce_scan_options(options)
     job = scan_manager.start_scan_async(Bucket.compounder, options)
     return ScanJobResponse(job_id=job.job_id, bucket=Bucket.compounder, status=job.status)
 

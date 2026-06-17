@@ -20,7 +20,7 @@ export function openCommandPalette() {
 
 export function CommandPalette() {
   const router = useRouter();
-  const { t, locale } = useTranslation();
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -55,7 +55,7 @@ export function CommandPalette() {
       { id: "penny", label: t.command.scanPenny, href: "/scan?bucket=penny", group: t.command.screens },
       { id: "compound", label: t.command.scanCompound, href: "/scan?bucket=compounder", group: t.command.screens },
     ],
-    [t, locale]
+    [t]
   );
 
   const items = useMemo(() => {

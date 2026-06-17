@@ -36,11 +36,6 @@ from utils.pydantic_util import model_to_dict
 
 logger = logging.getLogger(__name__)
 
-DISCLAIMER = (
-    "Daily decisions are model-generated research outputs, not financial advice. "
-    "Review before trading. The app does not place trades."
-)
-
 
 def _rebuild_from_store(account_id: int = DEFAULT_ACCOUNT_ID) -> PortfolioRebuildResult:
     rows = load_all_ledger_rows(account_id)
@@ -590,7 +585,6 @@ def get_current_portfolio() -> dict:
         "closed_positions": closed,
         "misc_events": misc_events,
         "data_source": account["source"],
-        "disclaimer": DISCLAIMER,
         "is_demo_data": account["source"] == "demo",
     }
 

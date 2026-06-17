@@ -19,6 +19,7 @@ from services.analyze_service import (
     score_all_buckets,
 )
 from data import cache as cache_module
+from utils.demo_guard import enforce_compare_symbols
 
 router = APIRouter(prefix="/analyze", tags=["analyze"])
 _EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix="analyze-routes")
@@ -41,6 +42,7 @@ def analyze_compare(symbols: str = Query(..., description="Comma-separated ticke
     parts = [s.strip().upper() for s in symbols.split(",") if s.strip()]
     if not parts:
         raise HTTPException(status_code=400, detail="Provide at least one symbol")
+    parts = enforce_compare_symbols(parts)
     if len(parts) > 4:
         raise HTTPException(status_code=400, detail="Maximum 4 symbols")
     try:

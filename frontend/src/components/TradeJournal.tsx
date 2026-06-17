@@ -22,7 +22,9 @@ import { DenseTable } from "@/components/ui/DenseTable";
 import clsx from "clsx";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:18731";
+import { getApiBaseUrl } from "@/lib/apiConfig";
+
+const API_URL = getApiBaseUrl();
 
 const defaultManual: TradeCreateRequest = {
   symbol: "",
@@ -91,7 +93,7 @@ export function TradeJournal({
       setStatusTone("error");
       setStatus(tRef.current.journal.loadFailed);
     });
-  }, [reload]);
+  }, [reload, tRef]);
 
   const submitManual = async () => {
     if (!manual.symbol.trim()) {

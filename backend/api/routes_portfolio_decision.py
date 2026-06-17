@@ -12,12 +12,14 @@ from models.schemas import (
     PortfolioDecisionRunResponse,
 )
 from services.portfolio_decision_service import run_stored_portfolio_decision
+from utils.demo_guard import require_non_demo_mode
 
 router = APIRouter(prefix="/portfolio/daily-decision", tags=["portfolio-decision"])
 
 
 @router.post("/run", response_model=PortfolioDecisionRunResponse)
 def run_daily_decision():
+    require_non_demo_mode()
     try:
         decision = run_stored_portfolio_decision(trigger="manual", persist=True)
     except ValueError as exc:

@@ -17,6 +17,7 @@ from models.schemas import (
     StrategyVersionResponse,
 )
 from services.scheduler import refresh_fundamentals, refresh_universe_quotes, run_daily_pipeline
+from utils.demo_guard import require_non_demo_mode
 
 router = APIRouter(prefix="/data", tags=["data"])
 
@@ -99,23 +100,27 @@ def scheduler_status():
 
 @router.post("/scheduler/run")
 def trigger_daily_pipeline():
+    require_non_demo_mode()
     result = run_daily_pipeline()
     return result
 
 
 @router.post("/scheduler/refresh-quotes")
 def trigger_quote_refresh():
+    require_non_demo_mode()
     return refresh_universe_quotes()
 
 
 @router.post("/scheduler/refresh-fundamentals")
 def trigger_fundamentals_refresh():
+    require_non_demo_mode()
     return refresh_fundamentals()
 
 
 @router.post("/scheduler/refresh-listing-master")
 def trigger_listing_master_refresh(force: bool = Query(False)):
     """Refresh Nasdaq Trader symbol directories into the listing master cache."""
+    require_non_demo_mode()
     from data.listing_master import refresh_listing_master
 
     return refresh_listing_master(force=force)
@@ -141,6 +146,7 @@ def get_listing_master_status():
 
 @router.post("/refresh")
 def data_refresh(scope: str = Query("home", description="home | portfolio | prices | penny_scan | all"), force: bool = False):
+    require_non_demo_mode()
     from services.refresh_orchestrator import refresh_if_stale
 
     try:

@@ -2,7 +2,9 @@
 
 import clsx from "clsx";
 import type { DailyDashboardResponse } from "@/lib/types";
+import { homeNoticeId } from "@/lib/dismissedNotices";
 import { useTranslation } from "@/lib/i18n";
+import { DismissibleNotice } from "@/components/ui/DismissibleNotice";
 
 export function DataFreshnessBanner({ data }: { data: DailyDashboardResponse }) {
   const { t } = useTranslation();
@@ -19,6 +21,9 @@ export function DataFreshnessBanner({ data }: { data: DailyDashboardResponse }) 
         ? t.home.dailyFreshnessMissing
         : data.decision_stale_warning ?? t.home.dailyFreshnessStale;
 
+  const messageKey =
+    status === "updating" ? "updating" : status === "missing" ? "missing" : data.decision_stale_warning ?? "stale";
+
   const tone =
     status === "updating"
       ? "border-sky-500/25 bg-sky-500/8 text-sky-100"
@@ -27,8 +32,11 @@ export function DataFreshnessBanner({ data }: { data: DailyDashboardResponse }) 
         : "border-amber-500/20 bg-amber-500/5 text-zinc-300";
 
   return (
-    <div className={clsx("rounded-xl border px-4 py-3 text-sm leading-relaxed", tone)} role="status">
+    <DismissibleNotice
+      noticeId={homeNoticeId.freshness(status, messageKey)}
+      className={clsx("rounded-xl border px-4 py-3 text-sm leading-relaxed", tone)}
+    >
       {message}
-    </div>
+    </DismissibleNotice>
   );
 }

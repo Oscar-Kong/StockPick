@@ -105,10 +105,25 @@ def test_walk_forward_validation(client):
 
 
 def test_pairs_research_contract(client):
-    r = client.post(
-        "/research/pairs",
-        json={"symbols": ["AAPL", "MSFT"], "lookback_period": "1y"},
-    )
+    from unittest.mock import patch
+
+    mock_body = {
+        "research_only": True,
+        "lookback_period": "1y",
+        "symbols_requested": ["AAPL", "MSFT"],
+        "symbols_used": ["AAPL", "MSFT"],
+        "pairs": [],
+        "pairs_evaluated": 1,
+        "pairs_returned": 0,
+        "cointegrated_count": 0,
+        "statsmodels_available": False,
+        "notes": ["mocked for contract test"],
+    }
+    with patch("api.routes_research.run_pairs_research", return_value=mock_body):
+        r = client.post(
+            "/research/pairs",
+            json={"symbols": ["AAPL", "MSFT"], "lookback_period": "1y"},
+        )
     assert r.status_code == 200
     body = r.json()
     for key in (

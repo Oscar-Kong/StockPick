@@ -8,9 +8,10 @@ import { useState } from "react";
 
 interface PortfolioAllocationPanelProps {
   symbols: string[];
+  experimental?: boolean;
 }
 
-export function PortfolioAllocationPanel({ symbols }: PortfolioAllocationPanelProps) {
+export function PortfolioAllocationPanel({ symbols, experimental }: PortfolioAllocationPanelProps) {
   const { t } = useTranslation();
   const [bucket, setBucket] = useState<Bucket>("penny");
   const [loading, setLoading] = useState(false);
@@ -50,6 +51,11 @@ export function PortfolioAllocationPanel({ symbols }: PortfolioAllocationPanelPr
 
   return (
     <div className="space-y-4">
+      {experimental && (
+        <p className="rounded border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-xs text-violet-100">
+          {t.portfolio.experimentalBadge}
+        </p>
+      )}
       <ResearchWarning message={t.portfolio.allocationHeuristicWarning} />
       <div className="flex flex-wrap gap-2">
         <select
@@ -94,9 +100,13 @@ export function PortfolioAllocationPanel({ symbols }: PortfolioAllocationPanelPr
         </div>
       )}
       {exportResult && (
-        <p className="text-xs text-[#7dff8e]">
-          {fmt(t.portfolio.leanExported, { id: exportResult.export_id })}
-        </p>
+        <div className="surface-card space-y-1 p-3 text-xs text-zinc-300">
+          <p className="text-[#7dff8e]">{fmt(t.portfolio.leanExported, { id: exportResult.export_id })}</p>
+          <p>{t.portfolio.leanPlaceholderNote}</p>
+          <p>
+            {exportResult.created_at} · {exportResult.bucket} · v{exportResult.strategy_version ?? "—"}
+          </p>
+        </div>
       )}
     </div>
   );

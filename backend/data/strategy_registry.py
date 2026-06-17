@@ -10,9 +10,7 @@ from sqlalchemy import Column, DateTime, String, Text, create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from data.db_engine import get_engine
-
-engine = get_engine()
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+from data.db_sessions import SessionLocal
 
 
 class Base(DeclarativeBase):
@@ -94,7 +92,7 @@ def _utcnow() -> datetime:
 
 
 def init_strategy_db() -> None:
-    Base.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=get_engine())
     registry = StrategyRegistry()
     registry.ensure_defaults()
 

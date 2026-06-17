@@ -19,6 +19,8 @@ from services.walk_forward_research_service import (
 )
 from services.pairs_research_service import run_pairs_research
 from services.quant_lab_summary_service import build_pairs_last_run, build_walk_forward_last_run
+from config import DEMO_MODE, DEMO_MAX_QUANT_JOB_SYMBOLS
+from utils.demo_guard import enforce_research_max_symbols, enforce_symbol_count
 
 router = APIRouter(prefix="/research", tags=["research"])
 
@@ -26,6 +28,8 @@ router = APIRouter(prefix="/research", tags=["research"])
 @router.post("/walk-forward", response_model=WalkForwardResearchResponse)
 def post_walk_forward_research(body: WalkForwardResearchRequest):
     """Run unified walk-forward research for a sleeve over a date range."""
+    max_symbols = enforce_research_max_symbols(body.max_symbols)
+    persist = False if DEMO_MODE else body.persist_snapshots
     try:
         cfg = WalkForwardConfig(
             sleeve=body.sleeve,
@@ -33,8 +37,8 @@ def post_walk_forward_research(body: WalkForwardResearchRequest):
             end_date=body.end_date,
             rebalance_frequency=body.rebalance_frequency,
             forward_horizons=list(body.forward_horizons),
-            max_symbols=body.max_symbols,
-            persist_snapshots=body.persist_snapshots,
+            max_symbols=max_symbols,
+            persist_snapshots=persist,
         )
         summary = run_walk_forward_research(cfg)
     except ValueError as exc:
@@ -62,6 +66,7 @@ def get_walk_forward_run(run_id: str):
 @router.post("/pairs", response_model=PairsResearchResponse)
 def post_pairs_research(body: PairsResearchRequest):
     """Pairs-trading research: cointegration, hedge ratio, spread z-score (not auto-trade)."""
+    enforce_symbol_count(body.symbols, max_count=DEMO_MAX_QUANT_JOB_SYMBOLS, field="pairs symbols")
     try:
         return run_pairs_research(
             body.symbols,

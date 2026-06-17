@@ -66,7 +66,7 @@ Open: `http://127.0.0.1:18730`
 | Scan      | `/scan` → run one bucket                        |
 | Workspace | Add ticker to watchlist → open Research         |
 | Analyze   | Quant tab shows signal bars; Refresh works      |
-| Portfolio | `/portfolio` — optimize weights on 2+ symbols   |
+| Portfolio | `/portfolio` — Optimize, Policy backtest, Exposure, Allocation, Daily decisions (2+ symbols for basket tools) |
 | Library   | Save a scan or report, visible under `/library` |
 | Journal   | Home → Journal panel (`/?journal=1#home-journal`) |
 
@@ -193,8 +193,11 @@ See [PROJECT_INVENTORY.md](PROJECT_INVENTORY.md) for UI gaps.
 
 1. **Offline alpha** → `POST /ml/alpha/ingest` → scan medium/compounder
 2. **Portfolio optimize** → `POST /portfolio/optimize` with symbol list
-3. **LEAN** → `POST /lean/export` → external LEAN → `POST /lean/import-summary`
-4. **Factor check** → `cd backend && python scripts/factor_validation.py --symbols AAPL,MSFT --factor momentum_20d`
+3. **Portfolio policy backtest** → `POST /portfolio/policy-backtest` (`institutional: false` for fast sim; `true` or `POST /api/v2/backtest/portfolio` for costs/slippage)
+4. **Portfolio factor exposure** → `POST /portfolio/factor-exposure`
+5. **Allocation** → `GET /allocation/recommendation/{bucket}?symbols=AAPL,MSFT`
+6. **LEAN** → `POST /lean/export` → external LEAN → `POST /lean/import-summary`
+7. **Factor check** → `cd backend && python scripts/factor_validation.py --symbols AAPL,MSFT --factor momentum_20d`
 
 Enable flags one at a time per [QUANT_STACK.md](QUANT_STACK.md).
 
@@ -243,14 +246,33 @@ With `PYPFOPT_ENABLED=false` or package missing, a fallback optimizer runs by de
 
 ---
 
-## 6) Data locations
+## 8) Public demo deployment (Vercel + Render)
+
+Full steps: **[DEPLOYMENT.md](DEPLOYMENT.md)**.
+
+Key flags on Render:
+
+| Variable | Demo value |
+|----------|------------|
+| `DEMO_MODE` | `true` |
+| `DEMO_SEED_DATA` | `true` |
+| `ALLOWED_ORIGINS` | Your Vercel URL (exact) |
+| `DATABASE_URL` | `sqlite:///./data/stockpick_demo.db` |
+
+Health check: `GET /health` (no external API calls). Render health path: `/health`.
+
+Vercel: `NEXT_PUBLIC_API_URL=<Render URL>`.
+
+---
+
+## 9) Data locations
 
 - SQLite / cache: `backend/data_store/`
 - LEAN artifacts: `backend/data_store/lean_exports/`
 
 ---
 
-## 7) Safe upgrade sequence (quant)
+## 10) Safe upgrade sequence (quant)
 
 1. Flags off
 2. Install `requirements-quant.txt`

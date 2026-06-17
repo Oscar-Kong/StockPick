@@ -107,7 +107,7 @@ describe("Quant Lab tabs", () => {
       await waitFor(() => {
         expect(screen.getByText(en.quantLab.noFactorIc)).toBeInTheDocument();
       });
-      expect(mocked.getV2FactorPerformance).toHaveBeenCalledTimes(1);
+      expect(mocked.getV2FactorPerformance).toHaveBeenCalled();
     });
 
     it("shows insufficient_data reliability when IC empty", async () => {

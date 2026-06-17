@@ -119,24 +119,29 @@ def _flag_obj(key: str):
 
 
 def list_api_settings() -> dict[str, Any]:
+    from config import DEMO_MODE
+
     registry = get_registry()
     groups = []
     for group in _CATALOG:
         items = []
         for key, label, description in group["flags"]:
             key_env = _KEY_ATTR.get(key)
-            items.append(
-                {
-                    "key": key,
-                    "label": label,
-                    "description": description,
-                    "enabled": registry.effective(key),
-                    "env_default": registry.default_for(key),
-                    "overridden": registry.is_overridden(key),
-                    "configured": _key_configured(key_env),
-                    "requires_key": key_env,
-                }
-            )
+            item = {
+                "key": key,
+                "label": label,
+                "description": description,
+                "enabled": registry.effective(key),
+                "env_default": registry.default_for(key),
+                "overridden": registry.is_overridden(key),
+            }
+            if not DEMO_MODE:
+                item["configured"] = _key_configured(key_env)
+                item["requires_key"] = key_env
+            else:
+                item["configured"] = None
+                item["requires_key"] = None
+            items.append(item)
         groups.append(
             {
                 "id": group["id"],
@@ -151,6 +156,8 @@ def list_api_settings() -> dict[str, Any]:
         "primary_fundamentals_source": config.PRIMARY_FUNDAMENTALS_SOURCE,
         "primary_news_source": config.PRIMARY_NEWS_SOURCE,
         "app_env": config.APP_ENV,
+        "demo_mode": DEMO_MODE,
+        "read_only": DEMO_MODE,
     }
 
 

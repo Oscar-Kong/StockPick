@@ -66,7 +66,7 @@ function SchedulerPanel({
     } else {
       setError(null);
     }
-  }, [loading, scheduler]);
+  }, [loading, scheduler, t.settings.schedulerUnavailable]);
 
   const jobs = scheduler?.recent_jobs ?? [];
 

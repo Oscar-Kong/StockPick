@@ -8,6 +8,22 @@ describe("parseApiError", () => {
     );
   });
 
+  it("extracts structured portfolio error message", () => {
+    expect(
+      parseApiError(
+        new Error(
+          JSON.stringify({
+            detail: {
+              error: "PORTFOLIO_OPTIMIZATION_FAILED",
+              message: "The allocation could not be calculated.",
+              request_id: "req_abc123",
+            },
+          })
+        )
+      )
+    ).toBe("The allocation could not be calculated. (req_abc123)");
+  });
+
   it("falls back to message text", () => {
     expect(parseApiError(new Error("network failure"))).toBe("network failure");
   });

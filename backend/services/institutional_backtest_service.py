@@ -1,7 +1,6 @@
 """Service layer for institutional portfolio backtest."""
 from __future__ import annotations
 
-from config import BACKTEST_INSTITUTIONAL
 from engines.backtest.institutional import InstitutionalBacktestResult, run_institutional_policy_backtest
 from models.schemas import PortfolioPolicyBacktestRequest, PortfolioPolicyBacktestResponse
 from services.policy_backtest import PolicyBacktestResult, run_policy_backtest
@@ -24,7 +23,6 @@ def _to_response(
             total_cost_usd=result.total_cost_usd,
             run_id=result.run_id,
             cost_events=result.cost_events,
-            institutional=True,
         )
     return PortfolioPolicyBacktestResponse(
         policy=result.policy,
@@ -45,6 +43,9 @@ def _to_response(
         turnover_pct=result.turnover_pct,
         rebalance_count=result.rebalance_count,
         equity_curve=result.equity_curve,
+        benchmark_equity_curve=getattr(result, "benchmark_equity_curve", []) or [],
+        start_date=getattr(result, "start_date", None),
+        end_date=getattr(result, "end_date", None),
         weights_history=result.weights_history,
         notes=result.notes,
         institutional=institutional,
@@ -53,7 +54,7 @@ def _to_response(
 
 
 def run_portfolio_backtest(body: PortfolioPolicyBacktestRequest) -> PortfolioPolicyBacktestResponse:
-    use_inst = body.institutional or BACKTEST_INSTITUTIONAL
+    use_inst = bool(body.institutional)
     symbols_req = [s.upper() for s in body.symbols]
 
     if use_inst:

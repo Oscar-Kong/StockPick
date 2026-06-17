@@ -10,6 +10,7 @@ from models.schemas import (
     Bucket,
 )
 from services.qlib_integration import get_latest_alpha, ingest_alpha_predictions
+from utils.demo_guard import require_non_demo_mode
 
 router = APIRouter(prefix="/ml", tags=["ml"])
 
@@ -21,6 +22,7 @@ def alpha_latest(bucket: Bucket = Bucket.penny):
 
 @router.post("/alpha/ingest", response_model=AlphaIngestResponse)
 def alpha_ingest(body: AlphaIngestRequest):
+    require_non_demo_mode()
     payload = ingest_alpha_predictions(
         body.bucket,
         as_of=body.as_of or "",

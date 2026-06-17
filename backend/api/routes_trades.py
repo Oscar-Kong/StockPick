@@ -22,6 +22,7 @@ from services.trade_review import parse_iso_datetime, review_trade
 from services.image_trade_analyzer import analyze_trade_screenshot
 from services.trade_feedback_service import record_outcome_for_trade, record_prediction_for_trade
 from services.portfolio_snapshot_service import journal_trade_sync_status
+from utils.demo_guard import require_non_demo_mode
 
 router = APIRouter(prefix="/trades", tags=["trades"])
 
@@ -194,6 +195,7 @@ def list_trades(symbol: str | None = None, limit: int = Query(default=100, ge=1,
 
 @router.post("/manual", response_model=TradeManualResponse)
 def create_trade_manual(body: TradeCreateRequest):
+    require_non_demo_mode()
     qty = float(body.quantity) if body.quantity is not None else None
     if qty is not None and qty <= 0:
         qty = None
@@ -244,6 +246,7 @@ async def create_trade_upload(
     notes: str = Form(""),
     screenshot: UploadFile | None = File(None),
 ):
+    require_non_demo_mode()
     if quantity is None or float(quantity) <= 0:
         raise HTTPException(
             status_code=400,
@@ -314,6 +317,7 @@ async def create_trade_upload(
 
 @router.post("/{trade_id}/sync-portfolio", response_model=TradeManualResponse)
 def sync_trade_portfolio(trade_id: int):
+    require_non_demo_mode()
     row = cache_module.get_trade(trade_id)
     if not row:
         raise HTTPException(status_code=404, detail="Trade not found")
@@ -325,6 +329,7 @@ def sync_trade_portfolio(trade_id: int):
 
 @router.patch("/{trade_id}", response_model=TradeManualResponse)
 def update_trade(trade_id: int, body: TradeUpdateRequest):
+    require_non_demo_mode()
     existing = cache_module.get_trade(trade_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Trade not found")
@@ -372,6 +377,7 @@ def update_trade(trade_id: int, body: TradeUpdateRequest):
 
 @router.delete("/{trade_id}")
 def delete_trade(trade_id: int):
+    require_non_demo_mode()
     existing = cache_module.get_trade(trade_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Trade not found")

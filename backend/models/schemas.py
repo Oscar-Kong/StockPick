@@ -541,7 +541,6 @@ class PortfolioOptimizeRequest(BaseModel):
     )
     kelly_overlay: bool = False
     max_weight: float = Field(default=0.30, gt=0, le=1)
-    long_only: bool = True
     cash_buffer: float = Field(default=0.0, ge=0, lt=1)
     target_return: float | None = Field(default=None, ge=-1, le=2)
     lookback_period: str = Field(default="1y", pattern="^(6mo|1y|2y|3y|5y)$")
@@ -603,6 +602,9 @@ class PortfolioPolicyBacktestResponse(BaseModel):
     turnover_pct: float = 0.0
     rebalance_count: int = 0
     equity_curve: list[dict[str, Any]] = []
+    benchmark_equity_curve: list[dict[str, Any]] = []
+    start_date: str | None = None
+    end_date: str | None = None
     weights_history: list[dict[str, Any]] = []
     notes: list[str] = []
     sortino_ratio: float | None = None
@@ -802,24 +804,29 @@ class OpenBBRiskResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str
-    alpha_vantage_configured: bool
-    fred_configured: bool
-    newsapi_configured: bool
-    finnhub_configured: bool = False
-    fmp_configured: bool = False
-    llm_configured: bool = False
-    quandl_configured: bool = False
-    openbb_enabled: bool = False
-    scheduler_enabled: bool = False
-    app_env: str = "development"
-    primary_price_source: str = "finnhub"
-    primary_fundamentals_source: str = "fmp"
-    primary_news_source: str = "finnhub"
-    database_dialect: str = "sqlite"
-    job_queue_backend: str = "sync"
-    redis_connected: bool = False
-    strategy_version: str = ""
-    factor_model_version: str = ""
+    environment: str = "development"
+    demo_mode: bool = False
+    database: str = "unknown"
+    version: str = "1.1.0"
+    # Legacy detail fields (omitted in production demo / lightweight health)
+    alpha_vantage_configured: bool | None = None
+    fred_configured: bool | None = None
+    newsapi_configured: bool | None = None
+    finnhub_configured: bool | None = None
+    fmp_configured: bool | None = None
+    llm_configured: bool | None = None
+    quandl_configured: bool | None = None
+    openbb_enabled: bool | None = None
+    scheduler_enabled: bool | None = None
+    app_env: str | None = None
+    primary_price_source: str | None = None
+    primary_fundamentals_source: str | None = None
+    primary_news_source: str | None = None
+    database_dialect: str | None = None
+    job_queue_backend: str | None = None
+    redis_connected: bool | None = None
+    strategy_version: str | None = None
+    factor_model_version: str | None = None
 
 
 class ApiSettingItem(BaseModel):
@@ -846,6 +853,8 @@ class ApiSettingsResponse(BaseModel):
     primary_fundamentals_source: str = "fmp"
     primary_news_source: str = "finnhub"
     app_env: str = "development"
+    demo_mode: bool = False
+    read_only: bool = False
 
 
 class ApiSettingsPatchRequest(BaseModel):
@@ -1117,7 +1126,103 @@ class CurrentPortfolioResponse(BaseModel):
     cash: float = 0.0
     holdings: list[dict[str, Any]] = []
     data_source: str = "manual"
+    is_demo_data: bool = False
     disclaimer: str = ""
+
+
+class PortfolioPositionSummary(BaseModel):
+    symbol: str
+    company_name: str | None = None
+    shares: float = 0.0
+    price: float | None = None
+    market_value: float | None = None
+    avg_cost: float | None = None
+    unrealized_pl_pct: float | None = None
+    weight: float | None = None
+    daily_change_pct: float | None = None
+    bucket: str | None = None
+    price_available: bool = True
+
+
+class PortfolioSummaryResponse(BaseModel):
+    as_of: str
+    price_as_of: str | None = None
+    total_value: float = 0.0
+    invested_value: float = 0.0
+    cash: float = 0.0
+    reserved_cash: float = 0.0
+    cash_weight: float = 0.0
+    today_change_pct: float | None = None
+    total_unrealized_pl_pct: float | None = None
+    active_holdings_count: int = 0
+    largest_position: str | None = None
+    largest_position_weight: float | None = None
+    largest_sector: str | None = None
+    portfolio_beta: float | None = None
+    estimated_annual_volatility: float | None = None
+    holdings_updated_at: str | None = None
+    last_price_update_at: str | None = None
+    risk_model_through: str | None = None
+    positions: list[PortfolioPositionSummary] = []
+    source: str = "portfolio_ledger"
+    data_source: str = "manual"
+    data_source_label: str = ""
+    is_demo_data: bool = False
+    stale: bool = False
+    warnings: list[str] = []
+    freshness: dict[str, Any] | None = None
+    disclaimer: str = ""
+
+
+class RebalanceHoldingInput(BaseModel):
+    symbol: str
+    shares: float = Field(ge=0)
+    avg_cost: float | None = Field(default=None, ge=0)
+    price: float | None = Field(default=None, gt=0)
+
+
+class RebalancePreviewRequest(BaseModel):
+    holdings: list[RebalanceHoldingInput] = Field(default_factory=list)
+    target_weights: dict[str, float] = Field(default_factory=dict)
+    cash: float = Field(default=0.0, ge=0)
+    cash_reserve: float = Field(default=0.05, ge=0, lt=1)
+    min_trade_amount: float = Field(default=0.0, ge=0)
+    fractional_shares: bool = True
+    fee_bps: float = Field(default=0.0, ge=0, le=100)
+    slippage_bps: float = Field(default=0.0, ge=0, le=100)
+    max_turnover: float | None = Field(default=None, ge=0, le=1)
+
+
+class RebalanceTradeItem(BaseModel):
+    symbol: str
+    current_shares: float
+    current_price: float
+    current_value: float
+    current_weight: float
+    target_weight: float
+    weight_difference: float
+    target_value: float
+    dollar_trade: float
+    share_trade: float
+    action: str
+    estimated_fee: float = 0.0
+    estimated_slippage: float = 0.0
+    post_trade_weight: float = 0.0
+
+
+class RebalancePreviewResponse(BaseModel):
+    total_value: float
+    cash_before: float
+    cash_after: float
+    cash_reserve: float
+    turnover_pct: float
+    estimated_fees: float
+    estimated_slippage: float
+    trade_count: int
+    trades: list[RebalanceTradeItem] = []
+    constraint_violations: list[str] = []
+    warnings: list[str] = []
+    model_version: str = "rebalance-v1"
 
 
 class PortfolioDecisionRunResponse(BaseModel):

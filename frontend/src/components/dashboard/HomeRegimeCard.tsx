@@ -34,7 +34,7 @@ export function HomeRegimeCard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tRef]);
 
   useEffect(() => {
     void load();

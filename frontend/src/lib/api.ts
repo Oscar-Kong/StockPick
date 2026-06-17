@@ -13,9 +13,11 @@ import type {
   HomeRefreshResponse,
   HomeRefreshStatusResponse,
   BrokerageCsvImportResponse,
-  PennyOpportunityItem,
   PortfolioOptimizeRequest,
   PortfolioOptimizeResponse,
+  PortfolioSummaryResponse,
+  RebalancePreviewRequest,
+  RebalancePreviewResponse,
   LeanExportRequest,
   LeanExportResponse,
   LeanImportSummaryRequest,
@@ -88,6 +90,15 @@ import type {
   AnalyzeWatchlistResponse,
 } from "./types";
 import type { Locale } from "@/lib/i18n";
+import { normalizeLastRunSummary, normalizeQuantLabEvidence } from "./quantLabLastRun";
+import {
+  getApiBaseUrl,
+  HEALTH_CHECK_TIMEOUT_MS,
+  HEALTH_RETRY_ATTEMPTS,
+  HEALTH_RETRY_DELAY_MS,
+  isBackendWakingError,
+} from "./apiConfig";
+import { parseApiError } from "./apiError";
 import {
   normalizeFactorPerformanceResponse,
   normalizeFeedbackSummaryResponse,
@@ -98,9 +109,8 @@ import {
   normalizeV2FactorsAdminResponse,
   normalizeWalkForwardResearchResponse,
 } from "./quantLabNormalizers";
-import { normalizeLastRunSummary, normalizeQuantLabEvidence } from "./quantLabLastRun";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:18731";
+const API_URL = getApiBaseUrl();
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 45_000;
 const ANALYZE_REQUEST_TIMEOUT_MS = 40_000;
@@ -129,7 +139,7 @@ async function request<T>(path: string, init?: RequestInit & { timeoutMs?: numbe
     });
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(text || `Request failed: ${res.status}`);
+      throw new Error(parseApiError(new Error(text || `Request failed: ${res.status}`)));
     }
     return res.json() as Promise<T>;
   } catch (err) {
@@ -233,6 +243,19 @@ export function runBacktestSweep(
   engine: "default" | "vectorbt" = "default"
 ): Promise<BacktestSweepResponse> {
   return request(`/backtest/${bucket}/${symbol}/sweep?engine=${engine}`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function getPortfolioSummary(): Promise<PortfolioSummaryResponse> {
+  return request("/portfolio/summary");
+}
+
+export function getPortfolioRebalancePreview(
+  body: RebalancePreviewRequest
+): Promise<RebalancePreviewResponse> {
+  return request("/portfolio/rebalance-preview", {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -374,7 +397,27 @@ export function explainStock(symbol: string, bucket: Bucket): Promise<ExplainRes
 }
 
 export function getHealth(): Promise<HealthResponse> {
-  return request("/health");
+  return request("/health", { timeoutMs: HEALTH_CHECK_TIMEOUT_MS });
+}
+
+export async function getHealthWithRetry(): Promise<HealthResponse> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < HEALTH_RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      return await getHealth();
+    } catch (err) {
+      lastError = err;
+      if (attempt < HEALTH_RETRY_ATTEMPTS - 1) {
+        await new Promise((resolve) => setTimeout(resolve, HEALTH_RETRY_DELAY_MS));
+      }
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Backend health check failed");
+}
+
+export function isApiWakingError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return isBackendWakingError(parseApiError(error));
 }
 
 export function getApiSettings(): Promise<ApiSettingsResponse> {

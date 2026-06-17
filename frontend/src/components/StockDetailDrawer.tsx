@@ -185,7 +185,7 @@ export function StockDetailDrawer({
         }
       }
     },
-    [stock, bucket]
+    [stock, bucket, tRef]
   );
 
   useEffect(() => {

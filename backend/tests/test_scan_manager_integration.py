@@ -176,6 +176,14 @@ def _run_scan_with_mocks(
             )
         )
         stack.enter_context(patch("services.scan_manager.HistoricalStore"))
+        stack.enter_context(
+            patch(
+                "services.scan_manager.build_candidate",
+                side_effect=lambda symbol, **kw: _make_ctx(
+                    symbol, base=score_map.get(symbol.upper(), 10.0)
+                ),
+            )
+        )
         reg_cls = stack.enter_context(patch("services.scan_manager.StrategyRegistry"))
         stack.enter_context(
             patch("services.scan_manager.cache_module.save_scan_results", side_effect=_capture_save)
@@ -247,9 +255,9 @@ def test_stage_a_filters_stage_b_symbols():
     )
 
     assert job.status == ScanStatus.completed
-    assert screener.enrich.call_count == len(stage_a)
-    enriched = {c.args[0].upper() for c in screener.enrich.call_args_list}
-    assert enriched == {s.upper() for s in stage_a}
+    assert screener.score.call_count == len(stage_a)
+    scored = {c.args[0].symbol.upper() for c in screener.score.call_args_list}
+    assert scored == {s.upper() for s in stage_a}
 
 
 def test_stage_b_ranking_and_max_results_truncation():
@@ -351,7 +359,7 @@ def test_scan_options_fast_mode_caps_stage_b_at_fast_top_n():
     )
     assert job.status == ScanStatus.completed
     # Only the top 5 (by Stage A order) should reach the deep-scoring path.
-    assert screener.enrich.call_count == 5
+    assert screener.score.call_count == 5
 
 
 def test_scan_options_deep_mode_uses_stage_b_top_n():
@@ -367,7 +375,7 @@ def test_scan_options_deep_mode_uses_stage_b_top_n():
         stage_b_top_n_fast=2,
     )
     assert job.status == ScanStatus.completed
-    assert screener.enrich.call_count == 6
+    assert screener.score.call_count == 6
 
 
 def test_compounder_scan_uses_long_ttl():

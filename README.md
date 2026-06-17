@@ -16,7 +16,7 @@ From one UI, you can:
 1. **Home** — daily buy/keep/sell dashboard for your Robinhood holdings (`/`). Import Robinhood CSV or log a **manual journal trade** (with quantity) to rebuild positions. When Robinhood's **Price** column disagrees with **Amount ÷ Quantity** (e.g. Price $1.19 vs $19.10 ÷ 10 = **$1.91**), the importer and ledger repair use the cash amount as the fill price and rebuild average cost. Shows the latest saved snapshot immediately; if holdings, prices, or decisions are stale, the UI marks status as **Updating** and refreshes in the background (holdings → prices → daily decision; penny scan runs async). Use **Refresh data now** to force a sync.
 2. **Scan** a bucket and rank candidates (`/scan`)
 3. **Workspace** — watchlist and single-symbol analyze (primary score from `/api/v2/score` when enabled) (`/workspace`)
-4. **Portfolio** — basket optimization, rebalance policy backtests (research; daily decisions live on Home) (`/portfolio`)
+4. **Portfolio** — overview, rebalance preview, risk diagnostics, policy backtests (`/portfolio`; daily decisions on Home)
 5. **Quant Lab** — latest evidence cards, **Research Reliability** scores per tab, validation tabs, research on demand (`/quant-lab`)
 6. **Library** — saved scans, research reports, analyze snapshots (`/library`)
 7. **Settings** — language, API providers, ops (`/settings`)
@@ -257,9 +257,11 @@ Optional LLM profile tuning:
 
 ### Portfolio + Quant
 
+- `GET /portfolio/summary` — canonical holdings, cash, freshness (same ledger as Home)
+- `POST /portfolio/rebalance-preview` — dollar/share trade preview from target weights
 - `POST /portfolio/optimize`
-- `POST /portfolio/policy-backtest`
-- `POST /portfolio/factor-exposure` — betas vs SPY, rolling correlation, PCA loadings (Portfolio → Factor exposure tab)
+- `POST /portfolio/policy-backtest` (includes normalized SPY benchmark curve)
+- `POST /portfolio/factor-exposure` — betas vs SPY, rolling correlation, PCA loadings (Portfolio → Risk tab)
 - `GET /ml/alpha/latest`
 - `POST /ml/alpha/ingest`
 - `GET /allocation/recommendation/{bucket}`
@@ -302,6 +304,8 @@ For production-grade models, offline training pipelines still need to be operate
 | [Architecture](docs/ARCHITECTURE.md) | Developers — modules and extension points |
 | [API Reference](docs/API_REFERENCE.md) | Developers — HTTP endpoints |
 | [Runbook](docs/RUNBOOK.md) | Ops — start, flags, troubleshooting |
+| [Deployment (Vercel + Render demo)](docs/DEPLOYMENT.md) | Free public demo — env vars, CORS, limits |
+| [Postgres migration](docs/POSTGRES_MIGRATION.md) | After demo — Neon, auth, per-user data |
 | [GitHub setup (no secrets)](docs/GITHUB_SETUP.md) | Safe publish checklist & gitignore |
 | [Analyze Panel (finance)](docs/ANALYZE_PANEL.md) | Investors — scores, factors, tabs |
 | [Analyze Sector Report](docs/ANALYZE_SECTOR_REPORT.md) | Developers — analyze APIs, flow, v2 hooks |

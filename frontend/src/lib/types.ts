@@ -204,9 +204,13 @@ export interface WatchlistImportResponse {
 
 export interface HealthResponse {
   status: string;
-  alpha_vantage_configured: boolean;
-  fred_configured: boolean;
-  newsapi_configured: boolean;
+  environment?: string;
+  demo_mode?: boolean;
+  database?: string;
+  version?: string;
+  alpha_vantage_configured?: boolean;
+  fred_configured?: boolean;
+  newsapi_configured?: boolean;
   finnhub_configured?: boolean;
   fmp_configured?: boolean;
   llm_configured?: boolean;
@@ -919,7 +923,6 @@ export interface PortfolioOptimizeRequest {
   objective?: "max_sharpe" | "min_vol" | "risk_parity" | "target_return" | "kelly";
   kelly_overlay?: boolean;
   max_weight?: number;
-  long_only?: boolean;
   cash_buffer?: number;
   target_return?: number | null;
   lookback_period?: "6mo" | "1y" | "2y" | "3y" | "5y";
@@ -981,6 +984,9 @@ export interface PortfolioPolicyBacktestResponse {
   turnover_pct: number;
   rebalance_count: number;
   equity_curve: { date: string; equity: number }[];
+  benchmark_equity_curve?: { date: string; equity: number }[];
+  start_date?: string | null;
+  end_date?: string | null;
   weights_history: { date: string; weights: Record<string, number> }[];
   notes: string[];
   sortino_ratio?: number | null;
@@ -992,6 +998,110 @@ export interface PortfolioPolicyBacktestResponse {
   run_id?: string | null;
   cost_events?: { date: string; notional?: number; cost_usd?: number; note?: string }[];
   institutional?: boolean;
+}
+
+export type PortfolioSourceType = "current" | "watchlist" | "custom";
+
+export interface PortfolioPositionSummary {
+  symbol: string;
+  company_name?: string | null;
+  shares: number;
+  price?: number | null;
+  market_value?: number | null;
+  avg_cost?: number | null;
+  unrealized_pl_pct?: number | null;
+  weight?: number | null;
+  daily_change_pct?: number | null;
+  bucket?: string | null;
+  price_available?: boolean;
+}
+
+export interface PortfolioSummaryResponse {
+  as_of: string;
+  price_as_of?: string | null;
+  total_value: number;
+  invested_value: number;
+  cash: number;
+  reserved_cash?: number;
+  cash_weight: number;
+  today_change_pct?: number | null;
+  total_unrealized_pl_pct?: number | null;
+  active_holdings_count: number;
+  largest_position?: string | null;
+  largest_position_weight?: number | null;
+  largest_sector?: string | null;
+  portfolio_beta?: number | null;
+  estimated_annual_volatility?: number | null;
+  holdings_updated_at?: string | null;
+  last_price_update_at?: string | null;
+  risk_model_through?: string | null;
+  positions: PortfolioPositionSummary[];
+  source: string;
+  data_source: string;
+  data_source_label: string;
+  is_demo_data?: boolean;
+  stale: boolean;
+  warnings: string[];
+  freshness?: Record<string, unknown> | null;
+  disclaimer: string;
+}
+
+export interface RebalanceHoldingInput {
+  symbol: string;
+  shares: number;
+  avg_cost?: number | null;
+  price?: number | null;
+}
+
+export interface RebalancePreviewRequest {
+  holdings: RebalanceHoldingInput[];
+  target_weights: Record<string, number>;
+  cash: number;
+  cash_reserve?: number;
+  min_trade_amount?: number;
+  fractional_shares?: boolean;
+  fee_bps?: number;
+  slippage_bps?: number;
+  max_turnover?: number | null;
+}
+
+export interface RebalanceTradeItem {
+  symbol: string;
+  current_shares: number;
+  current_price: number;
+  current_value: number;
+  current_weight: number;
+  target_weight: number;
+  weight_difference: number;
+  target_value: number;
+  dollar_trade: number;
+  share_trade: number;
+  action: "buy" | "sell" | "hold";
+  estimated_fee: number;
+  estimated_slippage: number;
+  post_trade_weight: number;
+}
+
+export interface RebalancePreviewResponse {
+  total_value: number;
+  cash_before: number;
+  cash_after: number;
+  cash_reserve: number;
+  turnover_pct: number;
+  estimated_fees: number;
+  estimated_slippage: number;
+  trade_count: number;
+  trades: RebalanceTradeItem[];
+  constraint_violations: string[];
+  warnings: string[];
+  model_version: string;
+}
+
+export interface ApiStructuredError {
+  error: string;
+  message: string;
+  request_id?: string;
+  retryable?: boolean;
 }
 
 export interface PortfolioHolding {

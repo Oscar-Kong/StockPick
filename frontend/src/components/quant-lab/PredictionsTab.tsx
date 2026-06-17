@@ -61,7 +61,7 @@ export function PredictionsTab() {
     }
 
     setLoading(false);
-  }, []);
+  }, [tRef]);
 
   useEffect(() => {
     void load();

@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 
 from models.schemas import ApiSettingsPatchRequest, ApiSettingsResetRequest, ApiSettingsResponse
 from services.api_settings import list_api_settings, patch_api_settings, reset_api_settings
+from utils.demo_guard import require_non_demo_mode
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -16,6 +17,7 @@ def get_api_settings():
 
 @router.patch("/apis", response_model=ApiSettingsResponse)
 def update_api_settings(body: ApiSettingsPatchRequest):
+    require_non_demo_mode()
     try:
         data = patch_api_settings(body.updates)
     except ValueError as exc:
@@ -25,6 +27,7 @@ def update_api_settings(body: ApiSettingsPatchRequest):
 
 @router.post("/apis/reset", response_model=ApiSettingsResponse)
 def reset_settings(body: ApiSettingsResetRequest | None = None):
+    require_non_demo_mode()
     keys = body.keys if body else None
     try:
         data = reset_api_settings(keys)

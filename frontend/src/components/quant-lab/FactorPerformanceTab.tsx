@@ -53,7 +53,7 @@ export function FactorPerformanceTab() {
     } finally {
       setLoading(false);
     }
-  }, [sleeve]);
+  }, [sleeve, tRef]);
 
   useEffect(() => {
     void load();

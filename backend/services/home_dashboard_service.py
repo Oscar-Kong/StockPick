@@ -114,8 +114,10 @@ def build_daily_dashboard(*, include_freshness: bool = False) -> DailyDashboardR
                 invested += float(item.market_value)
             else:
                 invested += float(h.get("shares", 0)) * float(h.get("avg_cost", 0))
-        if not holdings:
+        if not holdings and decision.invested_value is not None:
             invested = float(decision.invested_value or 0)
+        elif not decision.items and decision.invested_value is not None and invested <= 0:
+            invested = float(decision.invested_value)
     elif holdings:
         invested = sum(h.get("shares", 0) * h.get("avg_cost", 0) for h in holdings)
     else:

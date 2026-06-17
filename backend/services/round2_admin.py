@@ -58,7 +58,7 @@ def round2_ops_stats() -> dict:
 
     return {
         "model_version": FACTOR_MODEL_VERSION,
-        "prediction_snapshots_enabled": PREDICTION_SNAPSHOTS_ENABLED,
+        "prediction_snapshots_enabled": bool(PREDICTION_SNAPSHOTS_ENABLED),
         "snapshots_total": snap_total,
         "snapshots_last_7d": snap_week,
         "outcomes_resolved": outcomes_resolved,

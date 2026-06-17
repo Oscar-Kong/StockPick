@@ -10,7 +10,7 @@ import { QuantHealthCard } from "@/components/quant/QuantHealthCard";
 import { getSavedProgressSummary } from "@/lib/api";
 import type { SavedProgressSummary } from "@/lib/types";
 import { formatDateTime } from "@/lib/datetime";
-import { useTranslation } from "@/lib/i18n";
+import { useTranslation, useTRef } from "@/lib/i18n";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
@@ -21,6 +21,7 @@ function fmtWhen(value?: string | null): string {
 
 export function HomeDashboard() {
   const { t } = useTranslation();
+  const tRef = useTRef();
   const router = useRouter();
   const routes = [
     { href: "/workspace", title: t.nav.workspace, hint: t.home.routeWorkspaceHint, accent: true },
@@ -37,8 +38,8 @@ export function HomeDashboard() {
   useEffect(() => {
     getSavedProgressSummary()
       .then(setSummary)
-      .catch(() => setError(t.home.loadSummaryFailed));
-  }, []);
+      .catch(() => setError(tRef.current.home.loadSummaryFailed));
+  }, [tRef]);
 
   function onTickerSubmit(e: FormEvent) {
     e.preventDefault();

@@ -49,6 +49,8 @@ def test_half_life_mean_reverting_spread():
 
 
 def test_engle_granger_cointegrated_pair():
+    statsmodels = pytest.importorskip("statsmodels")
+    _ = statsmodels  # noqa: F841
     panel = _cointegrated_panel(250)
     out = engle_granger_test(panel["AAA"], panel["BBB"])
     assert out["sufficient"] is True
@@ -90,5 +92,6 @@ def test_run_pairs_research_with_panel():
     assert report["pairs_evaluated"] == 3
     assert len(report["pairs"]) == 3
     assert "not used for auto-trading" in report["notes"][0]
-    aaa_bbb = next(r for r in report["pairs"] if r["pair"] == ["AAA", "BBB"])
-    assert aaa_bbb["sufficient"] is True
+    if statsmodels_available():
+        aaa_bbb = next(r for r in report["pairs"] if r["pair"] == ["AAA", "BBB"])
+        assert aaa_bbb["sufficient"] is True

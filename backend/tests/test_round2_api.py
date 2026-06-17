@@ -1,10 +1,7 @@
 """Round 2 API smoke tests."""
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from unittest.mock import patch
 
 
 def _client():
@@ -23,7 +20,32 @@ def test_v2_score_shape():
     client = _client()
     if client is None:
         return
-    r = client.get("/api/v2/score/AAPL?sleeve=medium")
+    mock_score = {
+        "symbol": "AAPL",
+        "sleeve": "medium",
+        "score": 72.5,
+        "market_regime": "neutral",
+        "risk_level": "medium",
+        "summary": "Mock summary",
+        "factors": [],
+        "signals": [],
+        "attribution": {
+            "raw_score": 72.5,
+            "regime_mult": 1.0,
+            "sector_tilt": 0.0,
+            "dq_multiplier": 1.0,
+            "openbb_delta": 0.0,
+            "score_after_regime": 72.5,
+            "score_after_dq": 72.5,
+            "risk_deduction": 0.0,
+            "final_score": 72.5,
+        },
+        "risk": {"risk_score": 30.0, "deduction_pts": 0.0, "items": []},
+        "strategy_version": "test",
+        "factor_model_version": "test",
+    }
+    with patch("api.routes_v2.build_v2_score", return_value=mock_score):
+        r = client.get("/api/v2/score/AAPL?sleeve=medium")
     if r.status_code == 503:
         return
     assert r.status_code == 200, r.text
@@ -53,7 +75,9 @@ def test_round2_admin_stats():
     if r.status_code == 503:
         return
     assert r.status_code == 200
-    assert "snapshots_total" in r.json()
+    body = r.json()
+    assert "snapshots_total" in body
+    assert isinstance(body["prediction_snapshots_enabled"], bool)
 
 
 def test_round2_admin_stats_direct():
@@ -62,6 +86,7 @@ def test_round2_admin_stats_direct():
     stats = round2_ops_stats()
     assert "snapshots_total" in stats
     assert "model_version" in stats
+    assert isinstance(stats["prediction_snapshots_enabled"], bool)
 
 
 def test_dcf_sensitivity_grid():

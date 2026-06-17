@@ -2,7 +2,7 @@
 "use client";
 
 import { fmt, useTranslation } from "@/lib/i18n";
-import type { AnalyzeSymbolResponse, Bucket, Signal, V2ScoreResponse } from "@/lib/types";
+import type { AnalyzeSymbolResponse, Signal, V2ScoreResponse } from "@/lib/types";
 import { bucketFitDisplayOrder } from "@/lib/buckets";
 import type { AnalysisDisplay } from "@/lib/v2Score";
 import clsx from "clsx";

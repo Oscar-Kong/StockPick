@@ -28,7 +28,7 @@ export function QuantHealthCard({ embedded = false }: { embedded?: boolean }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tRef]);
 
   useEffect(() => {
     void load();

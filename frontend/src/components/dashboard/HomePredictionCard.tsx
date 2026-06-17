@@ -51,7 +51,7 @@ export function HomePredictionCard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tRef]);
 
   useEffect(() => {
     void load();

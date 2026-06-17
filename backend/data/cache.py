@@ -7,6 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from config import FUNDAMENTALS_CACHE_TTL, PRICE_CACHE_TTL
 from data.db_engine import get_engine
+from data.db_sessions import SessionLocal
 from utils.datetime_util import utc_iso_z, utc_now
 
 
@@ -105,19 +106,15 @@ class TradeEntry(Base):
     updated_at = Column(DateTime, nullable=False)
 
 
-engine = get_engine()
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
-
-
 def _migrate_watchlist_columns() -> None:
     """Add price/score/summary columns to existing SQLite DBs."""
     from sqlalchemy import inspect, text
 
-    insp = inspect(engine)
+    insp = inspect(get_engine())
     if "watchlist" not in insp.get_table_names():
         return
     cols = {c["name"] for c in insp.get_columns("watchlist")}
-    with engine.begin() as conn:
+    with get_engine().begin() as conn:
         if "price" not in cols:
             conn.execute(text("ALTER TABLE watchlist ADD COLUMN price FLOAT"))
         if "score" not in cols:
@@ -135,7 +132,7 @@ def _migrate_watchlist_columns() -> None:
 
 
 def init_db() -> None:
-    Base.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=get_engine())
     _migrate_watchlist_columns()
     from data.historical_store import init_historical_db
     from data.strategy_registry import init_strategy_db

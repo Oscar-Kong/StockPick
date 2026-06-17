@@ -45,6 +45,22 @@ APP_ENV = os.getenv("APP_ENV", "development").lower()
 _default_sqlite = f"sqlite:///{DATA_DIR / 'stock_picker.db'}"
 DATABASE_URL = os.getenv("DATABASE_URL", _default_sqlite)
 DATABASE_POOL_SIZE = int(os.getenv("DATABASE_POOL_SIZE", "5"))
+
+
+def _ensure_sqlite_parent_dir(url: str) -> None:
+    """Create parent directory for relative SQLite paths (Render ephemeral disk)."""
+    if not url.lower().startswith("sqlite"):
+        return
+    raw = url.split("///", 1)[-1] if "///" in url else url.split("://", 1)[-1]
+    if raw in (":memory:", "/:memory:"):
+        return
+    path = Path(raw)
+    if not path.is_absolute():
+        path = (BASE_DIR / path).resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+
+_ensure_sqlite_parent_dir(DATABASE_URL)
 SQLITE_SOURCE_PATH = os.getenv(
     "SQLITE_SOURCE_PATH",
     str(DATA_DIR / "stock_picker.db"),
@@ -305,3 +321,43 @@ SCAN_RESULT_TTL_COMPOUNDER = int(os.getenv("SCAN_RESULT_TTL_COMPOUNDER", "86400"
 # --- Data quality gates (0–100 scale) ---
 MIN_DATA_QUALITY_SCORE = float(os.getenv("MIN_DATA_QUALITY_SCORE", "60"))
 MIN_HISTORY_BARS = int(os.getenv("MIN_HISTORY_BARS", "252"))
+
+# --- Public demo deployment ---
+DEMO_MODE = os.getenv("DEMO_MODE", "false").lower() in ("1", "true", "yes")
+DEMO_SEED_DATA = os.getenv(
+    "DEMO_SEED_DATA",
+    "true" if DEMO_MODE else "false",
+).lower() in ("1", "true", "yes")
+DEMO_MAX_SCAN_SYMBOLS = int(os.getenv("DEMO_MAX_SCAN_SYMBOLS", "75"))
+DEMO_MAX_ANALYSIS_SYMBOLS = int(os.getenv("DEMO_MAX_ANALYSIS_SYMBOLS", "1"))
+DEMO_MAX_BACKTEST_SYMBOLS = int(os.getenv("DEMO_MAX_BACKTEST_SYMBOLS", "15"))
+DEMO_MAX_BACKTEST_DAYS = int(os.getenv("DEMO_MAX_BACKTEST_DAYS", "365"))
+DEMO_MAX_QUANT_JOB_SYMBOLS = int(os.getenv("DEMO_MAX_QUANT_JOB_SYMBOLS", "25"))
+DEMO_MAX_REQUESTS_PER_MINUTE = int(os.getenv("DEMO_MAX_REQUESTS_PER_MINUTE", "30"))
+
+# CORS — comma-separated exact origins (production); dev localhost defaults when unset.
+_ALLOWED_ORIGINS_RAW = os.getenv("ALLOWED_ORIGINS", "").strip()
+if _ALLOWED_ORIGINS_RAW:
+    ALLOWED_ORIGINS = [o.strip() for o in _ALLOWED_ORIGINS_RAW.split(",") if o.strip()]
+elif APP_ENV == "production":
+    ALLOWED_ORIGINS = []
+else:
+    ALLOWED_ORIGINS = [
+        "http://localhost:18730",
+        "http://127.0.0.1:18730",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+
+# Demo-safe production defaults (override via env when self-hosting).
+if DEMO_MODE:
+    SCHEDULER_ENABLED = _env_bool("SCHEDULER_ENABLED", "false")
+    QUANT_JOBS_ENABLED = _env_bool("QUANT_JOBS_ENABLED", "false")
+    LISTING_MASTER_ENABLED = _env_bool("LISTING_MASTER_ENABLED", "false")
+    MARKET_DATA_REFRESH_ENABLED = _env_bool("MARKET_DATA_REFRESH_ENABLED", "false")
+    PORTFOLIO_DECISION_ENABLED = _env_bool("PORTFOLIO_DECISION_ENABLED", "false")
+    UNIVERSE_SCAN_BATCH_SIZE = min(
+        UNIVERSE_SCAN_BATCH_SIZE if UNIVERSE_SCAN_BATCH_SIZE > 0 else DEMO_MAX_SCAN_SYMBOLS,
+        DEMO_MAX_SCAN_SYMBOLS,
+    )
+    MAX_CANDIDATES_PER_BUCKET = min(MAX_CANDIDATES_PER_BUCKET, DEMO_MAX_SCAN_SYMBOLS)

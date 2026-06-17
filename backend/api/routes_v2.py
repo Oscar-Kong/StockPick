@@ -15,6 +15,7 @@ from engines.weighting.regime_classifier import classify_spy
 from engines.weighting.weight_store import WeightStore
 from services.quant_jobs import run_daily_quant_jobs
 from services.quant_v2_service import build_v2_score
+from utils.demo_guard import require_non_demo_mode
 from utils.pydantic_util import models_to_dicts
 
 router = APIRouter(prefix="/api/v2", tags=["quant-v2"])
@@ -84,6 +85,7 @@ def get_sleeve_weights(
 
 @router.post("/jobs/ic-panel")
 def trigger_ic_panel():
+    require_non_demo_mode()
     if not SCORE_ENGINE_V2_ENABLED:
         raise HTTPException(status_code=503, detail="SCORE_ENGINE_V2_ENABLED is false")
     from engines.weighting.ic_panel import run_ic_panel
@@ -93,6 +95,7 @@ def trigger_ic_panel():
 
 @router.post("/jobs/rebalance")
 def trigger_rebalance(force: bool = Query(True)):
+    require_non_demo_mode()
     if not SCORE_ENGINE_V2_ENABLED:
         raise HTTPException(status_code=503, detail="SCORE_ENGINE_V2_ENABLED is false")
     return run_daily_quant_jobs(force_rebalance=force)
@@ -116,6 +119,10 @@ def list_hard_filters(sleeve: Bucket):
 
 @router.post("/backtest/portfolio", response_model=PortfolioPolicyBacktestResponse)
 def institutional_portfolio_backtest(body: PortfolioPolicyBacktestRequest):
+    from utils.demo_guard import enforce_backtest_symbols
+
+    if body.symbols:
+        enforce_backtest_symbols(list(body.symbols))
     if not BACKTEST_INSTITUTIONAL and not body.institutional:
         raise HTTPException(
             status_code=503,
@@ -258,6 +265,7 @@ def list_predictions(
 
 @router.post("/jobs/forward-labels")
 def trigger_forward_labels():
+    require_non_demo_mode()
     if not SCORE_ENGINE_V2_ENABLED:
         raise HTTPException(status_code=503, detail="SCORE_ENGINE_V2_ENABLED is false")
     from engines.labels.forward_returns import build_forward_labels
@@ -267,6 +275,7 @@ def trigger_forward_labels():
 
 @router.post("/jobs/outcome-weights")
 def trigger_outcome_weights():
+    require_non_demo_mode()
     if not SCORE_ENGINE_V2_ENABLED:
         raise HTTPException(status_code=503, detail="SCORE_ENGINE_V2_ENABLED is false")
     from engines.feedback.outcome_weights import run_outcome_weight_feedback
@@ -276,6 +285,7 @@ def trigger_outcome_weights():
 
 @router.post("/jobs/resolve-outcomes")
 def trigger_outcome_resolution():
+    require_non_demo_mode()
     if not SCORE_ENGINE_V2_ENABLED:
         raise HTTPException(status_code=503, detail="SCORE_ENGINE_V2_ENABLED is false")
     from engines.prediction.snapshots import resolve_prediction_outcomes
@@ -341,6 +351,7 @@ def get_agent_pipeline(
 
 @router.post("/jobs/pit-fundamentals")
 def trigger_pit_fundamentals():
+    require_non_demo_mode()
     if not SCORE_ENGINE_V2_ENABLED:
         raise HTTPException(status_code=503, detail="SCORE_ENGINE_V2_ENABLED is false")
     from data.pit_fmp_ingest import build_pit_panel
@@ -402,6 +413,7 @@ def list_jobs(limit: int = Query(20, ge=1, le=100)):
 
 @router.post("/jobs/enqueue/{job_name}")
 def enqueue_background_job(job_name: str, force_rebalance: bool = Query(False)):
+    require_non_demo_mode()
     from engines.jobs.queue import dispatch_job
 
     payload = {"force_rebalance": force_rebalance} if job_name == "quant_daily_jobs" else {}

@@ -8,9 +8,8 @@ from sqlalchemy import Column, DateTime, Float, Integer, String, Text, UniqueCon
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from data.db_engine import get_engine
+from data.db_sessions import SessionLocal, reset_session_factory
 from utils.datetime_util import utc_iso_z
-
-DEFAULT_ACCOUNT_ID = 1
 
 
 class PortfolioBase(DeclarativeBase):
@@ -115,8 +114,7 @@ class PortfolioDecisionSnapshot(PortfolioBase):
     created_at = Column(DateTime, nullable=False, index=True)
 
 
-_engine = get_engine()
-SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False)
+DEFAULT_ACCOUNT_ID = 1
 
 
 def _utcnow() -> datetime:
@@ -127,7 +125,7 @@ def _migrate_trade_history_columns() -> None:
     """Add ledger columns to existing SQLite trade_history tables."""
     from sqlalchemy import inspect, text
 
-    insp = inspect(_engine)
+    insp = inspect(get_engine())
     if "trade_history" not in insp.get_table_names():
         return
     existing = {c["name"] for c in insp.get_columns("trade_history")}
@@ -138,7 +136,7 @@ def _migrate_trade_history_columns() -> None:
         ("activity_date", "VARCHAR"),
         ("process_date", "VARCHAR"),
     ]
-    with _engine.begin() as conn:
+    with get_engine().begin() as conn:
         for col, typ in alters:
             if col not in existing:
                 conn.execute(text(f"ALTER TABLE trade_history ADD COLUMN {col} {typ}"))
@@ -147,11 +145,11 @@ def _migrate_trade_history_columns() -> None:
 def _migrate_brokerage_account_columns() -> None:
     from sqlalchemy import inspect, text
 
-    insp = inspect(_engine)
+    insp = inspect(get_engine())
     if "brokerage_accounts" not in insp.get_table_names():
         return
     existing = {c["name"] for c in insp.get_columns("brokerage_accounts")}
-    with _engine.begin() as conn:
+    with get_engine().begin() as conn:
         if "reserved_cash" not in existing:
             conn.execute(text("ALTER TABLE brokerage_accounts ADD COLUMN reserved_cash FLOAT DEFAULT 0"))
         if "ipo_shares" not in existing:
@@ -161,7 +159,7 @@ def _migrate_brokerage_account_columns() -> None:
 
 
 def init_portfolio_db() -> None:
-    PortfolioBase.metadata.create_all(bind=_engine)
+    PortfolioBase.metadata.create_all(bind=get_engine())
     _migrate_trade_history_columns()
     _migrate_brokerage_account_columns()
 

@@ -1,9 +1,17 @@
 "use client";
 
 import clsx from "clsx";
+import { useSyncExternalStore } from "react";
+import {
+  EMPTY_DISMISSED_NOTICES,
+  getDismissedNoticesSnapshot,
+  homeNoticeId,
+  subscribeDismissedNotices,
+} from "@/lib/dismissedNotices";
 import { inferAlertSeverity } from "@/lib/dailyDecisionUtils";
 import { useTranslation } from "@/lib/i18n";
 import { SectionCard } from "@/components/ui/AppCard";
+import { DismissibleNotice } from "@/components/ui/DismissibleNotice";
 
 const SEVERITY_STYLES = {
   critical: "border-red-500/25 bg-red-500/8 text-red-100",
@@ -13,14 +21,21 @@ const SEVERITY_STYLES = {
 
 export function RiskAlertsPanel({ alerts }: { alerts: string[] }) {
   const { t } = useTranslation();
-  if (!alerts.length) return null;
+  const dismissed = useSyncExternalStore(
+    subscribeDismissedNotices,
+    getDismissedNoticesSnapshot,
+    () => EMPTY_DISMISSED_NOTICES
+  );
+
+  const visible = alerts.filter((alert) => !dismissed.has(homeNoticeId.riskAlert(alert)));
+  if (!visible.length) return null;
 
   const grouped = {
     critical: [] as string[],
     warning: [] as string[],
     info: [] as string[],
   };
-  for (const alert of alerts) {
+  for (const alert of visible) {
     grouped[inferAlertSeverity(alert)].push(alert);
   }
 
@@ -39,11 +54,13 @@ export function RiskAlertsPanel({ alerts }: { alerts: string[] }) {
               <p className="text-label-caps mb-2">{label}</p>
               <ul className="space-y-2">
                 {grouped[key].map((alert) => (
-                  <li
-                    key={alert}
-                    className={clsx("rounded-lg border px-3 py-2.5 text-sm leading-relaxed", SEVERITY_STYLES[key])}
-                  >
-                    {alert}
+                  <li key={alert}>
+                    <DismissibleNotice
+                      noticeId={homeNoticeId.riskAlert(alert)}
+                      className={clsx("rounded-lg border px-3 py-2.5 text-sm leading-relaxed", SEVERITY_STYLES[key])}
+                    >
+                      {alert}
+                    </DismissibleNotice>
                   </li>
                 ))}
               </ul>

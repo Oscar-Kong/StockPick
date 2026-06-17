@@ -1,0 +1,56 @@
+services:
+  - type: web
+    name: stockpick-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    plan: free
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DEMO_MODE
+        value: "true"
+      - key: DEMO_SEED_DATA
+        value: "true"
+      - key: DATABASE_URL
+        value: sqlite:///./data/stockpick_demo.db
+      - key: SCHEDULER_ENABLED
+        value: "false"
+      - key: QUANT_JOBS_ENABLED
+        value: "false"
+      - key: LISTING_MASTER_ENABLED
+        value: "false"
+      - key: MARKET_DATA_REFRESH_ENABLED
+        value: "false"
+      - key: OPENBB_ENABLED
+        value: "false"
+      - key: QLIB_ENABLED
+        value: "false"
+      - key: VBT_ENABLED
+        value: "false"
+      - key: PYPFOPT_ENABLED
+        value: "false"
+      - key: FINRL_ENABLED
+        value: "false"
+      - key: LEAN_EXPORT_ENABLED
+        value: "false"
+      - key: NEWSAPI_ENABLED
+        value: "false"
+      - key: FINNHUB_API_KEY
+        sync: false
+      - key: FMP_API_KEY
+        sync: false
+      - key: ALPHA_VANTAGE_API_KEY
+        sync: false
+      - key: FRED_API_KEY
+        sync: false
+      - key: GPT_PROXY_API_KEY
+        sync: false
+      - key: GPT_PROXY_BASE_URL
+        sync: false
+      - key: GPT_PROXY_MODEL
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false

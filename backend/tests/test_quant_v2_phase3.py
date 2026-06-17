@@ -32,18 +32,12 @@ def test_hard_filters_disabled_by_default():
     assert r.passed is True
 
 
-def test_penny_delisting_filter():
-    import os
-
-    os.environ["HARD_FILTERS_V3_ENABLED"] = "true"
-    from importlib import reload
-    import config as cfg
-
-    reload(cfg)
+def test_penny_delisting_filter(monkeypatch):
+    import config
     import engines.filters.hard_filters as hf
 
-    reload(hf)
-
+    monkeypatch.setattr(config, "HARD_FILTERS_V3_ENABLED", True)
+    monkeypatch.setattr(hf, "HARD_FILTERS_V3_ENABLED", True)
     dates = pd.date_range("2024-01-01", periods=35, freq="B")
     close = [0.8] * 35
     hist = pd.DataFrame(
@@ -53,7 +47,7 @@ def test_penny_delisting_filter():
             "high": close,
             "low": close,
             "close": close,
-            "volume": [1_000_000] * 35,
+            "volume": [2_000_000] * 35,
         }
     )
     ctx = CandidateContext(symbol="TEST", price=0.8, info={}, history=hist)

@@ -16,6 +16,7 @@ from services.refresh_orchestrator import (
     start_home_refresh_async,
     try_begin_auto_refresh,
 )
+from utils.demo_guard import require_non_demo_mode
 
 router = APIRouter(prefix="/home", tags=["home"])
 
@@ -60,6 +61,7 @@ def daily_dashboard(skip_auto_refresh: bool = Query(False, description="Poll wit
 
 @router.post("/refresh", response_model=HomeRefreshResponse)
 def refresh_home(force: bool = Query(False, description="Bypass TTL guards")):
+    require_non_demo_mode()
     active = get_active_home_job_id()
     if is_home_refresh_running() and not force:
         return HomeRefreshResponse(

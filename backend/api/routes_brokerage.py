@@ -4,9 +4,9 @@ from __future__ import annotations
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from models.schemas import BrokerageCsvImportResponse, CurrentPortfolioResponse
+from utils.demo_guard import require_non_demo_mode
 from utils.pydantic_util import model_to_dict
 from services.portfolio_snapshot_service import (
-    DISCLAIMER,
     get_current_portfolio,
     import_robinhood_csv_and_decide,
     list_import_history,
@@ -23,6 +23,7 @@ async def import_robinhood_csv_route(
     cash: float | None = Form(None),
     replace: bool = Form(False),
 ):
+    require_non_demo_mode()
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Upload a .csv file")
     content = await file.read()
@@ -43,6 +44,7 @@ def update_buying_power(
     ipo_list_price: float | None = Form(None, ge=0),
 ):
     """Set Robinhood buying power and optional reserved cash (e.g. upcoming IPO)."""
+    require_non_demo_mode()
     try:
         from services.portfolio_decision_service import run_stored_portfolio_decision
         from services.portfolio_snapshot_service import set_portfolio_cash
@@ -71,6 +73,7 @@ def brokerage_imports():
 @router.post("/validate/robinhood-csv")
 async def validate_robinhood_csv_route(file: UploadFile = File(...)):
     """Dev validation: parse CSV and return reconstruction + debug without persisting."""
+    require_non_demo_mode()
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Upload a .csv file")
     content = await file.read()
@@ -110,4 +113,4 @@ router_portfolio = APIRouter(prefix="/portfolio", tags=["portfolio-holdings"])
 @router_portfolio.get("/current", response_model=CurrentPortfolioResponse)
 def portfolio_current():
     data = get_current_portfolio()
-    return CurrentPortfolioResponse(**data, disclaimer=DISCLAIMER)
+    return CurrentPortfolioResponse(**data)

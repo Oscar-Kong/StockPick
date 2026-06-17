@@ -48,28 +48,67 @@ def _price_panel(symbols: list[str], period: str) -> tuple[pd.DataFrame, list[st
     return panel, sorted(set(excluded))
 
 
+WEIGHT_SUM_TOLERANCE = 1e-6
+
+
+def validate_weight_constraints(n_assets: int, max_weight: float, cash_buffer: float) -> None:
+    """Raise when max_weight × n_assets cannot reach the invested target."""
+    if n_assets <= 0:
+        raise ValueError("No assets to allocate")
+    invested_target = 1.0 - cash_buffer
+    capacity = n_assets * max_weight
+    if capacity < invested_target - WEIGHT_SUM_TOLERANCE:
+        pct_max = int(round(max_weight * 100))
+        raise ValueError(
+            f"A {pct_max}% maximum position weight across {n_assets} assets can invest at most "
+            f"{int(round(capacity * 100))}%. Increase the maximum weight, add more assets, "
+            f"or increase the cash reserve."
+        )
+
+
 def _normalize_weights(raw: dict[str, float], max_weight: float, cash_buffer: float) -> dict[str, float]:
+    """Scale weights so sum(asset_weights) == 1 - cash_buffer (applied exactly once)."""
+    if not raw:
+        raise ValueError("No weights to normalize")
+
+    invested_target = max(0.0, 1.0 - cash_buffer)
+    n = len(raw)
+    validate_weight_constraints(n, max_weight, cash_buffer)
+
     positive = {k: max(0.0, float(v)) for k, v in raw.items()}
     total = sum(positive.values())
     if total <= 0:
-        n = max(1, len(raw))
-        base = (1.0 - cash_buffer) / n
+        base = min(max_weight, invested_target / max(1, n))
         return {k: round(base, 6) for k in raw}
 
-    weights = {k: v / total for k, v in positive.items()}
-    if max_weight < 1:
+    weights = {k: v / total * invested_target for k, v in positive.items()}
+
+    if max_weight >= 1:
+        return {k: round(v, 6) for k, v in weights.items()}
+
+    for _ in range(n + 1):
         clipped = {k: min(v, max_weight) for k, v in weights.items()}
-        residual = max(0.0, (1.0 - cash_buffer) - sum(clipped.values()))
-        if residual > 0:
-            room = {k: max(0.0, max_weight - clipped[k]) for k in clipped}
-            room_total = sum(room.values())
-            if room_total > 0:
-                for k in clipped:
-                    clipped[k] += residual * (room[k] / room_total)
+        current_sum = sum(clipped.values())
+        if abs(current_sum - invested_target) <= WEIGHT_SUM_TOLERANCE:
+            return {k: round(v, 6) for k, v in clipped.items()}
+
+        residual = invested_target - current_sum
+        if residual <= WEIGHT_SUM_TOLERANCE:
+            return {k: round(v, 6) for k, v in clipped.items()}
+
+        room = {k: max(0.0, max_weight - clipped[k]) for k in clipped}
+        room_total = sum(room.values())
+        if room_total <= WEIGHT_SUM_TOLERANCE:
+            validate_weight_constraints(n, max_weight, cash_buffer)
+            raise ValueError(
+                "Allocation constraints are infeasible after max-weight clipping. "
+                "Increase max weight, add assets, or adjust cash reserve."
+            )
+        for k in clipped:
+            clipped[k] += residual * (room[k] / room_total)
         weights = clipped
 
-    scale = max(0.0, 1.0 - cash_buffer)
-    return {k: round(v * scale, 6) for k, v in weights.items()}
+    return {k: round(v, 6) for k, v in weights.items()}
 
 
 def _fallback_optimize(
@@ -242,6 +281,14 @@ def optimize_portfolio(
             raw = _apply_kelly_overlay(result.weights, panel)
             result.weights = _normalize_weights(raw, max_weight=max_weight, cash_buffer=cash_buffer)
             result.notes = (result.notes or []) + ["Applied half-Kelly overlay on weights."]
+
+    weight_sum = sum(result.weights.values())
+    expected_sum = max(0.0, 1.0 - cash_buffer)
+    if abs(weight_sum - expected_sum) > WEIGHT_SUM_TOLERANCE * max(1, len(result.weights)):
+        result.notes = (result.notes or []) + [
+            f"Weight sum {weight_sum:.6f} deviates from target {expected_sum:.6f}."
+        ]
+
     if objective == "risk_parity":
         result.notes = (result.notes or []) + ["Risk parity via inverse-volatility weights."]
     return result

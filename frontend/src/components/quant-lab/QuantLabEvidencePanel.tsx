@@ -49,7 +49,7 @@ export function QuantLabEvidencePanel({ sleeve = "penny", onNavigateTab }: Quant
     } finally {
       setLoading(false);
     }
-  }, [sleeve]);
+  }, [sleeve, tRef]);
 
   useEffect(() => {
     void load();

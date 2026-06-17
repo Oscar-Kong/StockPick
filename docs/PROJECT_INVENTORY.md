@@ -12,7 +12,7 @@ Last reviewed against the repo layout, UI routes, and API surface. Use this with
 | `/scan` | Scan hub — compact command bar, inline status, dense results table; **Held** badge when ticker is in Home portfolio |
 | `/workspace` | Full-width research terminal — watchlist rail + grouped analyze tabs, symbol nav, mobile Insights sheet |
 | `/library` | Saved scans, reports, analyze snapshots — split list/detail layout |
-| `/portfolio` | Basket optimize + policy backtest — expanded ~1520px layout |
+| `/portfolio` | Portfolio workflow — Overview, Rebalance, Risk, Backtest, Advanced Research (~1520px) |
 | `/quant-lab` | Factor research tabs first; evidence/scan relationship in collapsible panels below |
 | `/settings` | Two-column settings — language, quant health, API integrations |
 | `/trader-intel` | Trader style profiles and presets |
@@ -66,8 +66,10 @@ These work via API / scripts / future UI; documented so nothing is “missing”
 
 | Capability | API / script | UI today |
 |------------|--------------|----------|
-| Portfolio optimize | `POST /portfolio/optimize` | `/portfolio` |
-| Portfolio policy backtest | `POST /portfolio/policy-backtest` | `/portfolio` |
+| Portfolio summary | `GET /portfolio/summary` | `/portfolio` Overview |
+| Rebalance preview | `POST /portfolio/rebalance-preview` | `/portfolio` Rebalance |
+| Portfolio optimize | `POST /portfolio/optimize` | `/portfolio` Rebalance |
+| Portfolio policy backtest | `POST /portfolio/policy-backtest` | `/portfolio` Backtest |
 | Allocation recommendation | `GET /allocation/recommendation/{bucket}` | None |
 | LEAN export / import summary | `/lean/export`, `/lean/import-summary` | None |
 | Alpha ingest | `POST /ml/alpha/ingest` | None (feeds screeners when `QLIB_ENABLED`) |

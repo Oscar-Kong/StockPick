@@ -42,7 +42,7 @@ export default function TraderIntelPage() {
       })
       .catch((err) => setError(err instanceof Error ? err.message : tRef.current.traderIntel.loadFailed))
       .finally(() => setLoading(false));
-  }, []);
+  }, [tRef]);
 
   return (
     <div className="space-y-6">

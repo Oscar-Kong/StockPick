@@ -1,7 +1,7 @@
 """Portfolio policy backtesting (equal-weight, inverse-vol, top-N momentum)."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
@@ -31,6 +31,9 @@ class PolicyBacktestResult:
     equity_curve: list[dict[str, Any]]
     weights_history: list[dict[str, Any]]
     notes: list[str]
+    benchmark_equity_curve: list[dict[str, Any]] = field(default_factory=list)
+    start_date: str | None = None
+    end_date: str | None = None
 
 
 def _build_price_panel(symbols: list[str], period: str) -> tuple[pd.DataFrame, list[str]]:
@@ -163,8 +166,22 @@ def run_policy_backtest(
     ps = PriceService()
     spy = ps.get_spy_history(period=lookback_period)
     benchmark = 0.0
+    benchmark_rows: list[dict[str, Any]] = []
     if not spy.empty and len(spy) > 2:
         benchmark = float((float(spy["close"].iloc[-1]) / float(spy["close"].iloc[0]) - 1.0) * 100)
+        spy_aligned = spy.copy()
+        spy_aligned["date"] = pd.to_datetime(spy_aligned["date"])
+        spy_series = spy_aligned.set_index("date")["close"].astype(float)
+        spy_aligned_idx = spy_series.reindex(returns.index).ffill().dropna()
+        if len(spy_aligned_idx) >= 2:
+            spy_norm = spy_aligned_idx / float(spy_aligned_idx.iloc[0]) * initial_capital
+            benchmark_rows = [
+                {"date": d.strftime("%Y-%m-%d"), "equity": round(float(v), 2)}
+                for d, v in spy_norm.items()
+            ]
+
+    start_date = equity_rows[0]["date"] if equity_rows else None
+    end_date = equity_rows[-1]["date"] if equity_rows else None
 
     return PolicyBacktestResult(
         policy=policy,
@@ -183,6 +200,9 @@ def run_policy_backtest(
         turnover_pct=metrics["turnover_pct"],
         rebalance_count=rebalance_count,
         equity_curve=equity_rows,
+        benchmark_equity_curve=benchmark_rows,
+        start_date=start_date,
+        end_date=end_date,
         weights_history=weights_rows,
         notes=["Policy simulation only — excludes fees/slippage/taxes."],
     )

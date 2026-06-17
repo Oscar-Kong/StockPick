@@ -36,8 +36,8 @@ class DataFreshnessMeta(FreshnessBase):
     extra_json = Column(Text, nullable=False, default="{}")
 
 
-_engine = get_engine()
-SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False)
+from data.db_engine import get_engine
+from data.db_sessions import SessionLocal
 
 
 def _utcnow() -> datetime:
@@ -45,7 +45,7 @@ def _utcnow() -> datetime:
 
 
 def init_freshness_db() -> None:
-    FreshnessBase.metadata.create_all(bind=_engine)
+    FreshnessBase.metadata.create_all(bind=get_engine())
 
 
 def get_freshness_meta(key: str) -> dict | None:

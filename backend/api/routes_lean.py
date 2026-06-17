@@ -10,12 +10,14 @@ from models.schemas import (
     LeanImportSummaryResponse,
 )
 from services.lean_handoff import build_lean_export, load_lean_export, save_lean_summary
+from utils.demo_guard import require_non_demo_mode
 
 router = APIRouter(prefix="/lean", tags=["lean"])
 
 
 @router.post("/export", response_model=LeanExportResponse)
 def lean_export(body: LeanExportRequest):
+    require_non_demo_mode()
     try:
         export_id, file_path, payload = build_lean_export(body)
     except ValueError as exc:
@@ -47,6 +49,7 @@ def lean_export_get(export_id: str):
 
 @router.post("/import-summary", response_model=LeanImportSummaryResponse)
 def lean_import_summary(body: LeanImportSummaryRequest):
+    require_non_demo_mode()
     try:
         summary_path = save_lean_summary(
             body.export_id,

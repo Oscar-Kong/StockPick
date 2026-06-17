@@ -11,6 +11,7 @@ from data.portfolio_store import (
     init_portfolio_db,
     load_all_ledger_rows,
     repair_ledger_fill_prices,
+    update_account_source,
     upsert_ledger_rows,
 )
 from integrations.robinhood.csv_importer import parse_robinhood_csv
@@ -170,6 +171,7 @@ def test_ensure_holdings_reconciled_fixes_stale_saved_avg_cost():
     finally:
         session.close()
 
+    update_account_source("csv")
     assert ensure_holdings_reconciled() is True
     saved = [h for h in get_current_holdings() if h["symbol"] == "LIDR"]
     assert saved[0]["avg_cost"] == pytest.approx(1.91, rel=1e-4)

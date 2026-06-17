@@ -12,9 +12,15 @@ from config import SCHEDULER_MARKET_CALENDAR
 
 @lru_cache(maxsize=1)
 def _calendar():
-    import exchange_calendars as xcals
-
+    try:
+        import exchange_calendars as xcals
+    except ImportError:
+        return None
     return xcals.get_calendar(SCHEDULER_MARKET_CALENDAR)
+
+
+def calendar_available() -> bool:
+    return _calendar() is not None
 
 
 def to_session_date(ts: Any) -> date | None:
@@ -27,6 +33,8 @@ def to_session_date(ts: Any) -> date | None:
 def session_index_for_date(d: date) -> int | None:
     """Index into calendar sessions on or after d."""
     cal = _calendar()
+    if cal is None:
+        return None
     sessions = cal.sessions
     try:
         sess = cal.date_to_session(d, direction="next")
@@ -43,6 +51,8 @@ def session_index_for_date(d: date) -> int | None:
 
 def forward_session_index(start_idx: int, horizon_sessions: int) -> int | None:
     cal = _calendar()
+    if cal is None:
+        return None
     end = start_idx + horizon_sessions
     if end >= len(cal.sessions):
         return None
@@ -51,6 +61,8 @@ def forward_session_index(start_idx: int, horizon_sessions: int) -> int | None:
 
 def session_date_at(index: int) -> str | None:
     cal = _calendar()
+    if cal is None:
+        return None
     if index < 0 or index >= len(cal.sessions):
         return None
     return str(cal.sessions[index].date())

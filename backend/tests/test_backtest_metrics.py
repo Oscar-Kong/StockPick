@@ -155,6 +155,9 @@ def test_policy_backtest_result_fields():
         "equity_curve",
         "weights_history",
         "notes",
+        "benchmark_equity_curve",
+        "start_date",
+        "end_date",
     }
 
 

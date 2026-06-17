@@ -1,7 +1,7 @@
 // Home — Daily Decision cockpit (Robinhood portfolio).
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
@@ -16,7 +16,9 @@ import {
   setBuyingPower,
 } from "@/lib/api";
 import { filterActiveDecisionItems, mergeHoldingsWithDecisionItems } from "@/lib/dailyDecisionUtils";
+import { activeHomeNoticeIds, homeNoticeId, pruneDismissedNotices } from "@/lib/dismissedNotices";
 import type { BrokerageCsvImportResponse, DailyDashboardResponse } from "@/lib/types";
+import { DismissibleNotice } from "@/components/ui/DismissibleNotice";
 import { useTranslation, useTRef } from "@/lib/i18n";
 import { ActiveHoldingsDecisionTable } from "./daily-decision/ActiveHoldingsDecisionTable";
 import { DailyActionQueue } from "./daily-decision/DailyActionQueue";
@@ -80,6 +82,16 @@ export function DailyDecisionHome() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const activeNoticeKey = useMemo(() => {
+    if (!data) return "";
+    return activeHomeNoticeIds(data).join("\0");
+  }, [data]);
+
+  useEffect(() => {
+    if (!data) return;
+    pruneDismissedNotices(activeHomeNoticeIds(data));
+  }, [activeNoticeKey, data]);
 
   useEffect(() => {
     if (loading) return;
@@ -277,16 +289,16 @@ export function DailyDecisionHome() {
         <>
           {error && <ErrorState message={error} onRetry={() => void load()} />}
           {data.portfolio_warnings?.map((warning) => (
-            <div
+            <DismissibleNotice
               key={warning}
+              noticeId={homeNoticeId.portfolioWarning(warning)}
               className="rounded-xl border border-amber-500/25 bg-amber-500/8 px-4 py-3 text-sm leading-relaxed text-amber-100"
-              role="status"
             >
               {warning}
-            </div>
+            </DismissibleNotice>
           ))}
           <DataFreshnessBanner data={data} />
-          {data.is_demo_data && <DemoDataBanner onImportClick={triggerImport} />}
+          {data.is_demo_data && <DemoDataBanner />}
 
           <DailyDecisionHero
             data={data}
@@ -307,7 +319,9 @@ export function DailyDecisionHome() {
             </>
           ) : (
             <>
-              <DailyActionQueue items={items} />
+              <div id="daily-decisions">
+                <DailyActionQueue items={items} />
+              </div>
 
               <div className="grid gap-5 lg:grid-cols-12 lg:gap-6">
                 <div className="space-y-5 lg:col-span-8">

@@ -250,7 +250,7 @@ export function AnalysisPanel({
     })();
 
     return () => ac.abort();
-  }, [symbol, bucket, initialNotes]);
+  }, [symbol, bucket, initialNotes, tRef]);
 
   useEffect(() => {
     if (!data || data.symbol !== symbol) return;
@@ -316,7 +316,7 @@ export function AnalysisPanel({
         if (!ac.signal.aborted) setV2Loading(false);
       });
     return () => ac.abort();
-  }, [data, symbol, bucket]);
+  }, [data, symbol, bucket, tRef]);
 
   const retryDiagnostics = useCallback(() => {
     diagnosticsOkRef.current = null;
@@ -376,7 +376,7 @@ export function AnalysisPanel({
     }
 
     return () => ac.abort();
-  }, [tab, data, symbol, bucket, insightsRetryTick]);
+  }, [tab, data, symbol, bucket, insightsRetryTick, tRef]);
 
   useEffect(() => {
     if (tab !== "report" || !symbol) return;
@@ -416,7 +416,7 @@ export function AnalysisPanel({
     } finally {
       if (gen === loadGenRef.current) setLoading(false);
     }
-  }, [symbol, bucket]);
+  }, [symbol, bucket, tRef]);
 
   const saveNotes = async () => {
     setSavingNotes(true);
