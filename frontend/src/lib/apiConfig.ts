@@ -29,6 +29,11 @@ export const HEALTH_CHECK_TIMEOUT_MS = 12_000;
 export const HEALTH_RETRY_ATTEMPTS = 4;
 export const HEALTH_RETRY_DELAY_MS = 2_500;
 
+/** Scan job kickoff — may wait for demo guards / DB before returning job id. */
+export const SCAN_REQUEST_TIMEOUT_MS = 120_000;
+/** Each poll is a lightweight in-memory status read. */
+export const SCAN_STATUS_REQUEST_TIMEOUT_MS = 60_000;
+
 export function isBackendWakingError(message: string): boolean {
   const m = message.toLowerCase();
   return (

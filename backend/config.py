@@ -311,7 +311,7 @@ SCAN_STAGE_B_TOP_N = int(os.getenv("SCAN_STAGE_B_TOP_N", "50"))
 SCAN_STAGE_B_TOP_N_FAST = int(os.getenv("SCAN_STAGE_B_TOP_N_FAST", "15"))
 SCAN_PRICE_DOWNLOAD_MAX_SECONDS = float(os.getenv("SCAN_PRICE_DOWNLOAD_MAX_SECONDS", "45"))
 # Stop Stage B deep-scoring after this many seconds and return partial ranked results.
-SCAN_STAGE_B_TIME_BUDGET_SECONDS = float(os.getenv("SCAN_STAGE_B_TIME_BUDGET_SECONDS", "900"))
+SCAN_STAGE_B_TIME_BUDGET_SECONDS = float(os.getenv("SCAN_STAGE_B_TIME_BUDGET_SECONDS", "0"))
 
 # Per-bucket SCAN_RESULT_TTL overrides. Compounder data changes slowly, so we
 # allow operators to keep its "latest" payload warm for much longer than penny.

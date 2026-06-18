@@ -14,7 +14,6 @@ import type {
   FactorExposureResponse,
   PortfolioOptimizeResponse,
   PortfolioPolicyBacktestResponse,
-  PortfolioSourceType,
   PortfolioSummaryResponse,
   RebalancePreviewResponse,
 } from "@/lib/types";
@@ -26,30 +25,36 @@ import {
 } from "@/lib/portfolioUtils";
 import { useTranslation, useTRef } from "@/lib/i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppTabBar, AppTabButton } from "./AppTabs";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { PageContainer } from "@/components/ui/PageContainer";
-import { PortfolioSourceBar } from "./portfolio/PortfolioSourceBar";
-import { PortfolioOverviewTab } from "./portfolio/PortfolioOverviewTab";
-import { PortfolioRebalanceTab } from "./portfolio/PortfolioRebalanceTab";
-import { PortfolioRiskTab } from "./portfolio/PortfolioRiskTab";
-import { PortfolioBacktestTab } from "./portfolio/PortfolioBacktestTab";
-import { PortfolioAdvancedTab } from "./portfolio/PortfolioAdvancedTab";
+import { AppTabBar, AppTabButton } from "@/components/AppTabs";
+import { GhostButton } from "@/components/ui/buttons";
+import { PortfolioRebalanceTab } from "@/components/portfolio/PortfolioRebalanceTab";
+import { PortfolioRiskTab } from "@/components/portfolio/PortfolioRiskTab";
+import { PortfolioBacktestTab } from "@/components/portfolio/PortfolioBacktestTab";
+import { PortfolioAdvancedTab } from "@/components/portfolio/PortfolioAdvancedTab";
+import type { ResearchPanel } from "./usePortfolioTab";
 
-type PanelTab = "overview" | "rebalance" | "risk" | "backtest" | "advanced";
+interface PortfolioResearchProps {
+  active: boolean;
+  holdingSymbols: string[];
+  panel: ResearchPanel;
+  onPanelChange: (panel: ResearchPanel) => void;
+}
 
-export function PortfolioPage() {
+export function PortfolioResearch({
+  active,
+  holdingSymbols,
+  panel,
+  onPanelChange,
+}: PortfolioResearchProps) {
   const { t } = useTranslation();
   const tRef = useTRef();
-  const [panel, setPanel] = useState<PanelTab>("overview");
-  const [source, setSource] = useState<PortfolioSourceType>("current");
-  const [symbolInput, setSymbolInput] = useState("");
+  const [basketInput, setBasketInput] = useState("");
+  const [basketTouched, setBasketTouched] = useState(false);
   const [watchlistSyms, setWatchlistSyms] = useState<string[]>([]);
   const [watchlistError, setWatchlistError] = useState<string | null>(null);
-
   const [summary, setSummary] = useState<PortfolioSummaryResponse | null>(null);
-  const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [summaryLoaded, setSummaryLoaded] = useState(false);
 
   const [objective, setObjective] = useState<
     "max_sharpe" | "min_vol" | "risk_parity" | "target_return" | "kelly"
@@ -85,16 +90,7 @@ export function PortfolioPage() {
   const [backtestResult, setBacktestResult] = useState<PortfolioPolicyBacktestResponse | null>(null);
 
   const benchmark = "SPY";
-
-  const activeSymbols = useMemo(() => {
-    if (source === "current" && summary?.positions.length) {
-      return summary.positions.map((p) => p.symbol);
-    }
-    if (source === "watchlist" && watchlistSyms.length) {
-      return watchlistSyms;
-    }
-    return parseSymbols(symbolInput);
-  }, [source, summary, watchlistSyms, symbolInput]);
+  const activeSymbols = useMemo(() => parseSymbols(basketInput), [basketInput]);
 
   const exposureKey = useMemo(
     () => buildExposureCacheKey({ symbols: activeSymbols, lookback, benchmark }),
@@ -103,29 +99,31 @@ export function PortfolioPage() {
   const exposureStale =
     exposureResult != null && exposureResultKey != null && exposureResultKey !== exposureKey;
 
-  const isHypothetical = source !== "current";
+  useEffect(() => {
+    if (!basketTouched && holdingSymbols.length) {
+      setBasketInput(holdingSymbols.join(", "));
+    }
+  }, [holdingSymbols, basketTouched]);
 
   const loadSummary = useCallback(async () => {
-    setSummaryLoading(true);
     setSummaryError(null);
     try {
       const res = await getPortfolioSummary();
       setSummary(res);
-      if (source === "current" && res.positions.length) {
-        setSymbolInput(res.positions.map((p) => p.symbol).join(", "));
-      }
     } catch (err) {
       setSummaryError(parseApiError(err, tRef.current.portfolio.summaryFailed));
     } finally {
-      setSummaryLoading(false);
+      setSummaryLoaded(true);
     }
-  }, [source, tRef]);
+  }, [tRef]);
 
   useEffect(() => {
+    if (!active || summaryLoaded) return;
     void loadSummary();
-  }, [loadSummary]);
+  }, [active, summaryLoaded, loadSummary]);
 
   useEffect(() => {
+    if (!active) return;
     getWatchlist()
       .then((items) => {
         setWatchlistSyms(items.map((i) => i.symbol));
@@ -134,17 +132,7 @@ export function PortfolioPage() {
       .catch((err) => {
         setWatchlistError(parseApiError(err, tRef.current.portfolio.watchlistFailed));
       });
-  }, [tRef]);
-
-  useEffect(() => {
-    if (source === "watchlist" && watchlistSyms.length) {
-      setSymbolInput(watchlistSyms.join(", "));
-    }
-  }, [source, watchlistSyms]);
-
-  const loadWatchlist = useCallback(() => {
-    if (watchlistSyms.length) setSymbolInput(watchlistSyms.join(", "));
-  }, [watchlistSyms]);
+  }, [active, tRef]);
 
   const runExposure = useCallback(async () => {
     if (activeSymbols.length < 2) {
@@ -176,7 +164,7 @@ export function PortfolioPage() {
   }, [activeSymbols, exposureKey, lookback, benchmark, tRef]);
 
   useEffect(() => {
-    if (panel !== "risk" || activeSymbols.length < 2) return;
+    if (!active || panel !== "exposure" || activeSymbols.length < 2) return;
     if (exposureCacheRef.current?.key === exposureKey) {
       if (exposureResultKey !== exposureKey) {
         setExposureResult(exposureCacheRef.current.data);
@@ -185,7 +173,7 @@ export function PortfolioPage() {
       return;
     }
     void runExposure();
-  }, [panel, exposureKey, activeSymbols.length, runExposure, exposureResultKey]);
+  }, [active, panel, exposureKey, activeSymbols.length, runExposure, exposureResultKey]);
 
   const runOptimize = async () => {
     if (activeSymbols.length < 2) {
@@ -271,57 +259,96 @@ export function PortfolioPage() {
     }
   };
 
+  const resetBasket = () => {
+    setBasketTouched(false);
+    setBasketInput(holdingSymbols.join(", "));
+  };
+
+  const addFromWatchlist = () => {
+    setBasketTouched(true);
+    setBasketInput([...new Set([...activeSymbols, ...watchlistSyms])].join(", "));
+  };
+
+  if (!active) {
+    return <p className="text-sm text-secondary">{t.portfolio.researchInactiveHint}</p>;
+  }
+
   return (
-    <PageContainer className="space-y-4">
-      <PageHeader
-        title={t.portfolio.title}
-        subtitle={t.portfolio.subtitleWorkflow}
-        actions={
-          <AppTabBar aria-label={t.portfolio.toolsAria}>
-            <AppTabButton active={panel === "overview"} onClick={() => setPanel("overview")}>
-              {t.portfolio.tabOverview}
-            </AppTabButton>
-            <AppTabButton active={panel === "rebalance"} onClick={() => setPanel("rebalance")}>
-              {t.portfolio.tabRebalance}
-            </AppTabButton>
-            <AppTabButton active={panel === "risk"} onClick={() => setPanel("risk")}>
-              {t.portfolio.tabRisk}
-            </AppTabButton>
-            <AppTabButton active={panel === "backtest"} onClick={() => setPanel("backtest")}>
-              {t.portfolio.tabBacktest}
-            </AppTabButton>
-            <AppTabButton active={panel === "advanced"} onClick={() => setPanel("advanced")}>
-              {t.portfolio.tabAdvanced}
-            </AppTabButton>
-          </AppTabBar>
-        }
-      />
-
-      <PortfolioSourceBar
-        source={source}
-        onSourceChange={setSource}
-        symbolInput={symbolInput}
-        onSymbolInputChange={setSymbolInput}
-        onLoadWatchlist={loadWatchlist}
-        watchlistSyms={watchlistSyms}
-        summary={summary}
-        summaryLoading={summaryLoading}
-        summaryError={summaryError ?? watchlistError}
-        onRetrySummary={() => void loadSummary()}
-        isHypothetical={isHypothetical}
-      />
-
-      {panel === "overview" && (
-        <PortfolioOverviewTab
-          summary={summary}
-          loading={summaryLoading && !summary}
-          refreshing={summaryLoading && !!summary}
-          error={summaryError}
-          onRetry={() => void loadSummary()}
+    <div className="space-y-4">
+      <section className="portfolio-research-basket surface-card">
+        <div className="portfolio-research-basket__header">
+          <div>
+            <p className="portfolio-source__label">{t.portfolio.researchBasketLabel}</p>
+            <p className="portfolio-source__hint">{t.portfolio.researchBasketHint}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <GhostButton type="button" className="text-xs" onClick={resetBasket} disabled={!holdingSymbols.length}>
+              {t.portfolio.resetToHoldings}
+            </GhostButton>
+            {watchlistSyms.length > 0 && (
+              <GhostButton type="button" className="text-xs" onClick={addFromWatchlist}>
+                {t.portfolio.addFromWatchlist}
+              </GhostButton>
+            )}
+          </div>
+        </div>
+        <textarea
+          id="research-basket-input"
+          value={basketInput}
+          onChange={(e) => {
+            setBasketTouched(true);
+            setBasketInput(e.target.value);
+          }}
+          rows={2}
+          placeholder={t.portfolio.symbolsPlaceholder}
+          className="portfolio-source__textarea"
         />
+        <div className="portfolio-source__chips">
+          {watchlistSyms.slice(0, 12).map((sym) => (
+            <button
+              key={sym}
+              type="button"
+              onClick={() => {
+                setBasketTouched(true);
+                setBasketInput([...new Set([...activeSymbols, sym])].join(", "));
+              }}
+              className="portfolio-source__chip"
+            >
+              +{sym}
+            </button>
+          ))}
+        </div>
+        <p className="portfolio-source__hint">
+          {t.portfolio.selectedCount.replace("{count}", String(activeSymbols.length))}
+          {activeSymbols.length > 0 && activeSymbols.length < 2 ? t.portfolio.needTwo : ""}
+        </p>
+        {(summaryError || watchlistError) && (
+          <p className="portfolio-notice portfolio-notice--error">{summaryError ?? watchlistError}</p>
+        )}
+      </section>
+
+      <AppTabBar aria-label={t.portfolio.researchToolsAria} className="portfolio-research__tabs">
+        <AppTabButton active={panel === "optimize"} onClick={() => onPanelChange("optimize")}>
+          {t.portfolio.tabOptimizeShort}
+        </AppTabButton>
+        <AppTabButton active={panel === "backtest"} onClick={() => onPanelChange("backtest")}>
+          {t.portfolio.tabBacktest}
+        </AppTabButton>
+        <AppTabButton active={panel === "exposure"} onClick={() => onPanelChange("exposure")}>
+          {t.portfolio.tabExposureShort}
+        </AppTabButton>
+        <AppTabButton active={panel === "allocation"} onClick={() => onPanelChange("allocation")}>
+          {t.portfolio.tabAllocationShort}
+        </AppTabButton>
+      </AppTabBar>
+
+      {activeSymbols.length < 2 && (
+        <p className="rounded-lg border border-amber-500/20 bg-amber-500/8 px-3 py-2 text-sm text-amber-100">
+          {t.portfolio.researchNeedSymbols}
+        </p>
       )}
 
-      {panel === "rebalance" && (
+      {panel === "optimize" && (
         <PortfolioRebalanceTab
           symbols={activeSymbols}
           summary={summary}
@@ -350,7 +377,7 @@ export function PortfolioPage() {
         />
       )}
 
-      {panel === "risk" && (
+      {panel === "exposure" && (
         <PortfolioRiskTab
           summary={summary}
           exposureResult={exposureResult}
@@ -387,9 +414,9 @@ export function PortfolioPage() {
         />
       )}
 
-      {panel === "advanced" && <PortfolioAdvancedTab symbols={activeSymbols} />}
+      {panel === "allocation" && <PortfolioAdvancedTab symbols={activeSymbols} />}
 
       <p className="text-xs text-zinc-600">{t.portfolio.quantHint}</p>
-    </PageContainer>
+    </div>
   );
 }

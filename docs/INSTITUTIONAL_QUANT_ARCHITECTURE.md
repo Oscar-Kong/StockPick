@@ -20,7 +20,7 @@ Target-state design for the Stock Picker platform: **penny (3–10d)**, **medium
 | **Scoring** | `WeightedSignal` + `composite_score()` in `screeners/base.py` | Dynamic weights, unified pipeline |
 | **Risk** | `services/alerts.py`, `openbb_governance`, `valuation_warnings` | Unified `RiskScore` 0–100 + deductions |
 | **Dynamic weighting** | `scoring/regime.py` (vol + sector tilt) | IC/IR, decay, 5 regimes, monthly rebalance |
-| **Portfolio** | `portfolio_summary_service.py`, `portfolio_optimizer.py`, `rebalance_service.py`, `policy_backtest.py`, `/portfolio` UI (5 tabs) | Canonical ledger summary (`GET /portfolio/summary`), optimize → rebalance preview (`POST /portfolio/rebalance-preview`), factor exposure, policy backtest |
+| **Portfolio** | `portfolio_summary_service.py`, `portfolio_optimizer.py`, `rebalance_service.py`, `policy_backtest.py`, `PortfolioWorkspace` UI (`/` with Today / Research / Activity tabs) | Canonical ledger summary (`GET /portfolio/summary`), optimize → rebalance preview (`POST /portfolio/rebalance-preview`), factor exposure, policy backtest |
 | **Backtest** | `ml/backtest_*.py`, vectorbt adapter, sweep | Costs, slippage, survivorship, portfolio BT |
 | **Live feedback** | Trade journal, `scripts/factor_validation.py` (IC) | Automated weight updates, factor retire/promote |
 | **Prediction loop** | `score_attribution`, trade journal predictions | `prediction_snapshots` + `prediction_outcomes` on every v2 score |

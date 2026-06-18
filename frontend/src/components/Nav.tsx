@@ -17,7 +17,7 @@ type NavLink = {
 function useNavLinks(): NavLink[] {
   const { t } = useTranslation();
   return [
-    { href: "/", label: t.nav.home },
+    { href: "/", label: t.nav.portfolio },
     {
       href: "/scan",
       label: t.nav.scan,
@@ -28,7 +28,6 @@ function useNavLinks(): NavLink[] {
       label: t.nav.workspace,
       match: ["/workspace", "/watchlist", "/analyze", "/trades"],
     },
-    { href: "/portfolio", label: t.nav.portfolio },
     { href: "/quant-lab", label: t.nav.quantLab, match: ["/quant-lab"] },
     { href: "/library", label: t.nav.library, match: ["/library", "/scans", "/reports"] },
     { href: "/settings", label: t.nav.settings, match: ["/settings"] },
@@ -50,7 +49,7 @@ export function Nav() {
     <>
       <header className="app-nav sticky top-0 z-40">
         <div className="app-nav-inner">
-          <Link href="/" className="app-brand" aria-label="Home">
+          <Link href="/" className="app-brand" aria-label={t.nav.portfolio}>
             <span className="app-brand-mark" aria-hidden />
             <span className="app-brand-text">
               <span className="app-brand-name">Picker</span>

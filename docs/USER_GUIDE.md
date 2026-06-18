@@ -44,11 +44,10 @@ The product focuses on **Penny** (default) and **Compounder**. Legacy **Medium**
 You only need **four routes** for 90% of work:
 
 ```
-Home (/)           → **Daily Decision cockpit** — Robinhood holdings, buy/keep/sell, CSV import, compact trade journal
+Portfolio (/)           → **Portfolio workspace** — Today (decisions), Research (tools), Activity (CSV & journal)
 Screen (/scan)     → discover ranked candidates (Penny + Compounder)
 Research (/workspace) → watchlist + deep dive
 Library (/library) → saved scans & reports
-Portfolio (/portfolio) → basket optimization & policy backtest (research; not daily workflow)
 Quant Lab (/quant-lab) → validation & factor research (not daily workflow)
 ```
 

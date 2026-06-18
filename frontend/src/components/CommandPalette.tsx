@@ -37,7 +37,14 @@ export function CommandPalette() {
 
   const staticItems: CommandItem[] = useMemo(
     () => [
-      { id: "home", label: t.nav.home, hint: t.nav.home, href: "/", group: t.command.go },
+      { id: "portfolio", label: t.nav.portfolio, hint: t.portfolio.workspaceSubtitle, href: "/", group: t.command.go },
+      {
+        id: "portfolio-research",
+        label: t.portfolio.tabResearch,
+        hint: t.portfolio.researchBasketHint,
+        href: "/?tab=research",
+        group: t.command.go,
+      },
       {
         id: "workspace",
         label: t.nav.workspace,
@@ -46,12 +53,11 @@ export function CommandPalette() {
         group: t.command.go,
       },
       { id: "scan", label: t.nav.scan, hint: t.nav.scan, href: "/scan", group: t.command.go },
-      { id: "portfolio", label: t.nav.portfolio, hint: t.nav.portfolio, href: "/portfolio", group: t.command.go },
       { id: "quant-lab", label: t.nav.quantLab, hint: t.home.routeQuantLabHint, href: "/quant-lab", group: t.command.go },
       { id: "library", label: t.nav.library, hint: t.nav.library, href: "/library", group: t.command.go },
       { id: "settings", label: t.nav.settings, hint: t.settings.apiSettingsDesc, href: "/settings", group: t.command.go },
       { id: "intel", label: t.command.traderIntel, href: "/trader-intel", group: t.command.go },
-      { id: "journal", label: t.command.tradeJournal, href: "/?journal=1#home-journal", group: t.command.go },
+      { id: "journal", label: t.command.tradeJournal, href: "/?tab=activity", group: t.command.go },
       { id: "penny", label: t.command.scanPenny, href: "/scan?bucket=penny", group: t.command.screens },
       { id: "compound", label: t.command.scanCompound, href: "/scan?bucket=compounder", group: t.command.screens },
     ],

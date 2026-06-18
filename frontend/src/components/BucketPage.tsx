@@ -6,7 +6,6 @@ import {
   deleteSavedScan,
   getDailyDashboard,
   getLatestScan,
-  getScanStatus,
   listSavedScans,
   saveScanSnapshot,
   startScan,
@@ -23,7 +22,7 @@ import type {
   StockResult,
 } from "@/lib/types";
 import { isStaleTimestamp } from "@/lib/quantHealth";
-import { SCAN_POLL_INTERVAL_MS, SCAN_POLL_MAX_TICKS } from "@/lib/scanPoll";
+import { startScanPoll } from "@/lib/scanPoll";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ScanScoringNote } from "./product/ScanScoringNote";
@@ -79,11 +78,11 @@ export function BucketPage({ bucket, title, description, embedded, onMetaChange 
   const [heldPositions, setHeldPositions] = useState<Map<string, HeldPositionSummary>>(() => new Map());
   const latestScanLoadedRef = useRef(false);
   const presetLoadedRef = useRef(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef = useRef<(() => void) | null>(null);
 
   const clearPoll = useCallback(() => {
     if (pollRef.current) {
-      clearInterval(pollRef.current);
+      pollRef.current();
       pollRef.current = null;
     }
   }, []);
@@ -173,42 +172,31 @@ export function BucketPage({ bucket, title, description, embedded, onMetaChange 
   }, []);
 
   const pollScan = useCallback(
-    async (jobId: string) => {
+    (jobId: string) => {
       clearPoll();
-      let ticks = 0;
-      const interval = setInterval(async () => {
-        ticks += 1;
-        try {
-          const data = await getScanStatus(jobId);
+      const stop = startScanPoll(jobId, {
+        onUpdate: (data) => {
           setProgress(data.progress);
           setMessage(data.message);
           setStatus(data.status);
-          if (data.status === "completed") {
-            setResults(data.results);
-            setLastScanAt(data.completed_at ?? new Date().toISOString());
-            setScoringEngineUsed(data.scoring_engine_used ?? null);
-            setParitySummary(data.parity_summary ?? null);
-            setScanning(false);
-            clearPoll();
-          } else if (data.status === "failed") {
-            setScanning(false);
-            clearPoll();
-          } else if (ticks >= SCAN_POLL_MAX_TICKS) {
-            setScanning(false);
-            setStatus("failed");
-            setMessage(t.scan.scanTimeout);
-            clearPoll();
-          }
-        } catch {
+        },
+        onComplete: (data) => {
+          setResults(data.results);
+          setLastScanAt(data.completed_at ?? new Date().toISOString());
+          setScoringEngineUsed(data.scoring_engine_used ?? null);
+          setParitySummary(data.parity_summary ?? null);
+          setScanning(false);
+          setStatus("completed");
+        },
+        onFailed: (reason) => {
           setScanning(false);
           setStatus("failed");
-          setMessage(t.scan.statusFetchFailed);
-          clearPoll();
-        }
-      }, SCAN_POLL_INTERVAL_MS);
-      pollRef.current = interval;
+          setMessage(reason);
+        },
+      });
+      pollRef.current = stop;
     },
-    [t, clearPoll]
+    [clearPoll]
   );
 
   const handleScan = async () => {
@@ -220,7 +208,7 @@ export function BucketPage({ bucket, title, description, embedded, onMetaChange 
     setParitySummary(null);
     try {
       const job = await startScan(bucket, options);
-      await pollScan(job.job_id);
+      pollScan(job.job_id);
     } catch (err) {
       setScanning(false);
       setStatus("failed");

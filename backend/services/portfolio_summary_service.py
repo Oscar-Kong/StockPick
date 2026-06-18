@@ -122,7 +122,7 @@ def build_portfolio_summary(*, include_freshness: bool = True) -> dict[str, Any]
         price_as_of = str(snap["created_at"])[:10]
 
     freshness = dashboard.freshness
-    price_status = assess_freshness("prices") if include_freshness else None
+    price_status = assess_freshness("latest_prices") if include_freshness else None
 
     warnings: list[str] = list(dashboard.portfolio_warnings or [])
     stale = bool(dashboard.decision_stale_warning) or (
@@ -153,7 +153,7 @@ def build_portfolio_summary(*, include_freshness: bool = True) -> dict[str, Any]
         "portfolio_beta": _portfolio_beta(holdings, decision_by_sym),
         "estimated_annual_volatility": None,
         "holdings_updated_at": as_of,
-        "last_price_update_at": price_status.as_of if price_status else price_as_of,
+        "last_price_update_at": price_status.last_updated_at if price_status else price_as_of,
         "risk_model_through": price_as_of,
         "positions": positions,
         "source": "portfolio_ledger",

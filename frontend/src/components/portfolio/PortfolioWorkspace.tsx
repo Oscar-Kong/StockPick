@@ -1,12 +1,11 @@
-// Home — Daily Decision cockpit (Robinhood portfolio).
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
-import { SectionCard } from "@/components/ui/AppCard";
 import { PageContainer } from "@/components/ui/PageContainer";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { AppTabBar, AppTabButton } from "@/components/AppTabs";
 import {
   getDailyDashboard,
   getHomeRefreshStatus,
@@ -15,31 +14,27 @@ import {
   runDailyDecisionNow,
   setBuyingPower,
 } from "@/lib/api";
-import { filterActiveDecisionItems, mergeHoldingsWithDecisionItems } from "@/lib/dailyDecisionUtils";
 import { activeHomeNoticeIds, homeNoticeId, pruneDismissedNotices } from "@/lib/dismissedNotices";
 import type { BrokerageCsvImportResponse, DailyDashboardResponse } from "@/lib/types";
 import { DismissibleNotice } from "@/components/ui/DismissibleNotice";
 import { useTranslation, useTRef } from "@/lib/i18n";
-import { ActiveHoldingsDecisionTable } from "./daily-decision/ActiveHoldingsDecisionTable";
-import { DailyActionQueue } from "./daily-decision/DailyActionQueue";
-import { DailyDecisionHero, PortfolioSummaryStrip } from "./daily-decision/DailyDecisionHero";
-import {
-  ClosedPositionsPanel,
-  EmptyPortfolioState,
-  PennyOpportunitiesPanel,
-} from "./daily-decision/DailyDecisionPanels";
-import { DataFreshnessBanner } from "./daily-decision/DataFreshnessBanner";
-import { DemoDataBanner } from "./daily-decision/DemoDataBanner";
-import { HomeJournalPanel } from "./HomeJournalPanel";
-import { RiskAlertsPanel } from "./daily-decision/RiskAlertsPanel";
+import { DataFreshnessBanner } from "@/components/dashboard/daily-decision/DataFreshnessBanner";
+import { DemoDataBanner } from "@/components/dashboard/daily-decision/DemoDataBanner";
+import { PortfolioToday } from "./PortfolioToday";
+import { PortfolioResearch } from "./PortfolioResearch";
+import { PortfolioActivity } from "./PortfolioActivity";
+import { usePortfolioTab } from "./usePortfolioTab";
 
 const POLL_MS = 5000;
 
-export function DailyDecisionHome() {
+export function PortfolioWorkspace() {
   const { t } = useTranslation();
   const tRef = useTRef();
+  const { tab, researchPanel, setTab, setResearchPanel, initialTabHint } = usePortfolioTab();
   const fileRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const legacyHandled = useRef(false);
+
   const [data, setData] = useState<DailyDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
@@ -47,7 +42,6 @@ export function DailyDecisionHome() {
   const [importing, setImporting] = useState(false);
   const [savingCash, setSavingCash] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<string | null>(null);
   const [cashInput, setCashInput] = useState("");
   const [ipoSharesInput, setIpoSharesInput] = useState("");
   const [ipoListPriceInput, setIpoListPriceInput] = useState("");
@@ -83,6 +77,17 @@ export function DailyDecisionHome() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (legacyHandled.current || loading) return;
+    if (initialTabHint === "activity") {
+      legacyHandled.current = true;
+      setTab("activity");
+    } else if (initialTabHint === "research") {
+      legacyHandled.current = true;
+      setTab("research");
+    }
+  }, [initialTabHint, loading, setTab]);
+
   const activeNoticeKey = useMemo(() => {
     if (!data) return "";
     return activeHomeNoticeIds(data).join("\0");
@@ -92,16 +97,6 @@ export function DailyDecisionHome() {
     if (!data) return;
     pruneDismissedNotices(activeHomeNoticeIds(data));
   }, [activeNoticeKey, data]);
-
-  useEffect(() => {
-    if (loading) return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("journal") === "1" || window.location.hash === "#home-journal") {
-      requestAnimationFrame(() => {
-        document.getElementById("home-journal")?.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
-    }
-  }, [loading, data]);
 
   useEffect(() => {
     if (data?.cash != null && data.cash > 0 && !cashInput.trim()) {
@@ -146,7 +141,6 @@ export function DailyDecisionHome() {
             await load({ silent: true, skipAutoRefresh: true });
           }
         } catch {
-          // Job may have expired after server restart — fall back to dashboard polling.
           setRefreshJobId(null);
           await load({ silent: true, skipAutoRefresh: true });
         }
@@ -170,7 +164,6 @@ export function DailyDecisionHome() {
       if (res.job_id) {
         setRefreshJobId(res.job_id);
       } else if (res.status === "running") {
-        // Backend refresh already in progress — poll dashboard until it clears.
         setRefreshJobId(null);
       } else if (res.status === "completed") {
         await load({ silent: true, skipAutoRefresh: true });
@@ -204,7 +197,11 @@ export function DailyDecisionHome() {
     if (!cashInput.trim() || Number.isNaN(cash) || cash < 0) return;
     const ipoShares = Number(ipoSharesInput);
     const ipoListPrice = Number(ipoListPriceInput);
-    const hasIpoOrder = ipoSharesInput.trim() !== "" && ipoListPriceInput.trim() !== "" && ipoShares > 0 && ipoListPrice > 0;
+    const hasIpoOrder =
+      ipoSharesInput.trim() !== "" &&
+      ipoListPriceInput.trim() !== "" &&
+      ipoShares > 0 &&
+      ipoListPrice > 0;
     const reserved = hasIpoOrder
       ? Math.round(ipoShares * ipoListPrice * 1.2 * 100) / 100
       : Number(reservedInput) || 0;
@@ -240,36 +237,19 @@ export function DailyDecisionHome() {
     }
   };
 
-  const hasHoldings = (data?.holdings.length ?? 0) > 0;
-  const items = mergeHoldingsWithDecisionItems(
-    data?.holdings ?? [],
-    filterActiveDecisionItems(data?.decision?.items ?? [])
+  const holdingSymbols = useMemo(
+    () => (data?.holdings ?? []).map((h) => h.symbol),
+    [data?.holdings]
   );
-  const showPennyOps =
-    !data?.is_demo_data && hasHoldings && (data?.top_penny_opportunities.length ?? 0) > 0;
 
-  const csvImportProps = {
-    cashInput,
-    onCashChange: setCashInput,
-    ipoSharesInput,
-    onIpoSharesChange: setIpoSharesInput,
-    ipoListPriceInput,
-    onIpoListPriceChange: setIpoListPriceInput,
-    reservedInput,
-    onReservedChange: setReservedInput,
-    replaceImport,
-    onReplaceChange: setReplaceImport,
-    onImportClick: triggerImport,
-    onSaveBuyingPower: () => void saveBuyingPower(),
-    savingCash,
-    importing,
-    lastImport,
-    csvRowsLoaded: data?.csv_rows_loaded,
-    ledgerRowsCount: data?.ledger_rows_count,
+  const tabLabel = (id: typeof tab) => {
+    if (id === "today") return t.portfolio.tabToday;
+    if (id === "research") return t.portfolio.tabResearch;
+    return t.portfolio.tabActivity;
   };
 
   return (
-    <PageContainer className="home">
+    <PageContainer className="portfolio-workspace">
       <input
         ref={fileRef}
         type="file"
@@ -281,12 +261,30 @@ export function DailyDecisionHome() {
         }}
       />
 
+      <PageHeader
+        title={t.portfolio.workspaceTitle}
+        subtitle={t.portfolio.workspaceSubtitle}
+        actions={
+          <AppTabBar aria-label={t.portfolio.workspaceTabsAria} className="portfolio-workspace__tabs">
+            <AppTabButton active={tab === "today"} onClick={() => setTab("today")}>
+              {tabLabel("today")}
+            </AppTabButton>
+            <AppTabButton active={tab === "research"} onClick={() => setTab("research")}>
+              {tabLabel("research")}
+            </AppTabButton>
+            <AppTabButton active={tab === "activity"} onClick={() => setTab("activity")}>
+              {tabLabel("activity")}
+            </AppTabButton>
+          </AppTabBar>
+        }
+      />
+
       {loading && !data ? (
         <LoadingSkeleton variant="home" />
       ) : error && !data ? (
         <ErrorState message={error} onRetry={() => void load()} />
       ) : data ? (
-        <>
+        <div className="space-y-4">
           {error && <ErrorState message={error} onRetry={() => void load()} />}
           {data.portfolio_warnings?.map((warning) => (
             <DismissibleNotice
@@ -300,61 +298,51 @@ export function DailyDecisionHome() {
           <DataFreshnessBanner data={data} />
           {data.is_demo_data && <DemoDataBanner />}
 
-          <DailyDecisionHero
-            data={data}
-            onRunNow={() => void runNow()}
-            onRefreshData={() => void refreshData(true)}
-            onImportClick={triggerImport}
-            running={running}
-            refreshing={refreshing}
-            canRun={hasHoldings && !data.is_demo_data}
-          />
-
-          {hasHoldings && <PortfolioSummaryStrip data={data} />}
-
-          {!hasHoldings ? (
-            <>
-              <EmptyPortfolioState onImportClick={triggerImport} />
-              <HomeJournalPanel csvImport={csvImportProps} />
-            </>
-          ) : (
-            <>
-              <div id="daily-decisions">
-                <DailyActionQueue items={items} />
-              </div>
-
-              <div className="grid gap-5 lg:grid-cols-12 lg:gap-6">
-                <div className="space-y-5 lg:col-span-8">
-                  <SectionCard
-                    title={t.home.dailyHoldingsTitle}
-                    subtitle={t.home.dailyHoldingsSubtitle}
-                    variant="elevated"
-                    action={
-                      <Link href="/scan?bucket=penny" className="text-sm font-medium text-brand hover:underline">
-                        {t.home.dailyPennyScan}
-                      </Link>
-                    }
-                  >
-                    <ActiveHoldingsDecisionTable
-                      items={items}
-                      expanded={expanded}
-                      onToggle={(sym) => setExpanded((cur) => (cur === sym ? null : sym))}
-                    />
-                  </SectionCard>
-
-                  {showPennyOps && <PennyOpportunitiesPanel items={data.top_penny_opportunities} />}
-                  <ClosedPositionsPanel closed={data.closed_positions ?? []} />
-                </div>
-
-                <aside className="space-y-5 lg:col-span-4">
-                  <RiskAlertsPanel alerts={data.risk_alerts ?? []} />
-                  <HomeJournalPanel csvImport={csvImportProps} />
-                </aside>
-              </div>
-            </>
+          {tab === "today" && (
+            <PortfolioToday
+              data={data}
+              running={running}
+              refreshing={refreshing}
+              onRunNow={() => void runNow()}
+              onRefreshData={() => void refreshData(true)}
+              onImportClick={() => {
+                setTab("activity");
+                triggerImport();
+              }}
+              onOpenActivity={() => setTab("activity")}
+            />
           )}
 
-        </>
+          {tab === "research" && (
+            <PortfolioResearch
+              active
+              holdingSymbols={holdingSymbols}
+              panel={researchPanel}
+              onPanelChange={setResearchPanel}
+            />
+          )}
+
+          {tab === "activity" && (
+            <PortfolioActivity
+              data={data}
+              cashInput={cashInput}
+              onCashChange={setCashInput}
+              ipoSharesInput={ipoSharesInput}
+              onIpoSharesChange={setIpoSharesInput}
+              ipoListPriceInput={ipoListPriceInput}
+              onIpoListPriceChange={setIpoListPriceInput}
+              reservedInput={reservedInput}
+              onReservedChange={setReservedInput}
+              replaceImport={replaceImport}
+              onReplaceChange={setReplaceImport}
+              onImportClick={triggerImport}
+              onSaveBuyingPower={() => void saveBuyingPower()}
+              savingCash={savingCash}
+              importing={importing}
+              lastImport={lastImport}
+            />
+          )}
+        </div>
       ) : null}
     </PageContainer>
   );

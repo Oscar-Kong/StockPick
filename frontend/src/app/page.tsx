@@ -1,6 +1,15 @@
-// Home — daily portfolio decision dashboard.
-import { DailyDecisionHome } from "@/components/dashboard/DailyDecisionHome";
+import { Suspense } from "react";
+import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
+import { PortfolioWorkspace } from "@/components/portfolio/PortfolioWorkspace";
 
-export default function Home() {
-  return <DailyDecisionHome />;
+function PortfolioPageInner() {
+  return <PortfolioWorkspace />;
+}
+
+export default function PortfolioPage() {
+  return (
+    <Suspense fallback={<LoadingSkeleton variant="home" />}>
+      <PortfolioPageInner />
+    </Suspense>
+  );
 }

@@ -27,6 +27,12 @@ def json_safe(obj: Any) -> Any:
         return [json_safe(v) for v in obj]
     if obj is None or isinstance(obj, (str, int, float, bool)):
         return obj
+    mod = getattr(type(obj), "__module__", "") or ""
+    if mod.startswith("numpy") and hasattr(obj, "item"):
+        try:
+            return json_safe(obj.item())
+        except Exception:
+            pass
     type_name = type(obj).__name__
     if type_name in ("bool_", "int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64"):
         return int(obj)

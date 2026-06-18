@@ -72,6 +72,11 @@ export function ScanInlineStatus({
         {message && (scanning || status === "running") && (
           <span className="scan-inline-status__message truncate">{message}</span>
         )}
+        {status === "failed" && message && (
+          <span className="scan-inline-status__failure" role="alert" title={message}>
+            {message}
+          </span>
+        )}
         <span className="scan-inline-status__sep" aria-hidden>
           ·
         </span>

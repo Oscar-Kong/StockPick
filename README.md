@@ -13,16 +13,18 @@ It combines rule-based screening, data reconciliation, optional OpenBB governanc
 
 From one UI, you can:
 
-1. **Home** — daily buy/keep/sell dashboard for your Robinhood holdings (`/`). Import Robinhood CSV or log a **manual journal trade** (with quantity) to rebuild positions. When Robinhood's **Price** column disagrees with **Amount ÷ Quantity** (e.g. Price $1.19 vs $19.10 ÷ 10 = **$1.91**), the importer and ledger repair use the cash amount as the fill price and rebuild average cost. Shows the latest saved snapshot immediately; if holdings, prices, or decisions are stale, the UI marks status as **Updating** and refreshes in the background (holdings → prices → daily decision; penny scan runs async). Use **Refresh data now** to force a sync.
+1. **Portfolio** (`/`) — unified workspace with three tabs:
+   - **Today** — daily buy/keep/sell decisions, holdings table, risk alerts, penny opportunities
+   - **Research** — optimize, backtest, factor exposure, allocation (what-if basket from holdings)
+   - **Activity** — Robinhood CSV import, buying power, trade journal, closed positions
 2. **Scan** a bucket and rank candidates (`/scan`)
 3. **Workspace** — watchlist and single-symbol analyze (primary score from `/api/v2/score` when enabled) (`/workspace`)
-4. **Portfolio** — overview, rebalance preview, risk diagnostics, policy backtests (`/portfolio`; daily decisions on Home)
-5. **Quant Lab** — latest evidence cards, **Research Reliability** scores per tab, validation tabs, research on demand (`/quant-lab`)
-6. **Library** — saved scans, research reports, analyze snapshots (`/library`)
-7. **Settings** — language, API providers, ops (`/settings`)
-8. **Trader Intel** — style presets and bucket tilts (`/trader-intel`, secondary nav link)
+4. **Quant Lab** — latest evidence cards, **Research Reliability** scores per tab, validation tabs, research on demand (`/quant-lab`)
+5. **Library** — saved scans, research reports, analyze snapshots (`/library`)
+6. **Settings** — language, API providers, ops (`/settings`)
+7. **Trader Intel** — style presets and bucket tilts (`/trader-intel`, secondary nav link)
 
-Top navigation: **Home · Scan · Workspace · Portfolio · Quant Lab · Library · Settings**. Trade journal is a compact panel on **Home** (`/?journal=1#home-journal`). Legacy routes (`/penny`, `/watchlist`, `/trades`, etc.) redirect.
+Top navigation: **Portfolio · Scan · Workspace · Quant Lab · Library · Settings**. Legacy `/portfolio` redirects to `/?tab=research`; `/trades` redirects to `/?tab=activity`. Other legacy routes (`/penny`, `/watchlist`, etc.) redirect as documented below.
 
 ## Scan vs Workspace vs Quant Lab
 
@@ -124,7 +126,7 @@ For a low-CPU option, use production mode: `npm run build && npm run start`.
 
 Open: [http://127.0.0.1:18730](http://127.0.0.1:18730)
 
-**Language:** use the gear icon (top right) → **English** / **中文**. Preference is stored in `localStorage` (`picker-locale`). All pages and major UI chrome are translated (Home, Research, Screen, Portfolio, Library, Settings, Trader Intel). Scan pick summaries respect locale when LLM is enabled. API-sourced content (reports, alerts, provider labels) remains in the language returned by the backend.
+**Language:** use the gear icon (top right) → **English** / **中文**. Preference is stored in `localStorage` (`picker-locale`). All pages and major UI chrome are translated (Portfolio, Research, Screen, Library, Settings, Trader Intel). Scan pick summaries respect locale when LLM is enabled. API-sourced content (reports, alerts, provider labels) remains in the language returned by the backend.
 
 ### One-command local start
 
@@ -261,7 +263,7 @@ Optional LLM profile tuning:
 - `POST /portfolio/rebalance-preview` — dollar/share trade preview from target weights
 - `POST /portfolio/optimize`
 - `POST /portfolio/policy-backtest` (includes normalized SPY benchmark curve)
-- `POST /portfolio/factor-exposure` — betas vs SPY, rolling correlation, PCA loadings (Portfolio → Risk tab)
+- `POST /portfolio/factor-exposure` — betas vs SPY, rolling correlation, PCA loadings (Portfolio → Research → Exposure)
 - `GET /ml/alpha/latest`
 - `POST /ml/alpha/ingest`
 - `GET /allocation/recommendation/{bucket}`

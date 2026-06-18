@@ -26,7 +26,7 @@ You are working in the Stock Picker 美股 repo (FastAPI backend + Next.js front
 7. If quant/scoring: also follow `.cursor/rules/quant-stock-picker.mdc`.
 
 ## Project map (start here)
-- Home daily decision cockpit: `frontend/src/components/dashboard/DailyDecisionHome.tsx`, `backend/services/home_dashboard_service.py`, `backend/services/refresh_orchestrator.py`
+- Portfolio workspace: `frontend/src/components/portfolio/PortfolioWorkspace.tsx`, `backend/services/home_dashboard_service.py`, `backend/services/refresh_orchestrator.py`
 - Portfolio / Robinhood CSV: `backend/services/portfolio_snapshot_service.py`, `backend/integrations/robinhood/`
 - Trade journal → portfolio sync: `backend/api/routes_trades.py`, `frontend/src/components/TradeJournal.tsx`
 - User-facing guide: `docs/USER_GUIDE.md`

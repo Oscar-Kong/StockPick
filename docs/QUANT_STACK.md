@@ -37,7 +37,7 @@ Use `backend/quant/contracts.py` as the shared contract seed.
 
 Backtest and sweep: **Workspace → Analyze → Backtest**.
 
-Portfolio optimize and policy backtest: **`/portfolio`**.
+Portfolio optimize and policy backtest: **Portfolio** → `/?tab=research` (legacy `/portfolio` redirects).
 
 Still API-only: allocation recommendation, LEAN export, alpha ingest UI. See [PROJECT_INVENTORY.md](PROJECT_INVENTORY.md).
 

@@ -19,6 +19,7 @@ import { DataQualityBadge } from "./DataQualityBadge";
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
 import { ResearchReport } from "./ResearchReport";
 import { ScanPickSummaryCell } from "./ScanPickSummaryCell";
+import { ScanTradeHintCell } from "@/components/scan/ScanTradeHintCell";
 import { ScoreBreakdown } from "./ScoreBreakdown";
 import { UnifiedRiskPanel } from "./UnifiedRiskPanel";
 import { ValuationBadges } from "./ValuationBadges";
@@ -238,6 +239,10 @@ export function StockDetailDrawer({
             <StatTile
               label={t.analysis.riskLabel}
               value={<RiskBadge level={stock.risk_level} />}
+            />
+            <StatTile
+              label={t.scan.recommendationCol}
+              value={<ScanTradeHintCell stock={stock} />}
             />
             {v2Score?.recommendation && (
               <StatTile

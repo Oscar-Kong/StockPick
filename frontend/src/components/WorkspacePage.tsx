@@ -4,6 +4,7 @@
 import { AnalysisPanel } from "@/components/AnalysisPanel";
 import { WatchlistImport } from "@/components/WatchlistImport";
 import { WatchlistRail } from "@/components/WatchlistRail";
+import { ErrorState } from "@/components/ui/ErrorState";
 import {
   getAnalyzeWatchlist,
   getWatchlist,
@@ -12,6 +13,7 @@ import {
 } from "@/lib/api";
 import type { AnalyzeWatchlistRow, WatchlistItem } from "@/lib/types";
 import { fmt, useTranslation } from "@/lib/i18n";
+import { explainWorkspaceLoadError } from "@/lib/workspaceLoadError";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -24,7 +26,7 @@ function WorkspaceContent() {
 
   useEffect(() => {
     if (tabParam === "journal") {
-      router.replace("/?journal=1#home-journal");
+      router.replace("/?tab=activity");
       return;
     }
     if (tabParam === "compare") {
@@ -46,6 +48,7 @@ function WorkspaceContent() {
   const [filter, setFilter] = useState("");
   const [showImport, setShowImport] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const autoPickedRef = useRef(false);
 
   const symbolOrder = useMemo(() => items.map((i) => i.symbol.toUpperCase()), [items]);
@@ -78,6 +81,7 @@ function WorkspaceContent() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const [analyzeRes, watchlist] = await Promise.all([
         getAnalyzeWatchlist(),
@@ -103,13 +107,14 @@ function WorkspaceContent() {
         setSelectedNotes(first.notes);
         setSelectedBucket(first.bucket);
       }
-    } catch {
+    } catch (err) {
       setMatrix([]);
       setItems([]);
+      setFetchError(explainWorkspaceLoadError(err, t));
     } finally {
       setLoading(false);
     }
-  }, [initialSymbol, selected]);
+  }, [initialSymbol, selected, t]);
 
   useEffect(() => {
     void load();
@@ -173,6 +178,15 @@ function WorkspaceContent() {
         </div>
       </header>
 
+      {fetchError && (
+        <div className="workspace-fetch-notice shrink-0 px-3 pb-2 md:px-4">
+          <ErrorState
+            message={`${t.workspace.fetchFailedTitle}. ${fetchError}`}
+            onRetry={() => void load()}
+          />
+        </div>
+      )}
+
       <div className="workspace-research">
         <div className="workspace-frame">
           <aside className="workspace-rail hidden md:flex">
@@ -217,9 +231,9 @@ function WorkspaceContent() {
                 </select>
               </div>
 
-              {selected ? (
+              {selected && !loading ? (
                 <AnalysisPanel
-                  key={`${selected}-${selectedBucket ?? "auto"}`}
+                  key={selected}
                   symbol={selected}
                   bucket={selectedBucket}
                   initialNotes={selectedNotes}
@@ -228,6 +242,10 @@ function WorkspaceContent() {
                   nextSymbol={nextSymbol}
                   onNavigateSymbol={selectSymbol}
                 />
+              ) : selected && loading ? (
+                <div className="flex flex-1 items-center justify-center p-10 text-center text-sm text-secondary">
+                  {t.workspace.loading}
+                </div>
               ) : (
                 <div className="flex flex-1 items-center justify-center p-10 text-center text-sm text-zinc-500">
                   {t.workspace.selectFromWatchlist}

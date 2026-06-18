@@ -34,6 +34,7 @@ import { V2FallbackBanner } from "./V2FallbackBanner";
 import { FactorAttributionTable } from "./quant/FactorAttributionTable";
 import { NotFinancialAdviceFooter } from "./ui/NotFinancialAdviceFooter";
 import { ResearchWarning } from "./ui/ResearchWarning";
+import { ErrorState } from "./ui/ErrorState";
 import { SimilarSignalBlock } from "./SimilarSignalBlock";
 import { ValuationBlock } from "./ValuationBlock";
 import {
@@ -42,6 +43,7 @@ import {
   scoreSourcesDiffer,
   type V2UnavailableReason,
 } from "@/lib/v2Score";
+import { explainAnalysisLoadError, isAbortError } from "@/lib/workspaceLoadError";
 
 interface AnalysisPanelProps {
   symbol: string;
@@ -241,8 +243,8 @@ export function AnalysisPanel({
         if (gen !== loadGenRef.current) return;
         setData(res);
       } catch (err) {
-        if (ac.signal.aborted || gen !== loadGenRef.current) return;
-        setError(err instanceof Error ? err.message : tRef.current.analysis.failed);
+        if (ac.signal.aborted || gen !== loadGenRef.current || isAbortError(err)) return;
+        setError(explainAnalysisLoadError(err, tRef.current, symbol));
         setData(null);
       } finally {
         if (gen === loadGenRef.current) setLoading(false);
@@ -411,8 +413,8 @@ export function AnalysisPanel({
       if (gen !== loadGenRef.current) return;
       setData(res);
     } catch (err) {
-      if (ac.signal.aborted || gen !== loadGenRef.current) return;
-      setError(err instanceof Error ? err.message : tRef.current.analysis.failed);
+      if (ac.signal.aborted || gen !== loadGenRef.current || isAbortError(err)) return;
+      setError(explainAnalysisLoadError(err, tRef.current, symbol));
     } finally {
       if (gen === loadGenRef.current) setLoading(false);
     }
@@ -478,10 +480,10 @@ export function AnalysisPanel({
               : "analysis-shell p-6"
           }
         >
-          <p className="text-sm text-red-400">{error}</p>
-          <button type="button" onClick={() => void refresh()} className="btn-ghost mt-3 px-3 py-1.5 text-xs">
-            {t.common.retry}
-          </button>
+          <ErrorState
+            message={`${t.analysis.fetchFailedTitle}. ${error}`}
+            onRetry={() => void refresh()}
+          />
         </div>
       );
     }

@@ -1,8 +1,21 @@
 """Pydantic v1/v2 model_dump compatibility."""
 from __future__ import annotations
 
+import pytest
+
 from models.schemas_v2 import FactorContributionV2
-from utils.pydantic_util import model_to_dict
+from utils.pydantic_util import json_safe, model_to_dict
+
+
+def test_json_safe_coerces_numpy_bool():
+    import json
+
+    np = pytest.importorskip("numpy")
+    payload = {"score_adjusted_for_data_quality": np.bool_(True), "raw_score": np.float64(53.9)}
+    safe = json_safe(payload)
+    json.dumps(safe)
+    assert safe["score_adjusted_for_data_quality"] is True
+    assert isinstance(safe["raw_score"], float)
 
 
 def test_factor_contribution_v2_serializes():

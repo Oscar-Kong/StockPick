@@ -66,7 +66,7 @@ Open: `http://127.0.0.1:18730`
 | Scan      | `/scan` → run one bucket                        |
 | Workspace | Add ticker to watchlist → open Research         |
 | Analyze   | Quant tab shows signal bars; Refresh works      |
-| Portfolio | `/portfolio` — Optimize, Policy backtest, Exposure, Allocation, Daily decisions (2+ symbols for basket tools) |
+| Portfolio | `/` — Today (decisions), Research (optimize/backtest/exposure/allocation), Activity (CSV, journal) |
 | Library   | Save a scan or report, visible under `/library` |
 | Journal   | Home → Journal panel (`/?journal=1#home-journal`) |
 
@@ -142,7 +142,9 @@ Set `UNIVERSE_SCAN_BATCH_SIZE=0` in `.env` to scan the full list instead of the 
 
 **Bulk scan fast path:** universe scans set `services.scan_context.set_bulk_scan(True)` for the job thread. While active, Stage B skips per-symbol reconcile, StockTwits/Finnhub sentiment, and OpenBB governance fetches. Single-symbol **Workspace → Analyze** keeps full depth. Set `OPENBB_ON_SCAN=false` as well for fastest scans.
 
-**UI poll window:** the scan page polls for up to 15 minutes (`SCAN_POLL_MAX_TICKS` × 1.5s in `frontend/src/lib/scanPoll.ts`). If you see a timeout message but the backend is still running, refresh and use **Load last scan**.
+**UI poll window:** the scan page polls until the backend job completes or fails — no client-side wall-clock cap. Transient status-fetch errors retry; after 20 consecutive failures the UI shows the error message. Use **Load last scan** if you navigated away mid-run.
+
+**Trade hint column:** each scan row includes `metrics.recommendation`, `buy_pct`, and `wait_pct` — a research-only buy vs wait mix derived from score, sleeve, risk, data quality, and earnings flags. Hover the cell for a one-line reason. Cached scans without these fields are approximated client-side until re-scanned.
 
 These were previously hard-coded inside `backend/services/scan_manager.py`. They are now configurable:
 
@@ -153,7 +155,7 @@ These were previously hard-coded inside `backend/services/scan_manager.py`. They
 | `SCAN_STAGE_B_TOP_N`              | `50`                             | Max candidates deep-scored per scan (`mode=deep`).                                     |
 | `SCAN_STAGE_B_TOP_N_FAST`         | `15`                             | Candidate cap when `ScanOptions.mode="fast"` — used for low-latency exploratory scans. |
 | `SCAN_PRICE_DOWNLOAD_MAX_SECONDS` | `45`                             | Hard cap (seconds) on the Stage A bulk OHLC provider fetch.                            |
-| `SCAN_STAGE_B_TIME_BUDGET_SECONDS`| `900`                            | Stop Stage B after this many seconds; return partial ranked results.                   |
+| `SCAN_STAGE_B_TIME_BUDGET_SECONDS`| `0` (unlimited)                  | Stop Stage B after this many seconds; `0` = score all candidates. Partial results if capped. |
 | `SCAN_RESULT_TTL_PENNY`           | inherits `SCAN_RESULT_TTL` (900) | TTL for `scan:latest:penny`.                                                           |
 | `SCAN_RESULT_TTL_COMPOUNDER`      | `86400`                          | TTL for `scan:latest:compounder`; compounder data changes slowly.                      |
 
@@ -228,6 +230,25 @@ Or production mode: `npm run build && npm run start`
 - Bucket-fit loads three screeners — wait for sidebar tiles
 - Use **Refresh** sparingly on large names
 - Check `ANALYZE_ROUTE_TIMEOUT_SECONDS` in config
+
+### “Analysis unavailable” while `/health` works
+
+The workspace shows this when the **browser** reports a network failure (`Failed to fetch`) — not only when the API process is down.
+
+1. Open DevTools → **Network** → find the failed `/analyze/{symbol}` request.
+2. **(failed)** with no status, or a CORS console error → your UI origin is not in `ALLOWED_ORIGINS`. Dev defaults allow `http://localhost:18730` and `http://127.0.0.1:18730`; custom `.env` overrides replace those defaults.
+3. **(canceled)** → request aborted on refresh/navigation; retry or wait for the watchlist to finish loading first.
+4. **504 / pending then failed** → analyze timed out or the connection dropped mid-request; retry or raise `ANALYZE_ROUTE_TIMEOUT_SECONDS`.
+5. **500 on `/analyze/...?refresh=1`** → backend bug during fresh analyze (e.g. numpy scalars in the JSON snapshot). Check the API response `message` field or backend logs; cached requests without `refresh=1` may still return 200.
+
+Quick check from the same machine:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:18731/health
+curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:18731/analyze/CLOV
+```
+
+Both should return `200`. If curl succeeds but the browser fails, suspect CORS or a non-default UI URL (LAN IP, forwarded port, `localhost` vs `127.0.0.1` mismatch in `ALLOWED_ORIGINS`).
 
 ### `engine=vectorbt` fails
 

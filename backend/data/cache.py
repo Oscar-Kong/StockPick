@@ -9,6 +9,7 @@ from config import FUNDAMENTALS_CACHE_TTL, PRICE_CACHE_TTL
 from data.db_engine import get_engine
 from data.db_sessions import SessionLocal
 from utils.datetime_util import utc_iso_z, utc_now
+from utils.pydantic_util import json_safe
 
 
 def _utcnow() -> datetime:
@@ -619,7 +620,7 @@ def save_analyze_snapshot(
                 updated_at=now,
             )
             session.add(row)
-        row.payload_json = json.dumps(payload or {})
+        row.payload_json = json.dumps(json_safe(payload or {}))
         row.score = float(payload.get("score")) if payload.get("score") is not None else None
         row.data_quality_score = (
             float(payload.get("data_quality_score"))

@@ -35,6 +35,7 @@ from screeners.compounder import CompounderScreener
 from screeners.penny import PennyScreener
 from services.scan_context import set_bulk_scan
 from services.scan_display import enrich_scan_display, refresh_results_return_metrics
+from services.scan_trade_hint import attach_trade_hint_to_metrics
 from utils.pydantic_util import model_to_dict, models_to_dicts
 
 logger = logging.getLogger(__name__)
@@ -225,6 +226,14 @@ class ScanManager:
                                 fallback_metrics,
                                 legacy_summary="Partial-data candidate — verify before trading.",
                             )
+                            fallback_metrics = attach_trade_hint_to_metrics(
+                                fallback_metrics,
+                                score=round(fallback_score, 1),
+                                sleeve=job.bucket.value,
+                                risk_level=fallback_risk,
+                                data_quality_score=quality_score,
+                                provider_limited=True,
+                            )
                             fallback_candidates.append(
                                 screener.to_result(
                                     ctx=ctx,
@@ -295,6 +304,13 @@ class ScanManager:
                         ctx.history,
                         metrics,
                         legacy_summary=summary,
+                    )
+                    metrics = attach_trade_hint_to_metrics(
+                        metrics,
+                        score=round(score, 1),
+                        sleeve=job.bucket.value,
+                        risk_level=risk,
+                        data_quality_score=quality_score,
                     )
 
                     result = screener.to_result(ctx, round(score, 1), signals, risk, summary, metrics)

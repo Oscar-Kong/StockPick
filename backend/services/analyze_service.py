@@ -212,7 +212,7 @@ def build_symbol_analysis(
     except Exception:
         pass
 
-    return payload
+    return json_safe(payload)
 
 
 def build_watchlist_matrix() -> list[dict[str, Any]]:

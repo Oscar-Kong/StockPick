@@ -1,9 +1,9 @@
 // Results table for scan outputs with selection and watchlist actions.
 "use client";
 
-import { RecommendationBadge } from "@/components/badges/RecommendationBadge";
 import { ScoreBadge } from "@/components/badges/ScoreBadge";
 import { ScoreSourceBadge } from "@/components/ScoreSourceBadge";
+import { ScanTradeHintCell } from "@/components/scan/ScanTradeHintCell";
 import { DenseTable, DenseTableToolbar } from "@/components/ui/DenseTable";
 import { fmt, useTranslation } from "@/lib/i18n";
 import type { HeldPositionSummary, StockResult } from "@/lib/types";
@@ -52,7 +52,7 @@ const OPTIONAL_COLUMNS: ColumnId[] = ["source"];
 const COLUMN_WIDTH: Record<ColumnId, string> = {
   rank: "2.75rem",
   symbol: "6.5rem",
-  recommendation: "3.25rem",
+  recommendation: "5.75rem",
   score: "4rem",
   price: "4.75rem",
   change: "4.25rem",
@@ -256,7 +256,6 @@ export function StockTable({
               const pending = watchlistPending === stock.symbol;
               const held = heldPositions?.get(stock.symbol.toUpperCase());
               const m = stock.metrics ?? {};
-              const rec = m.recommendation as string | undefined;
               const factor = topFactor(stock);
               const warning = topWarning(stock);
               const thesis = thesisText(stock);
@@ -269,11 +268,7 @@ export function StockTable({
                     {held && <HeldBadge position={held} />}
                   </>
                 ),
-                recommendation: rec ? (
-                  <RecommendationBadge recommendation={rec} />
-                ) : (
-                  emptyCell
-                ),
+                recommendation: <ScanTradeHintCell stock={stock} compact />,
                 score: <ScoreBadge score={stock.score} />,
                 price: <span className="finance-value">${stock.price.toFixed(2)}</span>,
                 change: (

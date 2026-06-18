@@ -12,7 +12,8 @@ Active sleeves: **penny**, **compounder**. Legacy API/database values may still 
 |------|----------|--------|
 | Infrastructure | `backend/core/` | `database.py`, `errors.py`, `sleeve.py` |
 | HTTP routes | `backend/api/` | FastAPI routers registered in `main.py` |
-| Domain services | `backend/services/` | Scan, portfolio, research, quant (migrating to `domains/`) |
+| Domain services | `backend/services/` | Scan, portfolio ledger & decisions, research, quant (migrating to `domains/`) |
+| Frontend portfolio | `frontend/src/components/portfolio/PortfolioWorkspace.tsx` | Single `/` route: **Today** (decisions), **Research** (optimize/backtest/exposure/allocation), **Activity** (CSV, journal) |
 | Data layer | `backend/data/` | SQLite/Postgres stores, cache, universe |
 | Quant engines | `backend/engines/` | Scoring, factors, risk |
 | Screeners | `backend/screeners/` | Penny and compounder algorithms |

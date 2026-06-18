@@ -97,6 +97,8 @@ import {
   HEALTH_RETRY_ATTEMPTS,
   HEALTH_RETRY_DELAY_MS,
   isBackendWakingError,
+  SCAN_REQUEST_TIMEOUT_MS,
+  SCAN_STATUS_REQUEST_TIMEOUT_MS,
 } from "./apiConfig";
 import { parseApiError } from "./apiError";
 import {
@@ -156,11 +158,14 @@ export function startScan(bucket: Bucket, options?: ScanOptions): Promise<ScanJo
   return request(`/scan/${bucket}`, {
     method: "POST",
     body: JSON.stringify(options ?? {}),
+    timeoutMs: SCAN_REQUEST_TIMEOUT_MS,
   });
 }
 
 export function getScanStatus(jobId: string): Promise<ScanStatusResponse> {
-  return request(`/scan/${jobId}`);
+  return request(`/scan/${jobId}`, {
+    timeoutMs: SCAN_STATUS_REQUEST_TIMEOUT_MS,
+  });
 }
 
 export function getLatestScan(bucket: Bucket): Promise<LatestScanResponse> {
