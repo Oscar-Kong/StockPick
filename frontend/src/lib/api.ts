@@ -99,6 +99,8 @@ import {
   isBackendWakingError,
   SCAN_REQUEST_TIMEOUT_MS,
   SCAN_STATUS_REQUEST_TIMEOUT_MS,
+  WALK_FORWARD_REQUEST_TIMEOUT_MS,
+  PAIRS_RESEARCH_REQUEST_TIMEOUT_MS,
 } from "./apiConfig";
 import { parseApiError } from "./apiError";
 import {
@@ -844,6 +846,7 @@ export async function runWalkForwardResearch(
     method: "POST",
     body: JSON.stringify(body),
     signal: options?.signal,
+    timeoutMs: WALK_FORWARD_REQUEST_TIMEOUT_MS,
   });
   return normalizeWalkForwardResearchResponse(raw);
 }
@@ -875,6 +878,7 @@ export async function runPairsResearch(
     method: "POST",
     body: JSON.stringify(body),
     signal: options?.signal,
+    timeoutMs: PAIRS_RESEARCH_REQUEST_TIMEOUT_MS,
   });
   return normalizePairsResearchResponse(raw);
 }
@@ -882,6 +886,16 @@ export async function runPairsResearch(
 export async function getPairsLatest(options?: V2RequestOptions): Promise<QuantLabLastRunSummary> {
   const raw = await request<unknown>("/research/pairs/latest", { signal: options?.signal });
   return normalizeLastRunSummary(raw, "pairs");
+}
+
+export async function getPairsRun(
+  runId: string,
+  options?: V2RequestOptions
+): Promise<PairsResearchResponse> {
+  const raw = await request<unknown>(`/research/pairs/${runId}`, { signal: options?.signal });
+  const summary = (raw as { summary?: Record<string, unknown> }).summary ?? raw;
+  const pairs = (raw as { pairs?: unknown[] }).pairs ?? [];
+  return normalizePairsResearchResponse({ ...(summary as object), pairs, run_id: runId });
 }
 
 export async function getQuantLabEvidence(

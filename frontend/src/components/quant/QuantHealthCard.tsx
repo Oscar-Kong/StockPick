@@ -10,14 +10,30 @@ import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import Link from "next/link";
 
-export function QuantHealthCard({ embedded = false }: { embedded?: boolean }) {
+type QuantHealthCardProps = {
+  embedded?: boolean;
+  summary?: QuantHealthSummary | null;
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
+};
+
+export function QuantHealthCard({
+  embedded = false,
+  summary: summaryProp,
+  loading: loadingProp,
+  error: errorProp,
+  onRetry,
+}: QuantHealthCardProps) {
   const { t } = useTranslation();
   const tRef = useTRef();
-  const [data, setData] = useState<QuantHealthSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<QuantHealthSummary | null>(summaryProp ?? null);
+  const [loading, setLoading] = useState(loadingProp ?? summaryProp === undefined);
+  const [error, setError] = useState<string | null>(errorProp ?? null);
+  const controlled = summaryProp !== undefined;
 
   const load = useCallback(async () => {
+    if (controlled) return;
     setLoading(true);
     setError(null);
     try {
@@ -28,11 +44,17 @@ export function QuantHealthCard({ embedded = false }: { embedded?: boolean }) {
     } finally {
       setLoading(false);
     }
-  }, [tRef]);
+  }, [controlled, tRef]);
 
   useEffect(() => {
+    if (controlled) {
+      setData(summaryProp);
+      setLoading(loadingProp ?? false);
+      setError(errorProp ?? null);
+      return;
+    }
     void load();
-  }, [load]);
+  }, [controlled, summaryProp, loadingProp, errorProp, load]);
 
   const Wrapper = embedded ? "div" : "section";
   const wrapperClass = embedded ? "space-y-3" : "surface-card p-4";
@@ -42,15 +64,13 @@ export function QuantHealthCard({ embedded = false }: { embedded?: boolean }) {
       <SectionHeader
         title={t.quantHealth.title}
         subtitle={t.quantHealth.subtitle}
-        action={
-          data ? (
-            <HealthStatusBadge severity={data.overall} />
-          ) : undefined
-        }
+        action={data ? <HealthStatusBadge severity={data.overall} /> : undefined}
       />
 
       {loading && <LoadingSkeleton lines={4} />}
-      {!loading && error && <ErrorState message={error} onRetry={() => void load()} />}
+      {!loading && error && (
+        <ErrorState message={error} onRetry={onRetry ? () => void onRetry() : () => void load()} />
+      )}
       {!loading && !error && data && (
         <div className="space-y-3">
           <ul className="space-y-2">

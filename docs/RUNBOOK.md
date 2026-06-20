@@ -250,6 +250,35 @@ curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:18731/analyze/CLOV
 
 Both should return `200`. If curl succeeds but the browser fails, suspect CORS or a non-default UI URL (LAN IP, forwarded port, `localhost` vs `127.0.0.1` mismatch in `ALLOWED_ORIGINS`).
 
+### Walk-forward times out in Quant Lab
+
+Walk-forward scores many symbols across each rebalance date — it is intentionally slow.
+
+- UI client timeout: **10 minutes** (`WALK_FORWARD_REQUEST_TIMEOUT_MS`)
+- Backend route timeout: **10 minutes** (`WALK_FORWARD_ROUTE_TIMEOUT_SECONDS`, default `600`)
+- UI runs use `persist_snapshots: false` (summary still saved to `backtest_runs`)
+- If it still times out: shorten the date range, select one horizon (20d only), or set `WALK_FORWARD_ROUTE_TIMEOUT_SECONDS=900` in `.env`
+
+
+Seed deterministic evidence (IC, walk-forward, predictions, pairs, jobs):
+
+```bash
+cd backend
+python scripts/seed_quant_lab_demo.py --sleeve medium
+DATABASE_URL=sqlite:///$(pwd)/../storage/dev/quant_lab_demo.db \
+  python -m uvicorn main:app --port 18731
+```
+
+Automated tests:
+
+```bash
+cd backend && pytest -q tests/test_quant_lab_contracts.py tests/test_quant_lab_integration.py
+cd frontend && npm test -- --run src/components/quant-lab
+cd frontend && npx playwright install chromium && npm run test:e2e
+```
+
+See [QUANT_LAB_FUNCTIONAL_TEST_REPORT.md](QUANT_LAB_FUNCTIONAL_TEST_REPORT.md) and [QUANT_LAB_MANUAL_TEST_CHECKLIST.md](QUANT_LAB_MANUAL_TEST_CHECKLIST.md).
+
 ### `engine=vectorbt` fails
 
 - `VBT_ENABLED=true`

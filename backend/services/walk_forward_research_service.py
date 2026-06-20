@@ -140,6 +140,17 @@ def universe_for_date(sleeve: str, as_of: date, *, max_symbols: int) -> tuple[li
     return base[:max_symbols], "fallback"
 
 
+def _rank_correlation(s: pd.Series, f: pd.Series) -> float:
+    """Spearman rank IC with scipy-free fallback for offline tests."""
+    try:
+        return float(s.corr(f, method="spearman"))
+    except (ImportError, ModuleNotFoundError, ValueError, TypeError):
+        rs = s.rank(method="average")
+        rf = f.rank(method="average")
+        val = float(rs.corr(rf, method="pearson"))
+        return 0.0 if np.isnan(val) else val
+
+
 def cross_section_metrics(scores: list[float], forward_returns: list[float]) -> dict[str, Any]:
     """Rank IC, Pearson IC, hit rate, quintile stats."""
     if len(scores) < 5 or len(scores) != len(forward_returns):
@@ -151,7 +162,7 @@ def cross_section_metrics(scores: list[float], forward_returns: list[float]) -> 
 
     s = pd.Series(scores, dtype=float)
     f = pd.Series(forward_returns, dtype=float)
-    rank_ic = float(s.corr(f, method="spearman"))
+    rank_ic = _rank_correlation(s, f)
     pearson_ic = float(s.corr(f, method="pearson"))
     if np.isnan(rank_ic):
         rank_ic = 0.0
@@ -419,11 +430,11 @@ def run_walk_forward_research(
 
         ps = PriceService()
         universe_seed = [s.upper() for s in get_universe(cfg.sleeve)][: cfg.max_symbols]
-        price_panel = {}
-        for sym in universe_seed:
-            h = ps.get_history(sym, period="5y")
-            if not h.empty:
-                price_panel[sym] = h.reset_index(drop=True)
+        price_panel = {
+            sym.upper(): df.reset_index(drop=True)
+            for sym, df in ps.download_batch(universe_seed, period="5y").items()
+            if df is not None and not df.empty
+        }
         if spy_hist is None:
             spy_hist = ps.get_spy_history(period="5y").reset_index(drop=True)
 

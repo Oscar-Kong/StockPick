@@ -122,6 +122,19 @@ class BacktestRun(QuantBase):
     finished_at = Column(DateTime, nullable=True)
 
 
+class PairsResearchRun(QuantBase):
+    __tablename__ = "pairs_research_runs"
+
+    run_id = Column(String(64), primary_key=True)
+    status = Column(String(16), nullable=False, default="completed")
+    config_json = Column(Text, nullable=False, default="{}")
+    summary_json = Column(Text, nullable=False, default="{}")
+    pairs_json = Column(Text, nullable=False, default="[]")
+    error_message = Column(Text, nullable=True)
+    started_at = Column(DateTime, nullable=False, default=_utcnow)
+    finished_at = Column(DateTime, nullable=True)
+
+
 class BacktestEquityPoint(QuantBase):
     __tablename__ = "backtest_equity_points"
 

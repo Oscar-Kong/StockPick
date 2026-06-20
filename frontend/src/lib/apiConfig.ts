@@ -33,6 +33,10 @@ export const HEALTH_RETRY_DELAY_MS = 2_500;
 export const SCAN_REQUEST_TIMEOUT_MS = 120_000;
 /** Each poll is a lightweight in-memory status read. */
 export const SCAN_STATUS_REQUEST_TIMEOUT_MS = 60_000;
+/** Walk-forward research — scores many symbols across rebalance periods. */
+export const WALK_FORWARD_REQUEST_TIMEOUT_MS = 600_000;
+/** Pairs research with statsmodels can run 1–2 minutes. */
+export const PAIRS_RESEARCH_REQUEST_TIMEOUT_MS = 180_000;
 
 export function isBackendWakingError(message: string): boolean {
   const m = message.toLowerCase();

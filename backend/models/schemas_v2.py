@@ -192,7 +192,7 @@ class WalkForwardResearchRequest(BaseModel):
     rebalance_frequency: str = Field(default="monthly", description="weekly | monthly | quarterly | N sessions")
     forward_horizons: list[int] = Field(default_factory=lambda: [20])
     max_symbols: int = Field(default=30, ge=5, le=200)
-    persist_snapshots: bool = True
+    persist_snapshots: bool = False
 
 
 class WalkForwardResearchResponse(BaseModel):
@@ -252,6 +252,7 @@ class PairResearchItem(BaseModel):
 
 
 class PairsResearchResponse(BaseModel):
+    run_id: str | None = None
     research_only: bool = True
     lookback_period: str
     symbols_requested: list[str] = []

@@ -938,6 +938,9 @@ export const en = {
     loadFailed: "Could not load data",
     runFailed: "Run failed",
     runWalkForward: "Run walk-forward",
+    walkForwardRunning: "Running walk-forward… (may take several minutes)",
+    walkForwardTimeout:
+      "Walk-forward timed out — try a shorter date range, one horizon, or wait and retry. Large runs can take 2–5 minutes.",
     runPairs: "Run pairs search",
     walkForwardOfflineWarning:
       "Offline research — does not auto-update live scan weights or recommendations.",

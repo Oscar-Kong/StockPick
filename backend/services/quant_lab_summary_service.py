@@ -146,12 +146,61 @@ def build_walk_forward_last_run(sleeve: str = DEFAULT_BUCKET) -> QuantLabLastRun
 
 
 def build_pairs_last_run() -> QuantLabLastRunSummary:
-    """Pairs research is not persisted — always unavailable until storage exists."""
-    return _unavailable(
-        "pairs",
-        reason="No saved run found",
-        tab="pairs",
+    from services.pairs_research_store import load_latest_pairs_run
+
+    row = load_latest_pairs_run()
+    if not row:
+        return _unavailable(
+            "pairs",
+            reason="No saved run found",
+            tab="pairs",
+            research_only=True,
+        )
+
+    finished_at = row.get("finished_at")
+    pairs_returned = int(row.get("pairs_returned") or 0)
+    cointegrated = int(row.get("cointegrated_count") or 0)
+    age_days = _days_since(finished_at)
+    stale = age_days is not None and age_days > WALK_FORWARD_STALE_DAYS
+    stale_reason = (
+        f"Last pairs run is {int(age_days)} days old"
+        if stale and age_days is not None
+        else None
+    )
+
+    main_metric = QuantLabMainMetric(
+        label="Qualifying pairs",
+        value=str(cointegrated),
+    )
+
+    warnings: list[str] = []
+    if pairs_returned == 0:
+        warnings.append("Last run returned zero pair rows")
+    if stale:
+        warnings.append(stale_reason or "Pairs evidence is stale")
+    if not row.get("statsmodels_available"):
+        warnings.append("statsmodels unavailable on last run")
+
+    trust = "fresh"
+    if pairs_returned < 1:
+        trust = "insufficient_sample"
+    elif stale:
+        trust = "stale"
+
+    return QuantLabLastRunSummary(
+        id="pairs",
+        available=True,
+        generated_at=finished_at,
+        run_id=row.get("run_id"),
+        status=row.get("status") or "completed",
+        sample_size=pairs_returned or None,
+        main_metric=main_metric,
+        stale=stale,
+        stale_reason=stale_reason,
+        warnings=warnings,
+        trust_indicator=trust,
         research_only=True,
+        tab="pairs",
     )
 
 

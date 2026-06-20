@@ -921,6 +921,9 @@ export const zh: Messages = {
     loadFailed: "无法加载数据",
     runFailed: "运行失败",
     runWalkForward: "运行 Walk-forward",
+    walkForwardRunning: "Walk-forward 运行中…（可能需要数分钟）",
+    walkForwardTimeout:
+      "Walk-forward 请求超时 — 请缩短日期范围、减少 horizon，或稍后重试。大型运行可能需要 2–5 分钟。",
     runPairs: "运行配对搜索",
     walkForwardOfflineWarning: "离线研究 — 不会自动更新实时筛选权重或建议。",
     staleIcWarning: "因子 IC 可能已过期 — 请在模型管理中运行 IC panel 任务。",

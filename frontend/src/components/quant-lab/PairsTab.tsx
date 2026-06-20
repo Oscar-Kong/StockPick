@@ -3,12 +3,12 @@
 import { ResearchWarning } from "@/components/ui/ResearchWarning";
 import { ResearchOnlyBadge } from "@/components/ui/ResearchOnlyBadge";
 import { TooltipLabel } from "@/components/ui/TooltipLabel";
-import { runPairsResearch } from "@/lib/api";
+import { runPairsResearch, getPairsLatest, getPairsRun } from "@/lib/api";
 import { parseApiError } from "@/lib/apiError";
 import { PAIRS_MAX_SYMBOLS, parseSymbolList } from "@/lib/quantLabFormatters";
 import { computePairsReliability } from "@/lib/researchReliability";
 import { useTranslation } from "@/lib/i18n";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { QuantLabEmptyState, QuantLabTabLayout } from "./QuantLabTabShell";
 import { ResearchReliabilityCard } from "./ResearchReliabilityCard";
 
@@ -19,8 +19,29 @@ export function PairsTab() {
   const [result, setResult] = useState<Awaited<ReturnType<typeof runPairsResearch>> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [hydrating, setHydrating] = useState(true);
+  const runLockRef = useRef(false);
+
+  useEffect(() => {
+    const ac = new AbortController();
+    void (async () => {
+      try {
+        const latest = await getPairsLatest({ signal: ac.signal });
+        if (latest.available && latest.run_id) {
+          const detail = await getPairsRun(latest.run_id, { signal: ac.signal });
+          setResult(detail);
+        }
+      } catch {
+        /* ignore — empty state explains next step */
+      } finally {
+        if (!ac.signal.aborted) setHydrating(false);
+      }
+    })();
+    return () => ac.abort();
+  }, []);
 
   const run = async () => {
+    if (runLockRef.current || running) return;
     setValidationError(null);
     setError(null);
     const list = parseSymbolList(symbols);
@@ -34,6 +55,7 @@ export function PairsTab() {
     }
 
     setRunning(true);
+    runLockRef.current = true;
     try {
       setResult(await runPairsResearch({ symbols: list, lookback_period: "1y" }));
     } catch (e) {
@@ -41,6 +63,7 @@ export function PairsTab() {
       setError(parseApiError(e, t.quantLab.runFailed));
     } finally {
       setRunning(false);
+      runLockRef.current = false;
     }
   };
 
@@ -82,7 +105,7 @@ export function PairsTab() {
           {validationError && <p className="text-xs text-amber-300">{validationError}</p>}
         </div>
       }
-      loading={running}
+      loading={running || hydrating}
       error={error}
       onRetry={() => void run()}
     >
@@ -148,7 +171,7 @@ export function PairsTab() {
           )}
         </div>
       )}
-      {!result && !running && !error && (
+      {!result && !running && !hydrating && !error && (
         <QuantLabEmptyState message={t.quantLab.pairsNoRunYet} />
       )}
     </QuantLabTabLayout>

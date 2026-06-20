@@ -20,7 +20,7 @@ import {
 } from "@/lib/researchReliability";
 import type { Bucket, QuantLabLastRunSummary } from "@/lib/types";
 import { useTranslation } from "@/lib/i18n";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BucketSelect, QuantLabEmptyState, QuantLabTabLayout } from "./QuantLabTabShell";
 import { QuantLabTrustBadge } from "./QuantLabTrustBadge";
 import { ResearchReliabilityCard } from "./ResearchReliabilityCard";
@@ -35,6 +35,7 @@ export function WalkForwardTab() {
   const [endDate, setEndDate] = useState(defaults.end_date);
   const [horizons, setHorizons] = useState<number[]>([20, 60]);
   const [running, setRunning] = useState(false);
+  const runLockRef = useRef(false);
   const [result, setResult] = useState<Awaited<ReturnType<typeof runWalkForwardResearch>> | null>(
     null
   );
@@ -76,6 +77,7 @@ export function WalkForwardTab() {
   };
 
   const run = async () => {
+    if (runLockRef.current || running) return;
     setValidationError(null);
     setError(null);
     const dateErr = validateWalkForwardDates(startDate, endDate);
@@ -94,22 +96,26 @@ export function WalkForwardTab() {
     }
 
     setRunning(true);
+    runLockRef.current = true;
     try {
       const res = await runWalkForwardResearch({
         sleeve,
         start_date: startDate,
         end_date: endDate,
         forward_horizons: horizons,
-        max_symbols: 25,
+        max_symbols: 20,
+        persist_snapshots: false,
       });
       setResult(res);
       saveWalkForwardLastRun(res);
       setLatestSummary(await getWalkForwardLatest(sleeve));
     } catch (e) {
       setResult(null);
-      setError(parseApiError(e, t.quantLab.runFailed));
+      const msg = parseApiError(e, t.quantLab.runFailed);
+      setError(msg.toLowerCase().includes("timed out") ? t.quantLab.walkForwardTimeout : msg);
     } finally {
       setRunning(false);
+      runLockRef.current = false;
     }
   };
 
@@ -201,7 +207,7 @@ export function WalkForwardTab() {
             disabled={running}
             className="btn-primary px-3 py-1.5 text-sm"
           >
-            {running ? t.common.running : t.quantLab.runWalkForward}
+            {running ? t.quantLab.walkForwardRunning : t.quantLab.runWalkForward}
           </button>
           {validationError && <p className="text-xs text-amber-300">{validationError}</p>}
         </div>

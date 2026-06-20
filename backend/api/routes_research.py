@@ -1,9 +1,12 @@
 """Walk-forward research API — offline scoring evaluation, no live weight updates."""
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+
 from buckets import DEFAULT_BUCKET
 from fastapi import APIRouter, HTTPException
 
+from config import DEMO_MODE, DEMO_MAX_QUANT_JOB_SYMBOLS, WALK_FORWARD_ROUTE_TIMEOUT_SECONDS
 from models.schemas_v2 import (
     PairsResearchRequest,
     PairsResearchResponse,
@@ -12,17 +15,23 @@ from models.schemas_v2 import (
     WalkForwardResearchResponse,
     WalkForwardRunDetailResponse,
 )
+from services.pairs_research_service import run_pairs_research
+from services.pairs_research_store import persist_pairs_run
+from services.quant_lab_summary_service import build_pairs_last_run, build_walk_forward_last_run
 from services.walk_forward_research_service import (
     WalkForwardConfig,
     load_walk_forward_run,
     run_walk_forward_research,
 )
-from services.pairs_research_service import run_pairs_research
-from services.quant_lab_summary_service import build_pairs_last_run, build_walk_forward_last_run
-from config import DEMO_MODE, DEMO_MAX_QUANT_JOB_SYMBOLS
 from utils.demo_guard import enforce_research_max_symbols, enforce_symbol_count
 
 router = APIRouter(prefix="/research", tags=["research"])
+_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="research-routes")
+
+
+def _run_with_timeout(fn, *args, timeout_seconds: float, **kwargs):
+    future = _EXECUTOR.submit(fn, *args, **kwargs)
+    return future.result(timeout=max(1.0, timeout_seconds))
 
 
 @router.post("/walk-forward", response_model=WalkForwardResearchResponse)
@@ -40,7 +49,19 @@ def post_walk_forward_research(body: WalkForwardResearchRequest):
             max_symbols=max_symbols,
             persist_snapshots=persist,
         )
-        summary = run_walk_forward_research(cfg)
+        summary = _run_with_timeout(
+            run_walk_forward_research,
+            cfg,
+            timeout_seconds=WALK_FORWARD_ROUTE_TIMEOUT_SECONDS,
+        )
+    except FuturesTimeout as exc:
+        raise HTTPException(
+            status_code=504,
+            detail=(
+                "Walk-forward research timed out — try a shorter date range, fewer horizons, "
+                "or lower max_symbols. Increase WALK_FORWARD_ROUTE_TIMEOUT_SECONDS for long runs."
+            ),
+        ) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
@@ -68,7 +89,7 @@ def post_pairs_research(body: PairsResearchRequest):
     """Pairs-trading research: cointegration, hedge ratio, spread z-score (not auto-trade)."""
     enforce_symbol_count(body.symbols, max_count=DEMO_MAX_QUANT_JOB_SYMBOLS, field="pairs symbols")
     try:
-        return run_pairs_research(
+        result = run_pairs_research(
             body.symbols,
             lookback_period=body.lookback_period,
             zscore_window=body.zscore_window,
@@ -79,10 +100,26 @@ def post_pairs_research(body: PairsResearchRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"pairs research failed: {exc}") from exc
+    if not DEMO_MODE:
+        try:
+            result["run_id"] = persist_pairs_run(result)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"pairs persistence failed: {exc}") from exc
+    return result
 
 
 @router.get("/pairs/latest", response_model=QuantLabLastRunSummary)
 def get_pairs_latest():
-    """Latest pairs research summary — unavailable until runs are persisted."""
+    """Latest persisted pairs research summary (read-only)."""
     return build_pairs_last_run()
 
+
+@router.get("/pairs/{run_id}")
+def get_pairs_run(run_id: str):
+    """Load persisted pairs research run detail."""
+    from services.pairs_research_store import load_pairs_run
+
+    row = load_pairs_run(run_id)
+    if not row:
+        raise HTTPException(status_code=404, detail=f"pairs run not found: {run_id}")
+    return row

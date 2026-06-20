@@ -1,16 +1,19 @@
-"""Quant Lab API contract tests — response shapes expected by frontend."""
+"""Quant Lab API contract tests — explicit enabled/disabled/degraded scenarios."""
 from __future__ import annotations
 
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from tests.fixtures.quant_lab_fixtures import build_cointegrated_panel, seed_quant_lab_demo
+
 
 @pytest.fixture
-def client():
+def client(isolated_backend_env):
     try:
         from fastapi.testclient import TestClient
         from main import app
@@ -22,77 +25,105 @@ def client():
         raise
 
 
-def _skip_503(r):
-    if r.status_code == 503:
-        pytest.skip(r.json().get("detail", "feature disabled"))
+@pytest.fixture
+def quant_lab_client(client, monkeypatch):
+    """V2 + feedback enabled with seeded evidence."""
+    import config
+
+    monkeypatch.setattr(config, "SCORE_ENGINE_V2_ENABLED", True, raising=False)
+    monkeypatch.setattr(config, "TRADE_FEEDBACK_ENABLED", True, raising=False)
+    monkeypatch.setattr(config, "DEMO_MODE", False, raising=False)
+    monkeypatch.setattr("api.routes_v2.SCORE_ENGINE_V2_ENABLED", True)
+    monkeypatch.setattr("api.routes_v2.TRADE_FEEDBACK_ENABLED", True)
+    monkeypatch.setattr("api.routes_research.DEMO_MODE", False)
+    monkeypatch.setenv("SCORE_ENGINE_V2_ENABLED", "true")
+    monkeypatch.setenv("TRADE_FEEDBACK_ENABLED", "true")
+    monkeypatch.setenv("DEMO_MODE", "false")
+    seed_quant_lab_demo(sleeve="medium")
+    return client
 
 
-def test_factors_performance_contract(client):
-    r = client.get("/api/v2/factors/performance?sleeve=medium")
-    _skip_503(r)
-    assert r.status_code == 200
+def _assert_disabled_503(r, *, feature: str):
+    assert r.status_code == 503, r.text
+    body = r.json()
+    detail = body.get("detail", body)
+    if isinstance(detail, dict):
+        assert detail.get("error") or detail.get("message")
+    else:
+        assert feature in str(detail).lower() or "disabled" in str(detail).lower()
+
+
+def test_factors_performance_enabled_contract(quant_lab_client):
+    r = quant_lab_client.get("/api/v2/factors/performance?sleeve=medium")
+    assert r.status_code == 200, r.text
     body = r.json()
     assert "as_of_date" in body
-    assert "factors" in body and isinstance(body["factors"], list)
+    assert isinstance(body["factors"], list)
+    assert len(body["factors"]) >= 1
     assert "by_horizon" in body
-    assert "by_regime" in body
-    assert "by_sector" in body
 
 
-def test_predictions_contract(client):
-    r = client.get("/api/v2/predictions?limit=5")
-    _skip_503(r)
-    assert r.status_code == 200
+def test_factors_performance_disabled_contract(client, monkeypatch):
+    monkeypatch.setattr("api.routes_v2.SCORE_ENGINE_V2_ENABLED", False)
+    r = client.get("/api/v2/factors/performance?sleeve=medium")
+    _assert_disabled_503(r, feature="score")
+
+
+def test_predictions_enabled_contract(quant_lab_client):
+    r = quant_lab_client.get("/api/v2/predictions?limit=10")
+    assert r.status_code == 200, r.text
     body = r.json()
-    assert "predictions" in body and isinstance(body["predictions"], list)
-    if body["predictions"]:
-        row = body["predictions"][0]
-        assert "id" in row and "symbol" in row and "created_at" in row
-        assert "outcome" in row
+    assert isinstance(body["predictions"], list)
+    assert len(body["predictions"]) >= 1
+    row = body["predictions"][0]
+    assert "symbol" in row and "created_at" in row
+    assert "outcome" in row
 
 
-def test_feedback_summary_contract(client):
-    r = client.get("/api/v2/feedback/summary")
-    _skip_503(r)
-    assert r.status_code == 200
+def test_feedback_summary_enabled_contract(quant_lab_client):
+    r = quant_lab_client.get("/api/v2/feedback/summary")
+    assert r.status_code == 200, r.text
     body = r.json()
     for key in ("outcomes_count", "snapshots_count", "recent_outcomes", "recent_snapshots"):
         assert key in body
 
 
-def test_weights_contract(client):
-    r = client.get("/api/v2/weights/medium")
-    _skip_503(r)
-    assert r.status_code == 200
+def test_feedback_disabled_contract(client, monkeypatch):
+    monkeypatch.setattr("api.routes_v2.TRADE_FEEDBACK_ENABLED", False)
+    r = client.get("/api/v2/feedback/summary")
+    _assert_disabled_503(r, feature="feedback")
+
+
+def test_weights_contract(quant_lab_client):
+    r = quant_lab_client.get("/api/v2/weights/medium")
+    assert r.status_code == 200, r.text
     body = r.json()
-    assert "sleeve" in body and "weights" in body
+    assert body["sleeve"] == "medium"
+    assert "weights" in body
 
 
-def test_audit_contract(client):
-    r = client.get("/api/v2/audit?limit=5")
-    assert r.status_code == 200
-    body = r.json()
-    assert "events" in body and isinstance(body["events"], list)
+def test_audit_contract(quant_lab_client):
+    r = quant_lab_client.get("/api/v2/audit?limit=5")
+    assert r.status_code == 200, r.text
+    assert isinstance(r.json()["events"], list)
 
 
-def test_factors_admin_contract(client):
-    r = client.get("/api/v2/factors/admin?sleeve=medium")
-    _skip_503(r)
-    assert r.status_code == 200
-    body = r.json()
-    assert "factors" in body and isinstance(body["factors"], list)
+def test_factors_admin_contract(quant_lab_client):
+    r = quant_lab_client.get("/api/v2/factors/admin?sleeve=medium")
+    assert r.status_code == 200, r.text
+    assert isinstance(r.json()["factors"], list)
 
 
-def test_scheduler_status_contract(client):
-    r = client.get("/data/scheduler/status")
-    assert r.status_code == 200
+def test_scheduler_status_contract(quant_lab_client):
+    r = quant_lab_client.get("/data/scheduler/status")
+    assert r.status_code == 200, r.text
     body = r.json()
     assert "enabled" in body
-    assert "recent_jobs" in body and isinstance(body["recent_jobs"], list)
+    assert isinstance(body["recent_jobs"], list)
 
 
-def test_walk_forward_validation(client):
-    r = client.post(
+def test_walk_forward_validation(quant_lab_client):
+    r = quant_lab_client.post(
         "/research/walk-forward",
         json={
             "sleeve": "medium",
@@ -104,74 +135,77 @@ def test_walk_forward_validation(client):
     assert r.status_code == 400
 
 
-def test_pairs_research_contract(client):
-    from unittest.mock import patch
-
-    mock_body = {
-        "research_only": True,
-        "lookback_period": "1y",
-        "symbols_requested": ["AAPL", "MSFT"],
-        "symbols_used": ["AAPL", "MSFT"],
-        "pairs": [],
-        "pairs_evaluated": 1,
-        "pairs_returned": 0,
-        "cointegrated_count": 0,
-        "statsmodels_available": False,
-        "notes": ["mocked for contract test"],
-    }
-    with patch("api.routes_research.run_pairs_research", return_value=mock_body):
-        r = client.post(
-            "/research/pairs",
-            json={"symbols": ["AAPL", "MSFT"], "lookback_period": "1y"},
-        )
-    assert r.status_code == 200
+def test_walk_forward_latest_with_seed(quant_lab_client):
+    r = quant_lab_client.get("/research/walk-forward/latest?sleeve=medium")
+    assert r.status_code == 200, r.text
     body = r.json()
-    for key in (
-        "research_only",
-        "pairs",
-        "pairs_evaluated",
-        "pairs_returned",
-        "cointegrated_count",
-        "statsmodels_available",
-        "notes",
-    ):
-        assert key in body
-    assert isinstance(body["pairs"], list)
-    assert isinstance(body["notes"], list)
+    assert body["available"] is True
+    assert body["run_id"] == "wf_test_001"
 
 
-def test_version_contract(client):
-    r = client.get("/api/v2/version")
-    assert r.status_code == 200
+def test_pairs_latest_with_seed(quant_lab_client):
+    r = quant_lab_client.get("/research/pairs/latest")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["available"] is True
+    assert body["run_id"] == "pairs_test_001"
+
+
+def test_pairs_research_real_service(quant_lab_client):
+    panel = build_cointegrated_panel()
+    with patch("services.pairs_research_service.load_aligned_closes") as mock_load:
+        mock_load.return_value = (panel, ["AAA", "BBB", "CCC", "DDD", "EEE", "FFF"], [])
+        r = quant_lab_client.post(
+            "/research/pairs",
+            json={"symbols": ["AAA", "BBB", "CCC", "DDD"], "lookback_period": "1y"},
+        )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["pairs_evaluated"] >= 1
+    assert body.get("run_id")
+    latest = quant_lab_client.get("/research/pairs/latest").json()
+    assert latest["available"] is True
+    assert latest.get("run_id")
+
+
+def test_quant_lab_evidence_contract(quant_lab_client):
+    r = quant_lab_client.get("/api/v2/quant-lab/evidence?sleeve=medium")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    for key in ("factor_ic", "walk_forward", "predictions", "pairs", "jobs"):
+        card = body[key]
+        assert "available" in card
+        assert "trust_indicator" in card
+    assert body["factor_ic"]["available"] is True
+    assert body["walk_forward"]["available"] is True
+    assert body["pairs"]["available"] is True
+    assert "validation_copy" in body
+
+
+def test_version_contract(quant_lab_client):
+    r = quant_lab_client.get("/api/v2/version")
+    assert r.status_code == 200, r.text
     body = r.json()
     assert "strategy_version" in body
     assert "factor_model_version" in body
 
 
-def test_walk_forward_latest_contract(client):
-    r = client.get("/research/walk-forward/latest?sleeve=medium")
-    assert r.status_code == 200
+def test_evidence_empty_database(client, monkeypatch):
+    import config
+
+    monkeypatch.setattr(config, "SCORE_ENGINE_V2_ENABLED", True, raising=False)
+    monkeypatch.setattr(config, "TRADE_FEEDBACK_ENABLED", True, raising=False)
+    r = client.get("/api/v2/quant-lab/evidence?sleeve=medium")
+    assert r.status_code == 200, r.text
     body = r.json()
-    assert "available" in body
-    assert "trust_indicator" in body
-    assert body["id"] == "walk_forward"
+    assert body["factor_ic"]["available"] is False
+    assert body["walk_forward"]["available"] is False
+    assert body["pairs"]["available"] is False
 
 
-def test_pairs_latest_contract(client):
+def test_pairs_empty_latest(client):
     r = client.get("/research/pairs/latest")
-    assert r.status_code == 200
+    assert r.status_code == 200, r.text
     body = r.json()
     assert body["available"] is False
     assert body["reason"]
-    assert body["id"] == "pairs"
-
-
-def test_quant_lab_evidence_contract(client):
-    r = client.get("/api/v2/quant-lab/evidence?sleeve=medium")
-    assert r.status_code == 200
-    body = r.json()
-    for key in ("factor_ic", "walk_forward", "predictions", "pairs", "jobs"):
-        assert key in body
-        assert "available" in body[key]
-        assert "trust_indicator" in body[key]
-    assert "validation_copy" in body

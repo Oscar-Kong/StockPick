@@ -9,6 +9,7 @@ import pandas as pd
 from data.price_service import PriceService
 from engines.pairs.cointegration import engle_granger_test, statsmodels_available
 from engines.pairs.spread import build_spread, estimate_half_life, spread_zscore
+from utils.pydantic_util import json_safe
 
 MIN_HISTORY_BARS = 60
 PERIOD_MAP = {"6mo": "6mo", "1y": "1y", "2y": "2y", "3y": "3y", "5y": "5y"}
@@ -178,7 +179,7 @@ def run_pairs_research(
     cointegrated = sum(1 for r in results if r.get("cointegrated_5pct"))
     insufficient = sum(1 for r in results if not r.get("sufficient"))
 
-    return {
+    return json_safe({
         "research_only": True,
         "lookback_period": lookback_period,
         "symbols_requested": [s.upper() for s in symbols],
@@ -192,4 +193,4 @@ def run_pairs_research(
         "statsmodels_available": sm_avail,
         "pairs": results,
         "notes": notes,
-    }
+    })

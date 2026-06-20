@@ -26,7 +26,7 @@ On open, Quant Lab loads read-only summaries via `GET /api/v2/quant-lab/evidence
 | Latest factor IC | `factor_ic_history` | Yes |
 | Latest walk-forward | `backtest_runs` (`run_type=walk_forward_research`) | Yes |
 | Latest prediction outcomes | `prediction_snapshots` / outcomes | Yes |
-| Latest pairs research | — | **No** — card shows "No saved run" |
+| Latest pairs research | `pairs_research_runs` | **Yes** (bounded retention) |
 | Latest quant jobs | `job_logs` + `job_queue` | Yes |
 
 Trust badges: **Fresh · Stale · Insufficient sample · Feature disabled · No saved run · Research only · Needs attention**
@@ -39,7 +39,8 @@ Heavy jobs (`POST /research/walk-forward`, `POST /research/pairs`, IC panel, sch
 |----------|---------|
 | `GET /api/v2/quant-lab/evidence?sleeve=` | All last-run cards (read-only) |
 | `GET /research/walk-forward/latest?sleeve=` | Latest walk-forward summary |
-| `GET /research/pairs/latest` | Always `available: false` until pairs runs are persisted |
+| `GET /research/pairs/latest` | Latest persisted pairs summary |
+| `GET /research/pairs/{run_id}` | Full persisted pairs run (bounded pair rows) |
 | `GET /research/walk-forward/{run_id}` | Full persisted run detail |
 
 ## Tabs (implemented)
@@ -49,7 +50,7 @@ Heavy jobs (`POST /research/walk-forward`, `POST /research/pairs`, IC panel, sch
 | Factor Performance | `GET /api/v2/factors/performance` | Sleeve filter; stale IC warning; empty state when no IC rows |
 | Walk-Forward | `POST /research/walk-forward` | **Run** only; research warning; date/horizon validation; last-run hint |
 | Prediction Outcomes | `GET /api/v2/predictions`, `/feedback/summary` | Independent partial failure; stale outcome badge |
-| Pairs Trading | `POST /research/pairs` | **Run** only; 2–20 symbols; research warning |
+| Pairs Trading | `POST /research/pairs`, `GET /research/pairs/latest` | **Run** + hydrates last persisted run on tab open |
 | Data Quality | `getQuantHealthSummary`, `/data/scheduler/status` | Non-fatal health/scheduler failures |
 | Model Admin | `/api/v2/version`, `/weights`, `/audit`, `/factors/admin` | `Promise.allSettled`; per-panel errors |
 

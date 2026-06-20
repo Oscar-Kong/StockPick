@@ -15,14 +15,19 @@ export function DataQualityTab() {
   const [health, setHealth] = useState<QuantHealthSummary | null>(null);
   const [scheduler, setScheduler] = useState<SchedulerStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [healthError, setHealthError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setHealthError(null);
     const [h, s] = await Promise.allSettled([getQuantHealthSummary(), getSchedulerStatus()]);
     setHealth(h.status === "fulfilled" ? h.value : null);
+    if (h.status === "rejected") {
+      setHealthError(h.reason instanceof Error ? h.reason.message : t.quantHealth.loadFailed);
+    }
     setScheduler(s.status === "fulfilled" ? s.value : null);
     setLoading(false);
-  }, []);
+  }, [t.quantHealth.loadFailed]);
 
   useEffect(() => {
     void load();
@@ -39,8 +44,10 @@ export function DataQualityTab() {
       title={t.quantLab.tabDataQuality}
       description={t.quantLab.hintDataQuality}
       reliability={<ResearchReliabilityCard score={reliability} />}
+      error={healthError}
+      onRetry={load}
     >
-      <QuantHealthCard embedded />
+      <QuantHealthCard embedded summary={health} loading={loading} error={healthError} onRetry={load} />
       <SchedulerPanel scheduler={scheduler} loading={loading} onRefresh={load} failedJobCount={failedJobCount} />
     </QuantLabTabLayout>
   );

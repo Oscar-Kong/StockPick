@@ -11,6 +11,7 @@ from engines.quant_models import (
     FactorDefinition,
     FeatureProvenance,
     JobQueueItem,
+    PairsResearchRun,
     PositionRecommendation,
     PredictionOutcome,
     PredictionSnapshot,
