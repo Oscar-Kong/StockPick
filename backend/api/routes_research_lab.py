@@ -24,6 +24,9 @@ from models.schemas_research import (
     ResearchIdeaListResponse,
     ResearchIdeaResponse,
     ResearchIdeaUpdate,
+    ResearchOverviewResponse,
+    GenerateIdeasRequest,
+    GenerateIdeasResponse,
     ResearchRunCompareResponse,
     ResearchRunListResponse,
     ResearchRunSummary,
@@ -53,6 +56,8 @@ from services.research_experiments_service import (
     update_experiment,
 )
 from services.research_ideas_service import create_idea, delete_idea, get_idea, list_ideas, update_idea
+from services.research_overview_service import get_research_overview
+from services.research_idea_generation_service import duplicate_idea, generate_ideas_from_findings
 from services.research_run_service import (
     backfill_run_index,
     compare_runs,
@@ -68,6 +73,36 @@ router = APIRouter(prefix="/api/v2/research", tags=["quant-lab-research"])
 def _require_research_api() -> None:
     if not QUANT_LAB_RESEARCH_API_ENABLED:
         raise HTTPException(status_code=503, detail="QUANT_LAB_RESEARCH_API_ENABLED is false")
+
+
+# --- Overview ---
+
+
+@router.get("/overview", response_model=ResearchOverviewResponse)
+def get_overview(sleeve: str | None = None):
+    _require_research_api()
+    from buckets import DEFAULT_BUCKET
+
+    return get_research_overview(sleeve or DEFAULT_BUCKET)
+
+
+@router.post("/ideas/generate", response_model=GenerateIdeasResponse)
+def post_generate_ideas(body: GenerateIdeasRequest):
+    _require_research_api()
+    from buckets import DEFAULT_BUCKET
+
+    overview = get_research_overview(body.sleeve or DEFAULT_BUCKET)
+    findings = overview.findings if body.from_findings_only else overview.findings
+    return generate_ideas_from_findings(findings, sleeve=body.sleeve, limit=body.limit)
+
+
+@router.post("/ideas/{idea_id}/duplicate", response_model=ResearchIdeaResponse)
+def post_duplicate_idea(idea_id: str):
+    _require_research_api()
+    row = duplicate_idea(idea_id)
+    if not row:
+        raise HTTPException(status_code=404, detail=f"idea not found: {idea_id}")
+    return row
 
 
 # --- Ideas ---

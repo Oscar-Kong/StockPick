@@ -2,8 +2,8 @@
 
 **Branch:** `quant-lab-workbench`  
 **Phase 1 completed:** 2026-06-20  
-**Phase 2 completed:** 2026-06-20  
-**Status:** Backend research foundation shipped — no frontend redesign yet.
+**Phase 3 completed:** 2026-06-20  
+**Status:** Research overview + idea board shipped; legacy experiment tabs remain under `?section=legacy`.
 
 Quant Lab is a **research and validation console** for US equities. It must not silently update live scan rankings, portfolio recommendations, or orders. Proposed model changes require reviewable **Change Proposals** (not yet implemented).
 
@@ -463,13 +463,16 @@ New columns on `research_runs` only: `experiment_id`, `idea_id`, `evidence_impac
 
 ### Phase 3 — Overview + Ideas (navigation shell)
 
-- [ ] New route structure: `/quant-lab/overview`, `/quant-lab/ideas`, … with legacy `?tab=` redirects
-- [ ] Overview page: promote evidence panel; rollup reliability
-- [x] Ideas CRUD API (`POST/GET/PATCH /api/v2/research/ideas`) — backend only
-- [ ] Ideas CRUD UI
-- [ ] Link ideas to symbols/factors/sleeves (metadata only)
-- [ ] Tests: routing, Ideas API, Overview render
-- [ ] i18n keys for new nav
+- [x] Top-level nav: Overview, Ideas, Experiments, Results, Model Monitor (+ Legacy tools)
+- [x] URL query `?section=` with default `overview`; `?tab=` redirects to `section=legacy`
+- [x] `GET /api/v2/research/overview` — bounded rollup (confidence, freshness, brief, ideas, activity, maintenance)
+- [x] Deterministic research brief (`research_brief_service.py`) + idea generation with dedup
+- [x] Overview UI: state summary, brief, recommended ideas, activity, evidence maintenance (real job endpoints)
+- [x] Ideas board UI: search/filter, manual create, generate, edit/notes/priority, archive, duplicate, configure experiment
+- [x] Legacy six tabs preserved under `section=legacy`
+- [x] i18n keys (en + zh)
+- [x] Tests: `test_research_overview.py`, frontend nav/overview/ideas tests
+- [ ] Link ideas to symbols/factors/sleeves (metadata only) — deferred to Phase 4+
 
 ### Phase 4 — Experiments launch pad
 
@@ -561,7 +564,43 @@ New columns on `research_runs` only: `experiment_id`, `idea_id`, `evidence_impac
 
 ---
 
-## 20. Test baseline (Phase 2)
+## 20. Test baseline (Phase 3)
+
+Recorded: **2026-06-20** after Phase 3.
+
+### Backend (full suite)
+
+```bash
+cd backend && python -m pytest -q
+```
+
+**Result:** `347 passed, 2 skipped`
+
+### Backend (research overview)
+
+```bash
+cd backend && python -m pytest tests/test_research_overview.py -q
+```
+
+**Result:** `8 passed`
+
+### Frontend (Quant Lab + new nav)
+
+```bash
+cd frontend && npm test -- --run src/components/quant-lab src/lib/quantLabNavigation.test.ts src/lib/researchOverviewNormalizers.test.ts
+```
+
+**Result:** `60 passed` (53 quant-lab component + 7 lib)
+
+### Frontend (full suite)
+
+```bash
+cd frontend && npm test -- --run
+```
+
+**Result:** `166 passed`
+
+## 20 (archived). Test baseline (Phase 2)
 
 Recorded: **2026-06-20** after Phase 2.
 

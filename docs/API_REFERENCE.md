@@ -5,6 +5,14 @@ Feature flag: `QUANT_LAB_RESEARCH_API_ENABLED` (503 when false)
 
 Research APIs do **not** auto-update live scan rankings, weights, or orders. Change proposals require explicit review.
 
+## Overview
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/overview?sleeve=` | Research home rollup: confidence, freshness, versions, regime, predictions, brief findings, recommended ideas, activity, maintenance actions |
+
+Bounded read-only aggregation — does not enqueue heavy research jobs.
+
 ## Ideas
 
 | Method | Path | Description |
@@ -14,6 +22,8 @@ Research APIs do **not** auto-update live scan rankings, weights, or orders. Cha
 | GET | `/ideas/{id}` | Get idea |
 | PATCH | `/ideas/{id}` | Update idea |
 | DELETE | `/ideas/{id}` | Delete idea |
+| POST | `/ideas/generate` | Generate ideas from deterministic brief findings (`sleeve`, `limit`, `from_findings_only`) |
+| POST | `/ideas/{id}/duplicate` | Duplicate idea (new id, archived source unchanged) |
 
 **Statuses:** `new`, `saved`, `ready_to_test`, `running`, `supported`, `rejected`, `inconclusive`, `archived`
 

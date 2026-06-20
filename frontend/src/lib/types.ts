@@ -1737,3 +1737,113 @@ export interface QuantHealthSummary {
   progress?: SavedProgressSummary | null;
   factor_ic_as_of?: string | null;
 }
+
+export type ResearchIdeaStatus =
+  | "new"
+  | "saved"
+  | "ready_to_test"
+  | "running"
+  | "supported"
+  | "rejected"
+  | "inconclusive"
+  | "archived";
+
+export type ResearchIdeaSourceType =
+  | "factor_deterioration"
+  | "factor_improvement"
+  | "prediction_drift"
+  | "recommendation_calibration"
+  | "market_regime"
+  | "scan_dispersion"
+  | "portfolio_concentration"
+  | "pair_relationship"
+  | "data_quality"
+  | "failed_experiment"
+  | "user_created";
+
+export interface ResearchIdea {
+  id: string;
+  title: string;
+  hypothesis: string;
+  description: string;
+  why_now: string;
+  source_type: ResearchIdeaSourceType;
+  source_references: string[];
+  sleeve: string | null;
+  universe_definition: Record<string, unknown>;
+  suggested_experiment_type: string | null;
+  suggested_parameters: Record<string, unknown>;
+  priority: number;
+  confidence: number;
+  status: ResearchIdeaStatus;
+  user_notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ResearchBriefFinding {
+  finding_id: string;
+  title: string;
+  explanation: string;
+  supporting_metric: string;
+  source_reference: string;
+  why_it_matters: string;
+  confidence: number;
+  evidence_impact: string;
+  suggested_experiment_type: string;
+  suggested_parameters: Record<string, unknown>;
+}
+
+export interface ResearchActivityItem {
+  id: string;
+  activity_type: string;
+  label: string;
+  occurred_at?: string | null;
+  status?: string | null;
+  run_id?: string | null;
+}
+
+export interface EvidenceMaintenanceAction {
+  action_id: string;
+  label: string;
+  description: string;
+  endpoint: string;
+  method: string;
+  available: boolean;
+  reason_unavailable?: string | null;
+}
+
+export interface ResearchOverviewResponse {
+  generated_at: string;
+  sleeve: string;
+  research_confidence_status: string;
+  research_confidence_score: number;
+  data_freshness: string;
+  strategy_version: string;
+  factor_model_version: string;
+  market_regime?: string | null;
+  predictions_resolved: number;
+  predictions_unresolved: number;
+  failed_or_blocked_jobs: number;
+  factor_ic?: QuantLabLastRunSummary | null;
+  walk_forward?: QuantLabLastRunSummary | null;
+  pairs?: QuantLabLastRunSummary | null;
+  major_warnings: string[];
+  findings: ResearchBriefFinding[];
+  recommended_ideas: ResearchIdea[];
+  recent_activity: ResearchActivityItem[];
+  maintenance_actions: EvidenceMaintenanceAction[];
+}
+
+export interface ResearchIdeaListResponse {
+  ideas: ResearchIdea[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+export interface GenerateIdeasResponse {
+  created: ResearchIdea[];
+  skipped_duplicates: number;
+  findings_used: number;
+}

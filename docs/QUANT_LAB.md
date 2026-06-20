@@ -35,7 +35,7 @@ Heavy jobs (`POST /research/walk-forward`, `POST /research/pairs`, IC panel, sch
 
 ## Research foundation API (Phase 2)
 
-Backend-only foundation at `/api/v2/research` (see [API_REFERENCE.md](./API_REFERENCE.md)):
+Backend foundation at `/api/v2/research` (see [API_REFERENCE.md](./API_REFERENCE.md)):
 
 - **Ideas** — hypotheses with source types and statuses
 - **Experiments** — lightweight definitions separate from runs
@@ -46,6 +46,23 @@ Backend-only foundation at `/api/v2/research` (see [API_REFERENCE.md](./API_REFE
 - **Change proposals** — reviewable drafts; never auto-applied
 
 Env: `QUANT_LAB_RESEARCH_API_ENABLED`, `RESEARCH_MAX_ORDINARY_MODIFIER` (default `0` = display-only).
+
+## Research home (Phase 3)
+
+**Default view:** Overview (`/quant-lab` or `/quant-lab?section=overview`).
+
+| Section | Query | Loads on open |
+|---------|-------|----------------|
+| Overview | `section=overview` (default) | `GET /api/v2/research/overview?sleeve=` only |
+| Ideas | `section=ideas` | `GET /api/v2/research/ideas` |
+| Experiments / Results / Model Monitor | `section=experiments` etc. | Section hub links to legacy runners |
+| Legacy tools | `section=legacy&tab=` | Original six tabs unchanged |
+
+Overview includes deterministic **research brief** findings, recommended ideas, recent activity, and collapsible **evidence maintenance** actions (IC panel, forward labels, resolve outcomes, quant daily jobs, evidence backfill).
+
+Ideas board supports manual create, generate-from-brief, edit/notes/priority, archive, duplicate, and **Configure experiment** (creates experiment record + opens legacy walk-forward tab).
+
+Page-level **Research only** badge remains visible.
 
 ## API endpoints
 

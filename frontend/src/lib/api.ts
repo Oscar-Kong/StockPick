@@ -88,6 +88,11 @@ import type {
   WatchlistRefreshResponse,
   AnalyzeSymbolResponse,
   AnalyzeWatchlistResponse,
+  ResearchOverviewResponse,
+  ResearchIdea,
+  ResearchIdeaListResponse,
+  GenerateIdeasResponse,
+  ResearchIdeaStatus,
 } from "./types";
 import type { Locale } from "@/lib/i18n";
 import { normalizeLastRunSummary, normalizeQuantLabEvidence } from "./quantLabLastRun";
@@ -113,6 +118,12 @@ import {
   normalizeV2FactorsAdminResponse,
   normalizeWalkForwardResearchResponse,
 } from "./quantLabNormalizers";
+import {
+  normalizeGenerateIdeasResponse,
+  normalizeResearchIdea,
+  normalizeResearchIdeaListResponse,
+  normalizeResearchOverviewResponse,
+} from "./researchOverviewNormalizers";
 
 const API_URL = getApiBaseUrl();
 
@@ -1073,4 +1084,119 @@ export async function getQuantHealthSummary(
     progress: progress.status === "fulfilled" ? progress.value : null,
     factor_ic_as_of: factorIcAsOf,
   };
+}
+
+export async function getResearchOverview(
+  sleeve: Bucket = "penny",
+  options?: V2RequestOptions
+): Promise<ResearchOverviewResponse> {
+  const raw = await request<unknown>(`/api/v2/research/overview?sleeve=${sleeve}`, {
+    signal: options?.signal,
+  });
+  return normalizeResearchOverviewResponse(raw);
+}
+
+export async function listResearchIdeas(
+  params?: { status?: ResearchIdeaStatus; sleeve?: string; offset?: number; limit?: number },
+  options?: V2RequestOptions
+): Promise<ResearchIdeaListResponse> {
+  const search = new URLSearchParams();
+  if (params?.status) search.set("status", params.status);
+  if (params?.sleeve) search.set("sleeve", params.sleeve);
+  if (params?.offset != null) search.set("offset", String(params.offset));
+  if (params?.limit != null) search.set("limit", String(params.limit));
+  const qs = search.toString() ? `?${search}` : "";
+  const raw = await request<unknown>(`/api/v2/research/ideas${qs}`, { signal: options?.signal });
+  return normalizeResearchIdeaListResponse(raw);
+}
+
+export async function createResearchIdea(
+  body: Partial<ResearchIdea> & { title: string; hypothesis?: string },
+  options?: V2RequestOptions
+): Promise<ResearchIdea> {
+  const raw = await request<unknown>("/api/v2/research/ideas", {
+    method: "POST",
+    body: JSON.stringify(body),
+    signal: options?.signal,
+  });
+  const idea = normalizeResearchIdea(raw);
+  if (!idea) throw new Error("Invalid idea response");
+  return idea;
+}
+
+export async function updateResearchIdea(
+  id: string,
+  body: Partial<ResearchIdea>,
+  options?: V2RequestOptions
+): Promise<ResearchIdea> {
+  const raw = await request<unknown>(`/api/v2/research/ideas/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+    signal: options?.signal,
+  });
+  const idea = normalizeResearchIdea(raw);
+  if (!idea) throw new Error("Invalid idea response");
+  return idea;
+}
+
+export async function duplicateResearchIdea(id: string, options?: V2RequestOptions): Promise<ResearchIdea> {
+  const raw = await request<unknown>(`/api/v2/research/ideas/${encodeURIComponent(id)}/duplicate`, {
+    method: "POST",
+    signal: options?.signal,
+  });
+  const idea = normalizeResearchIdea(raw);
+  if (!idea) throw new Error("Invalid idea response");
+  return idea;
+}
+
+export async function generateResearchIdeas(
+  body?: { sleeve?: string; limit?: number; from_findings_only?: boolean },
+  options?: V2RequestOptions
+): Promise<GenerateIdeasResponse> {
+  const raw = await request<unknown>("/api/v2/research/ideas/generate", {
+    method: "POST",
+    body: JSON.stringify(body ?? {}),
+    signal: options?.signal,
+  });
+  return normalizeGenerateIdeasResponse(raw);
+}
+
+export async function createResearchExperiment(
+  body: {
+    idea_id?: string;
+    name: string;
+    experiment_type: string;
+    sleeve?: string;
+    parameters?: Record<string, unknown>;
+    preset?: string;
+  },
+  options?: V2RequestOptions
+): Promise<Record<string, unknown>> {
+  return request("/api/v2/research/experiments", {
+    method: "POST",
+    body: JSON.stringify(body),
+    signal: options?.signal,
+  });
+}
+
+export function postIcPanelJob(options?: V2RequestOptions): Promise<Record<string, unknown>> {
+  return request("/api/v2/jobs/ic-panel", { method: "POST", signal: options?.signal });
+}
+
+export function postForwardLabelsJob(options?: V2RequestOptions): Promise<Record<string, unknown>> {
+  return request("/api/v2/jobs/forward-labels", { method: "POST", signal: options?.signal });
+}
+
+export function postResolveOutcomesJob(options?: V2RequestOptions): Promise<Record<string, unknown>> {
+  return request("/api/v2/jobs/resolve-outcomes", { method: "POST", signal: options?.signal });
+}
+
+export function postResearchRunsBackfill(
+  limit = 100,
+  options?: V2RequestOptions
+): Promise<Record<string, unknown>> {
+  return request(`/api/v2/research/runs/backfill?limit=${limit}`, {
+    method: "POST",
+    signal: options?.signal,
+  });
 }

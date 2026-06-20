@@ -6,6 +6,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+from models.schemas_v2 import QuantLabLastRunSummary
+
 IdeaStatus = Literal[
     "new",
     "saved",
@@ -397,3 +399,72 @@ class ChangeProposalListResponse(BaseModel):
     total: int
     offset: int
     limit: int
+
+
+class ResearchBriefFinding(BaseModel):
+    finding_id: str
+    title: str
+    explanation: str
+    supporting_metric: str
+    source_reference: str
+    why_it_matters: str
+    confidence: float = Field(ge=0.0, le=1.0)
+    evidence_impact: EvidenceImpact = "informational"
+    suggested_experiment_type: ExperimentType
+    suggested_parameters: dict[str, Any] = Field(default_factory=dict)
+
+
+class ResearchActivityItem(BaseModel):
+    id: str
+    activity_type: str
+    label: str
+    occurred_at: str | None = None
+    status: str | None = None
+    run_id: str | None = None
+
+
+class EvidenceMaintenanceAction(BaseModel):
+    action_id: str
+    label: str
+    description: str
+    endpoint: str
+    method: str = "POST"
+    available: bool = True
+    reason_unavailable: str | None = None
+
+
+class ResearchOverviewResponse(BaseModel):
+    generated_at: str
+    sleeve: str
+    research_confidence_status: str
+    research_confidence_score: int = Field(ge=0, le=100)
+    data_freshness: str
+    strategy_version: str
+    factor_model_version: str
+    market_regime: str | None = None
+    latest_experiment: ResearchExperimentResponse | None = None
+    latest_completed_run: ResearchRunSummary | None = None
+    predictions_resolved: int = 0
+    predictions_unresolved: int = 0
+    failed_or_blocked_jobs: int = 0
+    factor_ic: QuantLabLastRunSummary | None = None
+    walk_forward: QuantLabLastRunSummary | None = None
+    pairs: QuantLabLastRunSummary | None = None
+    major_warnings: list[str] = Field(default_factory=list)
+    findings: list[ResearchBriefFinding] = Field(default_factory=list)
+    recommended_ideas: list[ResearchIdeaResponse] = Field(default_factory=list)
+    recent_activity: list[ResearchActivityItem] = Field(default_factory=list)
+    maintenance_actions: list[EvidenceMaintenanceAction] = Field(default_factory=list)
+
+
+class GenerateIdeasRequest(BaseModel):
+    sleeve: str | None = None
+    from_findings_only: bool = True
+    limit: int = Field(default=10, ge=1, le=50)
+
+
+class GenerateIdeasResponse(BaseModel):
+    created: list[ResearchIdeaResponse]
+    skipped_duplicates: int = 0
+    findings_used: int = 0
+
