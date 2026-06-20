@@ -1847,3 +1847,79 @@ export interface GenerateIdeasResponse {
   skipped_duplicates: number;
   findings_used: number;
 }
+
+export interface ExperimentTemplateInfo {
+  experiment_type: string;
+  title: string;
+  description: string;
+  required_fields: string[];
+  optional_fields: string[];
+  universe_sources: string[];
+  supports_presets: boolean;
+}
+
+export interface PresetParameterValue {
+  key: string;
+  value: string | number | boolean | unknown[];
+  description?: string;
+}
+
+export interface ExperimentPresetInfo {
+  preset_id: string;
+  title: string;
+  description: string;
+  major_evidence_eligible: boolean;
+  verdict_ceiling: string;
+  parameters: PresetParameterValue[];
+}
+
+export interface ExperimentValidationCheck {
+  key: string;
+  label: string;
+  value?: string | number | boolean | null;
+  status: "ok" | "warning" | "error" | "missing";
+  detail?: string;
+}
+
+export interface ExperimentValidationResponse {
+  valid: boolean;
+  can_run: boolean;
+  symbol_count: number;
+  missing_data_rate?: number | null;
+  expected_periods?: number | null;
+  data_cutoff?: string | null;
+  dependency_availability: Record<string, boolean>;
+  major_limitations: string[];
+  checks: ExperimentValidationCheck[];
+  resolved_universe: string[];
+  merged_parameters: Record<string, unknown>;
+}
+
+export interface ExperimentStageRecord {
+  stage: string;
+  status: string;
+  message?: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+}
+
+export interface ExperimentJobResponse {
+  job_id: string;
+  experiment_id: string;
+  status: string;
+  current_stage?: string | null;
+  stages: ExperimentStageRecord[];
+  run_id?: string | null;
+  last_success_run_id?: string | null;
+  error_message?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+}
+
+export interface ExperimentLaunchResponse {
+  job_id: string;
+  experiment_id: string;
+  status: string;
+  duplicate_blocked: boolean;
+  message: string;
+}

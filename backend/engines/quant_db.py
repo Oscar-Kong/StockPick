@@ -21,6 +21,7 @@ from engines.quant_models import (
     QuantAuditLog,
     QuantBase,
     ResearchExperiment,
+    ResearchExperimentJob,
     ResearchIdea,
     ResearchRunIndex,
     TradeOutcome,

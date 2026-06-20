@@ -27,6 +27,12 @@ from models.schemas_research import (
     ResearchOverviewResponse,
     GenerateIdeasRequest,
     GenerateIdeasResponse,
+    ExperimentTemplatesResponse,
+    ExperimentPresetsResponse,
+    ExperimentValidateRequest,
+    ExperimentValidationResponse,
+    ExperimentJobResponse,
+    ExperimentLaunchResponse,
     ResearchRunCompareResponse,
     ResearchRunListResponse,
     ResearchRunSummary,
@@ -58,6 +64,10 @@ from services.research_experiments_service import (
 from services.research_ideas_service import create_idea, delete_idea, get_idea, list_ideas, update_idea
 from services.research_overview_service import get_research_overview
 from services.research_idea_generation_service import duplicate_idea, generate_ideas_from_findings
+from services.experiment_presets_service import list_presets, list_templates
+from services.experiment_validation_service import validate_experiment
+from services.experiment_launch_service import launch_experiment
+from services.experiment_job_service import get_job
 from services.research_run_service import (
     backfill_run_index,
     compare_runs,
@@ -187,6 +197,33 @@ def get_experiments(
     )
 
 
+@router.get("/experiments/templates", response_model=ExperimentTemplatesResponse)
+def get_experiment_templates():
+    _require_research_api()
+    return list_templates()
+
+
+@router.get("/experiments/presets", response_model=ExperimentPresetsResponse)
+def get_experiment_presets():
+    _require_research_api()
+    return list_presets()
+
+
+@router.post("/experiments/validate", response_model=ExperimentValidationResponse)
+def post_validate_experiment(body: ExperimentValidateRequest):
+    _require_research_api()
+    return validate_experiment(body)
+
+
+@router.get("/experiments/jobs/{job_id}", response_model=ExperimentJobResponse)
+def get_experiment_job(job_id: str):
+    _require_research_api()
+    row = get_job(job_id)
+    if not row:
+        raise HTTPException(status_code=404, detail=f"job not found: {job_id}")
+    return row
+
+
 @router.get("/experiments/{experiment_id}", response_model=ResearchExperimentResponse)
 def get_experiment_by_id(experiment_id: str):
     _require_research_api()
@@ -214,6 +251,15 @@ def remove_experiment(experiment_id: str):
     if not delete_experiment(experiment_id):
         raise HTTPException(status_code=404, detail=f"experiment not found: {experiment_id}")
     return {"deleted": True, "id": experiment_id}
+
+
+@router.post("/experiments/{experiment_id}/launch", response_model=ExperimentLaunchResponse)
+def post_launch_experiment(experiment_id: str):
+    _require_research_api()
+    try:
+        return launch_experiment(experiment_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 # --- Unified runs ---

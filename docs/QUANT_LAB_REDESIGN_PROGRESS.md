@@ -3,7 +3,8 @@
 **Branch:** `quant-lab-workbench`  
 **Phase 1 completed:** 2026-06-20  
 **Phase 3 completed:** 2026-06-20  
-**Status:** Research overview + idea board shipped; legacy experiment tabs remain under `?section=legacy`.
+**Phase 4 completed:** 2026-06-20  
+**Status:** Unified Experiment Studio shipped; legacy tab runners remain under `section=legacy`.
 
 Quant Lab is a **research and validation console** for US equities. It must not silently update live scan rankings, portfolio recommendations, or orders. Proposed model changes require reviewable **Change Proposals** (not yet implemented).
 
@@ -474,13 +475,18 @@ New columns on `research_runs` only: `experiment_id`, `idea_id`, `evidence_impac
 - [x] Tests: `test_research_overview.py`, frontend nav/overview/ideas tests
 - [ ] Link ideas to symbols/factors/sleeves (metadata only) — deferred to Phase 4+
 
-### Phase 4 — Experiments launch pad
+### Phase 4 — Unified Experiment Studio
 
-- [ ] Experiments page: cards for WF, pairs, IC panel, resolve-outcomes
-- [ ] `research_experiments` links `idea_id` + preset parameters (exploratory vs robust presets)
-- [ ] Reuse existing POST endpoints; create experiment record before run
-- [ ] Run status polling from `research_runs`
-- [ ] Tests: experiment lifecycle, launch presets, no live weight mutation
+- [x] `ExperimentStudio` replaces experiments section hub (legacy runners under Legacy tools)
+- [x] Six templates: factor validation, walk-forward, prediction calibration, pairs, similar-signal, portfolio policy
+- [x] Shared flow: choose → configure → review → run → status → result (URL `step=` query)
+- [x] Presets: Quick Check, Standard Research, Robust Validation (+ custom) with visible parameters
+- [x] `POST /experiments/validate` pre-run checks; `POST /experiments/{id}/launch` with staged jobs
+- [x] `GET /experiments/templates`, `/presets`, `/jobs/{job_id}`
+- [x] Universe resolver: scan, saved scan, watchlist, holdings, bucket, custom symbols
+- [x] Idea → experiment studio navigation from Ideas board
+- [x] Tests: `test_experiment_studio.py`, frontend studio tests
+- [ ] Results detail router (Phase 5) — studio links to results section only
 
 ### Phase 5 — Results unified history
 

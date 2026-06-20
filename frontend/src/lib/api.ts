@@ -1169,12 +1169,68 @@ export async function createResearchExperiment(
     sleeve?: string;
     parameters?: Record<string, unknown>;
     preset?: string;
+    universe_definition?: Record<string, unknown>;
+    notes?: string;
+    hypothesis?: string;
+    null_hypothesis?: string;
+    success_criteria?: string;
+    failure_criteria?: string;
   },
   options?: V2RequestOptions
-): Promise<Record<string, unknown>> {
+): Promise<Record<string, unknown> & { id?: string }> {
   return request("/api/v2/research/experiments", {
     method: "POST",
     body: JSON.stringify(body),
+    signal: options?.signal,
+  });
+}
+
+export async function updateResearchExperiment(
+  id: string,
+  body: Record<string, unknown>,
+  options?: V2RequestOptions
+): Promise<Record<string, unknown> & { id?: string }> {
+  return request(`/api/v2/research/experiments/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+    signal: options?.signal,
+  });
+}
+
+export async function getExperimentTemplates(options?: V2RequestOptions): Promise<{ templates: import("./types").ExperimentTemplateInfo[] }> {
+  return request("/api/v2/research/experiments/templates", { signal: options?.signal });
+}
+
+export async function getExperimentPresets(options?: V2RequestOptions): Promise<{ presets: import("./types").ExperimentPresetInfo[] }> {
+  return request("/api/v2/research/experiments/presets", { signal: options?.signal });
+}
+
+export async function validateResearchExperiment(
+  body: Record<string, unknown>,
+  options?: V2RequestOptions
+): Promise<import("./types").ExperimentValidationResponse> {
+  return request("/api/v2/research/experiments/validate", {
+    method: "POST",
+    body: JSON.stringify(body),
+    signal: options?.signal,
+  });
+}
+
+export async function launchResearchExperiment(
+  experimentId: string,
+  options?: V2RequestOptions
+): Promise<import("./types").ExperimentLaunchResponse> {
+  return request(`/api/v2/research/experiments/${encodeURIComponent(experimentId)}/launch`, {
+    method: "POST",
+    signal: options?.signal,
+  });
+}
+
+export async function getExperimentJob(
+  jobId: string,
+  options?: V2RequestOptions
+): Promise<import("./types").ExperimentJobResponse> {
+  return request(`/api/v2/research/experiments/jobs/${encodeURIComponent(jobId)}`, {
     signal: options?.signal,
   });
 }

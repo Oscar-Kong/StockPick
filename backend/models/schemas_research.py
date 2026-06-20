@@ -74,7 +74,36 @@ ProposalStatus = Literal[
     "archived",
 ]
 
-ExperimentPreset = Literal["exploratory", "robust", "custom"]
+ExperimentPreset = Literal[
+    "quick_check",
+    "standard_research",
+    "robust_validation",
+    "exploratory",
+    "robust",
+    "custom",
+]
+
+UniverseSource = Literal[
+    "latest_scan",
+    "saved_scan",
+    "watchlist",
+    "portfolio_holdings",
+    "full_bucket",
+    "custom_symbols",
+]
+
+ExperimentStage = Literal[
+    "validating",
+    "resolving_universe",
+    "loading_prices",
+    "calculating_features",
+    "running_analysis",
+    "calculating_outcomes",
+    "evaluating_reliability",
+    "persisting_result",
+    "complete",
+    "failed",
+]
 
 
 class ResearchIdeaCreate(BaseModel):
@@ -467,4 +496,100 @@ class GenerateIdeasResponse(BaseModel):
     created: list[ResearchIdeaResponse]
     skipped_duplicates: int = 0
     findings_used: int = 0
+
+
+class ExperimentTemplateInfo(BaseModel):
+    experiment_type: ExperimentType
+    title: str
+    description: str
+    required_fields: list[str] = Field(default_factory=list)
+    optional_fields: list[str] = Field(default_factory=list)
+    universe_sources: list[UniverseSource] = Field(default_factory=list)
+    supports_presets: bool = True
+
+
+class ExperimentTemplatesResponse(BaseModel):
+    templates: list[ExperimentTemplateInfo]
+
+
+class PresetParameterValue(BaseModel):
+    key: str
+    value: str | int | float | bool | list[Any]
+    description: str = ""
+
+
+class ExperimentPresetInfo(BaseModel):
+    preset_id: ExperimentPreset
+    title: str
+    description: str
+    major_evidence_eligible: bool = False
+    verdict_ceiling: str = "exploratory"
+    parameters: list[PresetParameterValue] = Field(default_factory=list)
+
+
+class ExperimentPresetsResponse(BaseModel):
+    presets: list[ExperimentPresetInfo]
+
+
+class ExperimentValidateRequest(BaseModel):
+    experiment_type: ExperimentType
+    sleeve: str | None = None
+    universe_definition: dict[str, Any] = Field(default_factory=dict)
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    preset: ExperimentPreset | None = None
+    hypothesis: str = ""
+    null_hypothesis: str = ""
+    success_criteria: str = ""
+    failure_criteria: str = ""
+
+
+class ExperimentValidationCheck(BaseModel):
+    key: str
+    label: str
+    value: str | int | float | bool | None = None
+    status: Literal["ok", "warning", "error", "missing"] = "ok"
+    detail: str = ""
+
+
+class ExperimentValidationResponse(BaseModel):
+    valid: bool
+    can_run: bool
+    symbol_count: int = 0
+    missing_data_rate: float | None = None
+    expected_periods: int | None = None
+    data_cutoff: str | None = None
+    dependency_availability: dict[str, bool] = Field(default_factory=dict)
+    major_limitations: list[str] = Field(default_factory=list)
+    checks: list[ExperimentValidationCheck] = Field(default_factory=list)
+    resolved_universe: list[str] = Field(default_factory=list)
+    merged_parameters: dict[str, Any] = Field(default_factory=dict)
+
+
+class ExperimentStageRecord(BaseModel):
+    stage: ExperimentStage
+    status: Literal["pending", "running", "completed", "failed", "skipped"] = "pending"
+    message: str = ""
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+
+
+class ExperimentJobResponse(BaseModel):
+    job_id: str
+    experiment_id: str
+    status: RunStatus
+    current_stage: ExperimentStage | None = None
+    stages: list[ExperimentStageRecord] = Field(default_factory=list)
+    run_id: str | None = None
+    last_success_run_id: str | None = None
+    error_message: str | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+
+
+class ExperimentLaunchResponse(BaseModel):
+    job_id: str
+    experiment_id: str
+    status: RunStatus = "pending"
+    duplicate_blocked: bool = False
+    message: str = ""
 

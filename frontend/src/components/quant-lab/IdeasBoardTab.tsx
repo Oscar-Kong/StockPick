@@ -10,7 +10,7 @@ import {
 } from "@/lib/api";
 import { parseApiError } from "@/lib/apiError";
 import type { Bucket, ResearchIdea, ResearchIdeaStatus } from "@/lib/types";
-import { buildQuantLabHref } from "@/lib/quantLabNavigation";
+import { buildExperimentStudioHref } from "@/lib/experimentStudio";
 import { useTranslation, useTRef } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -165,13 +165,16 @@ export function IdeasBoardTab({ sleeve, onSleeveChange }: IdeasBoardTabProps) {
         parameters: idea.suggested_parameters,
         preset: "exploratory",
       });
-      await updateResearchIdea(idea.id, { status: "ready_to_test" });
       const expId = typeof exp.id === "string" ? exp.id : null;
-      if (expId) {
-        router.push(buildQuantLabHref("legacy", { legacyTab: "walk-forward", extra: { experiment: expId } }));
-      } else {
-        router.push(buildQuantLabHref("experiments"));
-      }
+      await updateResearchIdea(idea.id, { status: "ready_to_test" });
+      router.push(
+        buildExperimentStudioHref({
+          step: "configure",
+          template: (idea.suggested_experiment_type as import("@/lib/experimentStudio").ExperimentType) || "walk_forward",
+          experimentId: expId ?? undefined,
+          ideaId: idea.id,
+        })
+      );
     });
   };
 

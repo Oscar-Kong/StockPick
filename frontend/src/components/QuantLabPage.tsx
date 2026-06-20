@@ -1,6 +1,7 @@
 "use client";
 
 import { AppTabBar, AppTabButton } from "@/components/AppTabs";
+import { ExperimentStudio } from "@/components/quant-lab/ExperimentStudio";
 import { IdeasBoardTab } from "@/components/quant-lab/IdeasBoardTab";
 import { LegacyQuantLabTabs } from "@/components/quant-lab/LegacyQuantLabTabs";
 import { OverviewTab } from "@/components/quant-lab/OverviewTab";
@@ -95,7 +96,7 @@ function QuantLabContent() {
           />
         )}
         {section === "ideas" && <IdeasBoardTab sleeve={sleeve} onSleeveChange={setSleeve} />}
-        {section === "experiments" && <SectionHub kind="experiments" />}
+        {section === "experiments" && <ExperimentStudio sleeve={sleeve} onSleeveChange={setSleeve} />}
         {section === "results" && <SectionHub kind="results" />}
         {section === "model-monitor" && <SectionHub kind="model-monitor" />}
         {section === "legacy" && <LegacyQuantLabTabs tab={legacyTab} onTabChange={setLegacyTab} />}

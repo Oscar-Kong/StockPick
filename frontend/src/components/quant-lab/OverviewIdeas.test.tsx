@@ -229,6 +229,9 @@ describe("IdeasBoardTab", () => {
     render(<IdeasBoardTab sleeve="penny" onSleeveChange={() => undefined} />);
     await waitFor(() => screen.getByText("Configure experiment"));
     fireEvent.click(screen.getByText("Configure experiment"));
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith(expect.stringContaining("experiment=exp_1")));
+    await waitFor(() =>
+      expect(mockPush).toHaveBeenCalledWith(expect.stringContaining("section=experiments"))
+    );
+    expect(mockPush).toHaveBeenCalledWith(expect.stringContaining("experiment=exp_1"));
   });
 });

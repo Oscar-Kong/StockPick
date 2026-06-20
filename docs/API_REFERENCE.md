@@ -25,6 +25,18 @@ Bounded read-only aggregation — does not enqueue heavy research jobs.
 | POST | `/ideas/generate` | Generate ideas from deterministic brief findings (`sleeve`, `limit`, `from_findings_only`) |
 | POST | `/ideas/{id}/duplicate` | Duplicate idea (new id, archived source unchanged) |
 
+## Experiment Studio
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/experiments/templates` | Six experiment template definitions |
+| GET | `/experiments/presets` | Quick Check / Standard / Robust preset parameters |
+| POST | `/experiments/validate` | Pre-run validation (hypothesis, universe, dependencies) |
+| POST | `/experiments/{id}/launch` | Launch experiment job (duplicate-safe) |
+| GET | `/experiments/jobs/{job_id}` | Job status with discrete stages |
+
+Job stages: `validating` → `resolving_universe` → `loading_prices` → `calculating_features` → `running_analysis` → `calculating_outcomes` → `evaluating_reliability` → `persisting_result` → `complete` / `failed`.
+
 **Statuses:** `new`, `saved`, `ready_to_test`, `running`, `supported`, `rejected`, `inconclusive`, `archived`
 
 **Source types:** `factor_deterioration`, `factor_improvement`, `prediction_drift`, `recommendation_calibration`, `market_regime`, `scan_dispersion`, `portfolio_concentration`, `pair_relationship`, `data_quality`, `failed_experiment`, `user_created`

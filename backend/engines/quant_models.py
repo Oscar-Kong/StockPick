@@ -383,6 +383,25 @@ class ResearchExperiment(QuantBase):
     updated_at = Column(DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
 
 
+class ResearchExperimentJob(QuantBase):
+    """Tracks experiment launch progress with discrete stages (no fake percentages)."""
+
+    __tablename__ = "research_experiment_jobs"
+
+    job_id = Column(String(64), primary_key=True)
+    experiment_id = Column(String(64), nullable=False, index=True)
+    status = Column(String(32), nullable=False, default="pending")
+    current_stage = Column(String(64), nullable=True)
+    stages_json = Column(Text, nullable=False, default="[]")
+    run_id = Column(String(64), nullable=True)
+    last_success_run_id = Column(String(64), nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=_utcnow)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
+
+
 class ResearchRunIndex(QuantBase):
     """Thin unified index over persisted research results — payloads live elsewhere."""
 

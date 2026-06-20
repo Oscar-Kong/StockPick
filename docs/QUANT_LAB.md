@@ -60,9 +60,26 @@ Env: `QUANT_LAB_RESEARCH_API_ENABLED`, `RESEARCH_MAX_ORDINARY_MODIFIER` (default
 
 Overview includes deterministic **research brief** findings, recommended ideas, recent activity, and collapsible **evidence maintenance** actions (IC panel, forward labels, resolve outcomes, quant daily jobs, evidence backfill).
 
-Ideas board supports manual create, generate-from-brief, edit/notes/priority, archive, duplicate, and **Configure experiment** (creates experiment record + opens legacy walk-forward tab).
+Ideas board supports manual create, generate-from-brief, edit/notes/priority, archive, duplicate, and **Configure experiment** (creates experiment record + opens Experiment Studio).
 
-Page-level **Research only** badge remains visible.
+## Experiment Studio (Phase 4)
+
+**Route:** `/quant-lab?section=experiments` with optional `step`, `template`, `experiment`, `job`, `idea` query params.
+
+Six templates share a wizard: **Choose → Configure → Review → Run → Status → Result**.
+
+| Template | Engine (unchanged) |
+|----------|-------------------|
+| Factor Validation | IC panel + `get_factor_performance` |
+| Walk-Forward | `run_walk_forward_research` |
+| Prediction Calibration | forward labels + resolve outcomes |
+| Pairs Discovery | `run_pairs_research` |
+| Similar-Signal Replay | `run_similar_signal_backtest` |
+| Portfolio Policy | `run_portfolio_backtest` (institutional persist) |
+
+Presets (**Quick Check**, **Standard Research**, **Robust Validation**) expose all parameter overrides in the UI. Pre-run validation via `POST /api/v2/research/experiments/validate`. Launch via `POST /api/v2/research/experiments/{id}/launch` with discrete job stages (no fake % progress).
+
+Legacy per-tab forms remain under **Legacy tools**.
 
 ## API endpoints
 
