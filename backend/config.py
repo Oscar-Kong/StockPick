@@ -156,6 +156,10 @@ FORWARD_LABELS_ENABLED = _env_bool("FORWARD_LABELS_ENABLED", "true")
 LEGACY_BACKTEST_COSTS_ENABLED = _env_bool("LEGACY_BACKTEST_COSTS_ENABLED", "true")
 PIT_FUNDAMENTALS_ENABLED = _env_bool("PIT_FUNDAMENTALS_ENABLED", "true")
 
+# --- Quant Lab research foundation ---
+QUANT_LAB_RESEARCH_API_ENABLED = _env_bool("QUANT_LAB_RESEARCH_API_ENABLED", "true")
+RESEARCH_MAX_ORDINARY_MODIFIER = float(os.getenv("RESEARCH_MAX_ORDINARY_MODIFIER", "0"))
+
 # --- Phase 7: production hardening ---
 JOB_QUEUE_BACKEND = os.getenv("JOB_QUEUE_BACKEND", "sync").lower()  # sync | db | redis
 REDIS_URL = os.getenv("REDIS_URL", "").strip()

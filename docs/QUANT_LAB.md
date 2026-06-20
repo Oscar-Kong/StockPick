@@ -33,6 +33,20 @@ Trust badges: **Fresh · Stale · Insufficient sample · Feature disabled · No 
 
 Heavy jobs (`POST /research/walk-forward`, `POST /research/pairs`, IC panel, scheduler mutations) run **only on user click**.
 
+## Research foundation API (Phase 2)
+
+Backend-only foundation at `/api/v2/research` (see [API_REFERENCE.md](./API_REFERENCE.md)):
+
+- **Ideas** — hypotheses with source types and statuses
+- **Experiments** — lightweight definitions separate from runs
+- **Unified run index** — thin summaries over `backtest_runs`, `pairs_research_runs`, `factor_ic_history`, predictions, jobs
+- **Evidence memory** — per-symbol deterministic findings linked to runs
+- **Factor lineage** — calculation metadata per factor/date
+- **Impact policy & major evidence gate** — centralized, deterministic (no LLM)
+- **Change proposals** — reviewable drafts; never auto-applied
+
+Env: `QUANT_LAB_RESEARCH_API_ENABLED`, `RESEARCH_MAX_ORDINARY_MODIFIER` (default `0` = display-only).
+
 ## API endpoints
 
 | Endpoint | Purpose |

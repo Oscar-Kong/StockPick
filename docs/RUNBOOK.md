@@ -259,6 +259,25 @@ Walk-forward scores many symbols across each rebalance date — it is intentiona
 - UI runs use `persist_snapshots: false` (summary still saved to `backtest_runs`)
 - If it still times out: shorten the date range, select one horizon (20d only), or set `WALK_FORWARD_ROUTE_TIMEOUT_SECONDS=900` in `.env`
 
+### Quant Lab research API (Phase 2)
+
+Requires `QUANT_LAB_RESEARCH_API_ENABLED=true` (default). Returns **503** when disabled.
+
+```bash
+# List indexed runs (backfills from existing stores on first call)
+curl -s "http://127.0.0.1:18731/api/v2/research/runs?limit=10" | jq .
+
+# Create idea
+curl -s -X POST http://127.0.0.1:18731/api/v2/research/ideas \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Test IC drift","hypothesis":"Momentum IC fading","source_type":"factor_deterioration","sleeve":"penny"}' | jq .
+
+# Evaluate major evidence gate for a persisted walk-forward run
+curl -s -X POST "http://127.0.0.1:18731/api/v2/research/gate/evaluate?run_id=YOUR_RUN_ID" | jq .
+```
+
+`RESEARCH_MAX_ORDINARY_MODIFIER=0` (default) keeps supporting/contradicting evidence **display-only** — no score mutation.
+
 
 Seed deterministic evidence (IC, walk-forward, predictions, pairs, jobs):
 

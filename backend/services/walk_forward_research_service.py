@@ -375,6 +375,9 @@ def persist_walk_forward_run(
                 )
             )
         session.commit()
+    from services.research_run_service import notify_run_persisted
+
+    notify_run_persisted(run_id, store="backtest_runs")
 
 
 def load_walk_forward_run(run_id: str) -> dict[str, Any] | None:

@@ -2,7 +2,8 @@
 
 **Branch:** `quant-lab-workbench`  
 **Phase 1 completed:** 2026-06-20  
-**Status:** Audit complete — no UI redesign or broad code changes in Phase 1.
+**Phase 2 completed:** 2026-06-20  
+**Status:** Backend research foundation shipped — no frontend redesign yet.
 
 Quant Lab is a **research and validation console** for US equities. It must not silently update live scan rankings, portfolio recommendations, or orders. Proposed model changes require reviewable **Change Proposals** (not yet implemented).
 
@@ -443,23 +444,29 @@ New columns on `research_runs` only: `experiment_id`, `idea_id`, `evidence_impac
 - [x] Establish test baseline
 - [x] Single docs commit
 
-### Phase 2 — Common contract + backend aggregation
+### Phase 2 — Common contract + backend aggregation ✅
 
-- [ ] Add `ResearchRunContract` Pydantic model + TypeScript type
-- [ ] Migration: `research_ideas`, `research_experiments`, `research_runs`
-- [ ] `research_run_service.py`: adapters from WF/pairs/IC/predictions/jobs
-- [ ] `GET /api/v2/research/runs` (filter by type, sleeve, status)
-- [ ] `GET /api/v2/research/runs/{run_id}` (contract + `result_reference` resolve)
-- [ ] Hook persist paths to upsert index rows
-- [ ] Create `docs/API_REFERENCE.md` Quant Lab section (file missing today)
-- [ ] Tests: contract, adapter roundtrip, backfill
-- [ ] Update `docs/QUANT_LAB.md`, `docs/RUNBOOK.md`
+- [x] `ResearchRunSummary` Pydantic model (`models/schemas_research.py`)
+- [x] Tables: `research_ideas`, `research_experiments`, `research_runs`, `evidence_memory`, `factor_lineage`, `change_proposals`
+- [x] `research_run_service.py` adapters (WF, pairs, IC panel, predictions, portfolio policy, similar_signal, jobs)
+- [x] `GET /api/v2/research/runs`, `/runs/{run_id}`, `/runs/compare`
+- [x] Ideas, experiments, evidence memory, factor lineage, change proposals CRUD
+- [x] `evidence_impact_policy.py` + `major_evidence_gate.py` (deterministic)
+- [x] Persist hooks: walk-forward, pairs, portfolio backtest
+- [x] `docs/API_REFERENCE.md` created
+- [x] Tests: `tests/test_research_foundation.py` (19 tests)
+- [x] Full backend suite: **339 passed, 2 skipped**
+
+**Files added:** `backend/models/schemas_research.py`, `backend/api/routes_research_lab.py`, `backend/services/research_*.py`, `backend/services/evidence_*.py`, `backend/services/major_evidence_gate.py`, `backend/services/change_proposals_service.py`, `backend/services/factor_lineage_service.py`
+
+**Env:** `QUANT_LAB_RESEARCH_API_ENABLED`, `RESEARCH_MAX_ORDINARY_MODIFIER`
 
 ### Phase 3 — Overview + Ideas (navigation shell)
 
 - [ ] New route structure: `/quant-lab/overview`, `/quant-lab/ideas`, … with legacy `?tab=` redirects
 - [ ] Overview page: promote evidence panel; rollup reliability
-- [ ] Ideas CRUD UI + `POST/GET/PATCH /api/v2/research/ideas`
+- [x] Ideas CRUD API (`POST/GET/PATCH /api/v2/research/ideas`) — backend only
+- [ ] Ideas CRUD UI
 - [ ] Link ideas to symbols/factors/sleeves (metadata only)
 - [ ] Tests: routing, Ideas API, Overview render
 - [ ] i18n keys for new nav
@@ -554,7 +561,52 @@ New columns on `research_runs` only: `experiment_id`, `idea_id`, `evidence_impac
 
 ---
 
-## 20. Test baseline (Phase 1)
+## 20. Test baseline (Phase 2)
+
+Recorded: **2026-06-20** after Phase 2.
+
+### Backend (full suite)
+
+```bash
+cd backend && python -m pytest -q
+```
+
+**Result:** `339 passed, 2 skipped`
+
+### Backend (research foundation)
+
+```bash
+cd backend && python -m pytest tests/test_research_foundation.py -q
+```
+
+**Result:** `19 passed`
+
+### Backend (Phase 1 Quant Lab)
+
+```bash
+cd backend && python -m pytest \
+  tests/test_quant_lab_contracts.py \
+  tests/test_quant_lab_integration.py \
+  tests/test_walk_forward_research_service.py \
+  tests/test_pairs_research.py -q
+```
+
+**Result:** `36 passed, 1 skipped`
+
+### Frontend (unchanged in Phase 2)
+
+```bash
+cd frontend && npm test -- --run \
+  src/components/quant-lab \
+  src/lib/quantLabNormalizers.test.ts \
+  src/lib/quantLabFormatters.test.ts \
+  src/lib/quantLabLastRun.test.ts \
+  src/lib/researchReliability.test.ts
+```
+
+**Result:** `61 passed` (Phase 1 baseline)
+
+## 20 (archived). Test baseline (Phase 1)
 
 Recorded: **2026-06-20** on branch `quant-lab-workbench`.
 

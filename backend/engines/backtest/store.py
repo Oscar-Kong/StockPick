@@ -52,3 +52,9 @@ def persist_backtest_run(result: InstitutionalBacktestResult) -> None:
                 )
             )
         session.commit()
+    from services.research_run_service import notify_run_persisted
+
+    notify_run_persisted(result.run_id, store="backtest_runs")
+    from services.research_run_service import notify_run_persisted
+
+    notify_run_persisted(result.run_id, store="backtest_runs")
