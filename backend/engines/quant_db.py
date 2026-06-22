@@ -71,6 +71,19 @@ def _migrate_quant_columns() -> None:
                 conn.execute(text("ALTER TABLE research_runs ADD COLUMN research_notes TEXT DEFAULT ''"))
             if "interpretation_json" not in cols:
                 conn.execute(text("ALTER TABLE research_runs ADD COLUMN interpretation_json TEXT"))
+            # List/filter indexes for Results tab queries
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_research_runs_sleeve_completed "
+                    "ON research_runs (sleeve, completed_at DESC)"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_research_runs_impact_archived "
+                    "ON research_runs (evidence_impact, archived)"
+                )
+            )
 
 
 def _seed_factor_definitions() -> None:

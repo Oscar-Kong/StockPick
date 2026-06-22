@@ -105,30 +105,24 @@ Legacy per-tab forms remain under **Legacy tools**.
 ## Frontend structure
 
 ```
+frontend/src/components/QuantLabPage.tsx     → section shell (?section=)
 frontend/src/components/quant-lab/
-  QuantLabTabs.tsx          # re-exports
-  QuantLabTabShell.tsx      # shared UI helpers (+ reliability slot)
+  OverviewTab.tsx           → research home (default)
+  IdeasBoardTab.tsx         → ideas CRUD + generate
+  ExperimentStudio.tsx      → unified experiment wizard
+  ResultsTab.tsx            → paginated runs + detail + compare
+  ModelMonitorTab.tsx       → health, jobs, audit, evidence review
+  LegacyQuantLabTabs.tsx    → factor, WF, predictions, pairs
+  QuantLabTabShell.tsx      → shared UI helpers
   ResearchReliabilityCard.tsx
-  FactorLifecycleBadge.tsx
-  FactorPerformanceTab.tsx
-  WalkForwardTab.tsx
-  PredictionsTab.tsx
-  PairsTab.tsx
-  DataQualityTab.tsx
-  ModelAdminTab.tsx
-  QuantLabTabs.test.tsx
-  ResearchReliabilityCard.test.tsx
-
-frontend/src/components/product/
-  EvidenceToActionBoundary.tsx
-
+  QuantLabEvidencePanel.tsx → collapsible on Overview only
+  DataQualityTab.tsx        → embedded in Model Monitor
+  FactorPerformanceTab.tsx, WalkForwardTab.tsx, …
 frontend/src/lib/
-  researchReliability.ts    # reliability scores + factor lifecycle
-  researchReliability.test.ts
-  quantLabNormalizers.ts    # API response normalizers
-  quantLabFormatters.ts     # dates, symbols, horizon text
-  apiError.ts
-  predictions.ts
+  quantLabNavigation.ts     → ?section= routing
+  experimentStudio.ts       → studio URL helpers
+  researchReliability.ts
+  researchOverviewNormalizers.ts
 ```
 
 ## Research Reliability
@@ -156,9 +150,7 @@ curl -X POST http://127.0.0.1:18731/api/v2/jobs/ic-panel
 
 ## Related
 
-- [Quant Lab Stability Audit](./QUANT_LAB_STABILITY_AUDIT.md)
-- [Quant Lab Stability Verification](./QUANT_LAB_STABILITY_VERIFICATION.md)
-- [Quant Lab Error Audit](./QUANT_LAB_ERROR_AUDIT.md)
-- [Quant Lab Fix Verification](./QUANT_LAB_FIX_VERIFICATION.md)
-- [Frontend Information Architecture](FRONTEND_INFORMATION_ARCHITECTURE.md)
-- [UI API Coverage Map](UI_API_COVERAGE_MAP.md)
+- [Quant Lab Redesign Final Report](./QUANT_LAB_REDESIGN_FINAL_REPORT.md)
+- [Quant Lab Redesign Progress](./QUANT_LAB_REDESIGN_PROGRESS.md)
+- [Manual test checklist](./QUANT_LAB_MANUAL_TEST_CHECKLIST.md)
+- [Research Reliability](./RESEARCH_RELIABILITY.md)

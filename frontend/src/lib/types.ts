@@ -2061,13 +2061,71 @@ export interface FactorHealthItem {
   supporting_run_ids: string[];
 }
 
+export interface PredictionHealthSummary {
+  resolved_count: number;
+  unresolved_count: number;
+  stale_count: number;
+  coverage_pct?: number | null;
+  mean_forecast_error_pct?: number | null;
+  recommendation_outcomes?: Record<string, number>;
+  horizon_breakdown?: Record<string, unknown>;
+  regime_breakdown?: Record<string, unknown>;
+  latest_outcome_job?: Record<string, unknown> | null;
+  calibration_ready: boolean;
+}
+
+export interface DataHealthSummary {
+  provider_availability?: Record<string, boolean>;
+  price_freshness?: Record<string, unknown>;
+  missing_stocks?: string[];
+  stale_stocks?: string[];
+  reconciliation_issues?: string[];
+  data_confidence?: Record<string, unknown>;
+  excluded_stock_counts?: Record<string, number>;
+  integrity_blockers: string[];
+}
+
+export interface ResearchJobMonitorItem {
+  job_id: string;
+  job_name: string;
+  status: string;
+  stage?: string;
+  duration_seconds?: number | null;
+  experiment_id?: string | null;
+  run_id?: string | null;
+  error_message?: string | null;
+  error_details?: Record<string, unknown>;
+  created_at?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  retry_blocked?: boolean;
+}
+
+export interface ModelConfigurationSummary {
+  strategy_version: string;
+  factor_model_version: string;
+  current_regime?: string | null;
+  dynamic_weights_enabled: boolean;
+  weights_by_sleeve?: Record<string, Record<string, number>>;
+  enabled_research_features?: Record<string, boolean>;
+  read_only?: boolean;
+}
+
 export interface ModelMonitorResponse {
   sleeve: string;
   factor_health: FactorHealthItem[];
-  prediction_health: Record<string, unknown>;
-  data_health: Record<string, unknown>;
-  research_jobs: Array<Record<string, unknown>>;
-  model_configuration: Record<string, unknown>;
+  prediction_health: PredictionHealthSummary;
+  data_health: DataHealthSummary;
+  research_jobs: ResearchJobMonitorItem[];
+  model_configuration: ModelConfigurationSummary;
+}
+
+export interface MajorEvidenceGateResult {
+  passed_checks?: string[];
+  failed_checks?: string[];
+  warnings?: string[];
+  sample_size?: number | null;
+  integrity_blockers?: string[];
 }
 
 export interface EvidenceReviewFinding {
@@ -2079,7 +2137,7 @@ export interface EvidenceReviewFinding {
   sleeve?: string | null;
   symbol?: string | null;
   supporting_run_ids: string[];
-  gate?: Record<string, unknown> | null;
+  gate?: MajorEvidenceGateResult | null;
   sample_size?: number | null;
   review_required: boolean;
   unresolved_warnings: string[];

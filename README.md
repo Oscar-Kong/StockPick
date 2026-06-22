@@ -19,7 +19,7 @@ From one UI, you can:
    - **Activity** — Robinhood CSV import, buying power, trade journal, closed positions
 2. **Scan** a bucket and rank candidates (`/scan`)
 3. **Workspace** — watchlist and single-symbol analyze (primary score from `/api/v2/score` when enabled) (`/workspace`)
-4. **Quant Lab** — latest evidence cards, **Research Reliability** scores per tab, validation tabs, research on demand (`/quant-lab`)
+4. **Quant Lab** — research workbench: Overview, Ideas, Experiment Studio, Results, Model Monitor + legacy validation tabs (`/quant-lab`)
 5. **Library** — saved scans, research reports, analyze snapshots (`/library`)
 6. **Settings** — language, API providers, ops (`/settings`)
 7. **Trader Intel** — style presets and bucket tilts (`/trader-intel`, secondary nav link)
@@ -31,13 +31,13 @@ Top navigation: **Portfolio · Scan · Workspace · Quant Lab · Library · Sett
 | | Scan | Workspace | Quant Lab |
 |---|------|-----------|-----------|
 | **Question** | Who ranked today? | Why this stock? | Can I trust the model? |
-| **Output** | Ranked candidate list | Symbol analysis | Factor IC, walk-forward, outcomes, jobs |
+| **Output** | Ranked candidate list | Symbol analysis | Research brief, experiments, persisted results |
 | **Affects live rankings** | Yes (on new scan) | No | **No** — validation only |
-| **Heavy jobs** | Scan button only | Analyze on open | Run buttons only |
+| **Heavy jobs** | Scan button only | Analyze on open | Experiment Studio launch only |
 
-**Flow:** Market Data → ScoringEngine → Scan Results → Workspace. Quant Lab validates factors, weights, and outcomes to inform *future* changes — not today's live ranking. Each tab shows a Research Reliability score (see [docs/RESEARCH_RELIABILITY.md](docs/RESEARCH_RELIABILITY.md)).
+**Flow:** Market Data → ScoringEngine → Scan Results → Workspace. Quant Lab validates factors, weights, and outcomes through **ideas, experiments, and reviewable change proposals** — not today's live ranking. See [docs/QUANT_LAB.md](docs/QUANT_LAB.md) and [docs/QUANT_LAB_REDESIGN_FINAL_REPORT.md](docs/QUANT_LAB_REDESIGN_FINAL_REPORT.md).
 
-**Wiring in progress:** allocation recommendation, LEAN export. See [Quant Lab docs](docs/QUANT_LAB.md).
+**Wiring in progress:** allocation recommendation, LEAN export.
 
 ## How It Works (End-to-End Flow)
 

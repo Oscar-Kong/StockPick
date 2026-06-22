@@ -351,7 +351,7 @@ export function ResultsTab({ sleeve, onSleeveChange }: ResultsTabProps) {
     <div className="space-y-3 text-sm">
       <p className="text-zinc-400">{t.quantLab.resultsIndexHint}</p>
       <div className="flex flex-wrap items-end gap-2">
-        <BucketSelect sleeve={sleeve} onChange={onSleeveChange} />
+        <BucketSelect label={t.common.bucket} value={sleeve} onChange={(v) => onSleeveChange(v as Bucket)} />
         <input
           className="rounded border border-zinc-800 bg-zinc-950 px-2 py-1 text-xs"
           placeholder={t.quantLab.resultsSearch}
@@ -382,6 +382,13 @@ export function ResultsTab({ sleeve, onSleeveChange }: ResultsTabProps) {
           <option value="supporting">supporting</option>
           <option value="major_positive">major_positive</option>
           <option value="major_negative">major_negative</option>
+        </select>
+        <select className="rounded border border-zinc-800 bg-zinc-950 px-2 py-1 text-xs" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setOffset(0); }}>
+          <option value="">{t.quantLab.resultsAllStatuses}</option>
+          <option value="completed">completed</option>
+          <option value="running">running</option>
+          <option value="failed">failed</option>
+          <option value="pending">pending</option>
         </select>
         <button
           type="button"

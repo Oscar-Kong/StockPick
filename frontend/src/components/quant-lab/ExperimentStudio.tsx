@@ -118,7 +118,21 @@ export function ExperimentStudio({ sleeve, onSleeveChange }: ExperimentStudioPro
   useEffect(() => {
     if (!jobId || (step !== "status" && step !== "run" && step !== "result")) return;
     let cancelled = false;
+    let polls = 0;
+    const maxPolls = 150;
+    let intervalId: number | undefined;
+    const stopPolling = () => {
+      if (intervalId !== undefined) {
+        window.clearInterval(intervalId);
+        intervalId = undefined;
+      }
+    };
     const poll = async () => {
+      if (cancelled || polls >= maxPolls) {
+        stopPolling();
+        return;
+      }
+      polls += 1;
       try {
         const j = await getExperimentJob(jobId);
         if (cancelled) return;
@@ -126,15 +140,18 @@ export function ExperimentStudio({ sleeve, onSleeveChange }: ExperimentStudioPro
         if (j.status === "completed" && step === "status") {
           navigate({ step: "result", jobId, template: template ?? undefined });
         }
+        if (j.status === "failed" || j.status === "cancelled" || polls >= maxPolls) {
+          stopPolling();
+        }
       } catch {
-        /* retry next tick */
+        if (polls >= maxPolls) stopPolling();
       }
     };
     void poll();
-    const id = window.setInterval(() => void poll(), 2000);
+    intervalId = window.setInterval(() => void poll(), 2000);
     return () => {
       cancelled = true;
-      window.clearInterval(id);
+      stopPolling();
     };
   }, [jobId, step, navigate, template]);
 

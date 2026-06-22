@@ -111,7 +111,7 @@ export function ModelMonitorTab({ sleeve, onSleeveChange }: ModelMonitorTabProps
     <div className="space-y-3 text-sm">
       <p className="text-zinc-400">{t.quantLab.monitorHint}</p>
       <div className="flex flex-wrap items-end gap-2">
-        <BucketSelect sleeve={sleeve} onChange={onSleeveChange} />
+        <BucketSelect label={t.common.bucket} value={sleeve} onChange={(v) => onSleeveChange(v as Bucket)} />
         <button type="button" className="rounded border border-zinc-700 px-2 py-1 text-xs" onClick={() => void load()}>
           {t.common.refresh}
         </button>

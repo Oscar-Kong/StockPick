@@ -1105,6 +1105,7 @@ export const en = {
     resultsAllTypes: "All types",
     resultsAllVerdicts: "All verdicts",
     resultsAllImpact: "All impact",
+    resultsAllStatuses: "All statuses",
     resultsCompareSelected: "Compare selected",
     resultsColName: "Name",
     resultsColType: "Type",

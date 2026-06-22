@@ -97,13 +97,27 @@ Walk-forward backtests often look strong because:
 - **Deflated Sharpe** ratio adjustment
 - Trial count / config search metadata from backend
 
+### Model Monitor (Phase 6–7)
+
+Aggregates factor health, prediction calibration readiness, data integrity blockers, research job history, and **evidence review** queue. Integrity blockers are listed explicitly — they never produce a positive score modifier.
+
+Server-side **decision boundary** (`backend/services/research_decision_boundary.py`):
+
+| Setting | Default | Effect |
+|---------|---------|--------|
+| `RESEARCH_MAX_ORDINARY_MODIFIER` | `0` | Supporting evidence does not change live scores |
+| Major / integrity impacts | gated | Require evidence review before any modifier |
+
+Audit events: `research_evidence_consumed` when boundary is invoked with `audit=True`.
+
 ## What Research Reliability is not
 
 - Not a trading signal or scan rank
 - Not a substitute for institutional-grade backtest hygiene
-- Not persisted server-side (recomputed on each tab render from API data)
+- Not persisted server-side for tab cards (recomputed on render); server persists run-level `evidence_impact` on the unified index
 
 ## Related docs
 
 - [Quant Lab](./QUANT_LAB.md)
+- [Quant Lab Redesign Final Report](./QUANT_LAB_REDESIGN_FINAL_REPORT.md)
 - [Research Reliability verification](./RESEARCH_RELIABILITY_VERIFICATION.md)

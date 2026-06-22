@@ -1085,6 +1085,7 @@ export const zh: Messages = {
     resultsAllTypes: "全部类型",
     resultsAllVerdicts: "全部结论",
     resultsAllImpact: "全部影响",
+    resultsAllStatuses: "全部状态",
     resultsCompareSelected: "对比所选",
     resultsColName: "名称",
     resultsColType: "类型",

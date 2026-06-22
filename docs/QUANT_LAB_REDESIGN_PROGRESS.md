@@ -4,7 +4,7 @@
 **Phase 1 completed:** 2026-06-20  
 **Phase 3 completed:** 2026-06-20  
 **Phase 4 completed:** 2026-06-20  
-**Status:** Unified Experiment Studio shipped; legacy tab runners remain under `section=legacy`.
+**Status:** Phase 7 stabilization complete — see [QUANT_LAB_REDESIGN_FINAL_REPORT.md](./QUANT_LAB_REDESIGN_FINAL_REPORT.md).
 
 Quant Lab is a **research and validation console** for US equities. It must not silently update live scan rankings, portfolio recommendations, or orders. Proposed model changes require reviewable **Change Proposals** (not yet implemented).
 
@@ -508,14 +508,26 @@ New columns on `research_runs` only: `experiment_id`, `idea_id`, `evidence_impac
 - [x] Removed data-quality / model-admin from legacy tabs
 - [x] Tests: `test_model_monitor.py`, `ModelMonitorTab.test.tsx`
 
-### Phase 7 — Change Proposals + evidence gates (partial)
+### Phase 7 — Stabilization + release audit ✅
 
-- [ ] `change_proposals` table + API (draft → review → approved/rejected)
-- [ ] Major Evidence Gate: server rules for `major_positive` / `major_negative` / `integrity_blocker`
-- [ ] UI: proposal builder from Results; explicit apply confirmation (still no silent scan update)
-- [ ] Persist reviewer notes + linked `run_id`s
-- [ ] Full E2E: idea → experiment → run → result → proposal
-- [ ] Update `docs/INSTITUTIONAL_QUANT_ARCHITECTURE.md`, `docs/RESEARCH_RELIABILITY.md`, `README.md`
+- [x] TypeScript + production build pass
+- [x] Bounded experiment job polling (max 150 × 2s)
+- [x] `research_runs` list indexes for sleeve/completed_at and impact/archived
+- [x] Results status filter wired in UI
+- [x] Model Monitor strong TypeScript types
+- [x] Expanded Playwright scenarios (12+)
+- [x] Full backend suite: **385 passed, 2 skipped**
+- [x] Frontend Quant Lab unit: **90 passed**
+- [x] `docs/QUANT_LAB_REDESIGN_FINAL_REPORT.md`
+- [x] Manual checklist + README aligned
+
+### Phase 7 (archived) — Change Proposals + evidence gates
+
+- [x] `change_proposals` table + API (draft → review)
+- [x] Major Evidence Gate server rules
+- [x] Evidence review in Model Monitor + proposal actions from review
+- [x] Research decision boundary in v2 scoring (default zero modifier)
+- [ ] Full live E2E job completion for all six experiment types (seed + contract tests cover engines)
 
 ---
 
