@@ -499,15 +499,16 @@ New columns on `research_runs` only: `experiment_id`, `idea_id`, `evidence_impac
 - [ ] Surface hidden fields: deciles, regime/sector, WF `periods[]` (future enhancement)
 - [ ] Historical case notes (optional link to similar-signal)
 
-### Phase 6 — Model Monitor
+### Phase 6 — Model Monitor ✅
 
-- [ ] Merge Data Quality + Model Admin into Model Monitor sub-sections
-- [ ] Factor lifecycle dashboard (promote/keep/watch/retire from server factors)
-- [ ] Job queue panel + trigger buttons (IC panel, resolve-outcomes, quant_daily_jobs)
-- [ ] Integrity blockers section (`integrity_blocker` runs)
-- [ ] Tests: tab merge without regression, job triggers in demo guard
+- [x] Consolidated Model Monitor tab (factor, prediction, data, jobs, config, audit, evidence review)
+- [x] Evidence impact review surface + change proposal actions
+- [x] Research decision boundary wired into v2 scoring (audited, default no modifier)
+- [x] Extended audit filters; job retry with duplicate guard
+- [x] Removed data-quality / model-admin from legacy tabs
+- [x] Tests: `test_model_monitor.py`, `ModelMonitorTab.test.tsx`
 
-### Phase 7 — Change Proposals + evidence gates
+### Phase 7 — Change Proposals + evidence gates (partial)
 
 - [ ] `change_proposals` table + API (draft → review → approved/rejected)
 - [ ] Major Evidence Gate: server rules for `major_positive` / `major_negative` / `integrity_blocker`

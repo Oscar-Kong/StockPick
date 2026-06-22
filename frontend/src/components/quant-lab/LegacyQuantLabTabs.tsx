@@ -1,9 +1,7 @@
 "use client";
 
 import {
-  DataQualityTab,
   FactorPerformanceTab,
-  ModelAdminTab,
   PairsTab,
   PredictionsTab,
   WalkForwardTab,
@@ -26,8 +24,6 @@ export function LegacyQuantLabTabs({ tab, onTabChange }: LegacyQuantLabTabsProps
     "walk-forward": t.quantLab.tabWalkForward,
     predictions: t.quantLab.tabPredictions,
     pairs: t.quantLab.tabPairs,
-    "data-quality": t.quantLab.tabDataQuality,
-    "model-admin": t.quantLab.tabModelAdmin,
   };
 
   return (
@@ -45,8 +41,6 @@ export function LegacyQuantLabTabs({ tab, onTabChange }: LegacyQuantLabTabsProps
         {tab === "walk-forward" && <WalkForwardTab />}
         {tab === "predictions" && <PredictionsTab />}
         {tab === "pairs" && <PairsTab />}
-        {tab === "data-quality" && <DataQualityTab />}
-        {tab === "model-admin" && <ModelAdminTab />}
       </div>
     </>
   );

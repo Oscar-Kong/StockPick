@@ -704,3 +704,130 @@ class ResearchRunDuplicateExperimentResponse(BaseModel):
     experiment_id: str
     run_id: str
 
+
+class FactorHealthItem(BaseModel):
+    factor_id: str
+    display_name: str
+    lifecycle: str = "hold"
+    production_weight: float | None = None
+    recent_ic: float | None = None
+    long_term_ic: float | None = None
+    sample_size: int | None = None
+    drift: float | None = None
+    horizon_stability: str = "unknown"
+    regime_stability: str = "unknown"
+    factor_version: str = ""
+    transformation_lineage: str = ""
+    last_calculation: str | None = None
+    last_reliable_validation_run_id: str | None = None
+    supporting_run_ids: list[str] = Field(default_factory=list)
+
+
+class PredictionHealthSummary(BaseModel):
+    resolved_count: int = 0
+    unresolved_count: int = 0
+    stale_count: int = 0
+    coverage_pct: float | None = None
+    mean_forecast_error_pct: float | None = None
+    recommendation_outcomes: dict[str, int] = Field(default_factory=dict)
+    horizon_breakdown: dict[str, Any] = Field(default_factory=dict)
+    regime_breakdown: dict[str, Any] = Field(default_factory=dict)
+    latest_outcome_job: dict[str, Any] | None = None
+    calibration_ready: bool = False
+
+
+class DataHealthSummary(BaseModel):
+    provider_availability: dict[str, bool] = Field(default_factory=dict)
+    price_freshness: dict[str, Any] = Field(default_factory=dict)
+    missing_stocks: list[str] = Field(default_factory=list)
+    stale_stocks: list[str] = Field(default_factory=list)
+    reconciliation_issues: list[str] = Field(default_factory=list)
+    data_confidence: dict[str, Any] = Field(default_factory=dict)
+    excluded_stock_counts: dict[str, int] = Field(default_factory=dict)
+    integrity_blockers: list[str] = Field(default_factory=list)
+
+
+class ResearchJobMonitorItem(BaseModel):
+    job_id: str
+    job_name: str
+    status: str
+    stage: str = ""
+    duration_seconds: int | None = None
+    experiment_id: str | None = None
+    run_id: str | None = None
+    error_message: str | None = None
+    error_details: dict[str, Any] = Field(default_factory=dict)
+    created_at: str | None = None
+    started_at: str | None = None
+    finished_at: str | None = None
+    retry_blocked: bool = False
+
+
+class ModelConfigurationSummary(BaseModel):
+    strategy_version: str = ""
+    factor_model_version: str = ""
+    current_regime: str | None = None
+    dynamic_weights_enabled: bool = False
+    weights_by_sleeve: dict[str, dict[str, float]] = Field(default_factory=dict)
+    enabled_research_features: dict[str, bool] = Field(default_factory=dict)
+    read_only: bool = True
+
+
+class ModelMonitorResponse(BaseModel):
+    sleeve: str
+    factor_health: list[FactorHealthItem] = Field(default_factory=list)
+    prediction_health: PredictionHealthSummary = Field(default_factory=PredictionHealthSummary)
+    data_health: DataHealthSummary = Field(default_factory=DataHealthSummary)
+    research_jobs: list[ResearchJobMonitorItem] = Field(default_factory=list)
+    model_configuration: ModelConfigurationSummary = Field(default_factory=ModelConfigurationSummary)
+
+
+class EvidenceReviewFinding(BaseModel):
+    finding_id: str
+    source_type: Literal["run", "evidence_memory"]
+    title: str
+    evidence_impact: EvidenceImpact
+    verdict: str | None = None
+    sleeve: str | None = None
+    symbol: str | None = None
+    supporting_run_ids: list[str] = Field(default_factory=list)
+    gate: MajorEvidenceGateResult | None = None
+    sample_size: int | None = None
+    review_required: bool = True
+    unresolved_warnings: list[str] = Field(default_factory=list)
+    model_versions: dict[str, str] = Field(default_factory=dict)
+    review_history: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class EvidenceReviewListResponse(BaseModel):
+    findings: list[EvidenceReviewFinding]
+    total: int
+
+
+class EvidenceReviewActionRequest(BaseModel):
+    action: Literal[
+        "leave_informational",
+        "acknowledge_supporting",
+        "create_validation_work",
+        "create_change_proposal",
+        "reject",
+        "approve_for_staging",
+    ]
+    notes: str = ""
+    proposal_title: str | None = None
+
+
+class EvidenceReviewActionResponse(BaseModel):
+    finding_id: str
+    action: str
+    evidence_impact: EvidenceImpact
+    proposal_id: str | None = None
+    audit_id: int | None = None
+
+
+class JobRetryResponse(BaseModel):
+    job_id: str
+    retried_as: str | None = None
+    duplicate_blocked: bool = False
+    message: str = ""
+

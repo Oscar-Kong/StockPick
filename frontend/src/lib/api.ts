@@ -817,13 +817,16 @@ export function getV2Version(options?: V2RequestOptions): Promise<V2VersionRespo
 }
 
 export async function getV2Audit(
-  params?: { limit?: number; eventType?: string; symbol?: string },
+  params?: { limit?: number; eventType?: string; symbol?: string; sleeve?: string; runId?: string; since?: string },
   options?: V2RequestOptions
 ): Promise<V2AuditResponse> {
   const search = new URLSearchParams();
   if (params?.limit != null) search.set("limit", String(params.limit));
   if (params?.eventType) search.set("event_type", params.eventType);
   if (params?.symbol) search.set("symbol", params.symbol);
+  if (params?.sleeve) search.set("sleeve", params.sleeve);
+  if (params?.runId) search.set("run_id", params.runId);
+  if (params?.since) search.set("since", params.since);
   const qs = search.toString() ? `?${search}` : "";
   const raw = await request<unknown>(`/api/v2/audit${qs}`, { signal: options?.signal });
   return normalizeV2AuditResponse(raw);
@@ -1354,6 +1357,48 @@ export async function createResearchRunFollowUpIdea(
   return request(`/api/v2/research/runs/${encodeURIComponent(runId)}/follow-up-idea`, {
     method: "POST",
     body: JSON.stringify(body),
+    signal: options?.signal,
+  });
+}
+
+export async function getModelMonitor(
+  sleeve: string,
+  options?: V2RequestOptions
+): Promise<import("./types").ModelMonitorResponse> {
+  return request(`/api/v2/research/model-monitor?sleeve=${encodeURIComponent(sleeve)}`, {
+    signal: options?.signal,
+  });
+}
+
+export async function listEvidenceReview(
+  params: { sleeve?: string; evidence_impact?: string; limit?: number } = {},
+  options?: V2RequestOptions
+): Promise<import("./types").EvidenceReviewListResponse> {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== "") qs.set(k, String(v));
+  }
+  return request(`/api/v2/research/evidence-review?${qs.toString()}`, { signal: options?.signal });
+}
+
+export async function postEvidenceReviewAction(
+  findingId: string,
+  body: { action: string; notes?: string; proposal_title?: string },
+  options?: V2RequestOptions
+): Promise<import("./types").EvidenceReviewActionResponse> {
+  return request(`/api/v2/research/evidence-review/${encodeURIComponent(findingId)}/action`, {
+    method: "POST",
+    body: JSON.stringify(body),
+    signal: options?.signal,
+  });
+}
+
+export async function retryResearchJob(
+  jobId: string,
+  options?: V2RequestOptions
+): Promise<import("./types").JobRetryResponse> {
+  return request(`/api/v2/research/jobs/${encodeURIComponent(jobId)}/retry`, {
+    method: "POST",
     signal: options?.signal,
   });
 }

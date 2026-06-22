@@ -2043,3 +2043,67 @@ export interface ResearchRunCompareDetailResponse {
   charts: ChartSeries[];
 }
 
+export interface FactorHealthItem {
+  factor_id: string;
+  display_name: string;
+  lifecycle: string;
+  production_weight?: number | null;
+  recent_ic?: number | null;
+  long_term_ic?: number | null;
+  sample_size?: number | null;
+  drift?: number | null;
+  horizon_stability: string;
+  regime_stability: string;
+  factor_version: string;
+  transformation_lineage: string;
+  last_calculation?: string | null;
+  last_reliable_validation_run_id?: string | null;
+  supporting_run_ids: string[];
+}
+
+export interface ModelMonitorResponse {
+  sleeve: string;
+  factor_health: FactorHealthItem[];
+  prediction_health: Record<string, unknown>;
+  data_health: Record<string, unknown>;
+  research_jobs: Array<Record<string, unknown>>;
+  model_configuration: Record<string, unknown>;
+}
+
+export interface EvidenceReviewFinding {
+  finding_id: string;
+  source_type: string;
+  title: string;
+  evidence_impact: string;
+  verdict?: string | null;
+  sleeve?: string | null;
+  symbol?: string | null;
+  supporting_run_ids: string[];
+  gate?: Record<string, unknown> | null;
+  sample_size?: number | null;
+  review_required: boolean;
+  unresolved_warnings: string[];
+  model_versions: Record<string, string>;
+  review_history: Array<Record<string, unknown>>;
+}
+
+export interface EvidenceReviewListResponse {
+  findings: EvidenceReviewFinding[];
+  total: number;
+}
+
+export interface EvidenceReviewActionResponse {
+  finding_id: string;
+  action: string;
+  evidence_impact: string;
+  proposal_id?: string | null;
+  audit_id?: number | null;
+}
+
+export interface JobRetryResponse {
+  job_id: string;
+  retried_as?: string | null;
+  duplicate_blocked: boolean;
+  message: string;
+}
+

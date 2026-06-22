@@ -72,7 +72,10 @@ Job stages: `validating` → `resolving_universe` → `loading_prices` → `calc
 | POST | `/runs/{run_id}/duplicate-experiment` | Clone experiment definition from run |
 | POST | `/runs/{run_id}/follow-up-idea` | Create linked follow-up idea |
 | POST | `/runs/{run_id}/sync-evidence` | Sync symbol findings to evidence memory |
-| POST | `/runs/{run_id}/resolve-outcomes` | Attach later outcomes without changing original finding |
+| GET | `/model-monitor?sleeve=` | Factor, prediction, data health, jobs, model config |
+| GET | `/evidence-review` | Findings requiring impact review |
+| POST | `/evidence-review/{finding_id}/action` | Review action (no direct weight updates) |
+| POST | `/jobs/{job_id}/retry` | Retry research job with duplicate guard |
 
 Run payloads remain in source tables (`backtest_runs`, `pairs_research_runs`, `factor_ic_history`, etc.). Index rows hold `result_reference` pointers, deterministic `interpretation_json`, `research_notes`, and `archived`.
 
@@ -107,6 +110,17 @@ Does not store full price history — references signals, factor snapshots, runs
 | POST | `/gate/evaluate?run_id=` | Major evidence gate for a run |
 
 Configured via `RESEARCH_MAX_ORDINARY_MODIFIER` (default `0` = display-only).
+
+## Model Monitor & evidence review (Phase 6)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/model-monitor?sleeve=` | Factor, prediction, data health, research jobs, read-only model config |
+| GET | `/evidence-review` | Findings classified for impact review |
+| POST | `/evidence-review/{finding_id}/action` | Review action (informational, proposal, reject — no live weight change) |
+| POST | `/jobs/{job_id}/retry` | Retry failed job with duplicate guard |
+
+`GET /api/v2/audit` supports filters: `sleeve`, `since`, `until`, `run_id`, `experiment_id`, `proposal_id`, `strategy_version`.
 
 ## Change proposals
 

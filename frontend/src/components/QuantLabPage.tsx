@@ -4,9 +4,9 @@ import { AppTabBar, AppTabButton } from "@/components/AppTabs";
 import { ExperimentStudio } from "@/components/quant-lab/ExperimentStudio";
 import { IdeasBoardTab } from "@/components/quant-lab/IdeasBoardTab";
 import { LegacyQuantLabTabs } from "@/components/quant-lab/LegacyQuantLabTabs";
+import { ModelMonitorTab } from "@/components/quant-lab/ModelMonitorTab";
 import { OverviewTab } from "@/components/quant-lab/OverviewTab";
 import { ResultsTab } from "@/components/quant-lab/ResultsTab";
-import { SectionHub } from "@/components/quant-lab/SectionHub";
 import { QuantLabEvidencePanel } from "@/components/quant-lab/QuantLabEvidencePanel";
 import { QuantLabScanRelationshipPanel } from "@/components/product/QuantLabScanRelationshipPanel";
 import { EvidenceToActionBoundary } from "@/components/product/EvidenceToActionBoundary";
@@ -63,6 +63,10 @@ function QuantLabContent() {
 
   const navigateEvidenceTab = useCallback(
     (tab: string) => {
+      if (tab === "model-monitor" || tab === "data-quality" || tab === "model-admin") {
+        setSection("model-monitor");
+        return;
+      }
       if (isQuantLabLegacyTab(tab)) {
         setSection("legacy", { legacyTab: tab });
       }
@@ -99,7 +103,7 @@ function QuantLabContent() {
         {section === "ideas" && <IdeasBoardTab sleeve={sleeve} onSleeveChange={setSleeve} />}
         {section === "experiments" && <ExperimentStudio sleeve={sleeve} onSleeveChange={setSleeve} />}
         {section === "results" && <ResultsTab sleeve={sleeve} onSleeveChange={setSleeve} />}
-        {section === "model-monitor" && <SectionHub kind="model-monitor" />}
+        {section === "model-monitor" && <ModelMonitorTab sleeve={sleeve} onSleeveChange={setSleeve} />}
         {section === "legacy" && <LegacyQuantLabTabs tab={legacyTab} onTabChange={setLegacyTab} />}
       </div>
 

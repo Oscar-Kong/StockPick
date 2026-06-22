@@ -14,8 +14,6 @@ export const LEGACY_TABS = [
   "walk-forward",
   "predictions",
   "pairs",
-  "data-quality",
-  "model-admin",
 ] as const;
 
 export type QuantLabLegacyTab = (typeof LEGACY_TABS)[number];
@@ -68,4 +66,4 @@ export const EXPERIMENT_LEGACY_LINKS: QuantLabLegacyTab[] = [
 
 export const RESULTS_LEGACY_LINKS: QuantLabLegacyTab[] = ["predictions", "walk-forward", "factor-performance"];
 
-export const MONITOR_LEGACY_LINKS: QuantLabLegacyTab[] = ["data-quality", "model-admin"];
+export const MONITOR_LEGACY_LINKS: QuantLabLegacyTab[] = [];

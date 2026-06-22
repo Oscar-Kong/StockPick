@@ -56,6 +56,13 @@ def list_audit_logs(
     limit: int = 50,
     event_type: str | None = None,
     symbol: str | None = None,
+    sleeve: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    run_id: str | None = None,
+    experiment_id: str | None = None,
+    proposal_id: str | None = None,
+    strategy_version: str | None = None,
 ) -> list[dict[str, Any]]:
     from sqlalchemy.orm import Session
 
@@ -66,17 +73,37 @@ def list_audit_logs(
             q = q.filter(QuantAuditLog.event_type == event_type)
         if symbol:
             q = q.filter(QuantAuditLog.symbol == symbol.upper())
-        rows = q.limit(limit).all()
-        return [
-            {
-                "id": r.id,
-                "event_type": r.event_type,
-                "symbol": r.symbol,
-                "sleeve": r.sleeve,
-                "strategy_version": r.strategy_version,
-                "factor_model_version": r.factor_model_version,
-                "payload": json.loads(r.payload_json or "{}"),
-                "created_at": utc_iso_z(r.created_at),
-            }
-            for r in rows
-        ]
+        if sleeve:
+            q = q.filter(QuantAuditLog.sleeve == sleeve)
+        if strategy_version:
+            q = q.filter(QuantAuditLog.strategy_version == strategy_version)
+        if since:
+            q = q.filter(QuantAuditLog.created_at >= datetime.fromisoformat(since.replace("Z", "+00:00")).replace(tzinfo=None))
+        if until:
+            q = q.filter(QuantAuditLog.created_at <= datetime.fromisoformat(until.replace("Z", "+00:00")).replace(tzinfo=None))
+        rows = q.limit(max(limit, 1) * 3 if run_id or experiment_id or proposal_id else limit).all()
+        out: list[dict[str, Any]] = []
+        for r in rows:
+            payload = json.loads(r.payload_json or "{}")
+            if run_id and run_id not in json.dumps(payload):
+                if payload.get("run_id") != run_id and run_id not in (payload.get("run_ids") or []):
+                    continue
+            if experiment_id and payload.get("experiment_id") != experiment_id:
+                continue
+            if proposal_id and payload.get("proposal_id") != proposal_id:
+                continue
+            out.append(
+                {
+                    "id": r.id,
+                    "event_type": r.event_type,
+                    "symbol": r.symbol,
+                    "sleeve": r.sleeve,
+                    "strategy_version": r.strategy_version,
+                    "factor_model_version": r.factor_model_version,
+                    "payload": payload,
+                    "created_at": utc_iso_z(r.created_at),
+                }
+            )
+            if len(out) >= limit:
+                break
+        return out

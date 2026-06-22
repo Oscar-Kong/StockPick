@@ -125,6 +125,11 @@ def build_v2_score(
 
     final = RiskEngine.apply_deduction(scoring.final_score, risk_assess)
 
+    from services.research_decision_boundary import apply_research_evidence_to_score
+
+    score_consumption = apply_research_evidence_to_score(final, symbol=sym, sleeve=sleeve)
+    final = score_consumption.adjusted_score
+
     liq_pen, liq_note = liquidity_penalty(ctx.info, price=ctx.price)
     metrics["liquidity_penalty"] = liq_pen
     metrics["liquidity_note"] = liq_note
@@ -298,6 +303,13 @@ def build_v2_score(
             gates=rec_obj.gates,
             bull_case=rec_obj.bull_case,
             bear_case=rec_obj.bear_case,
+        )
+        from services.research_decision_boundary import apply_research_evidence_to_recommendation
+
+        recommendation_payload, _boundary_reasons = apply_research_evidence_to_recommendation(
+            recommendation_payload,
+            symbol=sym,
+            sleeve=sleeve,
         )
 
         if MULTI_AGENT_PIPELINE_ENABLED:

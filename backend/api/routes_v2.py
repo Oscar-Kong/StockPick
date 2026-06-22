@@ -398,10 +398,30 @@ def list_audit(
     limit: int = Query(50, ge=1, le=500),
     event_type: str | None = Query(None),
     symbol: str | None = Query(None),
+    sleeve: str | None = Query(None),
+    since: str | None = Query(None),
+    until: str | None = Query(None),
+    run_id: str | None = Query(None),
+    experiment_id: str | None = Query(None),
+    proposal_id: str | None = Query(None),
+    strategy_version: str | None = Query(None),
 ):
     from engines.audit.logger import list_audit_logs
 
-    return {"events": list_audit_logs(limit=limit, event_type=event_type, symbol=symbol)}
+    return {
+        "events": list_audit_logs(
+            limit=limit,
+            event_type=event_type,
+            symbol=symbol,
+            sleeve=sleeve,
+            since=since,
+            until=until,
+            run_id=run_id,
+            experiment_id=experiment_id,
+            proposal_id=proposal_id,
+            strategy_version=strategy_version,
+        )
+    }
 
 
 @router.get("/jobs/queue")

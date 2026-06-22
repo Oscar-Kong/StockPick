@@ -42,8 +42,14 @@ vi.mock("@/components/quant-lab/OverviewTab", () => ({
 vi.mock("@/components/quant-lab/IdeasBoardTab", () => ({
   IdeasBoardTab: () => <div data-testid="ideas-tab">Ideas</div>,
 }));
-vi.mock("@/components/quant-lab/SectionHub", () => ({
-  SectionHub: ({ kind }: { kind: string }) => <div data-testid={`hub-${kind}`}>{kind}</div>,
+vi.mock("@/components/quant-lab/ExperimentStudio", () => ({
+  ExperimentStudio: () => <div data-testid="experiments-tab">Experiments</div>,
+}));
+vi.mock("@/components/quant-lab/ResultsTab", () => ({
+  ResultsTab: () => <div data-testid="results-tab">Results</div>,
+}));
+vi.mock("@/components/quant-lab/ModelMonitorTab", () => ({
+  ModelMonitorTab: () => <div data-testid="model-monitor-tab">Model Monitor</div>,
 }));
 vi.mock("@/components/quant-lab/LegacyQuantLabTabs", () => ({
   LegacyQuantLabTabs: () => <div data-testid="legacy-tabs">Legacy</div>,

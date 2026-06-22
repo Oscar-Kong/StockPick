@@ -15,8 +15,7 @@ type QuantLabTab =
   | "walk-forward"
   | "predictions"
   | "pairs"
-  | "data-quality"
-  | "model-admin";
+  | "model-monitor";
 
 interface QuantLabEvidencePanelProps {
   sleeve?: Bucket;
@@ -66,9 +65,9 @@ export function QuantLabEvidencePanel({ sleeve = "penny", onNavigateTab }: Quant
       "walk-forward",
       "predictions",
       "pairs",
-      "data-quality",
-      "model-admin",
+      "model-monitor",
     ];
+    if (tab === "data-quality" || tab === "model-admin") return "model-monitor";
     if (tab && valid.includes(tab as QuantLabTab)) return tab as QuantLabTab;
     return "factor-performance";
   };

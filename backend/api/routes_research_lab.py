@@ -45,6 +45,11 @@ from models.schemas_research import (
     ResearchRunListResponse,
     ResearchRunNoteRequest,
     ResearchRunSummary,
+    ModelMonitorResponse,
+    EvidenceReviewListResponse,
+    EvidenceReviewActionRequest,
+    EvidenceReviewActionResponse,
+    JobRetryResponse,
 )
 from services.change_proposals_service import (
     create_proposal,
@@ -96,6 +101,9 @@ from services.research_results_service import (
 )
 from services.research_run_export_service import export_csv, export_json
 from services.evidence_memory_sync_service import resolve_outcomes_from_feedback, sync_evidence_from_run
+from services.model_monitor_service import get_model_monitor
+from services.evidence_impact_review_service import apply_review_action, list_review_findings
+from services.job_retry_service import retry_research_job
 
 router = APIRouter(prefix="/api/v2/research", tags=["quant-lab-research"])
 
@@ -624,3 +632,39 @@ def remove_change_proposal(proposal_id: str):
     if not delete_proposal(proposal_id):
         raise HTTPException(status_code=404, detail=f"proposal not found: {proposal_id}")
     return {"deleted": True, "id": proposal_id}
+
+
+# --- Model Monitor ---
+
+
+@router.get("/model-monitor", response_model=ModelMonitorResponse)
+def get_model_monitor_view(sleeve: str | None = None):
+    _require_research_api()
+    from buckets import DEFAULT_BUCKET
+
+    return get_model_monitor(sleeve or DEFAULT_BUCKET)
+
+
+@router.get("/evidence-review", response_model=EvidenceReviewListResponse)
+def get_evidence_review(
+    sleeve: str | None = None,
+    evidence_impact: str | None = None,
+    limit: int = Query(50, ge=1, le=200),
+):
+    _require_research_api()
+    return list_review_findings(sleeve=sleeve, evidence_impact=evidence_impact, limit=limit)  # type: ignore[arg-type]
+
+
+@router.post("/evidence-review/{finding_id}/action", response_model=EvidenceReviewActionResponse)
+def post_evidence_review_action(finding_id: str, body: EvidenceReviewActionRequest):
+    _require_research_api()
+    row = apply_review_action(finding_id, body)
+    if not row:
+        raise HTTPException(status_code=404, detail=f"finding not found: {finding_id}")
+    return row
+
+
+@router.post("/jobs/{job_id}/retry", response_model=JobRetryResponse)
+def post_retry_job(job_id: str):
+    _require_research_api()
+    return retry_research_job(job_id)
