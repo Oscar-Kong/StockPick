@@ -233,6 +233,33 @@ class ResearchRunMetric(BaseModel):
     value: str | float | int
 
 
+ResearchVerdict = Literal[
+    "supports_hypothesis",
+    "rejects_hypothesis",
+    "inconclusive",
+    "insufficient_data",
+    "invalid",
+]
+
+
+class ResearchRunReliability(BaseModel):
+    score: int = Field(ge=0, le=100)
+    status: str = "insufficient_data"
+    reasons: list[str] = Field(default_factory=list)
+
+
+class ResearchRunInterpretation(BaseModel):
+    verdict: ResearchVerdict
+    conclusion: str
+    evidence_impact: EvidenceImpact
+    reliability: ResearchRunReliability
+    supporting_observations: list[str] = Field(default_factory=list, max_length=3)
+    main_limitation: str = ""
+    suggested_next_action: str = ""
+    major_evidence_gate: MajorEvidenceGateResult
+    prose: str | None = None
+
+
 class ResearchRunSummary(BaseModel):
     run_id: str
     experiment_id: str | None = None
@@ -258,8 +285,15 @@ class ResearchRunSummary(BaseModel):
     result_reference: ResultReference
 
 
+class ResearchRunListItem(ResearchRunSummary):
+    duration_seconds: int | None = None
+    archived: bool = False
+    research_notes: str = ""
+    reliability_score: int | None = None
+
+
 class ResearchRunListResponse(BaseModel):
-    runs: list[ResearchRunSummary]
+    runs: list[ResearchRunListItem]
     total: int
     offset: int
     limit: int
@@ -592,4 +626,81 @@ class ExperimentLaunchResponse(BaseModel):
     status: RunStatus = "pending"
     duplicate_blocked: bool = False
     message: str = ""
+
+
+class ChartSeriesPoint(BaseModel):
+    x: str | float | int
+    y: float | int | None = None
+    label: str | None = None
+
+
+class ChartSeries(BaseModel):
+    chart_id: str
+    title: str
+    chart_type: Literal["line", "bar", "heatmap", "scatter", "area"]
+    x_label: str = ""
+    y_label: str = ""
+    series: list[dict[str, Any]] = Field(default_factory=list)
+    empty_reason: str | None = None
+
+
+class MetricExplanation(BaseModel):
+    metric_key: str
+    label: str
+    measures: str
+    preferred_direction: str
+    why_it_matters: str
+    limitations: str
+
+
+class ResearchRunDetailResponse(BaseModel):
+    summary: ResearchRunListItem
+    interpretation: ResearchRunInterpretation
+    experiment: ResearchExperimentResponse | None = None
+    detail: dict[str, Any] = Field(default_factory=dict)
+    charts: list[ChartSeries] = Field(default_factory=list)
+    metric_explanations: list[MetricExplanation] = Field(default_factory=list)
+    evidence_memory: list[EvidenceMemoryResponse] = Field(default_factory=list)
+    related_runs: list[ResearchRunSummary] = Field(default_factory=list)
+    related_ideas: list[ResearchIdeaResponse] = Field(default_factory=list)
+    skipped_data: list[str] = Field(default_factory=list)
+
+
+class RunComparisonMetricDiff(BaseModel):
+    label: str
+    values: dict[str, str | float | int | None]
+    comparable: bool = True
+    note: str = ""
+
+
+class ResearchRunCompareDetailResponse(BaseModel):
+    run_ids: list[str]
+    comparable: bool
+    compatibility_checks: list[ExperimentValidationCheck] = Field(default_factory=list)
+    comparison_notes: list[str] = Field(default_factory=list)
+    parameter_diffs: list[RunComparisonMetricDiff] = Field(default_factory=list)
+    metric_diffs: list[RunComparisonMetricDiff] = Field(default_factory=list)
+    runs: list[ResearchRunListItem] = Field(default_factory=list)
+    conclusion: str = ""
+    shared_sleeve: str | None = None
+    shared_run_types: list[str] = Field(default_factory=list)
+    charts: list[ChartSeries] = Field(default_factory=list)
+
+
+class ResearchRunNoteRequest(BaseModel):
+    notes: str = ""
+
+
+class ResearchRunArchiveRequest(BaseModel):
+    archived: bool = True
+
+
+class ResearchRunFollowUpIdeaRequest(BaseModel):
+    title: str | None = None
+    hypothesis: str = ""
+
+
+class ResearchRunDuplicateExperimentResponse(BaseModel):
+    experiment_id: str
+    run_id: str
 

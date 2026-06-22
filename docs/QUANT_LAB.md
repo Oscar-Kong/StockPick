@@ -55,7 +55,7 @@ Env: `QUANT_LAB_RESEARCH_API_ENABLED`, `RESEARCH_MAX_ORDINARY_MODIFIER` (default
 |---------|-------|----------------|
 | Overview | `section=overview` (default) | `GET /api/v2/research/overview?sleeve=` only |
 | Ideas | `section=ideas` | `GET /api/v2/research/ideas` |
-| Experiments / Results / Model Monitor | `section=experiments` etc. | Section hub links to legacy runners |
+| Experiments / Results / Model Monitor | `section=experiments` etc. | **Results** tab: unified run index, detail, compare, export; Model Monitor still links to legacy |
 | Legacy tools | `section=legacy&tab=` | Original six tabs unchanged |
 
 Overview includes deterministic **research brief** findings, recommended ideas, recent activity, and collapsible **evidence maintenance** actions (IC panel, forward labels, resolve outcomes, quant daily jobs, evidence backfill).

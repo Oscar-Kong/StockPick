@@ -63,6 +63,14 @@ def _migrate_quant_columns() -> None:
                 conn.execute(text("ALTER TABLE prediction_outcomes ADD COLUMN excess_vs_spy_90d FLOAT"))
             if "excess_vs_sector_90d" not in cols:
                 conn.execute(text("ALTER TABLE prediction_outcomes ADD COLUMN excess_vs_sector_90d FLOAT"))
+        if "research_runs" in tables:
+            cols = {c["name"] for c in insp.get_columns("research_runs")}
+            if "archived" not in cols:
+                conn.execute(text("ALTER TABLE research_runs ADD COLUMN archived INTEGER DEFAULT 0"))
+            if "research_notes" not in cols:
+                conn.execute(text("ALTER TABLE research_runs ADD COLUMN research_notes TEXT DEFAULT ''"))
+            if "interpretation_json" not in cols:
+                conn.execute(text("ALTER TABLE research_runs ADD COLUMN interpretation_json TEXT"))
 
 
 def _seed_factor_definitions() -> None:

@@ -57,14 +57,26 @@ Job stages: `validating` → `resolving_universe` → `loading_prices` → `calc
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/runs` | Paginated run index (`run_type`, `sleeve`, `status`, `experiment_id`, `idea_id`, `backfill`) |
+| GET | `/runs` | Paginated run index (`run_type`, `sleeve`, `status`, `verdict`, `evidence_impact`, `search`, `date_from`, `date_to`, `archived`, `include_archived`, `experiment_id`, `idea_id`, `backfill`) |
 | GET | `/runs/{run_id}` | Run summary (`ResearchRunSummary`) |
+| GET | `/runs/{run_id}/detail` | Full result detail: interpretation, charts, metrics, evidence memory (`ResearchRunDetailResponse`) |
+| GET | `/runs/{run_id}/export?format=json\|csv` | Export metadata + results (no secrets) |
 | GET | `/runs/compare?run_ids=a,b` | Comparison metadata |
+| GET | `/runs/compare/detail?run_ids=a,b,c` | Compatibility checks, metric diffs, charts (2–4 runs) |
 | POST | `/runs/backfill?limit=` | Index existing persisted stores |
 | POST | `/runs/{run_id}/index` | Index single run from store |
+| POST | `/runs/{run_id}/refresh` | Re-index from source store + refresh interpretation |
 | PATCH | `/runs/{run_id}/link` | Link run to experiment/idea |
+| PATCH | `/runs/{run_id}/notes` | Save research notes on index row |
+| PATCH | `/runs/{run_id}/archive` | Archive / unarchive run |
+| POST | `/runs/{run_id}/duplicate-experiment` | Clone experiment definition from run |
+| POST | `/runs/{run_id}/follow-up-idea` | Create linked follow-up idea |
+| POST | `/runs/{run_id}/sync-evidence` | Sync symbol findings to evidence memory |
+| POST | `/runs/{run_id}/resolve-outcomes` | Attach later outcomes without changing original finding |
 
-Run payloads remain in source tables (`backtest_runs`, `pairs_research_runs`, `factor_ic_history`, etc.). Index rows hold `result_reference` pointers only.
+Run payloads remain in source tables (`backtest_runs`, `pairs_research_runs`, `factor_ic_history`, etc.). Index rows hold `result_reference` pointers, deterministic `interpretation_json`, `research_notes`, and `archived`.
+
+**Deterministic verdicts:** `supports_hypothesis`, `rejects_hypothesis`, `inconclusive`, `insufficient_data`, `invalid` — computed server-side; optional LLM may rewrite prose only.
 
 **Evidence impact levels:** `informational`, `supporting`, `contradicting`, `major_positive`, `major_negative`, `integrity_blocker`
 

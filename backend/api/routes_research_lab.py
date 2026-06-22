@@ -1,6 +1,8 @@
 """Quant Lab research foundation API — ideas, experiments, runs, evidence memory, proposals."""
 from __future__ import annotations
 
+import json
+
 from fastapi import APIRouter, HTTPException, Query
 
 from config import QUANT_LAB_RESEARCH_API_ENABLED
@@ -33,8 +35,15 @@ from models.schemas_research import (
     ExperimentValidationResponse,
     ExperimentJobResponse,
     ExperimentLaunchResponse,
+    ResearchRunCompareDetailResponse,
     ResearchRunCompareResponse,
+    ResearchRunDetailResponse,
+    ResearchRunDuplicateExperimentResponse,
+    ResearchRunFollowUpIdeaRequest,
+    ResearchRunArchiveRequest,
+    ResearchRunListItem,
     ResearchRunListResponse,
+    ResearchRunNoteRequest,
     ResearchRunSummary,
 )
 from services.change_proposals_service import (
@@ -71,11 +80,22 @@ from services.experiment_job_service import get_job
 from services.research_run_service import (
     backfill_run_index,
     compare_runs,
+    compare_runs_detail,
     get_run,
     index_run_from_store,
     link_run_to_experiment,
     list_runs,
+    refresh_run_from_store,
 )
+from services.research_run_detail_service import get_run_detail
+from services.research_results_service import (
+    archive_run,
+    create_follow_up_idea,
+    duplicate_experiment_from_run,
+    set_run_notes,
+)
+from services.research_run_export_service import export_csv, export_json
+from services.evidence_memory_sync_service import resolve_outcomes_from_feedback, sync_evidence_from_run
 
 router = APIRouter(prefix="/api/v2/research", tags=["quant-lab-research"])
 
@@ -270,19 +290,33 @@ def get_runs(
     run_type: str | None = None,
     sleeve: str | None = None,
     status: str | None = None,
+    verdict: str | None = None,
+    evidence_impact: str | None = None,
     experiment_id: str | None = None,
     idea_id: str | None = None,
+    search: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    archived: bool | None = Query(False),
+    include_archived: bool = Query(False),
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     backfill: bool = Query(True),
 ):
     _require_research_api()
+    archived_filter = None if include_archived else archived
     return list_runs(
         run_type=run_type,
         sleeve=sleeve,
         status=status,
+        verdict=verdict,
+        evidence_impact=evidence_impact,
         experiment_id=experiment_id,
         idea_id=idea_id,
+        search=search,
+        date_from=date_from,
+        date_to=date_to,
+        archived=archived_filter,
         offset=offset,
         limit=limit,
         backfill=backfill,
@@ -302,6 +336,103 @@ def get_runs_compare(run_ids: str = Query(..., description="Comma-separated run 
     if len(ids) < 1:
         raise HTTPException(status_code=400, detail="run_ids required")
     return compare_runs(ids)
+
+
+@router.get("/runs/compare/detail", response_model=ResearchRunCompareDetailResponse)
+def get_runs_compare_detail(run_ids: str = Query(..., description="Comma-separated run IDs (2–4)")):
+    _require_research_api()
+    ids = [x.strip() for x in run_ids.split(",") if x.strip()]
+    if len(ids) < 2:
+        raise HTTPException(status_code=400, detail="at least two run_ids required")
+    if len(ids) > 4:
+        raise HTTPException(status_code=400, detail="at most four run_ids allowed")
+    return compare_runs_detail(ids)
+
+
+@router.get("/runs/{run_id}/detail", response_model=ResearchRunDetailResponse)
+def get_run_detail_by_id(run_id: str, refresh: bool = Query(False)):
+    _require_research_api()
+    row = get_run_detail(run_id, refresh=refresh, use_llm=False)
+    if not row:
+        raise HTTPException(status_code=404, detail=f"run not found: {run_id}")
+    return row
+
+
+@router.get("/runs/{run_id}/export")
+def get_run_export(run_id: str, format: str = Query("json", pattern="^(json|csv)$"), refresh: bool = Query(False)):
+    _require_research_api()
+    if format == "csv":
+        body = export_csv(run_id, refresh=refresh)
+        if body is None:
+            raise HTTPException(status_code=404, detail=f"run not found: {run_id}")
+        from fastapi.responses import PlainTextResponse
+
+        return PlainTextResponse(body, media_type="text/csv")
+    body = export_json(run_id, refresh=refresh)
+    if body is None:
+        raise HTTPException(status_code=404, detail=f"run not found: {run_id}")
+    from fastapi.responses import JSONResponse
+
+    return JSONResponse(content=json.loads(body))
+
+
+@router.patch("/runs/{run_id}/notes", response_model=ResearchRunListItem)
+def patch_run_notes(run_id: str, body: ResearchRunNoteRequest):
+    _require_research_api()
+    row = set_run_notes(run_id, body.notes)
+    if not row:
+        raise HTTPException(status_code=404, detail=f"run not found: {run_id}")
+    return row
+
+
+@router.patch("/runs/{run_id}/archive", response_model=ResearchRunListItem)
+def patch_run_archive(run_id: str, body: ResearchRunArchiveRequest):
+    _require_research_api()
+    row = archive_run(run_id, archived=body.archived)
+    if not row:
+        raise HTTPException(status_code=404, detail=f"run not found: {run_id}")
+    return row
+
+
+@router.post("/runs/{run_id}/duplicate-experiment", response_model=ResearchRunDuplicateExperimentResponse)
+def post_duplicate_experiment(run_id: str):
+    _require_research_api()
+    row = duplicate_experiment_from_run(run_id)
+    if not row:
+        raise HTTPException(status_code=404, detail=f"run not found: {run_id}")
+    return row
+
+
+@router.post("/runs/{run_id}/follow-up-idea", response_model=ResearchRunSummary)
+def post_follow_up_idea(run_id: str, body: ResearchRunFollowUpIdeaRequest):
+    _require_research_api()
+    row = create_follow_up_idea(run_id, title=body.title, hypothesis=body.hypothesis)
+    if not row:
+        raise HTTPException(status_code=404, detail=f"run not found: {run_id}")
+    return row
+
+
+@router.post("/runs/{run_id}/refresh", response_model=ResearchRunListItem)
+def post_refresh_run(run_id: str, store: str | None = None):
+    _require_research_api()
+    row = refresh_run_from_store(run_id, store=store)
+    if not row:
+        raise HTTPException(status_code=404, detail=f"unable to refresh run: {run_id}")
+    return row
+
+
+@router.post("/runs/{run_id}/sync-evidence")
+def post_sync_evidence(run_id: str):
+    _require_research_api()
+    created = sync_evidence_from_run(run_id)
+    return {"synced": len(created), "items": created}
+
+
+@router.post("/runs/{run_id}/resolve-outcomes")
+def post_resolve_outcomes(run_id: str):
+    _require_research_api()
+    updated = resolve_outcomes_from_feedback(run_id)
+    return {"updated": len(updated), "items": updated}
 
 
 @router.get("/runs/{run_id}", response_model=ResearchRunSummary)

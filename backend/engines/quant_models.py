@@ -431,6 +431,9 @@ class ResearchRunIndex(QuantBase):
     completed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=_utcnow)
     updated_at = Column(DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
+    archived = Column(Integer, nullable=False, default=0)
+    research_notes = Column(Text, nullable=False, default="")
+    interpretation_json = Column(Text, nullable=True)
 
 
 class EvidenceMemory(QuantBase):

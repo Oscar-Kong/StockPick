@@ -18,6 +18,7 @@ import {
   type ExperimentType,
   type UniverseSource,
 } from "@/lib/experimentStudio";
+import { buildQuantLabHref } from "@/lib/quantLabNavigation";
 import type {
   ExperimentJobResponse,
   ExperimentPresetInfo,
@@ -512,7 +513,11 @@ export function ExperimentStudio({ sleeve, onSleeveChange }: ExperimentStudioPro
             <button
               type="button"
               className="rounded border border-zinc-700 px-3 py-1 text-xs"
-              onClick={() => router.push(`/quant-lab?section=results`)}
+              onClick={() =>
+                router.push(
+                  buildQuantLabHref("results", { extra: { run_id: job.run_id! } })
+                )
+              }
             >
               {t.quantLab.studioOpenResults}
             </button>

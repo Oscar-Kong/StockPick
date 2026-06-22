@@ -1923,3 +1923,123 @@ export interface ExperimentLaunchResponse {
   duplicate_blocked: boolean;
   message: string;
 }
+
+export type ResearchVerdict =
+  | "supports_hypothesis"
+  | "rejects_hypothesis"
+  | "inconclusive"
+  | "insufficient_data"
+  | "invalid";
+
+export interface ResearchRunMetric {
+  label: string;
+  value: string | number;
+}
+
+export interface ResearchRunListItem {
+  run_id: string;
+  experiment_id?: string | null;
+  idea_id?: string | null;
+  run_type: string;
+  name: string;
+  status: string;
+  verdict?: string | null;
+  evidence_impact: string;
+  reliability?: Record<string, unknown> | null;
+  sleeve?: string | null;
+  universe: string[];
+  parameters: Record<string, unknown>;
+  strategy_version: string;
+  factor_model_version: string;
+  data_cutoff?: string | null;
+  sample_size?: number | null;
+  primary_metrics: ResearchRunMetric[];
+  warnings: string[];
+  blockers: string[];
+  started_at?: string | null;
+  completed_at?: string | null;
+  duration_seconds?: number | null;
+  archived: boolean;
+  research_notes: string;
+  reliability_score?: number | null;
+  result_reference: { store: string; run_id: string; detail_path?: string | null };
+}
+
+export interface ResearchRunListResponse {
+  runs: ResearchRunListItem[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+export interface ResearchRunReliability {
+  score: number;
+  status: string;
+  reasons: string[];
+}
+
+export interface ResearchRunInterpretation {
+  verdict: ResearchVerdict;
+  conclusion: string;
+  evidence_impact: string;
+  reliability: ResearchRunReliability;
+  supporting_observations: string[];
+  main_limitation: string;
+  suggested_next_action: string;
+  major_evidence_gate: Record<string, unknown>;
+  prose?: string | null;
+}
+
+export interface ChartSeries {
+  chart_id: string;
+  title: string;
+  chart_type: "line" | "bar" | "heatmap" | "scatter" | "area";
+  x_label?: string;
+  y_label?: string;
+  series: Array<{ name: string; data: Array<{ x: string | number; y?: number | null; label?: string | null }> }>;
+  empty_reason?: string | null;
+}
+
+export interface MetricExplanation {
+  metric_key: string;
+  label: string;
+  measures: string;
+  preferred_direction: string;
+  why_it_matters: string;
+  limitations: string;
+}
+
+export interface ResearchRunDetailResponse {
+  summary: ResearchRunListItem;
+  interpretation: ResearchRunInterpretation;
+  experiment?: Record<string, unknown> | null;
+  detail: Record<string, unknown>;
+  charts: ChartSeries[];
+  metric_explanations: MetricExplanation[];
+  evidence_memory: Array<Record<string, unknown>>;
+  related_runs: ResearchRunListItem[];
+  related_ideas: ResearchIdea[];
+  skipped_data: string[];
+}
+
+export interface RunComparisonMetricDiff {
+  label: string;
+  values: Record<string, string | number | null>;
+  comparable: boolean;
+  note: string;
+}
+
+export interface ResearchRunCompareDetailResponse {
+  run_ids: string[];
+  comparable: boolean;
+  compatibility_checks: ExperimentValidationCheck[];
+  comparison_notes: string[];
+  parameter_diffs: RunComparisonMetricDiff[];
+  metric_diffs: RunComparisonMetricDiff[];
+  runs: ResearchRunListItem[];
+  conclusion: string;
+  shared_sleeve?: string | null;
+  shared_run_types: string[];
+  charts: ChartSeries[];
+}
+

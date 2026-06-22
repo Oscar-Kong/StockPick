@@ -486,15 +486,18 @@ New columns on `research_runs` only: `experiment_id`, `idea_id`, `evidence_impac
 - [x] Universe resolver: scan, saved scan, watchlist, holdings, bucket, custom symbols
 - [x] Idea → experiment studio navigation from Ideas board
 - [x] Tests: `test_experiment_studio.py`, frontend studio tests
-- [ ] Results detail router (Phase 5) — studio links to results section only
+- [x] Results detail router (Phase 5) — studio links to `section=results&run_id=…`
+- [x] Tests: `test_research_results.py`, `ResultsTab.test.tsx`
 
-### Phase 5 — Results unified history
+### Phase 5 — Results unified history ✅
 
-- [ ] Results list from `GET /api/v2/research/runs`
-- [ ] Detail routers: WF viewer, pairs viewer, IC snapshot viewer, prediction batch viewer
-- [ ] Surface hidden fields: deciles, regime/sector, WF `periods[]`
+- [x] Results list from `GET /api/v2/research/runs` (filters, pagination, search)
+- [x] Detail: interpretation header, charts, metric tooltips, evidence memory, exports
+- [x] Compare 2–4 compatible runs via `/runs/compare/detail`
+- [x] Actions: archive, notes, duplicate experiment, follow-up idea
+- [x] Evidence memory sync + later outcome resolution without mutating original finding
+- [ ] Surface hidden fields: deciles, regime/sector, WF `periods[]` (future enhancement)
 - [ ] Historical case notes (optional link to similar-signal)
-- [ ] Tests: list pagination, detail hydration, normalizers
 
 ### Phase 6 — Model Monitor
 

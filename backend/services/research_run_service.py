@@ -16,11 +16,16 @@ from engines.quant_models import (
     ResearchRunIndex,
 )
 from models.schemas_research import (
+    ChartSeries,
+    ExperimentValidationCheck,
+    ResearchRunCompareDetailResponse,
     ResearchRunCompareResponse,
+    ResearchRunListItem,
     ResearchRunListResponse,
     ResearchRunMetric,
     ResearchRunSummary,
     ResultReference,
+    RunComparisonMetricDiff,
 )
 from services.evidence_impact_policy import default_impact_for_run_type, evaluate_evidence_impact
 from services.major_evidence_gate import evaluate_major_evidence_gate
@@ -45,6 +50,22 @@ def _parse_dt(value: str | datetime | None) -> datetime | None:
         return datetime.fromisoformat(str(value).replace("Z", "+00:00")).replace(tzinfo=None)
     except ValueError:
         return None
+
+
+def _duration_seconds(row: ResearchRunIndex) -> int | None:
+    if row.started_at and row.completed_at:
+        return max(0, int((row.completed_at - row.started_at).total_seconds()))
+    return None
+
+
+def _reliability_score(row: ResearchRunIndex) -> int | None:
+    rel = json_loads(row.reliability_json, None)
+    if isinstance(rel, dict) and rel.get("score") is not None:
+        try:
+            return int(rel["score"])
+        except (TypeError, ValueError):
+            return None
+    return None
 
 
 def _row_to_summary(row: ResearchRunIndex) -> ResearchRunSummary:
@@ -81,6 +102,17 @@ def _row_to_summary(row: ResearchRunIndex) -> ResearchRunSummary:
         started_at=row.started_at,
         completed_at=row.completed_at,
         result_reference=ref,
+    )
+
+
+def _row_to_list_item(row: ResearchRunIndex) -> ResearchRunListItem:
+    summary = _row_to_summary(row)
+    return ResearchRunListItem(
+        **summary.model_dump(),
+        duration_seconds=_duration_seconds(row),
+        archived=bool(row.archived),
+        research_notes=row.research_notes or "",
+        reliability_score=_reliability_score(row),
     )
 
 
@@ -586,8 +618,14 @@ def list_runs(
     run_type: str | None = None,
     sleeve: str | None = None,
     status: str | None = None,
+    verdict: str | None = None,
+    evidence_impact: str | None = None,
     experiment_id: str | None = None,
     idea_id: str | None = None,
+    search: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    archived: bool | None = False,
     offset: int = 0,
     limit: int = 50,
     backfill: bool = True,
@@ -611,6 +649,22 @@ def list_runs(
             q = q.filter(ResearchRunIndex.experiment_id == experiment_id)
         if idea_id:
             q = q.filter(ResearchRunIndex.idea_id == idea_id)
+        if verdict:
+            q = q.filter(ResearchRunIndex.verdict == verdict)
+        if evidence_impact:
+            q = q.filter(ResearchRunIndex.evidence_impact == evidence_impact)
+        if archived is not None:
+            q = q.filter(ResearchRunIndex.archived == (1 if archived else 0))
+        if date_from:
+            q = q.filter(ResearchRunIndex.completed_at >= _parse_dt(date_from))
+        if date_to:
+            q = q.filter(ResearchRunIndex.completed_at <= _parse_dt(date_to))
+        if search:
+            term = f"%{search.strip()}%"
+            q = q.filter(
+                (ResearchRunIndex.name.ilike(term))
+                | (ResearchRunIndex.run_id.ilike(term))
+            )
         total = q.count()
         rows = (
             q.order_by(ResearchRunIndex.completed_at.desc().nullslast(), ResearchRunIndex.created_at.desc())
@@ -619,11 +673,185 @@ def list_runs(
             .all()
         )
         return ResearchRunListResponse(
-            runs=[_row_to_summary(r) for r in rows],
+            runs=[_row_to_list_item(r) for r in rows],
             total=total,
             offset=offset,
             limit=limit,
         )
+
+
+def _compatibility_checks(runs: list[ResearchRunListItem]) -> tuple[list[ExperimentValidationCheck], list[str], bool]:
+    checks: list[ExperimentValidationCheck] = []
+    notes: list[str] = []
+    types = {r.run_type for r in runs}
+    type_ok = len(types) == 1
+    checks.append(
+        ExperimentValidationCheck(
+            key="same_run_type",
+            label="Experiment type",
+            status="ok" if type_ok else "error",
+            detail="All runs share the same run type" if type_ok else f"Mixed types: {', '.join(sorted(types))}",
+        )
+    )
+
+    sleeves = {r.sleeve for r in runs if r.sleeve}
+    sleeve_ok = len(sleeves) <= 1
+    checks.append(
+        ExperimentValidationCheck(
+            key="sleeve",
+            label="Sleeve",
+            status="ok" if sleeve_ok else "warning",
+            detail="Shared sleeve" if sleeve_ok else "Mixed sleeves — compare with caution",
+        )
+    )
+
+    strategies = {r.strategy_version for r in runs if r.strategy_version}
+    factors = {r.factor_model_version for r in runs if r.factor_model_version}
+    version_ok = len(strategies) <= 1 and len(factors) <= 1
+    checks.append(
+        ExperimentValidationCheck(
+            key="model_versions",
+            label="Model versions",
+            status="ok" if version_ok else "warning",
+            detail="Matching strategy/factor versions" if version_ok else "Version mismatch across runs",
+        )
+    )
+
+    horizons: set[str] = set()
+    for r in runs:
+        for h in r.parameters.get("forward_horizons") or []:
+            horizons.add(str(h))
+    horizon_ok = len(horizons) <= 1 or not horizons
+    checks.append(
+        ExperimentValidationCheck(
+            key="horizons",
+            label="Horizons",
+            status="ok" if horizon_ok else "error",
+            detail="Comparable forward horizons" if horizon_ok else f"Mixed horizons: {', '.join(sorted(horizons))}",
+        )
+    )
+
+    cutoffs = [r.data_cutoff for r in runs if r.data_cutoff]
+    date_ok = len(set(cutoffs)) <= 1 or len(cutoffs) == 0
+    checks.append(
+        ExperimentValidationCheck(
+            key="date_overlap",
+            label="Data window",
+            status="ok" if date_ok else "warning",
+            detail="Aligned data cutoffs" if date_ok else "Different data cutoffs — metrics not directly comparable",
+        )
+    )
+
+    universes = {tuple(sorted(r.universe)) for r in runs if r.universe}
+    universe_ok = len(universes) <= 1
+    checks.append(
+        ExperimentValidationCheck(
+            key="universe",
+            label="Universe",
+            status="ok" if universe_ok else "warning",
+            detail="Same universe" if universe_ok else "Universe differs between runs",
+        )
+    )
+
+    comparable = type_ok and horizon_ok and len(runs) >= 2 and len(runs) <= 4
+    if len(runs) < 2:
+        notes.append("need_at_least_two_runs")
+    if len(runs) > 4:
+        notes.append("max_four_runs")
+        comparable = False
+    if not type_ok:
+        notes.append("mixed_run_types")
+    if not horizon_ok:
+        notes.append("mixed_horizons")
+    return checks, notes, comparable
+
+
+def _scalar_export(value: Any) -> str | float | int | None:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value if not isinstance(value, bool) else int(value)
+    try:
+        return json.dumps(value, sort_keys=True, default=str)
+    except TypeError:
+        return str(value)
+
+
+def _metric_diffs(runs: list[ResearchRunListItem]) -> tuple[list[RunComparisonMetricDiff], list[RunComparisonMetricDiff]]:
+    param_diffs: list[RunComparisonMetricDiff] = []
+    metric_diffs: list[RunComparisonMetricDiff] = []
+    param_keys = sorted({k for r in runs for k in r.parameters.keys()})
+    for key in param_keys[:20]:
+        values = {r.run_id: _scalar_export(r.parameters.get(key)) for r in runs}
+        unique = {json.dumps(v, sort_keys=True, default=str) for v in values.values()}
+        param_diffs.append(
+            RunComparisonMetricDiff(
+                label=key,
+                values=values,
+                comparable=len(unique) <= 1,
+                note="" if len(unique) <= 1 else "Parameter differs",
+            )
+        )
+
+    labels = sorted({m.label for r in runs for m in r.primary_metrics})
+    for label in labels:
+        values: dict[str, str | float | int | None] = {}
+        for r in runs:
+            match = next((m.value for m in r.primary_metrics if m.label == label), None)
+            values[r.run_id] = match
+        unique_vals = {str(v) for v in values.values()}
+        metric_diffs.append(
+            RunComparisonMetricDiff(
+                label=label,
+                values=values,
+                comparable=len(unique_vals) <= 1 or len(runs) == len({r.run_type for r in runs}),
+                note="" if len(unique_vals) > 1 else "Identical across runs",
+            )
+        )
+    return param_diffs, metric_diffs
+
+
+def compare_runs_detail(run_ids: list[str]) -> ResearchRunCompareDetailResponse:
+    items: list[ResearchRunListItem] = []
+    notes: list[str] = []
+    for rid in run_ids[:4]:
+        summary = get_run(rid)
+        if not summary:
+            notes.append(f"run_not_found:{rid}")
+            continue
+        engine = get_engine()
+        with Session(engine) as session:
+            row = session.get(ResearchRunIndex, rid)
+            items.append(_row_to_list_item(row) if row else ResearchRunListItem(**summary.model_dump()))
+
+    checks, compat_notes, comparable = _compatibility_checks(items)
+    notes.extend(compat_notes)
+    param_diffs, metric_diffs = _metric_diffs(items) if items else ([], [])
+
+    sleeves = {r.sleeve for r in items if r.sleeve}
+    types = {r.run_type for r in items}
+    conclusion = "Runs are comparable for side-by-side review." if comparable else (
+        "Runs are not fully compatible — do not treat unrelated metrics as equivalents."
+    )
+
+    from services.research_run_detail_service import build_charts, load_detail_payload
+
+    charts: list[ChartSeries] = []
+    if comparable and items:
+        detail = load_detail_payload(items[0])
+        charts = build_charts(items[0].run_type, items[0], detail)
+
+    return ResearchRunCompareDetailResponse(
+        run_ids=[r.run_id for r in items],
+        comparable=comparable,
+        compatibility_checks=checks,
+        comparison_notes=notes,
+        parameter_diffs=param_diffs,
+        metric_diffs=metric_diffs,
+        runs=items,
+        conclusion=conclusion,
+        shared_sleeve=next(iter(sleeves)) if len(sleeves) == 1 else None,
+        shared_run_types=sorted(types),
+        charts=charts,
+    )
 
 
 def compare_runs(run_ids: list[str]) -> ResearchRunCompareResponse:
@@ -662,6 +890,19 @@ def notify_run_persisted(run_id: str, store: str | None = None) -> None:
         index_run_from_store(run_id, store=store)
     except Exception as exc:
         logger.debug("run index notify failed for %s: %s", run_id, exc)
+
+
+def refresh_run_from_store(run_id: str, store: str | None = None) -> ResearchRunListItem | None:
+    summary = index_run_from_store(run_id, store=store)
+    if not summary:
+        return None
+    from services.research_run_detail_service import get_run_detail
+
+    get_run_detail(run_id, refresh=True, use_llm=False)
+    engine = get_engine()
+    with Session(engine) as session:
+        row = session.get(ResearchRunIndex, run_id)
+        return _row_to_list_item(row) if row else ResearchRunListItem(**summary.model_dump())
 
 
 def link_run_to_experiment(run_id: str, experiment_id: str | None, idea_id: str | None = None) -> ResearchRunSummary | None:
