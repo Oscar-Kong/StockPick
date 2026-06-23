@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import { en } from "@/lib/i18n/messages/en";
+import { formatDateTime } from "@/lib/datetime";
 import { StockTable } from "./StockTable";
 import type { StockResult } from "@/lib/types";
 
@@ -51,5 +52,17 @@ describe("StockTable holdings badge", () => {
       />
     );
     expect(screen.queryByText(/Held ·/)).not.toBeInTheDocument();
+  });
+
+  it("shows scan timestamp next to results count when scanAt is set", () => {
+    const scanAt = "2026-06-23T15:30:00Z";
+    render(
+      <StockTable
+        results={[sample]}
+        onAddWatchlist={() => {}}
+        scanAt={scanAt}
+      />
+    );
+    expect(screen.getByText(new RegExp(formatDateTime(scanAt)))).toBeInTheDocument();
   });
 });

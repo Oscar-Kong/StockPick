@@ -368,6 +368,7 @@ export function BucketPage({ bucket, title, description, embedded, onMetaChange 
         watchlistPending={watchlistPending}
         heldPositions={heldPositions}
         scoringEngineUsed={scoringEngineUsed}
+        scanAt={lastScanAt}
       />
     </div>
   );

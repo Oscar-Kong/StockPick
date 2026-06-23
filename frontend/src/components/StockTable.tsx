@@ -5,6 +5,7 @@ import { ScoreBadge } from "@/components/badges/ScoreBadge";
 import { ScoreSourceBadge } from "@/components/ScoreSourceBadge";
 import { ScanTradeHintCell } from "@/components/scan/ScanTradeHintCell";
 import { DenseTable, DenseTableToolbar } from "@/components/ui/DenseTable";
+import { formatDateTime } from "@/lib/datetime";
 import { fmt, useTranslation } from "@/lib/i18n";
 import type { HeldPositionSummary, StockResult } from "@/lib/types";
 import clsx from "clsx";
@@ -18,6 +19,8 @@ interface StockTableProps {
   watchlistPending?: string | null;
   heldPositions?: ReadonlyMap<string, HeldPositionSummary>;
   scoringEngineUsed?: boolean | null;
+  /** When the displayed results were produced (live scan or cached load). */
+  scanAt?: string | null;
 }
 
 type ColumnId =
@@ -126,6 +129,7 @@ export function StockTable({
   watchlistPending,
   heldPositions,
   scoringEngineUsed,
+  scanAt,
 }: StockTableProps) {
   const { t } = useTranslation();
   const router = useRouter();
@@ -201,6 +205,11 @@ export function StockTable({
           {heldCount > 0 ? (
             <span className="ml-2 text-sky-300/90">
               · {fmt(t.scan.heldInResults, { count: heldCount })}
+            </span>
+          ) : null}
+          {scanAt ? (
+            <span className="ml-2 text-secondary" title={t.scan.lastScanLabel}>
+              · {formatDateTime(scanAt)}
             </span>
           ) : null}
         </span>
