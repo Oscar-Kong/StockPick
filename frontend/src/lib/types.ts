@@ -1741,3 +1741,431 @@ export interface QuantHealthSummary {
   progress?: SavedProgressSummary | null;
   factor_ic_as_of?: string | null;
 }
+
+export type ResearchIdeaStatus =
+  | "new"
+  | "saved"
+  | "ready_to_test"
+  | "running"
+  | "supported"
+  | "rejected"
+  | "inconclusive"
+  | "archived";
+
+export type ResearchIdeaSourceType =
+  | "factor_deterioration"
+  | "factor_improvement"
+  | "prediction_drift"
+  | "recommendation_calibration"
+  | "market_regime"
+  | "scan_dispersion"
+  | "portfolio_concentration"
+  | "pair_relationship"
+  | "data_quality"
+  | "failed_experiment"
+  | "user_created";
+
+export interface ResearchIdea {
+  id: string;
+  title: string;
+  hypothesis: string;
+  description: string;
+  why_now: string;
+  source_type: ResearchIdeaSourceType;
+  source_references: string[];
+  sleeve: string | null;
+  universe_definition: Record<string, unknown>;
+  suggested_experiment_type: string | null;
+  suggested_parameters: Record<string, unknown>;
+  priority: number;
+  confidence: number;
+  status: ResearchIdeaStatus;
+  user_notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ResearchBriefFinding {
+  finding_id: string;
+  title: string;
+  explanation: string;
+  supporting_metric: string;
+  source_reference: string;
+  why_it_matters: string;
+  confidence: number;
+  evidence_impact: string;
+  suggested_experiment_type: string;
+  suggested_parameters: Record<string, unknown>;
+}
+
+export interface ResearchActivityItem {
+  id: string;
+  activity_type: string;
+  label: string;
+  occurred_at?: string | null;
+  status?: string | null;
+  run_id?: string | null;
+}
+
+export interface EvidenceMaintenanceAction {
+  action_id: string;
+  label: string;
+  description: string;
+  endpoint: string;
+  method: string;
+  available: boolean;
+  reason_unavailable?: string | null;
+}
+
+export interface ResearchOverviewResponse {
+  generated_at: string;
+  sleeve: string;
+  research_confidence_status: string;
+  research_confidence_score: number;
+  data_freshness: string;
+  strategy_version: string;
+  factor_model_version: string;
+  market_regime?: string | null;
+  predictions_resolved: number;
+  predictions_unresolved: number;
+  failed_or_blocked_jobs: number;
+  factor_ic?: QuantLabLastRunSummary | null;
+  walk_forward?: QuantLabLastRunSummary | null;
+  pairs?: QuantLabLastRunSummary | null;
+  major_warnings: string[];
+  findings: ResearchBriefFinding[];
+  recommended_ideas: ResearchIdea[];
+  recent_activity: ResearchActivityItem[];
+  maintenance_actions: EvidenceMaintenanceAction[];
+}
+
+export interface ResearchIdeaListResponse {
+  ideas: ResearchIdea[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+export interface GenerateIdeasResponse {
+  created: ResearchIdea[];
+  skipped_duplicates: number;
+  findings_used: number;
+}
+
+export interface ExperimentTemplateInfo {
+  experiment_type: string;
+  title: string;
+  description: string;
+  required_fields: string[];
+  optional_fields: string[];
+  universe_sources: string[];
+  supports_presets: boolean;
+}
+
+export interface PresetParameterValue {
+  key: string;
+  value: string | number | boolean | unknown[];
+  description?: string;
+}
+
+export interface ExperimentPresetInfo {
+  preset_id: string;
+  title: string;
+  description: string;
+  major_evidence_eligible: boolean;
+  verdict_ceiling: string;
+  parameters: PresetParameterValue[];
+}
+
+export interface ExperimentValidationCheck {
+  key: string;
+  label: string;
+  value?: string | number | boolean | null;
+  status: "ok" | "warning" | "error" | "missing";
+  detail?: string;
+}
+
+export interface ExperimentValidationResponse {
+  valid: boolean;
+  can_run: boolean;
+  symbol_count: number;
+  missing_data_rate?: number | null;
+  expected_periods?: number | null;
+  data_cutoff?: string | null;
+  dependency_availability: Record<string, boolean>;
+  major_limitations: string[];
+  checks: ExperimentValidationCheck[];
+  resolved_universe: string[];
+  merged_parameters: Record<string, unknown>;
+}
+
+export interface ExperimentStageRecord {
+  stage: string;
+  status: string;
+  message?: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+}
+
+export interface ExperimentJobResponse {
+  job_id: string;
+  experiment_id: string;
+  status: string;
+  current_stage?: string | null;
+  stages: ExperimentStageRecord[];
+  run_id?: string | null;
+  last_success_run_id?: string | null;
+  error_message?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+}
+
+export interface ExperimentLaunchResponse {
+  job_id: string;
+  experiment_id: string;
+  status: string;
+  duplicate_blocked: boolean;
+  message: string;
+}
+
+export type ResearchVerdict =
+  | "supports_hypothesis"
+  | "rejects_hypothesis"
+  | "inconclusive"
+  | "insufficient_data"
+  | "invalid";
+
+export interface ResearchRunMetric {
+  label: string;
+  value: string | number;
+}
+
+export interface ResearchRunListItem {
+  run_id: string;
+  experiment_id?: string | null;
+  idea_id?: string | null;
+  run_type: string;
+  name: string;
+  status: string;
+  verdict?: string | null;
+  evidence_impact: string;
+  reliability?: Record<string, unknown> | null;
+  sleeve?: string | null;
+  universe: string[];
+  parameters: Record<string, unknown>;
+  strategy_version: string;
+  factor_model_version: string;
+  data_cutoff?: string | null;
+  sample_size?: number | null;
+  primary_metrics: ResearchRunMetric[];
+  warnings: string[];
+  blockers: string[];
+  started_at?: string | null;
+  completed_at?: string | null;
+  duration_seconds?: number | null;
+  archived: boolean;
+  research_notes: string;
+  reliability_score?: number | null;
+  result_reference: { store: string; run_id: string; detail_path?: string | null };
+}
+
+export interface ResearchRunListResponse {
+  runs: ResearchRunListItem[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+export interface ResearchRunReliability {
+  score: number;
+  status: string;
+  reasons: string[];
+}
+
+export interface ResearchRunInterpretation {
+  verdict: ResearchVerdict;
+  conclusion: string;
+  evidence_impact: string;
+  reliability: ResearchRunReliability;
+  supporting_observations: string[];
+  main_limitation: string;
+  suggested_next_action: string;
+  major_evidence_gate: Record<string, unknown>;
+  prose?: string | null;
+}
+
+export interface ChartSeries {
+  chart_id: string;
+  title: string;
+  chart_type: "line" | "bar" | "heatmap" | "scatter" | "area";
+  x_label?: string;
+  y_label?: string;
+  series: Array<{ name: string; data: Array<{ x: string | number; y?: number | null; label?: string | null }> }>;
+  empty_reason?: string | null;
+}
+
+export interface MetricExplanation {
+  metric_key: string;
+  label: string;
+  measures: string;
+  preferred_direction: string;
+  why_it_matters: string;
+  limitations: string;
+}
+
+export interface ResearchRunDetailResponse {
+  summary: ResearchRunListItem;
+  interpretation: ResearchRunInterpretation;
+  experiment?: Record<string, unknown> | null;
+  detail: Record<string, unknown>;
+  charts: ChartSeries[];
+  metric_explanations: MetricExplanation[];
+  evidence_memory: Array<Record<string, unknown>>;
+  related_runs: ResearchRunListItem[];
+  related_ideas: ResearchIdea[];
+  skipped_data: string[];
+}
+
+export interface RunComparisonMetricDiff {
+  label: string;
+  values: Record<string, string | number | null>;
+  comparable: boolean;
+  note: string;
+}
+
+export interface ResearchRunCompareDetailResponse {
+  run_ids: string[];
+  comparable: boolean;
+  compatibility_checks: ExperimentValidationCheck[];
+  comparison_notes: string[];
+  parameter_diffs: RunComparisonMetricDiff[];
+  metric_diffs: RunComparisonMetricDiff[];
+  runs: ResearchRunListItem[];
+  conclusion: string;
+  shared_sleeve?: string | null;
+  shared_run_types: string[];
+  charts: ChartSeries[];
+}
+
+export interface FactorHealthItem {
+  factor_id: string;
+  display_name: string;
+  lifecycle: string;
+  production_weight?: number | null;
+  recent_ic?: number | null;
+  long_term_ic?: number | null;
+  sample_size?: number | null;
+  drift?: number | null;
+  horizon_stability: string;
+  regime_stability: string;
+  factor_version: string;
+  transformation_lineage: string;
+  last_calculation?: string | null;
+  last_reliable_validation_run_id?: string | null;
+  supporting_run_ids: string[];
+}
+
+export interface PredictionHealthSummary {
+  resolved_count: number;
+  unresolved_count: number;
+  stale_count: number;
+  coverage_pct?: number | null;
+  mean_forecast_error_pct?: number | null;
+  recommendation_outcomes?: Record<string, number>;
+  horizon_breakdown?: Record<string, unknown>;
+  regime_breakdown?: Record<string, unknown>;
+  latest_outcome_job?: Record<string, unknown> | null;
+  calibration_ready: boolean;
+}
+
+export interface DataHealthSummary {
+  provider_availability?: Record<string, boolean>;
+  price_freshness?: Record<string, unknown>;
+  missing_stocks?: string[];
+  stale_stocks?: string[];
+  reconciliation_issues?: string[];
+  data_confidence?: Record<string, unknown>;
+  excluded_stock_counts?: Record<string, number>;
+  integrity_blockers: string[];
+}
+
+export interface ResearchJobMonitorItem {
+  job_id: string;
+  job_name: string;
+  status: string;
+  stage?: string;
+  duration_seconds?: number | null;
+  experiment_id?: string | null;
+  run_id?: string | null;
+  error_message?: string | null;
+  error_details?: Record<string, unknown>;
+  created_at?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  retry_blocked?: boolean;
+}
+
+export interface ModelConfigurationSummary {
+  strategy_version: string;
+  factor_model_version: string;
+  current_regime?: string | null;
+  dynamic_weights_enabled: boolean;
+  weights_by_sleeve?: Record<string, Record<string, number>>;
+  enabled_research_features?: Record<string, boolean>;
+  read_only?: boolean;
+}
+
+export interface ModelMonitorResponse {
+  sleeve: string;
+  factor_health: FactorHealthItem[];
+  prediction_health: PredictionHealthSummary;
+  data_health: DataHealthSummary;
+  research_jobs: ResearchJobMonitorItem[];
+  model_configuration: ModelConfigurationSummary;
+}
+
+export interface MajorEvidenceGateResult {
+  passed_checks?: string[];
+  failed_checks?: string[];
+  warnings?: string[];
+  sample_size?: number | null;
+  integrity_blockers?: string[];
+}
+
+export interface EvidenceReviewFinding {
+  finding_id: string;
+  source_type: string;
+  title: string;
+  evidence_impact: string;
+  verdict?: string | null;
+  sleeve?: string | null;
+  symbol?: string | null;
+  supporting_run_ids: string[];
+  gate?: MajorEvidenceGateResult | null;
+  sample_size?: number | null;
+  review_required: boolean;
+  unresolved_warnings: string[];
+  model_versions: Record<string, string>;
+  review_history: Array<Record<string, unknown>>;
+}
+
+export interface EvidenceReviewListResponse {
+  findings: EvidenceReviewFinding[];
+  total: number;
+}
+
+export interface EvidenceReviewActionResponse {
+  finding_id: string;
+  action: string;
+  evidence_impact: string;
+  proposal_id?: string | null;
+  audit_id?: number | null;
+}
+
+export interface JobRetryResponse {
+  job_id: string;
+  retried_as?: string | null;
+  duplicate_blocked: boolean;
+  message: string;
+}
+

@@ -22,24 +22,6 @@ STAGE_ORDER = [
     "complete",
 ]
 
-SCAN_EVAL_STAGE_ORDER = [
-    "validating",
-    "preparing_universe",
-    "loading_historical_data",
-    "replaying_scans",
-    "calculating_forward_outcomes",
-    "comparing_algorithms",
-    "generating_charts",
-    "persisting_result",
-    "complete",
-]
-
-
-def stage_order_for_experiment(experiment_type: str | None) -> list[str]:
-    if experiment_type == "scan_evaluation":
-        return list(SCAN_EVAL_STAGE_ORDER)
-    return list(STAGE_ORDER)
-
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
@@ -74,13 +56,12 @@ def _to_response(row: ResearchExperimentJob) -> ExperimentJobResponse:
     )
 
 
-def create_job(experiment_id: str, *, experiment_type: str | None = None) -> ExperimentJobResponse:
+def create_job(experiment_id: str) -> ExperimentJobResponse:
     job_id = f"expjob_{uuid.uuid4().hex[:12]}"
     now = _utcnow()
-    order = stage_order_for_experiment(experiment_type)
     stages = [
         ExperimentStageRecord(stage=s, status="pending")  # type: ignore[arg-type]
-        for s in order
+        for s in STAGE_ORDER
     ]
     engine = get_engine()
     with Session(engine) as session:

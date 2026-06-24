@@ -31,7 +31,7 @@ def client(research_db):
     return TestClient(app)
 
 
-def test_list_templates_has_seven_types(research_db):
+def test_list_templates_has_six_types(research_db):
     resp = list_templates()
     types = {t.experiment_type for t in resp.templates}
     assert types == {
@@ -41,13 +41,12 @@ def test_list_templates_has_seven_types(research_db):
         "pairs_discovery",
         "similar_signal",
         "portfolio_policy",
-        "scan_evaluation",
     }
 
 
 def test_presets_transparent_parameters(research_db):
     resp = list_presets()
-    assert len(resp.presets) == 4
+    assert len(resp.presets) == 3
     quick = next(p for p in resp.presets if p.preset_id == "quick_check")
     assert quick.major_evidence_eligible is False
     assert any(p.key == "max_symbols" for p in quick.parameters)
@@ -118,13 +117,13 @@ def test_validate_walk_forward_defaults_dates(research_db):
 def test_templates_api(client):
     r = client.get("/api/v2/research/experiments/templates")
     assert r.status_code == 200, r.text
-    assert len(r.json()["templates"]) == 7
+    assert len(r.json()["templates"]) == 6
 
 
 def test_presets_api(client):
     r = client.get("/api/v2/research/experiments/presets")
     assert r.status_code == 200, r.text
-    assert len(r.json()["presets"]) == 4
+    assert len(r.json()["presets"]) == 3
 
 
 def test_validate_api(client):

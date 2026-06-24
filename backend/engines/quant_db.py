@@ -8,7 +8,10 @@ from engines.factor.catalog import active_factor_catalog
 from engines.quant_models import (
     BacktestEquityPoint,
     BacktestRun,
+    ChangeProposal,
+    EvidenceMemory,
     FactorDefinition,
+    FactorLineage,
     FeatureProvenance,
     JobQueueItem,
     PairsResearchRun,
@@ -17,6 +20,10 @@ from engines.quant_models import (
     PredictionSnapshot,
     QuantAuditLog,
     QuantBase,
+    ResearchExperiment,
+    ResearchExperimentJob,
+    ResearchIdea,
+    ResearchRunIndex,
     TradeOutcome,
     TradePrediction,
     UniversePit,
@@ -56,6 +63,27 @@ def _migrate_quant_columns() -> None:
                 conn.execute(text("ALTER TABLE prediction_outcomes ADD COLUMN excess_vs_spy_90d FLOAT"))
             if "excess_vs_sector_90d" not in cols:
                 conn.execute(text("ALTER TABLE prediction_outcomes ADD COLUMN excess_vs_sector_90d FLOAT"))
+        if "research_runs" in tables:
+            cols = {c["name"] for c in insp.get_columns("research_runs")}
+            if "archived" not in cols:
+                conn.execute(text("ALTER TABLE research_runs ADD COLUMN archived INTEGER DEFAULT 0"))
+            if "research_notes" not in cols:
+                conn.execute(text("ALTER TABLE research_runs ADD COLUMN research_notes TEXT DEFAULT ''"))
+            if "interpretation_json" not in cols:
+                conn.execute(text("ALTER TABLE research_runs ADD COLUMN interpretation_json TEXT"))
+            # List/filter indexes for Results tab queries
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_research_runs_sleeve_completed "
+                    "ON research_runs (sleeve, completed_at DESC)"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_research_runs_impact_archived "
+                    "ON research_runs (evidence_impact, archived)"
+                )
+            )
 
 
 def _seed_factor_definitions() -> None:

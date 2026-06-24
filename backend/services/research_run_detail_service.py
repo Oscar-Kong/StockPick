@@ -23,7 +23,6 @@ from services.research_run_interpretation_service import (
     persist_interpretation,
 )
 from services.research_run_service import _row_to_list_item, get_run, list_runs
-from services.scan_evaluation_charts import charts_from_artifact
 from sqlalchemy.orm import Session
 
 
@@ -327,9 +326,6 @@ def build_charts(run_type: str, summary: ResearchRunSummary, detail: dict[str, A
             )
         )
 
-    elif run_type == "scan_evaluation":
-        charts.extend(charts_from_artifact(detail))
-
     return charts
 
 
@@ -380,24 +376,6 @@ METRIC_EXPLANATIONS: dict[str, list[MetricExplanation]] = {
             preferred_direction="Lower absolute error indicates better calibration.",
             why_it_matters="Links model recommendations to realized outcomes.",
             limitations="Depends on resolution coverage and horizon alignment.",
-        ),
-    ],
-    "scan_evaluation": [
-        MetricExplanation(
-            metric_key="recall_at_10",
-            label="Stage A Recall@10",
-            measures="Share of realized top-decile forward performers captured in the Stage A shortlist (top 10).",
-            preferred_direction="Higher recall indicates better early-stage ranking quality.",
-            why_it_matters="Stage A gates expensive enrichment; recall measures whether strong names survive the filter.",
-            limitations="Depends on universe size, horizon, and survivorship in historical data.",
-        ),
-        MetricExplanation(
-            metric_key="mean_rank_ic",
-            label="Mean rank IC",
-            measures="Spearman correlation between ranking score and forward return across rebalance dates.",
-            preferred_direction="Higher positive IC indicates scores align with realized outcomes.",
-            why_it_matters="Summarizes monotonic relationship between score and forward performance.",
-            limitations="Sensitive to outliers, thin universes, and regime shifts.",
         ),
     ],
 }

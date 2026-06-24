@@ -66,7 +66,7 @@ def launch_experiment(experiment_id: str) -> ExperimentLaunchResponse:
     if not validation.can_run:
         raise ValueError("experiment validation failed — cannot run")
 
-    job = create_job(experiment_id, experiment_type=exp.experiment_type)
+    job = create_job(experiment_id)
     _EXECUTOR.submit(_run_job, job.job_id, experiment_id)
     return ExperimentLaunchResponse(
         job_id=job.job_id,
@@ -108,10 +108,6 @@ def _run_job(job_id: str, experiment_id: str) -> None:
         complete_stage(job_id, "validating", "Configuration valid")
 
         merged = validation.merged_parameters
-        if exp.experiment_type == "scan_evaluation":
-            _run_scan_evaluation_job(job_id, experiment_id, exp, merged, last_success)
-            return
-
         mark_stage(job_id, "resolving_universe", "running")
         symbols, source, _ = resolve_universe(
             exp.universe_definition, sleeve=exp.sleeve, parameters=merged
@@ -180,86 +176,7 @@ def _dispatch_experiment(
         return _run_similar_signal(exp, symbols, merged)
     if exp_type == "portfolio_policy":
         return _run_portfolio_policy(exp, symbols, merged)
-    if exp_type == "scan_evaluation":
-        raise ValueError("scan_evaluation uses dedicated job runner")
     raise ValueError(f"unsupported experiment type: {exp_type}")
-
-
-def _run_scan_evaluation_job(
-    job_id: str,
-    experiment_id: str,
-    exp: Any,
-    merged: dict[str, Any],
-    last_success: str | None,
-) -> None:
-    from services.scan_evaluation_experiment_runner import ScanEvaluationExperimentRunner
-
-    bucket = str(merged.get("bucket") or exp.sleeve or "penny")
-    merged = {**merged, "bucket": bucket}
-
-    def on_stage(stage: str, status: str, message: str) -> None:
-        if status == "running":
-            mark_stage(job_id, stage, "running", message)
-        else:
-            complete_stage(job_id, stage, message)
-
-    try:
-        mark_stage(job_id, "preparing_universe", "running", "Resolving evaluation universe")
-        complete_stage(job_id, "preparing_universe", f"Bucket={bucket}")
-
-        runner = ScanEvaluationExperimentRunner()
-        payload = runner.run(bucket=bucket, merged=merged, on_stage=on_stage)
-
-        mark_stage(job_id, "generating_charts", "running", "Writing chart artifacts")
-        complete_stage(job_id, "generating_charts", "Charts generated")
-
-        run_id = str(payload.get("run_id") or "")
-        mark_stage(job_id, "persisting_result", "running")
-        _persist_scan_evaluation_run(run_id, exp, merged, payload, experiment_id)
-        if run_id:
-            link_run_to_experiment(run_id, experiment_id, idea_id=exp.idea_id)
-            last_success = run_id
-        complete_stage(job_id, "persisting_result", "Artifacts persisted")
-
-        update_job(
-            job_id,
-            status="completed",
-            current_stage="complete",
-            run_id=run_id,
-            last_success_run_id=last_success,
-            stage_update=("complete", "completed", "Scan evaluation complete"),
-        )
-    except Exception as exc:
-        logger.exception("scan evaluation job %s failed", job_id)
-        fail_job(job_id, "replaying_scans", str(exc), preserve_last_success=True)
-        if last_success:
-            update_job(job_id, last_success_run_id=last_success)
-
-
-def _persist_scan_evaluation_run(
-    run_id: str,
-    exp: Any,
-    merged: dict[str, Any],
-    payload: dict[str, Any],
-    experiment_id: str,
-) -> None:
-    summary = {
-        **payload,
-        "experiment_type": "scan_evaluation",
-        "experiment_id": experiment_id,
-        "status": "completed",
-    }
-    _persist_synthetic_run(
-        run_id,
-        run_type="scan_evaluation",
-        name=exp.name,
-        sleeve=str(merged.get("bucket") or exp.sleeve),
-        universe=[],
-        parameters=merged,
-        summary=summary,
-        experiment_id=experiment_id,
-    )
-    notify_run_persisted(run_id, store="backtest_runs")
 
 
 def _run_walk_forward(exp: Any, symbols: list[str], merged: dict[str, Any]) -> str:

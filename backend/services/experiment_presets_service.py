@@ -13,27 +13,9 @@ from models.schemas_research import (
     PresetParameterValue,
 )
 
-SCAN_EVAL_SMOKE_PRESET: dict[str, Any] = {
-    "title": "Scan Eval Smoke (MacBook)",
-    "description": "Short window, tiny universe, two algorithms — smoke test only, not statistically meaningful.",
-    "major_evidence_eligible": False,
-    "verdict_ceiling": "exploratory",
-    "max_universe": 8,
-    "max_symbols": 8,
-    "stage_b_cap": 8,
-    "max_results": 5,
-    "forward_horizons": [5],
-    "rebalance_frequency": "monthly",
-    "algorithm_versions": ["alphabetical_baseline", "stage_a_v2"],
-    "apply_penny_friction": True,
-    "spread_bps": 50,
-    "slippage_bps": 25,
-}
-
 PRESET_ALIASES: dict[str, str] = {
     "exploratory": "quick_check",
     "robust": "robust_validation",
-    "scan_eval_smoke": "scan_eval_smoke",
 }
 
 BASE_PRESETS: dict[str, dict[str, Any]] = {
@@ -142,30 +124,12 @@ TEMPLATE_META: dict[str, dict[str, Any]] = {
             "custom_symbols",
         ],
     },
-    "scan_evaluation": {
-        "title": "Scan Selection Evaluation",
-        "description": "Replay Stage A/B ranking on historical dates and compare forward returns — does not change production scan.",
-        "required_fields": ["bucket", "start_date", "end_date", "algorithm_versions"],
-        "optional_fields": [
-            "rebalance_frequency",
-            "forward_horizons",
-            "stage_b_cap",
-            "max_results",
-            "max_universe",
-            "spread_bps",
-            "slippage_bps",
-            "apply_penny_friction",
-        ],
-        "universe_sources": ["full_bucket"],
-    },
 }
 
 
 def normalize_preset(preset: str | None) -> str:
     if not preset or preset == "custom":
         return "custom"
-    if preset == "scan_eval_smoke":
-        return "scan_eval_smoke"
     return PRESET_ALIASES.get(preset, preset)
 
 
@@ -173,8 +137,6 @@ def get_preset_parameters(preset: str | None) -> dict[str, Any]:
     key = normalize_preset(preset)
     if key == "custom":
         return {}
-    if key == "scan_eval_smoke":
-        return {k: v for k, v in SCAN_EVAL_SMOKE_PRESET.items() if k not in ("title", "description", "major_evidence_eligible", "verdict_ceiling")}
     return dict(BASE_PRESETS.get(key, {}))
 
 
@@ -189,19 +151,12 @@ def merge_parameters(
         merged.update({k: v for k, v in user_params.items() if v is not None})
     if experiment_type == "walk_forward" and "forward_horizons" in merged:
         merged["forward_horizons"] = list(merged["forward_horizons"])
-    if experiment_type == "scan_evaluation" and "forward_horizons" in merged:
-        merged["forward_horizons"] = [int(x) for x in merged["forward_horizons"]]
-    if experiment_type == "scan_evaluation" and "algorithm_versions" in merged:
-        av = merged["algorithm_versions"]
-        if isinstance(av, str):
-            merged["algorithm_versions"] = [v.strip() for v in av.split(",") if v.strip()]
     return merged
 
 
 def list_presets() -> ExperimentPresetsResponse:
     presets: list[ExperimentPresetInfo] = []
-    all_presets = {**BASE_PRESETS, "scan_eval_smoke": SCAN_EVAL_SMOKE_PRESET}
-    for preset_id, meta in all_presets.items():
+    for preset_id, meta in BASE_PRESETS.items():
         params = [
             PresetParameterValue(key=k, value=v, description="")
             for k, v in meta.items()

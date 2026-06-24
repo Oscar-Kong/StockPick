@@ -88,7 +88,7 @@ export function QuantHealthCard({
             ))}
           </ul>
           <div className="flex flex-wrap gap-3 text-xs">
-            <Link href="/quant-lab?tab=data-quality" className="text-[#7dff8e] hover:underline">
+            <Link href="/quant-lab?section=model-monitor" className="text-[#7dff8e] hover:underline">
               {t.quantHealth.openQuantLab}
             </Link>
             <Link href="/settings" className="text-zinc-400 hover:text-zinc-200">

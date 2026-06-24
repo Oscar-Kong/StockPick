@@ -48,12 +48,6 @@ def _default_hypotheses(experiment_type: str) -> tuple[str, str, str, str]:
             "Positive excess return with controlled drawdown and turnover.",
             "Drawdown or costs erase gross spread.",
         ),
-        "scan_evaluation": (
-            "Stage A/B ranking captures names with superior forward returns vs baseline.",
-            "Ranking does not beat alphabetical baseline on forward returns or recall.",
-            "Higher Recall@10/20 and positive rank IC vs alphabetical_baseline.",
-            "No improvement over baseline or insufficient historical data.",
-        ),
     }
     return defaults.get(
         experiment_type,
@@ -135,109 +129,7 @@ def validate_experiment(body: ExperimentValidateRequest) -> ExperimentValidation
                 )
             )
 
-    if exp_type == "scan_evaluation":
-        from services.scan_evaluation_experiment_runner import (
-            DEFAULT_ALGORITHM_VERSIONS,
-            MAX_LOCAL_SYMBOLS,
-            validate_scan_evaluation_params,
-        )
-        from services.scan_evaluation_replay import SUPPORTED_ALGORITHM_VERSIONS
-        from services.walk_forward_research_service import rebalance_dates
-
-        merged.setdefault("bucket", body.sleeve or "penny")
-        if not merged.get("algorithm_versions"):
-            merged["algorithm_versions"] = list(DEFAULT_ALGORITHM_VERSIONS)
-        errors = validate_scan_evaluation_params(merged)
-        for err in errors:
-            checks.append(
-                ExperimentValidationCheck(key="scan_eval", label="Scan evaluation", status="error", detail=err)
-            )
-        versions = merged.get("algorithm_versions") or []
-        if isinstance(versions, str):
-            versions = [v.strip() for v in versions.split(",") if v.strip()]
-        bad = [v for v in versions if v not in SUPPORTED_ALGORITHM_VERSIONS]
-        if bad:
-            checks.append(
-                ExperimentValidationCheck(
-                    key="algorithm_versions",
-                    label="Algorithm versions",
-                    status="error",
-                    detail=f"Unsupported: {', '.join(bad)}",
-                )
-            )
-        else:
-            checks.append(
-                ExperimentValidationCheck(
-                    key="algorithm_versions",
-                    label="Algorithm versions",
-                    value=", ".join(str(v) for v in versions),
-                    status="ok",
-                )
-            )
-        max_u = int(merged.get("max_universe") or merged.get("max_symbols") or 25)
-        if max_u > MAX_LOCAL_SYMBOLS:
-            checks.append(
-                ExperimentValidationCheck(
-                    key="max_universe",
-                    label="Max universe",
-                    value=max_u,
-                    status="warning",
-                    detail=f"Exceeds recommended local cap ({MAX_LOCAL_SYMBOLS}).",
-                )
-            )
-        start = merged.get("start_date")
-        end = merged.get("end_date")
-        if start and end:
-            try:
-                from datetime import date as date_cls
-
-                sd = date_cls.fromisoformat(str(start))
-                ed = date_cls.fromisoformat(str(end))
-                if ed <= sd:
-                    checks.append(
-                        ExperimentValidationCheck(
-                            key="rebalance_dates",
-                            label="Rebalance dates",
-                            status="error",
-                            detail="end_date must be after start_date.",
-                        )
-                    )
-                else:
-                    dates = rebalance_dates(str(start), str(end), str(merged.get("rebalance_frequency") or "monthly"))
-                    if not dates:
-                        checks.append(
-                            ExperimentValidationCheck(
-                                key="rebalance_dates",
-                                label="Rebalance dates",
-                                status="error",
-                                detail="No overlapping trading dates in range.",
-                            )
-                        )
-                    else:
-                        checks.append(
-                            ExperimentValidationCheck(
-                                key="rebalance_dates",
-                                label="Rebalance dates",
-                                value=len(dates),
-                                status="ok",
-                                detail=f"{len(dates)} replay dates",
-                            )
-                        )
-            except ValueError:
-                checks.append(
-                    ExperimentValidationCheck(
-                        key="rebalance_dates",
-                        label="Rebalance dates",
-                        status="error",
-                        detail="Invalid date range.",
-                    )
-                )
-        limitations.append(
-            "Evaluation experiments do not automatically modify the production scan configuration."
-        )
-        limitations.append("Survivorship bias possible when universe_pit is empty.")
-
-    if symbol_count < min_symbols and exp_type not in ("prediction_calibration", "factor_validation", "scan_evaluation"):
+    if symbol_count < min_symbols and exp_type not in ("prediction_calibration", "factor_validation"):
         checks.append(
             ExperimentValidationCheck(
                 key="symbol_count",
@@ -281,7 +173,7 @@ def validate_experiment(body: ExperimentValidateRequest) -> ExperimentValidation
                 )
             )
 
-    if exp_type in ("walk_forward", "factor_validation", "scan_evaluation"):
+    if exp_type in ("walk_forward", "factor_validation"):
         start = merged.get("start_date")
         end = merged.get("end_date")
         if not start or not end:

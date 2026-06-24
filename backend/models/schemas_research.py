@@ -40,7 +40,6 @@ ExperimentType = Literal[
     "pairs_discovery",
     "similar_signal",
     "portfolio_policy",
-    "scan_evaluation",
 ]
 
 ResearchRunType = Literal[
@@ -51,7 +50,6 @@ ResearchRunType = Literal[
     "similar_signal",
     "portfolio_policy",
     "quant_job",
-    "scan_evaluation",
 ]
 
 RunStatus = Literal["pending", "running", "completed", "failed", "cancelled"]
@@ -82,7 +80,6 @@ ExperimentPreset = Literal[
     "robust_validation",
     "exploratory",
     "robust",
-    "scan_eval_smoke",
     "custom",
 ]
 
@@ -98,17 +95,11 @@ UniverseSource = Literal[
 ExperimentStage = Literal[
     "validating",
     "resolving_universe",
-    "preparing_universe",
     "loading_prices",
-    "loading_historical_data",
     "calculating_features",
     "running_analysis",
-    "replaying_scans",
     "calculating_outcomes",
-    "calculating_forward_outcomes",
-    "comparing_algorithms",
     "evaluating_reliability",
-    "generating_charts",
     "persisting_result",
     "complete",
     "failed",

@@ -57,6 +57,9 @@ def persist_pairs_run(
         )
         _prune_old_runs(session)
         session.commit()
+    from services.research_run_service import notify_run_persisted
+
+    notify_run_persisted(run_id, store="pairs_research_runs")
     return run_id
 
 

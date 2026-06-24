@@ -12,7 +12,6 @@ import {
 import { parseApiError } from "@/lib/apiError";
 import {
   buildExperimentStudioHref,
-  defaultScanEvaluationParams,
   defaultWalkForwardDates,
   type ExperimentPresetId,
   type ExperimentStudioStep,
@@ -34,10 +33,6 @@ import { BucketSelect } from "./QuantLabTabShell";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { ResearchOnlyBadge } from "@/components/ui/ResearchOnlyBadge";
-import { ScanEvaluationConfigFields } from "./ScanEvaluationConfigFields";
-import { ScanEvaluationResultPanel } from "./ScanEvaluationResultPanel";
-import { getResearchRunDetail } from "@/lib/api";
-import type { ResearchRunDetailResponse } from "@/lib/types";
 
 interface ExperimentStudioProps {
   sleeve: Bucket;
@@ -63,7 +58,6 @@ export function ExperimentStudio({ sleeve, onSleeveChange }: ExperimentStudioPro
   const [error, setError] = useState<string | null>(null);
   const [validation, setValidation] = useState<ExperimentValidationResponse | null>(null);
   const [job, setJob] = useState<ExperimentJobResponse | null>(null);
-  const [runDetail, setRunDetail] = useState<ResearchRunDetailResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const runLockRef = useRef(false);
 
@@ -161,27 +155,13 @@ export function ExperimentStudio({ sleeve, onSleeveChange }: ExperimentStudioPro
     };
   }, [jobId, step, navigate, template]);
 
-  useEffect(() => {
-    if (template !== "scan_evaluation" || step !== "result" || !job?.run_id) {
-      setRunDetail(null);
-      return;
-    }
-    void getResearchRunDetail(job.run_id).then(setRunDetail).catch(() => setRunDetail(null));
-  }, [template, step, job?.run_id]);
-
   const selectedTemplate = useMemo(
     () => templates.find((x) => x.experiment_type === template) ?? null,
     [templates, template]
   );
 
   const onChooseTemplate = (expType: ExperimentType) => {
-    const tmpl = templates.find((x) => x.experiment_type === expType);
-    if (expType === "scan_evaluation") {
-      setPreset("scan_eval_smoke");
-      setParams(defaultScanEvaluationParams());
-      setUniverseSource("full_bucket");
-    }
-    setName(tmpl?.title ?? expType.replace(/_/g, " "));
+    setName(selectedTemplate?.title ?? expType.replace(/_/g, " "));
     navigate({ step: "configure", template: expType });
   };
 
@@ -427,9 +407,6 @@ export function ExperimentStudio({ sleeve, onSleeveChange }: ExperimentStudioPro
           {template === "pairs_discovery" && (
             <p className="text-xs text-amber-300/90">{t.quantLab.cointegrationTooltip}</p>
           )}
-          {template === "scan_evaluation" && (
-            <ScanEvaluationConfigFields params={params} preset={preset} onChange={setParams} />
-          )}
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
@@ -548,9 +525,6 @@ export function ExperimentStudio({ sleeve, onSleeveChange }: ExperimentStudioPro
               </ul>
               {job.error_message && <p className="text-xs text-red-400">{job.error_message}</p>}
             </>
-          )}
-          {step === "result" && template === "scan_evaluation" && runDetail && (
-            <ScanEvaluationResultPanel detail={runDetail} variant="compact" />
           )}
           {step === "result" && job?.run_id && (
             <button

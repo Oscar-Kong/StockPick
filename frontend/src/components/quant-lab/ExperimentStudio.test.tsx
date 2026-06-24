@@ -51,15 +51,6 @@ describe("ExperimentStudio", () => {
           universe_sources: ["custom_symbols"],
           supports_presets: true,
         },
-        {
-          experiment_type: "scan_evaluation",
-          title: "Scan Selection Evaluation",
-          description: "Compare scan algorithms",
-          required_fields: ["bucket"],
-          optional_fields: [],
-          universe_sources: ["full_bucket"],
-          supports_presets: true,
-        },
       ],
     });
     mocked.getExperimentPresets.mockResolvedValue({
@@ -76,11 +67,10 @@ describe("ExperimentStudio", () => {
     });
   });
 
-  it("lists templates when API returns templates", async () => {
+  it("lists six template types when API returns templates", async () => {
     render(<ExperimentStudio sleeve="penny" onSleeveChange={() => undefined} />);
     await waitFor(() => expect(screen.getByText("Walk-Forward Ranking Test")).toBeInTheDocument());
     expect(screen.getByText("Pairs Discovery")).toBeInTheDocument();
-    expect(screen.getByText("Scan Selection Evaluation")).toBeInTheDocument();
   });
 
   it("shows research-only choose hint", async () => {

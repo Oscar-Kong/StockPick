@@ -339,3 +339,169 @@ class FundamentalsPit(QuantBase):
     filing_date = Column(String(10), nullable=True)
     source = Column(String(32), nullable=False, default="reconciled")
     available_to_model_at = Column(DateTime, nullable=False, default=_utcnow)
+
+
+class ResearchIdea(QuantBase):
+    __tablename__ = "research_ideas"
+
+    id = Column(String(64), primary_key=True)
+    title = Column(String(256), nullable=False)
+    hypothesis = Column(Text, nullable=False, default="")
+    description = Column(Text, nullable=False, default="")
+    why_now = Column(Text, nullable=False, default="")
+    source_type = Column(String(64), nullable=False, default="user_created")
+    source_references_json = Column(Text, nullable=False, default="[]")
+    sleeve = Column(String(16), nullable=True)
+    universe_definition_json = Column(Text, nullable=False, default="{}")
+    suggested_experiment_type = Column(String(64), nullable=True)
+    suggested_parameters_json = Column(Text, nullable=False, default="{}")
+    priority = Column(Integer, nullable=False, default=50)
+    confidence = Column(Float, nullable=False, default=0.5)
+    status = Column(String(32), nullable=False, default="new")
+    user_notes = Column(Text, nullable=False, default="")
+    created_at = Column(DateTime, nullable=False, default=_utcnow)
+    updated_at = Column(DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
+
+
+class ResearchExperiment(QuantBase):
+    __tablename__ = "research_experiments"
+
+    id = Column(String(64), primary_key=True)
+    idea_id = Column(String(64), nullable=True, index=True)
+    name = Column(String(256), nullable=False)
+    experiment_type = Column(String(64), nullable=False)
+    hypothesis = Column(Text, nullable=False, default="")
+    null_hypothesis = Column(Text, nullable=False, default="")
+    success_criteria = Column(Text, nullable=False, default="")
+    failure_criteria = Column(Text, nullable=False, default="")
+    sleeve = Column(String(16), nullable=True)
+    universe_definition_json = Column(Text, nullable=False, default="{}")
+    parameters_json = Column(Text, nullable=False, default="{}")
+    preset = Column(String(32), nullable=True)
+    notes = Column(Text, nullable=False, default="")
+    created_at = Column(DateTime, nullable=False, default=_utcnow)
+    updated_at = Column(DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
+
+
+class ResearchExperimentJob(QuantBase):
+    """Tracks experiment launch progress with discrete stages (no fake percentages)."""
+
+    __tablename__ = "research_experiment_jobs"
+
+    job_id = Column(String(64), primary_key=True)
+    experiment_id = Column(String(64), nullable=False, index=True)
+    status = Column(String(32), nullable=False, default="pending")
+    current_stage = Column(String(64), nullable=True)
+    stages_json = Column(Text, nullable=False, default="[]")
+    run_id = Column(String(64), nullable=True)
+    last_success_run_id = Column(String(64), nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=_utcnow)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
+
+
+class ResearchRunIndex(QuantBase):
+    """Thin unified index over persisted research results — payloads live elsewhere."""
+
+    __tablename__ = "research_runs"
+
+    run_id = Column(String(64), primary_key=True)
+    experiment_id = Column(String(64), nullable=True, index=True)
+    idea_id = Column(String(64), nullable=True, index=True)
+    run_type = Column(String(64), nullable=False, index=True)
+    name = Column(String(256), nullable=False, default="")
+    status = Column(String(32), nullable=False, default="completed")
+    verdict = Column(String(64), nullable=True)
+    evidence_impact = Column(String(32), nullable=False, default="informational")
+    reliability_json = Column(Text, nullable=True)
+    sleeve = Column(String(16), nullable=True, index=True)
+    universe_json = Column(Text, nullable=False, default="[]")
+    parameters_json = Column(Text, nullable=False, default="{}")
+    strategy_version = Column(String(32), nullable=False, default="")
+    factor_model_version = Column(String(32), nullable=False, default="")
+    data_cutoff = Column(String(10), nullable=True)
+    sample_size = Column(Integer, nullable=True)
+    primary_metrics_json = Column(Text, nullable=False, default="[]")
+    warnings_json = Column(Text, nullable=False, default="[]")
+    blockers_json = Column(Text, nullable=False, default="[]")
+    result_reference_json = Column(Text, nullable=False, default="{}")
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=_utcnow)
+    updated_at = Column(DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
+    archived = Column(Integer, nullable=False, default=0)
+    research_notes = Column(Text, nullable=False, default="")
+    interpretation_json = Column(Text, nullable=True)
+
+
+class EvidenceMemory(QuantBase):
+    __tablename__ = "evidence_memory"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    symbol = Column(String(16), nullable=True, index=True)
+    universe_json = Column(Text, nullable=True)
+    original_signal_json = Column(Text, nullable=False, default="{}")
+    factor_snapshot_ref_json = Column(Text, nullable=False, default="{}")
+    market_regime = Column(String(32), nullable=True)
+    experiment_id = Column(String(64), nullable=True, index=True)
+    run_id = Column(String(64), nullable=True, index=True)
+    deterministic_finding = Column(Text, nullable=False, default="")
+    verdict = Column(String(64), nullable=True)
+    evidence_impact = Column(String(32), nullable=False, default="informational")
+    reliability_json = Column(Text, nullable=True)
+    forward_outcomes_json = Column(Text, nullable=False, default="{}")
+    confirmation_status = Column(String(32), nullable=False, default="pending")
+    related_decisions_json = Column(Text, nullable=False, default="[]")
+    created_at = Column(DateTime, nullable=False, default=_utcnow)
+    updated_at = Column(DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
+
+
+class FactorLineage(QuantBase):
+    __tablename__ = "factor_lineage"
+    __table_args__ = (
+        UniqueConstraint(
+            "factor_id",
+            "calculation_date",
+            "sleeve",
+            "strategy_version",
+            "factor_model_version",
+            name="uq_factor_lineage",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    factor_id = Column(String(64), nullable=False, index=True)
+    factor_name = Column(String(128), nullable=False)
+    raw_factor_version = Column(String(32), nullable=False, default="")
+    transformation_version = Column(String(32), nullable=False, default="")
+    normalization_method = Column(String(64), nullable=False, default="percentile_0_100")
+    winsorization_method = Column(String(64), nullable=False, default="none")
+    neutralization_method = Column(String(64), nullable=False, default="none")
+    formula_version = Column(String(32), nullable=False, default="")
+    calculation_date = Column(String(10), nullable=False)
+    data_cutoff = Column(String(10), nullable=False)
+    universe_json = Column(Text, nullable=False, default="[]")
+    sleeve = Column(String(16), nullable=False)
+    strategy_version = Column(String(32), nullable=False)
+    factor_model_version = Column(String(32), nullable=False)
+    created_at = Column(DateTime, nullable=False, default=_utcnow)
+
+
+class ChangeProposal(QuantBase):
+    __tablename__ = "change_proposals"
+
+    id = Column(String(64), primary_key=True)
+    title = Column(String(256), nullable=False)
+    finding = Column(Text, nullable=False, default="")
+    supporting_run_ids_json = Column(Text, nullable=False, default="[]")
+    proposed_change_json = Column(Text, nullable=False, default="{}")
+    affected_sleeve = Column(String(16), nullable=True)
+    affected_factors_json = Column(Text, nullable=False, default="[]")
+    expected_benefit = Column(Text, nullable=False, default="")
+    main_risks = Column(Text, nullable=False, default="")
+    required_validation = Column(Text, nullable=False, default="")
+    status = Column(String(32), nullable=False, default="draft")
+    created_at = Column(DateTime, nullable=False, default=_utcnow)
+    updated_at = Column(DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)

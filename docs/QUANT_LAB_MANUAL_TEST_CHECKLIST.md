@@ -4,67 +4,71 @@ Use with a **seeded demo DB** for deterministic results:
 
 ```bash
 cd backend
-python scripts/seed_quant_lab_demo.py --sleeve medium
+python scripts/seed_quant_lab_demo.py --sleeve penny
 DATABASE_URL=sqlite:///$(pwd)/../storage/dev/quant_lab_demo.db \
-  python -m uvicorn main:app --port 18731
+  .venv/bin/python -m uvicorn main:app --port 18731
 ```
 
 Frontend: `NEXT_PUBLIC_API_URL=http://127.0.0.1:18731 npm run dev`
 
 ---
 
-## Page shell
+## Full workflow (18 steps)
 
-- [ ] Open `/quant-lab` — no console errors
-- [ ] All six tabs visible
-- [ ] URL updates with `?tab=`
-- [ ] Refresh preserves tab
-- [ ] Browser back/forward works
-- [ ] Invalid `?tab=foo` falls back to Factor Performance
-- [ ] Evidence overview loads (expand section)
-- [ ] Pairs evidence card shows a run after seed (not “No saved run”)
+- [ ] **1.** Open `/quant-lab` — lands on Overview (`?section=overview`)
+- [ ] **2.** Review confidence score, freshness, versions, prediction counts
+- [ ] **3.** Read a data-backed finding in the research brief
+- [ ] **4.** Click **Generate ideas** or open Ideas → manual create
+- [ ] **5.** Edit idea title/hypothesis/notes and save
+- [ ] **6.** **Configure experiment** from an idea → Experiment Studio opens
+- [ ] **7.** Choose template, select preset (Quick / Standard / Robust)
+- [ ] **8.** Review validation panel — data sufficiency + hypothesis checks
+- [ ] **9.** Launch experiment — job starts
+- [ ] **10.** Observe job stages on Status step (poll stops on complete/fail)
+- [ ] **11.** Open persisted result from Result step or Results section
+- [ ] **12.** Read verdict, limitations, evidence impact on detail view
+- [ ] **13.** Duplicate experiment with changed parameters
+- [ ] **14.** Select 2–4 runs → Compare compatible results
+- [ ] **15.** Create follow-up idea from a result
+- [ ] **16.** Create change proposal (from evidence review or proposal API)
+- [ ] **17.** Review finding in Model Monitor → Evidence review
+- [ ] **18.** Hard refresh browser — section URL, ideas, runs, notes persist
 
-## Factor Performance
+---
 
-- [ ] Empty DB: explains how to run IC panel job
-- [ ] Seeded DB: table shows factors with IC values
-- [ ] Sleeve switch refetches
-- [ ] Refresh works
-- [ ] Stale badge when IC older than 7 days
+## Primary sections
 
-## Walk-Forward
+- [ ] Overview — single `GET /overview` fetch (Network tab)
+- [ ] Ideas — filter, search, archive, duplicate
+- [ ] Experiments — all six templates visible on Choose step
+- [ ] Results — pagination (20/page), filters (type, verdict, impact, status)
+- [ ] Model Monitor — factor, prediction, data, jobs, config, audit, evidence review
+- [ ] Legacy tools — factor, walk-forward, predictions, pairs tabs
 
-- [ ] Latest run hint on load (seeded DB)
-- [ ] Invalid date range shows validation error
-- [ ] Run button disabled while running
-- [ ] Double-click does not submit twice
-- [ ] Completed run persists after refresh
+## States to spot-check
 
-## Predictions
-
-- [ ] Resolved and unresolved counts distinct
-- [ ] Feedback partial failure still shows predictions
-- [ ] No fake 0% for missing outcomes
-
-## Pairs
-
-- [ ] Last run hydrates on tab open (seeded DB)
-- [ ] Run with 2+ symbols succeeds
-- [ ] Evidence overview updates after new run
-- [ ] Validation for &lt;2 symbols and &gt;20 symbols
-
-## Data Quality
-
-- [ ] Single health fetch (Network tab — one `getQuantHealthSummary` chain per refresh)
-- [ ] Scheduler failure shows warning, health may still show
-- [ ] Failed job count when applicable
-
-## Model Admin
-
-- [ ] Version, weights, audit, factors load independently
-- [ ] One panel failure does not blank entire tab
+| State | Where |
+|-------|-------|
+| Loading | Any section first paint |
+| Empty | Ideas with no rows, Results with empty index |
+| Ready | Overview with seeded brief |
+| Queued / running | Experiment job status step |
+| Success | Completed run in Results |
+| Partial success | Predictions tab with feedback failure |
+| Insufficient data | Validation panel before launch |
+| Invalid input | WF date range, pairs &lt;2 symbols |
+| Feature disabled | Legacy tab when flag off |
+| Failed job | Model Monitor jobs + retry (duplicate blocked) |
+| Stale evidence | Trust badge on legacy factor tab |
+| Integrity blocker | Model Monitor data health list |
 
 ## Research boundary
 
+- [ ] Research-only badge visible on Overview and Experiment Studio
 - [ ] Reliability cards state results do **not** change live scan rankings
-- [ ] Research-only badges on walk-forward and pairs
+- [ ] No auto-apply of weights from completed experiments
+
+## Console
+
+- [ ] No `pageerror` on Overview, Ideas, Experiments, Results, Model Monitor
+- [ ] Partial API failure (503 on overview) shows ErrorState + retry — not blank panel

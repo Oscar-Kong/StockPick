@@ -33,8 +33,6 @@ Trust badges: **Fresh · Stale · Insufficient sample · Feature disabled · No 
 
 Heavy jobs (`POST /research/walk-forward`, `POST /research/pairs`, IC panel, scheduler mutations) run **only on user click**.
 
-<<<<<<< Updated upstream
-=======
 ## Research foundation API (Phase 2)
 
 Backend foundation at `/api/v2/research` (see [API_REFERENCE.md](./API_REFERENCE.md)):
@@ -68,7 +66,7 @@ Ideas board supports manual create, generate-from-brief, edit/notes/priority, ar
 
 **Route:** `/quant-lab?section=experiments` with optional `step`, `template`, `experiment`, `job`, `idea` query params.
 
-Seven templates share a wizard: **Choose → Configure → Review → Run → Status → Result**.
+Six templates share a wizard: **Choose → Configure → Review → Run → Status → Result**.
 
 | Template | Engine (unchanged) |
 |----------|-------------------|
@@ -78,26 +76,11 @@ Seven templates share a wizard: **Choose → Configure → Review → Run → St
 | Pairs Discovery | `run_pairs_research` |
 | Similar-Signal Replay | `run_similar_signal_backtest` |
 | Portfolio Policy | `run_portfolio_backtest` (institutional persist) |
-| **Scan Selection Evaluation** | `run_scan_evaluation` / `compare_algorithm_versions` via `ScanEvaluationExperimentRunner` |
 
-Presets (**Quick Check**, **Standard Research**, **Robust Validation**, **Scan Eval Smoke**) expose parameter overrides in the UI. The smoke preset is for local MacBook checks only — not statistically meaningful.
-
-### Scan evaluation workflow
-
-1. Open **Experiments** → choose **Scan Selection Evaluation**.
-2. Configure bucket (`penny` / `compounder`), date range, rebalance frequency, algorithm versions (default `alphabetical_baseline` vs `stage_a_v2`), horizons, Stage B cap, universe cap, and penny friction assumptions.
-3. Use preset **`scan_eval_smoke`** for a short window and tiny universe on a laptop.
-4. Review validation (dates, algorithm versions, rebalance date count, limitations).
-5. Launch — job stages: `preparing_universe` → `loading_historical_data` → `replaying_scans` → `calculating_forward_outcomes` → `comparing_algorithms` → `generating_charts` → `persisting_result` → `complete`.
-6. Open **Results** for comparison table, metrics, and charts from persisted `charts.json`.
-
-**Important:** Evaluation experiments do **not** automatically modify the production scan configuration. There is no automatic promotion of a winning algorithm.
-
-See [SCAN_EVALUATION.md](./SCAN_EVALUATION.md) for artifact layout, `charts.json` schema, and adding algorithm versions.
+Presets (**Quick Check**, **Standard Research**, **Robust Validation**) expose all parameter overrides in the UI. Pre-run validation via `POST /api/v2/research/experiments/validate`. Launch via `POST /api/v2/research/experiments/{id}/launch` with discrete job stages (no fake % progress).
 
 Legacy per-tab forms remain under **Legacy tools**.
 
->>>>>>> Stashed changes
 ## API endpoints
 
 | Endpoint | Purpose |
@@ -122,30 +105,24 @@ Legacy per-tab forms remain under **Legacy tools**.
 ## Frontend structure
 
 ```
+frontend/src/components/QuantLabPage.tsx     → section shell (?section=)
 frontend/src/components/quant-lab/
-  QuantLabTabs.tsx          # re-exports
-  QuantLabTabShell.tsx      # shared UI helpers (+ reliability slot)
+  OverviewTab.tsx           → research home (default)
+  IdeasBoardTab.tsx         → ideas CRUD + generate
+  ExperimentStudio.tsx      → unified experiment wizard
+  ResultsTab.tsx            → paginated runs + detail + compare
+  ModelMonitorTab.tsx       → health, jobs, audit, evidence review
+  LegacyQuantLabTabs.tsx    → factor, WF, predictions, pairs
+  QuantLabTabShell.tsx      → shared UI helpers
   ResearchReliabilityCard.tsx
-  FactorLifecycleBadge.tsx
-  FactorPerformanceTab.tsx
-  WalkForwardTab.tsx
-  PredictionsTab.tsx
-  PairsTab.tsx
-  DataQualityTab.tsx
-  ModelAdminTab.tsx
-  QuantLabTabs.test.tsx
-  ResearchReliabilityCard.test.tsx
-
-frontend/src/components/product/
-  EvidenceToActionBoundary.tsx
-
+  QuantLabEvidencePanel.tsx → collapsible on Overview only
+  DataQualityTab.tsx        → embedded in Model Monitor
+  FactorPerformanceTab.tsx, WalkForwardTab.tsx, …
 frontend/src/lib/
-  researchReliability.ts    # reliability scores + factor lifecycle
-  researchReliability.test.ts
-  quantLabNormalizers.ts    # API response normalizers
-  quantLabFormatters.ts     # dates, symbols, horizon text
-  apiError.ts
-  predictions.ts
+  quantLabNavigation.ts     → ?section= routing
+  experimentStudio.ts       → studio URL helpers
+  researchReliability.ts
+  researchOverviewNormalizers.ts
 ```
 
 ## Research Reliability
@@ -173,9 +150,7 @@ curl -X POST http://127.0.0.1:18731/api/v2/jobs/ic-panel
 
 ## Related
 
-- [Quant Lab Stability Audit](./QUANT_LAB_STABILITY_AUDIT.md)
-- [Quant Lab Stability Verification](./QUANT_LAB_STABILITY_VERIFICATION.md)
-- [Quant Lab Error Audit](./QUANT_LAB_ERROR_AUDIT.md)
-- [Quant Lab Fix Verification](./QUANT_LAB_FIX_VERIFICATION.md)
-- [Frontend Information Architecture](FRONTEND_INFORMATION_ARCHITECTURE.md)
-- [UI API Coverage Map](UI_API_COVERAGE_MAP.md)
+- [Quant Lab Redesign Final Report](./QUANT_LAB_REDESIGN_FINAL_REPORT.md)
+- [Quant Lab Redesign Progress](./QUANT_LAB_REDESIGN_PROGRESS.md)
+- [Manual test checklist](./QUANT_LAB_MANUAL_TEST_CHECKLIST.md)
+- [Research Reliability](./RESEARCH_RELIABILITY.md)
