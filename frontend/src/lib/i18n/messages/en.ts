@@ -717,6 +717,7 @@ export const en = {
     mainFactorCol: "Top factor",
     mainWarningCol: "Warning",
     rankingScore: "Rank",
+    rankingScoreOnlyHint: "Composite ranking score (confidence and tradability not differentiated for this run).",
     pillarAlpha: "Alpha",
     pillarConfidence: "Conf",
     pillarTradability: "Trade",
@@ -1024,8 +1025,6 @@ export const en = {
     trustNeedsAttention: "Needs attention",
     overfittingTitle: "Overfitting & validation gaps",
     factorLifecycle: "Lifecycle",
-<<<<<<< Updated upstream
-=======
     navAria: "Quant Lab navigation",
     navOverview: "Overview",
     navIdeas: "Ideas",
@@ -1113,6 +1112,11 @@ export const en = {
     studioBack: "Back",
     scanEvalProductionNotice:
       "Evaluation experiments do not automatically modify the production scan configuration.",
+    scanEvalComparisonTitle: "Algorithm comparison",
+    scanEvalBestRecall: "Best Recall@10",
+    scanEvalAllMetrics: "Full metrics table",
+    scanEvalLimitations: "Limitations & caveats",
+    scanEvalNoComparison: "No comparison metrics persisted for this run.",
     scanEvalSmokePresetHint:
       "Smoke-test preset — short window and tiny universe for local MacBook checks only; not statistically meaningful.",
     scanEvalRebalance: "Rebalance frequency",
@@ -1187,7 +1191,6 @@ export const en = {
     monitorLeaveInformational: "Leave informational",
     monitorCreateProposal: "Create proposal",
     monitorReject: "Reject",
->>>>>>> Stashed changes
   },
   reliability: {
     cardTitle: "Research reliability",

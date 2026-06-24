@@ -36,27 +36,36 @@ def charts_from_artifact(detail: dict[str, Any]) -> list[ChartSeries]:
         except Exception:
             raw = {}
 
-    # Comparison mode charts
+    # Comparison mode — one grouped recall chart instead of three separate bar charts
     recall_rows = raw.get("recall_by_version") or []
     if recall_rows:
+        multi_series = []
         for metric, label in (
             ("recall_at_10", "Recall@10"),
             ("recall_at_20", "Recall@20"),
             ("recall_at_50", "Recall@50"),
         ):
-            series = _safe_points(
-                [{"x": r.get("version"), "y": r.get(metric)} for r in recall_rows],
-                x_key="x",
-                y_key="y",
-                series_name=label,
-            )
+            pts = []
+            for row in recall_rows:
+                ver = row.get("version")
+                y = row.get(metric)
+                if ver is None or y is None:
+                    continue
+                try:
+                    pts.append({"x": str(ver), "y": float(y)})
+                except (TypeError, ValueError):
+                    continue
+            if pts:
+                multi_series.append({"name": label, "data": pts})
+        if multi_series:
             charts.append(
                 ChartSeries(
-                    chart_id=f"scan_recall_{metric}",
-                    title=f"Stage A {label} by algorithm",
+                    chart_id="scan_recall_comparison",
+                    title="Stage A recall by algorithm",
                     chart_type="bar",
-                    series=series,
-                    empty_reason=None if series else f"No {label} data",
+                    x_label="Algorithm",
+                    y_label="Recall",
+                    series=multi_series,
                 )
             )
 

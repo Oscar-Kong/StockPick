@@ -2,6 +2,12 @@
 
 import clsx from "clsx";
 import { useTranslation } from "@/lib/i18n";
+import {
+  displayPillars,
+  hasDecomposedScores,
+  hasInformativePillarBreakdown,
+  readScanScoreParts,
+} from "@/lib/scanScoreDisplay";
 import type { StockResult } from "@/lib/types";
 
 function pillarColor(value: number): string {
@@ -10,64 +16,102 @@ function pillarColor(value: number): string {
   return "text-red-300/90";
 }
 
-function readPillar(stock: StockResult, key: "alpha_score" | "confidence_score" | "tradability_score"): number | null {
-  const top = stock[key];
-  if (typeof top === "number" && Number.isFinite(top)) return top;
-  const m = stock.metrics ?? {};
-  const nested = m[key];
-  if (typeof nested === "number" && Number.isFinite(nested)) return nested;
-  return null;
-}
-
 interface ScanScoreBreakdownProps {
   stock: StockResult;
   compact?: boolean;
   className?: string;
 }
 
-/** Alpha / confidence / tradability — separate from composite ranking score. */
+function SingleScore({
+  value,
+  title,
+  className,
+  size = "md",
+}: {
+  value: number;
+  title?: string;
+  className?: string;
+  size?: "sm" | "md" | "lg";
+}) {
+  const sizeClass =
+    size === "lg" ? "text-lg font-semibold" : size === "sm" ? "text-xs font-semibold" : "text-sm font-semibold";
+  return (
+    <span
+      className={clsx("tabular-nums text-zinc-100", sizeClass, className)}
+      title={title}
+    >
+      {value.toFixed(0)}
+    </span>
+  );
+}
+
+/** Ranking score in the table; pillar chips only when they differ from neutral defaults. */
 export function ScanScoreBreakdown({ stock, compact, className }: ScanScoreBreakdownProps) {
   const { t } = useTranslation();
-  const alpha = readPillar(stock, "alpha_score");
-  const confidence = readPillar(stock, "confidence_score");
-  const tradability = readPillar(stock, "tradability_score");
-  const ranking =
-    typeof stock.ranking_score === "number"
-      ? stock.ranking_score
-      : typeof stock.metrics?.ranking_score === "number"
-        ? (stock.metrics.ranking_score as number)
-        : stock.score;
+  const parts = readScanScoreParts(stock);
+  const informative = hasInformativePillarBreakdown(parts);
+  const pillars = displayPillars(parts);
 
-  if (alpha == null && confidence == null && tradability == null) {
+  if (!hasDecomposedScores(stock)) {
+    return <SingleScore value={parts.ranking} className={className} size={compact ? "sm" : "md"} />;
+  }
+
+  // Confidence/tradability stuck at ~50 — show one composite score (no noisy pillar row).
+  if (!informative) {
     return (
-      <span className={clsx("text-xs font-semibold tabular-nums text-zinc-200", className)}>
-        {ranking.toFixed(0)}
-      </span>
+      <SingleScore
+        value={parts.ranking}
+        title={t.scan.rankingScoreOnlyHint}
+        className={className}
+        size={compact ? "sm" : "lg"}
+      />
     );
   }
 
-  const items = [
-    { key: "alpha", label: t.scan.pillarAlpha, value: alpha },
-    { key: "confidence", label: t.scan.pillarConfidence, value: confidence },
-    { key: "trade", label: t.scan.pillarTradability, value: tradability },
-  ].filter((item) => item.value != null);
+  const pillarLabels: Record<DisplayPillar["key"], string> = {
+    alpha: t.scan.pillarAlpha,
+    confidence: t.scan.pillarConfidence,
+    trade: t.scan.pillarTradability,
+  };
+
+  if (compact) {
+    return (
+      <div className={clsx("scan-score-breakdown scan-score-breakdown--compact", className)}>
+        <SingleScore value={parts.ranking} title={t.scan.rankingScore} size="sm" />
+        {pillars.length > 0 && (
+          <div className="scan-score-breakdown__pillars">
+            {pillars.map((item) => (
+              <div key={item.key} className="scan-score-breakdown__pillar" title={pillarLabels[item.key]}>
+                <span className="scan-score-breakdown__pillar-label">{pillarLabels[item.key]}</span>
+                <span className={clsx("scan-score-breakdown__pillar-value tabular-nums", pillarColor(item.value))}>
+                  {item.value.toFixed(0)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
-    <div className={clsx("scan-score-breakdown", compact && "scan-score-breakdown--compact", className)}>
+    <div className={clsx("scan-score-breakdown", className)}>
       <div className="scan-score-breakdown__rank" title={t.scan.rankingScore}>
         <span className="text-[10px] uppercase tracking-wide text-zinc-500">{t.scan.rankingScore}</span>
-        <span className="text-sm font-semibold tabular-nums text-zinc-100">{ranking.toFixed(0)}</span>
+        <SingleScore value={parts.ranking} size="lg" />
       </div>
-      <div className="scan-score-breakdown__pillars">
-        {items.map((item) => (
-          <div key={item.key} className="scan-score-breakdown__pillar" title={item.label}>
-            <span className="scan-score-breakdown__pillar-label">{item.label}</span>
-            <span className={clsx("scan-score-breakdown__pillar-value tabular-nums", pillarColor(item.value!))}>
-              {item.value!.toFixed(0)}
-            </span>
-          </div>
-        ))}
-      </div>
+      {pillars.length > 0 && (
+        <div className="scan-score-breakdown__pillars">
+          {pillars.map((item) => (
+            <div key={item.key} className="scan-score-breakdown__pillar" title={pillarLabels[item.key]}>
+              <span className="scan-score-breakdown__pillar-label">{pillarLabels[item.key]}</span>
+              <span className={clsx("scan-score-breakdown__pillar-value tabular-nums", pillarColor(item.value))}>
+                {item.value.toFixed(0)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

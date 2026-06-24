@@ -2438,6 +2438,48 @@ body::before {
   min-width: 52rem;
 }
 
+/* Center numeric columns under headers (override global col-num right-align). */
+.scan-results-table .dense-table th.col-num,
+.scan-results-table .dense-table td.col-num {
+  text-align: center;
+}
+
+.scan-results-table .dense-table thead th {
+  vertical-align: middle;
+}
+
+.scan-results-table .dense-table tbody td {
+  vertical-align: middle;
+}
+
+.scan-results-table td .scan-score-breakdown {
+  align-items: center;
+  margin-inline: auto;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.scan-results-table td .scan-score-breakdown__pillars {
+  justify-content: center;
+}
+
+.scan-results-table td.scan-col-center > .scan-trade-hint {
+  margin-inline: auto;
+}
+
+/* Numeric columns: center via text-align; avoid inline-flex on $ spans (pulls text left). */
+.scan-results-table td.col-num {
+  text-align: center;
+}
+
+.scan-results-table td.col-num > .finance-value,
+.scan-results-table td.col-num > span {
+  display: inline-block;
+  width: auto;
+  max-width: 100%;
+  text-align: center;
+}
+
 .scan-results-table .scan-col-center,
 .scan-results-table th.scan-col-center,
 .scan-results-table td.scan-col-center {
@@ -2463,7 +2505,7 @@ body::before {
   vertical-align: middle;
 }
 
-.scan-results-table td.scan-col-center > :not(.scan-empty-cell) {
+.scan-results-table td.scan-col-center:not(.col-num) > :not(.scan-empty-cell) {
   display: inline-flex;
   max-width: 100%;
   margin-inline: auto;

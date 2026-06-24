@@ -189,7 +189,7 @@ def test_build_charts_from_artifact(research_db):
     detail = {"charts": raw, "quant_lab": {"mode": "comparison"}}
     charts = build_charts("scan_evaluation", MagicMock(), detail)
     assert charts
-    assert any(c.chart_id.startswith("scan_recall") for c in charts)
+    assert any(c.chart_id == "scan_recall_comparison" for c in charts)
 
 
 def test_persist_and_index_scan_evaluation(research_db):

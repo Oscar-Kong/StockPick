@@ -704,6 +704,7 @@ export const zh: Messages = {
     mainFactorCol: "主因子",
     mainWarningCol: "警告",
     rankingScore: "综合",
+    rankingScoreOnlyHint: "综合排名分（本次运行中置信度与可交易性未区分）。",
     pillarAlpha: "Alpha",
     pillarConfidence: "置信",
     pillarTradability: "可交易",
@@ -1004,8 +1005,6 @@ export const zh: Messages = {
     trustNeedsAttention: "需要关注",
     overfittingTitle: "过拟合与验证缺口",
     factorLifecycle: "生命周期",
-<<<<<<< Updated upstream
-=======
     navAria: "量化实验室导航",
     navOverview: "概览",
     navIdeas: "研究想法",
@@ -1092,6 +1091,11 @@ export const zh: Messages = {
     studioOpenResults: "打开结果",
     studioBack: "返回",
     scanEvalProductionNotice: "评估实验不会自动修改生产环境的扫描配置。",
+    scanEvalComparisonTitle: "算法对比",
+    scanEvalBestRecall: "Recall@10 最佳",
+    scanEvalAllMetrics: "完整指标表",
+    scanEvalLimitations: "限制与注意事项",
+    scanEvalNoComparison: "此运行未保存对比指标。",
     scanEvalSmokePresetHint: "冒烟测试预设 — 仅用于本地 MacBook 快速验证，不具备统计意义。",
     scanEvalRebalance: "再平衡频率",
     scanEvalAlgorithms: "要对比的算法版本",
@@ -1165,7 +1169,6 @@ export const zh: Messages = {
     monitorLeaveInformational: "保持信息级",
     monitorCreateProposal: "创建提案",
     monitorReject: "驳回",
->>>>>>> Stashed changes
   },
   reliability: {
     cardTitle: "研究可靠性",

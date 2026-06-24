@@ -215,47 +215,64 @@ export function ResultsTab({ sleeve, onSleeveChange }: ResultsTabProps) {
 
   if (runId && detail) {
     const interp = detail.interpretation;
+    const isScanEval = detail.summary.run_type === "scan_evaluation";
+
     return (
       <div className="space-y-4 text-sm">
         <button type="button" className="text-sky-400 hover:underline" onClick={backToIndex}>
           {t.quantLab.resultsBack}
         </button>
 
-        <header className="rounded-lg border border-zinc-800 bg-zinc-950/50 p-4 space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-emerald-800/60 bg-emerald-950/40 px-2 py-0.5 text-xs uppercase text-emerald-200">
-              {interp.verdict.replace(/_/g, " ")}
-            </span>
-            <span className="rounded-full border border-zinc-700 px-2 py-0.5 text-xs text-zinc-300">
-              {interp.evidence_impact}
-            </span>
-            <span className="text-xs text-zinc-500">
-              {t.quantLab.resultsReliability}: {interp.reliability.score}
-            </span>
-          </div>
-          <p className="text-zinc-100">{interp.conclusion}</p>
-          {interp.prose && <p className="text-zinc-400">{interp.prose}</p>}
-          <ul className="list-inside list-disc text-xs text-zinc-400">
-            {interp.supporting_observations.map((o) => (
-              <li key={o}>{o}</li>
+        {isScanEval ? (
+          <header className="rounded-lg border border-zinc-800 bg-zinc-950/50 p-4 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-sky-800/50 bg-sky-950/30 px-2 py-0.5 text-xs uppercase text-sky-200">
+                scan evaluation
+              </span>
+              <span className="rounded-full border border-zinc-700 px-2 py-0.5 text-xs text-zinc-400">
+                {interp.evidence_impact}
+              </span>
+            </div>
+            <h2 className="text-base font-semibold text-zinc-100">{detail.summary.name}</h2>
+            <p className="text-xs text-zinc-400">{interp.conclusion}</p>
+          </header>
+        ) : (
+          <header className="rounded-lg border border-zinc-800 bg-zinc-950/50 p-4 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-emerald-800/60 bg-emerald-950/40 px-2 py-0.5 text-xs uppercase text-emerald-200">
+                {interp.verdict.replace(/_/g, " ")}
+              </span>
+              <span className="rounded-full border border-zinc-700 px-2 py-0.5 text-xs text-zinc-300">
+                {interp.evidence_impact}
+              </span>
+              <span className="text-xs text-zinc-500">
+                {t.quantLab.resultsReliability}: {interp.reliability.score}
+              </span>
+            </div>
+            <p className="text-zinc-100">{interp.conclusion}</p>
+            {interp.prose && <p className="text-zinc-400">{interp.prose}</p>}
+            <ul className="list-inside list-disc text-xs text-zinc-400">
+              {interp.supporting_observations.map((o) => (
+                <li key={o}>{o}</li>
+              ))}
+            </ul>
+            <p className="text-xs text-amber-200/90">
+              {t.quantLab.resultsLimitation}: {interp.main_limitation}
+            </p>
+            <p className="text-xs text-sky-200/90">
+              {t.quantLab.resultsNextAction}: {interp.suggested_next_action}
+            </p>
+          </header>
+        )}
+
+        {isScanEval && <ScanEvaluationResultPanel detail={detail} variant="full" />}
+
+        {detail.charts.length > 0 && (
+          <div className="grid gap-3 lg:grid-cols-2">
+            {detail.charts.map((c) => (
+              <ResultChart key={c.chart_id} chart={c} />
             ))}
-          </ul>
-          <p className="text-xs text-amber-200/90">
-            {t.quantLab.resultsLimitation}: {interp.main_limitation}
-          </p>
-          <p className="text-xs text-sky-200/90">
-            {t.quantLab.resultsNextAction}: {interp.suggested_next_action}
-          </p>
-        </header>
-
-        {detail.summary.run_type === "scan_evaluation" && <ScanEvaluationResultPanel detail={detail} />}
-
-        {detail.summary.run_type !== "scan_evaluation" && (
-        <div className="grid gap-3 lg:grid-cols-2">
-          {detail.charts.map((c) => (
-            <ResultChart key={c.chart_id} chart={c} />
-          ))}
-        </div>
+          </div>
         )}
 
         {detail.metric_explanations.length > 0 && (
@@ -266,6 +283,7 @@ export function ResultsTab({ sleeve, onSleeveChange }: ResultsTabProps) {
           </div>
         )}
 
+        {!isScanEval && (
         <div className="rounded-lg border border-zinc-800 p-3">
           <h4 className="text-xs font-semibold uppercase text-zinc-500">{t.quantLab.resultsPrimaryMetrics}</h4>
           <ul className="mt-2 space-y-1 text-zinc-200">
@@ -276,6 +294,7 @@ export function ResultsTab({ sleeve, onSleeveChange }: ResultsTabProps) {
             ))}
           </ul>
         </div>
+        )}
 
         {detail.evidence_memory.length > 0 && (
           <div className="rounded-lg border border-zinc-800 p-3 space-y-2">

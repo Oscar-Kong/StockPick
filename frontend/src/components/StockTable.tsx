@@ -63,8 +63,8 @@ const COLUMN_WIDTH: Record<ColumnId, string> = {
   source: "5.5rem",
 };
 
-/** Compact columns — centered header + cell (often "—"). */
-const CENTER_COLUMNS = new Set<ColumnId>(["recommendation", "factor", "warning", "source"]);
+/** Columns that stay left-aligned (long text). All others center under their header. */
+const LEFT_ALIGN_COLUMNS = new Set<ColumnId>(["thesis"]);
 
 const ALL_COLUMNS: ColumnId[] = [...DEFAULT_COLUMNS, ...OPTIONAL_COLUMNS];
 
@@ -166,8 +166,8 @@ export function StockTable({
 
   const thClass = (id: ColumnId) =>
     clsx(
-      id === "rank" || id === "score" || id === "price" || id === "change" ? "col-num" : "",
-      CENTER_COLUMNS.has(id) && "scan-col-center",
+      !LEFT_ALIGN_COLUMNS.has(id) && "scan-col-center",
+      (id === "rank" || id === "score" || id === "price" || id === "change") && "col-num",
       id === "thesis" && "scan-col-thesis",
       id === "watchlist" && "scan-col-watchlist"
     );
@@ -236,7 +236,7 @@ export function StockTable({
             {visibleColumns.map((id) => (
               <col
                 key={id}
-                className={CENTER_COLUMNS.has(id) ? "scan-col-center" : undefined}
+                className={!LEFT_ALIGN_COLUMNS.has(id) ? "scan-col-center" : undefined}
                 style={id === "thesis" ? undefined : { width: COLUMN_WIDTH[id] }}
               />
             ))}

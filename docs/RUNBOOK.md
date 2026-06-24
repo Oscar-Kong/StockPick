@@ -231,6 +231,8 @@ Each candidate exposes three independent 0–100 pillars plus a weighted composi
 | `tradability_score` | Liquidity, volume, volatility, spread proxy, gap risk |
 | `ranking_score` | Weighted composite used for sort order (see env weights below) |
 
+The scan results table shows **only `ranking_score`** when `confidence_score` and `tradability_score` are at the neutral placeholder (~50, meaning insufficient data to differentiate). Pillar chips appear only when a sub-score materially differs from 50.
+
 `StockResult.score` mirrors final `ranking_score` after diversification and persistence. Scan metadata includes `ranking_diagnostics` with exclusion reasons (`excluded_by_sector_limit`, `excluded_by_correlation_limit`, `excluded_by_share_class`, `replaced_by_higher_confidence_candidate`, `retained_by_persistence_rule`, etc.).
 
 | Env | Default | Role |

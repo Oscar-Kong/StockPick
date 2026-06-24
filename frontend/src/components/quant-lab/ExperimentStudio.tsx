@@ -547,13 +547,10 @@ export function ExperimentStudio({ sleeve, onSleeveChange }: ExperimentStudioPro
                 ))}
               </ul>
               {job.error_message && <p className="text-xs text-red-400">{job.error_message}</p>}
-              {template === "scan_evaluation" && (
-                <p className="text-xs text-amber-200/90">{t.quantLab.scanEvalProductionNotice}</p>
-              )}
             </>
           )}
           {step === "result" && template === "scan_evaluation" && runDetail && (
-            <ScanEvaluationResultPanel detail={runDetail} compact />
+            <ScanEvaluationResultPanel detail={runDetail} variant="compact" />
           )}
           {step === "result" && job?.run_id && (
             <button
