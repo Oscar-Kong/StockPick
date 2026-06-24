@@ -72,6 +72,7 @@ class PriceService:
     ):
         self.store = store or HistoricalStore()
         self.market = market or MarketDataClient()
+        self.history_fetch_count = 0
 
     def get_history(
         self,
@@ -90,6 +91,7 @@ class PriceService:
         *,
         force_refresh: bool = False,
     ) -> tuple[pd.DataFrame, dict[str, Any]]:
+        self.history_fetch_count += 1
         sym = symbol.upper()
         min_bars = PERIOD_MIN_BARS.get(period, 200)
         limit = PERIOD_LIMIT.get(period, 500)
@@ -182,8 +184,9 @@ class PriceService:
             )
             for sym, df in fetched.items():
                 if not df.empty:
-                    self._persist(sym, df)
-                    result[sym.upper()] = df
+                    trimmed = self._trim_period(df, period)
+                    self._persist(sym, trimmed)
+                    result[sym.upper()] = trimmed
 
         return result
 

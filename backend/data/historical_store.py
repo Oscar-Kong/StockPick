@@ -228,6 +228,55 @@ class HistoricalStore:
             if not self._session:
                 session.close()
 
+    def get_latest_fundamental_snapshot(self, symbol: str) -> dict | None:
+        """Most recent stored fundamental snapshot for a symbol."""
+        session = self._get_session()
+        try:
+            row = (
+                session.query(FundamentalSnapshot)
+                .filter(FundamentalSnapshot.symbol == symbol.upper())
+                .order_by(FundamentalSnapshot.snapshot_date.desc())
+                .first()
+            )
+            if not row or not row.data_json:
+                return None
+            return {
+                "symbol": row.symbol,
+                "snapshot_date": row.snapshot_date,
+                "source": row.source,
+                "quality_score": row.quality_score,
+                "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+                "payload": json.loads(row.data_json),
+            }
+        finally:
+            if not self._session:
+                session.close()
+
+    def get_cached_quality_scores(self, symbols: list[str]) -> dict[str, float]:
+        """Batch lookup today's reconciled fundamental quality scores (cheap Stage A input)."""
+        if not symbols:
+            return {}
+        session = self._get_session()
+        try:
+            today = _utcnow().strftime("%Y-%m-%d")
+            unique = list(dict.fromkeys(s.upper() for s in symbols if s))
+            rows = (
+                session.query(FundamentalSnapshot.symbol, FundamentalSnapshot.quality_score)
+                .filter(
+                    FundamentalSnapshot.symbol.in_(unique),
+                    FundamentalSnapshot.snapshot_date == today,
+                )
+                .all()
+            )
+            out: dict[str, float] = {}
+            for sym, score in rows:
+                if score is not None and float(score) > 0:
+                    out[sym.upper()] = float(score)
+            return out
+        finally:
+            if not self._session:
+                session.close()
+
     def add_quality_flag(self, symbol: str, flag_type: str, message: str) -> None:
         session = self._get_session()
         try:

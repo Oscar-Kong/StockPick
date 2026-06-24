@@ -1,8 +1,8 @@
 // Results table for scan outputs with selection and watchlist actions.
 "use client";
 
-import { ScoreBadge } from "@/components/badges/ScoreBadge";
 import { ScoreSourceBadge } from "@/components/ScoreSourceBadge";
+import { ScanScoreBreakdown } from "@/components/scan/ScanScoreBreakdown";
 import { ScanTradeHintCell } from "@/components/scan/ScanTradeHintCell";
 import { DenseTable, DenseTableToolbar } from "@/components/ui/DenseTable";
 import { fmt, useTranslation } from "@/lib/i18n";
@@ -53,7 +53,7 @@ const COLUMN_WIDTH: Record<ColumnId, string> = {
   rank: "2.75rem",
   symbol: "6.5rem",
   recommendation: "5.75rem",
-  score: "4rem",
+  score: "5.5rem",
   price: "4.75rem",
   change: "4.25rem",
   factor: "7rem",
@@ -269,7 +269,9 @@ export function StockTable({
                   </>
                 ),
                 recommendation: <ScanTradeHintCell stock={stock} compact />,
-                score: <ScoreBadge score={stock.score} />,
+                score: (
+                  <ScanScoreBreakdown stock={stock} compact />
+                ),
                 price: <span className="finance-value">${stock.price.toFixed(2)}</span>,
                 change: (
                   <span className={clsx("finance-value", changeClass(m.change_pct_1d))}>

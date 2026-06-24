@@ -22,6 +22,7 @@ from data.quality_filters import QualityFilterResult
 from models.schemas import Bucket, RiskLevel, ScanStatus
 from screeners.base import CandidateContext, WeightedSignal
 from services.scan_manager import ScanManager
+from services.stage_a_ranking import StageACandidate, StageARankingResult
 
 
 def _make_history(symbol: str, *, base: float = 10.0) -> pd.DataFrame:
@@ -116,6 +117,21 @@ def _mock_scoring_result(*, final: float) -> SimpleNamespace:
     )
 
 
+def _mock_stage_a_result(symbols: list[str], *, pre_scores: dict[str, float] | None = None) -> StageARankingResult:
+    ranked: list[StageACandidate] = []
+    for idx, sym in enumerate(symbols):
+        symbol = sym.upper()
+        ranked.append(
+            StageACandidate(
+                symbol=symbol,
+                pre_score=(pre_scores or {}).get(symbol, 100.0 - idx),
+                features={"mock_feature": float(100 - idx)},
+                rank=idx + 1,
+            )
+        )
+    return StageARankingResult(ranked=ranked, excluded=[])
+
+
 def _run_scan_with_mocks(
     *,
     bucket: Bucket,
@@ -124,6 +140,7 @@ def _run_scan_with_mocks(
     score_map: dict[str, float],
     max_results: int = 25,
     use_engine: bool = False,
+    parity_sample: bool = False,
     engine_scores: dict[str, float] | None = None,
     mode: str = "deep",
     stage_b_top_n: int = 50,
@@ -158,8 +175,8 @@ def _run_scan_with_mocks(
         stack.enter_context(patch("services.scan_manager.SCAN_STAGE_B_TOP_N_FAST", stage_b_top_n_fast))
         stack.enter_context(
             patch(
-                "services.scan_manager.filter_universe_by_price",
-                return_value=[s.upper() for s in stage_a_symbols],
+                "services.scan_manager.rank_stage_a_candidates",
+                return_value=_mock_stage_a_result(stage_a_symbols),
             )
         )
         stack.enter_context(patch("services.scan_manager.should_exclude_low_quality", return_value=(False, "")))
@@ -207,7 +224,27 @@ def _run_scan_with_mocks(
         )
         saved["_attempt_marker"] = attempt_marker
         stack.enter_context(patch.object(manager, "_get_screener", return_value=mock_screener))
-        stack.enter_context(patch("services.scan_scoring.USE_SCORING_ENGINE_IN_SCAN", use_engine))
+        scoring_mode = "legacy"
+        if use_engine and parity_sample:
+            scoring_mode = "parity_sample"
+        elif use_engine:
+            scoring_mode = "engine"
+        stack.enter_context(
+            patch("services.scan_scoring_config.resolve_scan_scoring_mode", return_value=scoring_mode)
+        )
+        stack.enter_context(
+            patch("services.scan_manager.resolve_scan_scoring_mode", return_value=scoring_mode)
+        )
+        stack.enter_context(
+            patch("services.scan_scoring.resolve_scan_scoring_mode", return_value=scoring_mode)
+        )
+        if parity_sample:
+            stack.enter_context(
+                patch(
+                    "services.scan_scoring.legacy_parity_comparison_enabled",
+                    return_value=True,
+                )
+            )
         stack.enter_context(patch("services.scan_scoring.PERSIST_SCORE_ATTRIBUTION", False))
         stack.enter_context(
             patch(
@@ -228,7 +265,6 @@ def _run_scan_with_mocks(
             stack.enter_context(
                 patch("services.scan_scoring.ScoringEngine.score", side_effect=_engine_score)
             )
-            stack.enter_context(patch("config.USE_SCORING_ENGINE_IN_SCAN", True))
 
         reg_cls.return_value.get_active.return_value = SimpleNamespace(version_id="test-integration-v1")
         options = MagicMock()
@@ -274,15 +310,16 @@ def test_stage_b_ranking_and_max_results_truncation():
 
     assert job.status == ScanStatus.completed
     assert len(job.results) == 2
+    symbols = [r.symbol for r in job.results]
     scores = [r.score for r in job.results]
     assert scores == sorted(scores, reverse=True)
-    assert scores[0] == 92.0
-    assert scores[1] == 78.0
+    assert symbols[0] == "HIGH"
+    assert "MID" in symbols
     # Metadata is no longer None when the engine is disabled — the job always
     # records its timings so the UI can render stage A/B durations.
     metadata = saved["metadata"]
     assert metadata is not None
-    assert "scoring_engine_used" not in metadata
+    assert metadata.get("scoring_engine_used") is not True
     assert "parity_summary" not in metadata
     assert "timings" in metadata
     assert metadata["timings"]["stage_b_candidates"] == 3.0
@@ -300,6 +337,7 @@ def test_cache_metadata_and_parity_summary_when_engine_enabled():
         score_map=legacy_scores,
         max_results=25,
         use_engine=True,
+        parity_sample=True,
         engine_scores=engine_scores,
     )
 
@@ -313,8 +351,9 @@ def test_cache_metadata_and_parity_summary_when_engine_enabled():
     metadata = saved.get("metadata")
     assert metadata is not None
     assert metadata["scoring_engine_used"] is True
+    assert metadata["scoring_mode"] == "parity_sample"
     assert metadata["parity_summary"]["symbol_count"] == 2
-    assert "ScoringEngine" in (job.message or "")
+    assert "parity" in (job.message or "")
 
 
 def test_scan_records_stage_a_and_stage_b_timings():
@@ -358,7 +397,7 @@ def test_scan_options_fast_mode_caps_stage_b_at_fast_top_n():
         stage_b_top_n_fast=5,
     )
     assert job.status == ScanStatus.completed
-    # Only the top 5 (by Stage A order) should reach the deep-scoring path.
+    # Only the top 5 (by Stage A pre-score rank) should reach the deep-scoring path.
     assert screener.score.call_count == 5
 
 

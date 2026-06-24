@@ -42,8 +42,8 @@ def run_compounder_backtest(
 
     quality_note = None
     if info and fundamentals:
-        rev = revenue_eps_consistency_score(info, fundamentals)
-        roic = roic_margin_stability_score(info, fundamentals)
+        rev = float(revenue_eps_consistency_score(info, fundamentals))
+        roic = float(roic_margin_stability_score(info, fundamentals))
         if rev < 50 or roic < 50:
             quality_note = "Fundamental quality below threshold at snapshot"
 

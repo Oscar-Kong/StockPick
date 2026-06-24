@@ -88,8 +88,8 @@ def _compounder_quality_momentum(
     if trend_score(window) < 50:
         return False
     if info and fundamentals:
-        rev = revenue_eps_consistency_score(info, fundamentals)
-        roic = roic_margin_stability_score(info, fundamentals)
+        rev = float(revenue_eps_consistency_score(info, fundamentals))
+        roic = float(roic_margin_stability_score(info, fundamentals))
         return rev >= 50 and roic >= 50
     return trend_score(window) >= 60
 

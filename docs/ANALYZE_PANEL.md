@@ -58,7 +58,7 @@ The **headline score** can differ slightly from the sum of bars because steps 3â
 
 ### Factor weights by sleeve (summary)
 
-**Penny:** 5d momentum, volume spike, RSI, social buzz, volatility fit.
+**Penny:** 5d momentum, volume spike (normalized score), relative volume ratio (raw x baseline), RSI, social buzz, volatility fit. Scan drawer shows **Relative volume: 3.2x** separately from **Volume signal score: 92/100**.
 
 **Medium:** 20d RS vs SPY, technical setup, sector RS, quant alpha, sentiment, optional governance.
 

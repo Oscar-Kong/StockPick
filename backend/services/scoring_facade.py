@@ -18,8 +18,8 @@ that do not care about scan-only bookkeeping fields can ignore them.
 
 The numeric `score`, `risk`, and signal list produced here are guaranteed to
 match what Scan Stage B produces for the same `CandidateContext`. If
-`USE_SCORING_ENGINE_IN_SCAN=true`, both Scan and Watchlist switch to the
-engine in lockstep.
+`SCAN_SCORING_MODE=engine`, both Scan and Watchlist switch to the ScoringEngine in lockstep — no
+more "same symbol, two scores" drift. Use `parity_sample` during migration to compare legacy vs engine on a sample without doubling work for every symbol.
 """
 from __future__ import annotations
 

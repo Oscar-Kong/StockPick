@@ -17,6 +17,10 @@ export interface StockResult {
   symbol: string;
   price: number;
   score: number;
+  alpha_score?: number | null;
+  confidence_score?: number | null;
+  tradability_score?: number | null;
+  ranking_score?: number | null;
   signals: Signal[];
   risk_level: RiskLevel;
   summary: string;

@@ -7,6 +7,15 @@ from dataclasses import dataclass, field
 from models.schemas import Bucket, RiskLevel, ScanOptions, Signal, StockResult
 
 
+def _opt_score(value) -> float | None:
+    if value is None:
+        return None
+    try:
+        return round(float(value), 1)
+    except (TypeError, ValueError):
+        return None
+
+
 @dataclass
 class WeightedSignal:
     name: str
@@ -57,6 +66,10 @@ class BaseScreener(ABC):
             symbol=ctx.symbol,
             price=ctx.price,
             score=round(score, 1),
+            alpha_score=_opt_score(metrics.get("alpha_score")),
+            confidence_score=_opt_score(metrics.get("confidence_score")),
+            tradability_score=_opt_score(metrics.get("tradability_score")),
+            ranking_score=_opt_score(metrics.get("ranking_score") or score),
             signals=[
                 Signal(
                     name=s.name,

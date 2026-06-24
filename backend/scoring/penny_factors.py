@@ -10,13 +10,13 @@ from scoring.technical import breakout_score, volatility_fit_score, volume_spike
 
 
 def rel_volume_score(df: pd.DataFrame, lookback: int = 20) -> float:
-    if df is None or df.empty or len(df) < lookback + 1:
-        return 0.0
-    avg_vol = df["volume"].iloc[-lookback - 1 : -1].mean()
-    latest = df["volume"].iloc[-1]
-    if avg_vol <= 0:
-        return 0.0
-    return clip100(latest / avg_vol, 1.0, 3.0)
+    from scoring.penny_liquidity import (
+        relative_volume_ratio_from_df,
+        relative_volume_score_from_ratio,
+    )
+
+    ratio = relative_volume_ratio_from_df(df, lookback=lookback)
+    return relative_volume_score_from_ratio(ratio)
 
 
 def volume_surge_zscore(df: pd.DataFrame, lookback: int = 20) -> float:

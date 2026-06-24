@@ -42,7 +42,7 @@ Top navigation: **Portfolio · Scan · Workspace · Quant Lab · Library · Sett
 ## How It Works (End-to-End Flow)
 
 1. **Scan request** (`POST /scan/{bucket}`)
-2. **Stage A**: bulk OHLC pull + quick filter
+2. **Stage A**: bulk OHLC pull, eligibility filter, cross-sectional preliminary ranking (momentum/volume/liquidity features), then advance top-N by `pre_score` to Stage B
 3. **Stage B**: deep scoring for narrowed symbols
 4. **Scoring**: technical/fundamental/sentiment/data-quality (+ optional OpenBB governance)
 5. **Persistence**:
@@ -180,7 +180,9 @@ Optional LLM profile tuning:
 | `FINRL_ENABLED` | `false` | FinRL allocation workflow flag |
 | `LEAN_EXPORT_ENABLED` | `false` | LEAN handoff workflow flag |
 | `SCORE_ENGINE_V2_ENABLED` | `true` | v2 score API (`/api/v2/score`) |
-| `USE_SCORING_ENGINE_IN_SCAN` | `false` | Route scan Stage B through `ScoringEngine` (legacy path when false). Staging guide: [SCAN_SCORING_ENGINE_MIGRATION.md](docs/SCAN_SCORING_ENGINE_MIGRATION.md) |
+| `SCAN_SCORING_MODE` | *(unset → legacy)* | Stage B scorer: `legacy`, `engine`, or `parity_sample` |
+| `SCAN_PARITY_SAMPLE_RATE` | `0.10` | Legacy comparison fraction in `parity_sample` mode (hash of `scan_id:symbol`) |
+| `USE_SCORING_ENGINE_IN_SCAN` | `false` | Deprecated fallback when `SCAN_SCORING_MODE` unset (`true` → `engine`) |
 | `PERSIST_SCORE_ATTRIBUTION` | `true` | Persist factor attribution rows on v2/scan scores |
 | `PREDICTION_SNAPSHOTS_ENABLED` | `true` | Store every v2 score as a prediction snapshot |
 | `VALUATION_ENGINE_ENABLED` | `true` | DCF + peer + reverse DCF on v2 score |
@@ -306,6 +308,7 @@ For production-grade models, offline training pipelines still need to be operate
 | [Architecture](docs/ARCHITECTURE.md) | Developers — modules and extension points |
 | [API Reference](docs/API_REFERENCE.md) | Developers — HTTP endpoints |
 | [Runbook](docs/RUNBOOK.md) | Ops — start, flags, troubleshooting |
+| [Scan evaluation harness](docs/SCAN_EVALUATION.md) | Quant — offline Stage A/B replay & forward-return labels |
 | [Deployment (Vercel + Render demo)](docs/DEPLOYMENT.md) | Free public demo — env vars, CORS, limits |
 | [Postgres migration](docs/POSTGRES_MIGRATION.md) | After demo — Neon, auth, per-user data |
 | [GitHub setup (no secrets)](docs/GITHUB_SETUP.md) | Safe publish checklist & gitignore |

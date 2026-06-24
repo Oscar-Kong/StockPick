@@ -126,7 +126,8 @@ Ticker universes are built in three layers (`backend/data/universe.py`, `backend
 
 1. **Official listing master** — Nasdaq Trader `nasdaqlisted.txt` + `otherlisted.txt`, cached under `universe:listing_master` with revision `universe:listing_master_revision`.
 2. **Curated discovery seeds** — thematic lists such as `PENNY_DISCOVERY_SEEDS` and `LARGE_CAP_SEEDS` (not proof of current listing or sub-$5 status).
-3. **Runtime eligibility** — price, liquidity, and bucket rules in the scanner (`filter_universe_by_price`, screener modules).
+3. **Runtime eligibility** — price, liquidity, and bucket rules (`check_bucket_eligibility`, screener modules).
+4. **Stage A ranking** — inexpensive cross-sectional `pre_score` from bulk OHLC (+ cached fundamental quality for compounders). Top `SCAN_STAGE_B_TOP_N` advance to Stage B.
 
 **Refresh:** listing master refreshes once daily via the scheduler daily pipeline and asynchronously on startup. Manual refresh: `POST /data/scheduler/refresh-listing-master` (optional `?force=true`). Inspect cache metadata: `GET /data/universe/listing-master`.
 
@@ -155,6 +156,11 @@ These were previously hard-coded inside `backend/services/scan_manager.py`. They
 | `SCAN_STAGE_B_TOP_N`              | `50`                             | Max candidates deep-scored per scan (`mode=deep`).                                     |
 | `SCAN_STAGE_B_TOP_N_FAST`         | `15`                             | Candidate cap when `ScanOptions.mode="fast"` — used for low-latency exploratory scans. |
 | `SCAN_PRICE_DOWNLOAD_MAX_SECONDS` | `45`                             | Hard cap (seconds) on the Stage A bulk OHLC provider fetch.                            |
+| `SCAN_PENNY_STAGE_A_PERIOD`         | `6mo`                            | Penny Stage A bulk OHLC horizon.                                                       |
+| `SCAN_PENNY_STAGE_B_PERIOD`         | `6mo`                            | Penny Stage B candidate build horizon.                                                   |
+| `SCAN_COMPOUNDER_STAGE_A_PERIOD`    | `1y`                             | Compounder Stage A cheap universe filter horizon.                                      |
+| `SCAN_COMPOUNDER_STAGE_B_PERIOD`    | `5y`                             | Compounder Stage B deep scoring horizon (feeds 5Y smooth growth).                      |
+| `FUNDAMENTAL_SNAPSHOT_MAX_AGE_DAYS` | `1`                              | Reuse DB fundamental snapshots younger than this; stale triggers one reconcile refresh. |
 | `SCAN_STAGE_B_TIME_BUDGET_SECONDS`| `0` (unlimited)                  | Stop Stage B after this many seconds; `0` = score all candidates. Partial results if capped. |
 | `SCAN_RESULT_TTL_PENNY`           | inherits `SCAN_RESULT_TTL` (900) | TTL for `scan:latest:penny`.                                                           |
 | `SCAN_RESULT_TTL_COMPOUNDER`      | `86400`                          | TTL for `scan:latest:compounder`; compounder data changes slowly.                      |
@@ -163,20 +169,92 @@ These were previously hard-coded inside `backend/services/scan_manager.py`. They
 
 `GET /scan/{job_id}` and `GET /scan/latest/{bucket}` now return optional fields used by the UI:
 
-- `timings`: `{stage_a_ms, stage_b_ms, total_ms, stage_b_candidates, stage_b_mode}`
+- `timings`: `{stage_a_ms, stage_a_bulk_download_ms, stage_a_rank_ms, stage_a_bulk_symbols, stage_b_ms, stage_b_candidate_build_ms, stage_b_bulk_cache_hits, stage_b_provider_fallbacks, stage_b_history_reloads, stage_b_candidate_build_calls, stage_b_candidates, stage_b_mode, stage_a_eligible, stage_a_excluded}`
+- `history_horizons`: `{stage_a_period, stage_b_period, bucket}` — OHLC windows used for the scan.
+- `data_flow` (cached scan metadata): `{bulk_download_ms, bulk_symbols_returned, stage_a_rank_ms, stage_b_build_ms, bulk_cache_hits, provider_fallbacks, history_reload_count, fundamental_cache_hits, fundamental_refreshes, candidate_build_calls, per_symbol_sources[], per_symbol_diagnostics[]}`.
+- `data_flow.per_symbol_diagnostics[]`: per-symbol `{price_history_period, price_history_bars, fundamental_snapshot_date, fundamental_source, reconciliation_quality, missing_fundamental_fields, confidence_penalty, ...}`.
+- `stage_a_diagnostics` (cached scan metadata): `{eligible_count, excluded_count, advanced_count, candidates[], excluded[]}` where each candidate includes `pre_score`, percentile `features`, `rank`, `warnings`, and optional `data_quality`.
+- `skipped_candidates` / `skipped_count` (cached scan metadata): structured Stage B skip records `{symbol, reason, detail?}` where `reason` is one of `missing_history`, `stale_history`, `provider_failure`, `invalid_price`, `missing_required_fundamentals`, `candidate_build_exception`, or `strict_filter_rejection`.
 - `cache_age_seconds` (latest only): seconds since the result was written to the cache table.
 - `last_attempt_failed_at` / `last_attempt_error` (latest only): set when the most recent scan attempt failed. The previously cached successful results are **not** clobbered — they remain visible alongside the failure marker so the UI can render "showing prior results; last attempt failed at …".
 
 All new fields are nullable and backward-compatible — clients that ignore them keep working.
+
+**Penny scan metrics (Stage B):** candidate `metrics` now separates raw liquidity from normalized scores:
+
+| Field | Meaning |
+|-------|---------|
+| `relative_volume_ratio` / `volume_ratio` | Today vs prior 20 completed bars (current bar excluded from baseline), e.g. `3.2` → display as **3.2x** |
+| `relative_volume_score` / `volume_signal_score` | Normalized 0–100 volume factor (3× baseline → 100) |
+| `average_dollar_volume_20d` | Mean daily `$` volume over prior 20 bars (excludes today) |
+| `atr_percent`, `gap_percent`, `spread_estimate_pct` | Raw volatility / gap / intraday spread proxies |
+| `liquidity_warnings` | Non-fatal risk flags (unconfirmed volume spike, extreme gap, wide spread, etc.) |
+
+Penny **hard filters** reject on price bounds, minimum share/dollar volume, min history, stale data quality, OTC/PINK, and **extreme** spread (`PENNY_MAX_SPREAD_PCT`, default 15%) — not on moderate spread or missing momentum signals.
+
+| Env | Default | Role |
+|-----|---------|------|
+| `PENNY_MAX_SPREAD_PCT` | `15.0` | Hard filter — reject when `(high−low)/close` on latest bar exceeds this percent |
 
 ### Canonical scoring entry point
 
 Every code path that needs a final score for a symbol should route through
 `services.scoring_facade.score_symbol_canonical(...)`. Scan Stage B, Watchlist,
 and Analyze all use it, so the same `CandidateContext` produces the same
-numeric score regardless of entry point. When `USE_SCORING_ENGINE_IN_SCAN`
-flips, both Scan and Watchlist switch to the ScoringEngine in lockstep — no
-more "same symbol, two scores" drift.
+numeric score regardless of entry point.
+
+**Stage B scoring modes** (`SCAN_SCORING_MODE`):
+
+| Mode | Production scorer | Legacy scorer | Use case |
+|------|-------------------|---------------|----------|
+| `legacy` | Legacy screener | Always | Rollback / baseline |
+| `engine` | ScoringEngine | Never | Production rollout (recommended) |
+| `parity_sample` | ScoringEngine | Deterministic sample | Staging comparison |
+
+When `SCAN_SCORING_MODE` is unset, `USE_SCORING_ENGINE_IN_SCAN=true` maps to `engine`; otherwise `legacy`.
+
+| Env | Default | Role |
+|-----|---------|------|
+| `SCAN_SCORING_MODE` | *(unset)* | `legacy` \| `engine` \| `parity_sample` |
+| `SCAN_PARITY_SAMPLE_RATE` | `0.10` | Legacy comparison fraction in parity mode (hash of `scan_id:symbol`) |
+
+Parity diagnostics include `scan_id`, `timestamp`, `scoring_version`, `factor_differences`, and score deltas. Scan timings add `stage_b_scoring_*_ms` and call counts — in `engine` mode legacy screener work is skipped (~50% less Stage B scoring vs the old always-run-both path).
+
+**Final scan ranking** (Stage B output, after factor scoring):
+
+Each candidate exposes three independent 0–100 pillars plus a weighted composite:
+
+| Field | Meaning |
+|-------|---------|
+| `alpha_score` | Setup attractiveness from bucket factors |
+| `confidence_score` | Data completeness, freshness, provider agreement, history, reconciliation |
+| `tradability_score` | Liquidity, volume, volatility, spread proxy, gap risk |
+| `ranking_score` | Weighted composite used for sort order (see env weights below) |
+
+`StockResult.score` mirrors final `ranking_score` after diversification and persistence. Scan metadata includes `ranking_diagnostics` with exclusion reasons (`excluded_by_sector_limit`, `excluded_by_correlation_limit`, `excluded_by_share_class`, `replaced_by_higher_confidence_candidate`, `retained_by_persistence_rule`, etc.).
+
+| Env | Default | Role |
+|-----|---------|------|
+| `SCAN_RANK_ALPHA_WEIGHT_PENNY` | `0.65` | Alpha weight (penny bucket; medium/compounder have `_MEDIUM` / `_COMPOUNDER` variants) |
+| `SCAN_RANK_CONFIDENCE_WEIGHT_PENNY` | `0.20` | Confidence weight |
+| `SCAN_RANK_TRADABILITY_WEIGHT_PENNY` | `0.15` | Tradability weight |
+| `SCAN_MAX_PER_SECTOR` | `3` | Max final results from one sector |
+| `SCAN_MAX_PER_CORRELATION_CLUSTER` | `2` | Max final results from one return-correlation cluster |
+| `SCAN_CORRELATION_CLUSTER_THRESHOLD` | `0.75` | Pairwise return correlation to merge clusters |
+| `SCAN_PERSISTENCE_DELTA` | `3.0` | Minimum score gap before a newcomer displaces a prior-scan incumbent |
+| `SCAN_MIN_RESULTS_AFTER_DIVERSIFICATION` | `3` | Target minimum breadth (sector cap may relax; share-class and correlation caps do not) |
+| `SCAN_PENNY_LOW_CONFIDENCE_MAX` | `2` | Max low-confidence penny names in final list |
+| `SCAN_PENNY_LOW_CONFIDENCE_THRESHOLD` | `45.0` | Confidence below this counts toward penny cap |
+
+**Offline scan evaluation** (historical replay — does not change production rankings):
+
+```bash
+cd backend && python scripts/run_scan_evaluation.py \
+  --bucket penny --start-date 2024-03-01 --end-date 2024-06-01 \
+  --algorithm-version stage_a_v2 --max-universe 30 --output-dir data/scan_eval
+```
+
+See [SCAN_EVALUATION.md](SCAN_EVALUATION.md) for MacBook quick start, algorithm version labels, and output files.
 
 ### Auto-refresh slot reservation
 

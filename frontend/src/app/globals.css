@@ -2333,6 +2333,54 @@ body::before {
   color: var(--text-secondary);
 }
 
+.scan-score-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 4.5rem;
+}
+
+.scan-score-breakdown--compact {
+  gap: 0.15rem;
+}
+
+.scan-score-breakdown__rank {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.scan-score-breakdown__pillars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.35rem;
+  font-size: 0.625rem;
+  line-height: 1.2;
+  color: var(--text-tertiary);
+}
+
+.scan-score-breakdown__pillar {
+  white-space: nowrap;
+}
+
+.scan-score-breakdown__pillar--alpha {
+  color: #34d399;
+}
+
+.scan-score-breakdown__pillar--confidence {
+  color: #60a5fa;
+}
+
+.scan-score-breakdown__pillar--tradability {
+  color: #fbbf24;
+}
+
+.scan-score-breakdown__pillar--low {
+  opacity: 0.85;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
 .scan-inline-status__sep {
   color: var(--text-tertiary);
 }

@@ -1,11 +1,22 @@
 """Technical indicator scoring."""
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 import pandas as pd
 from ta.momentum import RSIIndicator
 from ta.trend import ADXIndicator, MACD, SMAIndicator
 from ta.volatility import AverageTrueRange, BollingerBands
+
+
+@dataclass(frozen=True)
+class SmoothGrowthResult:
+    score: float
+    label: str
+    bars_used: int
+    years_requested: int
+    years_effective: float
 
 
 def _clamp(value: float, lo: float = 0.0, hi: float = 100.0) -> float:
@@ -24,14 +35,13 @@ def momentum_score(df: pd.DataFrame, days: int = 5) -> float:
 
 
 def volume_spike_score(df: pd.DataFrame, lookback: int = 20) -> float:
-    if len(df) < lookback + 1:
-        return 0.0
-    avg_vol = df["volume"].iloc[-lookback - 1 : -1].mean()
-    latest = df["volume"].iloc[-1]
-    if avg_vol <= 0:
-        return 0.0
-    ratio = latest / avg_vol
-    return _clamp(min(ratio, 3.0) / 3.0 * 100)
+    from scoring.penny_liquidity import (
+        relative_volume_ratio_from_df,
+        relative_volume_score_from_ratio,
+    )
+
+    ratio = relative_volume_ratio_from_df(df, lookback=lookback)
+    return relative_volume_score_from_ratio(ratio)
 
 
 def rsi_score(df: pd.DataFrame, period: int = 14) -> float:
@@ -128,22 +138,45 @@ def volatility_fit_score(df: pd.DataFrame) -> float:
 
 def smooth_growth_score(df: pd.DataFrame, years: int = 5) -> float:
     """Score smooth upward price trend over ~5 years."""
-    if len(df) < 252:
-        return 50.0
-    window = df.tail(min(len(df), 252 * years))
+    return smooth_growth_score_with_horizon(df, years=years).score
+
+
+def smooth_growth_score_with_horizon(df: pd.DataFrame, years: int = 5) -> SmoothGrowthResult:
+    """Score smooth upward trend; label reflects the actual history window used."""
+    if df is None or df.empty or len(df) < 252:
+        effective = len(df) / 252.0 if df is not None and len(df) else 0.0
+        label = f"{effective:.1f}Y smooth growth (insufficient history)"
+        return SmoothGrowthResult(50.0, label, len(df) if df is not None else 0, years, round(effective, 2))
+
+    bars_requested = 252 * years
+    window = df.tail(min(len(df), bars_requested))
     closes = window["close"].values
-    if len(closes) < 50:
-        return 50.0
+    bars_used = len(closes)
+    years_effective = round(bars_used / 252.0, 2)
+    if years_effective >= years - 0.25:
+        label = f"{years}Y smooth growth"
+    else:
+        label = f"{years_effective:.1f}Y smooth growth"
+
+    if bars_used < 50:
+        return SmoothGrowthResult(50.0, f"{label} (insufficient history)", bars_used, years, years_effective)
+
     total_return = closes[-1] / closes[0] - 1
     if total_return <= 0:
-        return max(0.0, 20 + total_return * 100)
+        return SmoothGrowthResult(
+            max(0.0, 20 + total_return * 100),
+            label,
+            bars_used,
+            years,
+            years_effective,
+        )
     log_returns = np.diff(np.log(closes))
     volatility = np.std(log_returns) * np.sqrt(252)
-    # Reward growth with low volatility (smooth compounders)
     if volatility <= 0:
-        return 50.0
+        return SmoothGrowthResult(50.0, label, bars_used, years, years_effective)
     sharpe_like = total_return / volatility
-    return _clamp(40 + sharpe_like * 30 + total_return * 50)
+    score = _clamp(40 + sharpe_like * 30 + total_return * 50)
+    return SmoothGrowthResult(score, label, bars_used, years, years_effective)
 
 
 def adx_score(df: pd.DataFrame, period: int = 14) -> float:

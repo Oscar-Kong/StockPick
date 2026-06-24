@@ -33,6 +33,71 @@ Trust badges: **Fresh · Stale · Insufficient sample · Feature disabled · No 
 
 Heavy jobs (`POST /research/walk-forward`, `POST /research/pairs`, IC panel, scheduler mutations) run **only on user click**.
 
+<<<<<<< Updated upstream
+=======
+## Research foundation API (Phase 2)
+
+Backend foundation at `/api/v2/research` (see [API_REFERENCE.md](./API_REFERENCE.md)):
+
+- **Ideas** — hypotheses with source types and statuses
+- **Experiments** — lightweight definitions separate from runs
+- **Unified run index** — thin summaries over `backtest_runs`, `pairs_research_runs`, `factor_ic_history`, predictions, jobs
+- **Evidence memory** — per-symbol deterministic findings linked to runs
+- **Factor lineage** — calculation metadata per factor/date
+- **Impact policy & major evidence gate** — centralized, deterministic (no LLM)
+- **Change proposals** — reviewable drafts; never auto-applied
+
+Env: `QUANT_LAB_RESEARCH_API_ENABLED`, `RESEARCH_MAX_ORDINARY_MODIFIER` (default `0` = display-only).
+
+## Research home (Phase 3)
+
+**Default view:** Overview (`/quant-lab` or `/quant-lab?section=overview`).
+
+| Section | Query | Loads on open |
+|---------|-------|----------------|
+| Overview | `section=overview` (default) | `GET /api/v2/research/overview?sleeve=` only |
+| Ideas | `section=ideas` | `GET /api/v2/research/ideas` |
+| Model Monitor | `section=model-monitor` | `GET /api/v2/research/model-monitor` — factor/prediction/data health, jobs, audit, evidence review |
+| Legacy tools | `section=legacy&tab=` | Factor performance, walk-forward, predictions, pairs |
+
+Overview includes deterministic **research brief** findings, recommended ideas, recent activity, and collapsible **evidence maintenance** actions (IC panel, forward labels, resolve outcomes, quant daily jobs, evidence backfill).
+
+Ideas board supports manual create, generate-from-brief, edit/notes/priority, archive, duplicate, and **Configure experiment** (creates experiment record + opens Experiment Studio).
+
+## Experiment Studio (Phase 4)
+
+**Route:** `/quant-lab?section=experiments` with optional `step`, `template`, `experiment`, `job`, `idea` query params.
+
+Seven templates share a wizard: **Choose → Configure → Review → Run → Status → Result**.
+
+| Template | Engine (unchanged) |
+|----------|-------------------|
+| Factor Validation | IC panel + `get_factor_performance` |
+| Walk-Forward | `run_walk_forward_research` |
+| Prediction Calibration | forward labels + resolve outcomes |
+| Pairs Discovery | `run_pairs_research` |
+| Similar-Signal Replay | `run_similar_signal_backtest` |
+| Portfolio Policy | `run_portfolio_backtest` (institutional persist) |
+| **Scan Selection Evaluation** | `run_scan_evaluation` / `compare_algorithm_versions` via `ScanEvaluationExperimentRunner` |
+
+Presets (**Quick Check**, **Standard Research**, **Robust Validation**, **Scan Eval Smoke**) expose parameter overrides in the UI. The smoke preset is for local MacBook checks only — not statistically meaningful.
+
+### Scan evaluation workflow
+
+1. Open **Experiments** → choose **Scan Selection Evaluation**.
+2. Configure bucket (`penny` / `compounder`), date range, rebalance frequency, algorithm versions (default `alphabetical_baseline` vs `stage_a_v2`), horizons, Stage B cap, universe cap, and penny friction assumptions.
+3. Use preset **`scan_eval_smoke`** for a short window and tiny universe on a laptop.
+4. Review validation (dates, algorithm versions, rebalance date count, limitations).
+5. Launch — job stages: `preparing_universe` → `loading_historical_data` → `replaying_scans` → `calculating_forward_outcomes` → `comparing_algorithms` → `generating_charts` → `persisting_result` → `complete`.
+6. Open **Results** for comparison table, metrics, and charts from persisted `charts.json`.
+
+**Important:** Evaluation experiments do **not** automatically modify the production scan configuration. There is no automatic promotion of a winning algorithm.
+
+See [SCAN_EVALUATION.md](./SCAN_EVALUATION.md) for artifact layout, `charts.json` schema, and adding algorithm versions.
+
+Legacy per-tab forms remain under **Legacy tools**.
+
+>>>>>>> Stashed changes
 ## API endpoints
 
 | Endpoint | Purpose |

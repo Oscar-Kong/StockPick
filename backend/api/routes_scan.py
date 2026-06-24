@@ -43,6 +43,12 @@ def scan_compounder(options: ScanOptions | None = None):
     return ScanJobResponse(job_id=job.job_id, bucket=Bucket.compounder, status=job.status)
 
 
+def _parse_completed_at(value: str | None) -> datetime | None:
+    if not value or not isinstance(value, str):
+        return None
+    return datetime.fromisoformat(value.replace("Z", ""))
+
+
 @router.get("/latest/{bucket}", response_model=LatestScanResponse)
 def get_latest_scan(bucket: Bucket):
     data = scan_manager.get_latest_scan(bucket)
@@ -67,7 +73,7 @@ def get_latest_scan(bucket: Bucket):
     return LatestScanResponse(
         bucket=bucket,
         results=results,
-        completed_at=datetime.fromisoformat(completed) if completed else None,
+        completed_at=_parse_completed_at(completed),
         strategy_version=data.get("strategy_version"),
         parity_summary=data.get("parity_summary"),
         scoring_engine_used=data.get("scoring_engine_used"),
@@ -111,6 +117,6 @@ def get_scan_status(job_id: str):
         results=job.results,
         completed_at=job.completed_at,
         parity_summary=job.parity_summary,
-        scoring_engine_used=job.parity_summary.get("scoring_engine_used") if job.parity_summary else None,
+        scoring_engine_used=job.scoring_engine_used,
         timings=dict(job.timings) if job.timings else None,
     )

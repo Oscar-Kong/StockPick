@@ -52,22 +52,65 @@ def _gate_label(
     return label, gates
 
 
+def _format_penny_context(metrics: dict[str, Any] | None) -> str | None:
+    if not metrics:
+        return None
+    ratio = metrics.get("relative_volume_ratio")
+    if ratio is None:
+        ratio = metrics.get("volume_ratio")
+    vol_score = metrics.get("relative_volume_score") or metrics.get("volume_signal_score")
+    atr = metrics.get("atr_percent")
+    adv = metrics.get("average_dollar_volume_20d")
+    parts: list[str] = []
+    if ratio is not None:
+        parts.append(f"rel vol {float(ratio):.1f}x")
+    if vol_score is not None:
+        parts.append(f"vol signal {float(vol_score):.0f}/100")
+    if atr is not None:
+        parts.append(f"ATR {float(atr):.1f}%")
+    if adv is not None:
+        if float(adv) >= 1_000_000:
+            parts.append(f"avg $ vol ${float(adv) / 1_000_000:.1f}M")
+        else:
+            parts.append(f"avg $ vol ${float(adv):,.0f}")
+    liquidity_warnings = metrics.get("liquidity_warnings") or metrics.get("dilution_warnings")
+    if isinstance(liquidity_warnings, list) and liquidity_warnings:
+        parts.append(str(liquidity_warnings[0]).replace("_", " "))
+    if not parts:
+        return None
+    return "; ".join(parts)
+
+
 def _short_reason(
     label: str,
     *,
     score: float,
     gates: list[str],
+    sleeve: str = "",
+    metrics: dict[str, Any] | None = None,
 ) -> str:
+    penny_ctx = _format_penny_context(metrics) if sleeve == "penny" else None
     if gates:
-        return gates[0]
+        base = gates[0]
+        if penny_ctx:
+            return f"{base} ({penny_ctx})"
+        return base
     if label in ("strong_buy", "buy"):
+        if penny_ctx:
+            return f"Score {score:.0f} — {penny_ctx}"
         return f"Score {score:.0f} supports entry"
     if label == "watch":
+        if penny_ctx:
+            return f"Setup forming — {penny_ctx}"
         return "Setup forming — confirm before sizing"
     if label == "avoid":
+        if penny_ctx:
+            return f"Weak score — {penny_ctx}"
         return "Weak score — skip for now"
     if label == "high_risk_no_decision":
         return "Data too thin for a confident call"
+    if penny_ctx:
+        return f"Mixed signals — {penny_ctx}"
     return "Mixed signals — patience"
 
 
@@ -79,9 +122,11 @@ def compute_scan_trade_hint(
     data_quality_score: float | None = None,
     earnings_soon: bool = False,
     provider_limited: bool = False,
+    metrics: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return recommendation label plus buy/wait mix for a scan row."""
     score = max(0.0, min(100.0, float(score)))
+    m = metrics or {}
 
     buy_raw = max(0.0, (score - 35.0) * 1.4)
     wait_raw = max(5.0, 100.0 - score * 0.85) + _RISK_WAIT_BONUS.get(risk_level, 12.0)
@@ -108,6 +153,18 @@ def compute_scan_trade_hint(
             wait_raw += 10.0
         if risk_level == RiskLevel.high:
             buy_raw *= 0.65
+        ratio = m.get("relative_volume_ratio") or m.get("volume_ratio")
+        if ratio is not None and float(ratio) >= 3.0:
+            buy_raw *= 1.05
+        liq_warn = m.get("liquidity_warnings") or []
+        if isinstance(liq_warn, list):
+            if "insufficient_liquidity" in liq_warn:
+                wait_raw += 12.0
+                buy_raw *= 0.7
+            if "abnormal_volume_without_price_confirmation" in liq_warn:
+                wait_raw += 10.0
+            if "extreme_gap" in liq_warn or "very_high_atr" in liq_warn:
+                wait_raw += 8.0
     elif sleeve == "compounder":
         if score < 62:
             buy_raw *= 0.45
@@ -127,7 +184,13 @@ def compute_scan_trade_hint(
         "recommendation": label,
         "buy_pct": buy_pct,
         "wait_pct": wait_pct,
-        "trade_hint_reason": _short_reason(label, score=score, gates=gates),
+        "trade_hint_reason": _short_reason(
+            label,
+            score=score,
+            gates=gates,
+            sleeve=sleeve,
+            metrics=m,
+        ),
     }
 
 
@@ -150,6 +213,7 @@ def attach_trade_hint_to_metrics(
             data_quality_score=data_quality_score,
             earnings_soon=earnings_soon or bool(metrics.get("earnings_soon")),
             provider_limited=provider_limited or bool(metrics.get("provider_limited_partial_data")),
+            metrics=metrics,
         )
     )
     return out

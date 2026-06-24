@@ -82,7 +82,7 @@ def valuation_percentile_scores(info: dict, fundamentals: dict) -> dict[str, flo
 def adjusted_eps_score(info: dict, fundamentals: dict) -> float:
     eps = safe_float(info.get("trailingEps") or fundamentals.get("eps"))
     if eps == 0:
-        return revenue_eps_consistency_score(info, fundamentals)
+        return revenue_eps_consistency_score(info, fundamentals).score
     one_off = safe_float(info.get("extraordinaryItems") or fundamentals.get("extraordinary_items"))
     if abs(eps) > 0 and abs(one_off) / abs(eps) > 0.5:
         return 35.0
@@ -99,7 +99,7 @@ def compounder_expanded_scores(
     return {
         "rev_growth": rev_growth_score(info, fundamentals),
         "eps_growth": eps_growth_score(info, fundamentals),
-        "roic": roic_margin_stability_score(info, fundamentals),
+        "roic": roic_margin_stability_score(info, fundamentals).score,
         "fcf_yield": fcf_yield_score(info, fundamentals),
         "debt_ratio": debt_ratio_score(info, fundamentals),
         "goodwill_ratio": goodwill_ratio_score(info, fundamentals),

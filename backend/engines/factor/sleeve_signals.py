@@ -8,7 +8,7 @@ from scoring.fundamental import (
     revenue_eps_consistency_score,
     roic_margin_stability_score,
 )
-from scoring.technical import smooth_growth_score
+from scoring.technical import smooth_growth_score, smooth_growth_score_with_horizon
 from data.fred_client import FredClient
 from scoring.sentiment import combined_sentiment_score
 from scoring.technical import (
@@ -69,16 +69,20 @@ def build_compounder_signals(ctx: CandidateContext) -> list[WeightedSignal]:
     df = ctx.history
     rev_eps = revenue_eps_consistency_score(ctx.info, ctx.fundamentals)
     roic = roic_margin_stability_score(ctx.info, ctx.fundamentals)
-    smooth = smooth_growth_score(df) if df is not None and not getattr(df, "empty", True) else 50.0
+    smooth = (
+        smooth_growth_score_with_horizon(df, years=5)
+        if df is not None and not getattr(df, "empty", True)
+        else smooth_growth_score_with_horizon(df, years=5)
+    )
     moat = moat_proxy_score(ctx.info, ctx.fundamentals)
     macro = FredClient().macro_regime_score()
-    qlib_fallback = (rev_eps + roic + smooth) / 3
+    qlib_fallback = (float(rev_eps) + float(roic) + smooth.score) / 3
     qlib_alpha, qlib_source = get_symbol_alpha_score(Bucket.compounder, ctx.symbol, qlib_fallback)
     signals = [
-        WeightedSignal("Revenue/EPS consistency", rev_eps, 0.28, "Steady earnings and revenue growth"),
-        WeightedSignal("ROIC & margins", roic, 0.24, "Profitability and balance sheet quality"),
-        WeightedSignal("5Y smooth growth", smooth, 0.20, "Low-volatility upward price trend"),
-        WeightedSignal("Moat proxies", moat, 0.13, "Margins, FCF, sector quality"),
+        WeightedSignal("Revenue/EPS consistency", float(rev_eps), 0.28, "Steady earnings and revenue growth"),
+        WeightedSignal("ROIC & margins", float(roic), 0.24, "Profitability and balance sheet quality"),
+        WeightedSignal(smooth.label, smooth.score, 0.20, "Low-volatility upward price trend"),
+        WeightedSignal("Moat proxies", float(moat), 0.13, "Margins, FCF, sector quality"),
         WeightedSignal("Macro regime", macro, 0.10, "Economic backdrop for long holds"),
         WeightedSignal("Qlib alpha", qlib_alpha, 0.05, f"Model signal source: {qlib_source}"),
     ]

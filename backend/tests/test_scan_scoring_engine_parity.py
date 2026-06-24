@@ -109,7 +109,6 @@ def _enrich_side_effect(sym, info, fund, m, bucket, **kw):
 
 def test_legacy_path_preserves_result_shape():
     with (
-        patch("services.scan_scoring.USE_SCORING_ENGINE_IN_SCAN", False),
         patch("services.scan_scoring.enrich_metrics", side_effect=_enrich_side_effect),
         patch("services.scan_scoring._apply_openbb_adjustment", side_effect=lambda score, metrics: score),
     ):
@@ -124,6 +123,7 @@ def test_legacy_path_preserves_result_shape():
                 quality_score=80.0,
                 strategy_version="test-v1",
                 quality_filter={"passed": True},
+                scoring_mode="legacy",
             )
             fields = _stock_result_fields(outcome)
             assert 0 <= fields["score"] <= 100
@@ -140,7 +140,6 @@ def test_legacy_path_preserves_result_shape():
 
 def test_engine_path_bounded_score_and_shape():
     with (
-        patch("services.scan_scoring.USE_SCORING_ENGINE_IN_SCAN", True),
         patch("services.scan_scoring.PERSIST_SCORE_ATTRIBUTION", False),
         patch("services.scan_scoring.enrich_metrics", side_effect=_enrich_side_effect),
         patch("services.scan_scoring._apply_openbb_adjustment", side_effect=lambda score, metrics: score),
@@ -158,25 +157,27 @@ def test_engine_path_bounded_score_and_shape():
                 quality_score=80.0,
                 strategy_version="test-v2",
                 quality_filter={"passed": True},
+                scoring_mode="engine",
+                scan_id="test-engine",
             )
             assert 0 <= outcome.score <= 100
             assert outcome.scoring_engine_used is True
             assert outcome.metrics["scoring_engine"] is True
             assert outcome.metrics["strategy_version"] == "test-v2"
             assert _stock_result_fields(outcome)["signals"]
-            assert outcome.parity_record is not None
-            assert outcome.parity_record.sleeve == bucket.value
-            assert outcome.metrics["parity"]["symbol"] == ctx.symbol
+            assert outcome.parity_record is None
             mock_engine_score.assert_called()
+            screener.score.assert_not_called()
 
 
 def test_parity_delta_recorded_and_logged():
+    legacy_signals = [WeightedSignal("Test signal", 70.0, 1.0, "mock")]
     with (
-        patch("services.scan_scoring.USE_SCORING_ENGINE_IN_SCAN", True),
         patch("services.scan_scoring.PERSIST_SCORE_ATTRIBUTION", False),
         patch("services.scan_scoring.enrich_metrics", side_effect=_enrich_side_effect),
         patch("services.scan_scoring._apply_openbb_adjustment", side_effect=lambda score, metrics: score),
         patch("services.scan_scoring.ScoringEngine.score") as mock_engine_score,
+        patch("services.scan_scoring.legacy_parity_comparison_enabled", return_value=True),
         patch.object(logging.getLogger("services.scan_parity"), "info") as log_info,
     ):
         mock_engine_score.return_value = _mock_scoring_result(final=60.0)
@@ -191,6 +192,8 @@ def test_parity_delta_recorded_and_logged():
             quality_score=80.0,
             strategy_version="test-v2",
             quality_filter={"passed": True},
+            scoring_mode="parity_sample",
+            scan_id="parity-scan-1",
         )
 
         assert outcome.parity_delta is not None
@@ -198,6 +201,7 @@ def test_parity_delta_recorded_and_logged():
         assert outcome.metrics["legacy_score"] == outcome.legacy_score
         assert outcome.parity_delta == abs(outcome.legacy_score - outcome.score)
         assert outcome.parity_record.top_factor_contributions
+        assert outcome.parity_record.scan_id == "parity-scan-1"
         assert any("Scan score parity" in str(c.args[0]) for c in log_info.call_args_list)
 
     record = log_score_parity(
@@ -206,6 +210,8 @@ def test_parity_delta_recorded_and_logged():
         legacy_score=72.5,
         engine_score=60.0,
         factors=_mock_scoring_result().factors,
+        legacy_signals=legacy_signals,
+        scan_id="manual",
     )
     assert record.parity_delta == 12.5
 
@@ -219,11 +225,11 @@ def test_engine_path_per_bucket_parity_summary():
         Bucket.compounder: 78.0,
     }
     with (
-        patch("services.scan_scoring.USE_SCORING_ENGINE_IN_SCAN", True),
         patch("services.scan_scoring.PERSIST_SCORE_ATTRIBUTION", False),
         patch("services.scan_scoring.enrich_metrics", side_effect=_enrich_side_effect),
         patch("services.scan_scoring._apply_openbb_adjustment", side_effect=lambda score, metrics: score),
         patch("services.scan_scoring.ScoringEngine.score") as mock_engine_score,
+        patch("services.scan_scoring.legacy_parity_comparison_enabled", return_value=True),
     ):
         for bucket in (Bucket.penny, Bucket.medium, Bucket.compounder):
             ctx = _mock_ctx(f"SUM{bucket.value[:3].upper()}")
@@ -238,11 +244,13 @@ def test_engine_path_per_bucket_parity_summary():
                 quality_score=80.0,
                 strategy_version="test-v2",
                 quality_filter={"passed": True},
+                scoring_mode="parity_sample",
+                scan_id="summary-scan",
             )
             assert outcome.parity_record is not None
             records.append(outcome.parity_record)
 
-    summary = aggregate_scan_parity_summary(records)
+    summary = aggregate_scan_parity_summary(records, scoring_mode="parity_sample", sample_rate=1.0)
     assert summary is not None
     assert summary.symbol_count == 3
     assert summary.max_delta >= 0

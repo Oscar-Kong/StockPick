@@ -115,10 +115,17 @@ class ScoringEngine:
     @staticmethod
     def _build_summary(ctx: CandidateContext, sleeve: str, score: float, metrics: dict[str, Any]) -> str:
         if sleeve == "penny":
-            vol_ratio = (metrics.get("volume_ratio") or 1.0)
+            vol_ratio = metrics.get("relative_volume_ratio") or metrics.get("volume_ratio") or 1.0
+            vol_score = metrics.get("relative_volume_score") or metrics.get("volume_signal_score")
+            if vol_score is not None:
+                return (
+                    f"Short-term penny momentum play; suggested hold 3-10 days. "
+                    f"Relative volume {float(vol_ratio):.1f}x (signal {float(vol_score):.0f}/100). "
+                    f"Score {score:.0f}/100."
+                )
             return (
                 f"Short-term penny momentum play; suggested hold 3-10 days. "
-                f"Volume activity ~{vol_ratio:.1f}x baseline. Score {score:.0f}/100."
+                f"Relative volume {float(vol_ratio):.1f}x baseline. Score {score:.0f}/100."
             )
         if sleeve == "compounder":
             name = ctx.info.get("shortName") or ctx.fundamentals.get("name") or ctx.symbol

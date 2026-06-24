@@ -36,7 +36,11 @@ class Signal(BaseModel):
 class StockResult(BaseModel):
     symbol: str
     price: float
-    score: float = Field(ge=0, le=100)
+    score: float = Field(ge=0, le=100, description="Final ranking score (weighted alpha/confidence/tradability)")
+    alpha_score: float | None = Field(default=None, ge=0, le=100)
+    confidence_score: float | None = Field(default=None, ge=0, le=100)
+    tradability_score: float | None = Field(default=None, ge=0, le=100)
+    ranking_score: float | None = Field(default=None, ge=0, le=100)
     signals: list[Signal] = []
     risk_level: RiskLevel = RiskLevel.medium
     summary: str = ""

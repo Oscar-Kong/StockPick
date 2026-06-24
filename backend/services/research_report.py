@@ -185,12 +185,14 @@ def _catalysts(metrics: dict, sleeve: str) -> list[dict]:
                 "impact": "high" if days <= 7 else "medium",
             }
         )
-    if sleeve == "penny" and metrics.get("volume_ratio"):
+    vol_ratio = metrics.get("relative_volume_ratio") or metrics.get("volume_ratio")
+    if sleeve == "penny" and vol_ratio:
+        impact = "high" if float(vol_ratio) >= 3.0 else "medium"
         out.append(
             {
-                "event": "Volume activity vs baseline",
+                "event": f"Volume {float(vol_ratio):.1f}x vs 20d baseline",
                 "timing": "near-term",
-                "impact": "medium",
+                "impact": impact,
             }
         )
     if not out:

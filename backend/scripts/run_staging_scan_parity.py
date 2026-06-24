@@ -20,13 +20,16 @@ from unittest.mock import MagicMock
 import pandas as pd
 
 # Must precede config import so dotenv does not override when already exported.
-os.environ["USE_SCORING_ENGINE_IN_SCAN"] = "true"
+os.environ["SCAN_SCORING_MODE"] = "parity_sample"
+os.environ["SCAN_PARITY_SAMPLE_RATE"] = "1.0"
+os.environ.setdefault("USE_SCORING_ENGINE_IN_SCAN", "true")
 os.environ.setdefault("APP_ENV", "staging")
 os.environ.setdefault("SCORE_ENGINE_V2_ENABLED", "true")
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from config import USE_SCORING_ENGINE_IN_SCAN  # noqa: E402
+from config import SCAN_PARITY_SAMPLE_RATE, SCAN_SCORING_MODE  # noqa: E402
+from services.scan_scoring_config import resolve_scan_scoring_mode  # noqa: E402
 from models.schemas import Bucket, ScanOptions  # noqa: E402
 from screeners.base import CandidateContext  # noqa: E402
 from services.scan_manager import ScanManager  # noqa: E402
@@ -249,11 +252,12 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    if not USE_SCORING_ENGINE_IN_SCAN:
+    mode = resolve_scan_scoring_mode()
+    if mode not in ("engine", "parity_sample"):
         print(
             json.dumps(
                 {
-                    "error": "USE_SCORING_ENGINE_IN_SCAN is false — export staging env before running",
+                    "error": f"SCAN_SCORING_MODE={mode!r} — set parity_sample or engine for staging",
                     "hint": "source scripts/staging-scan-engine.env",
                 },
                 indent=2,
@@ -266,7 +270,8 @@ def main() -> int:
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "app_env": os.getenv("APP_ENV", "staging"),
-        "use_scoring_engine_in_scan": bool(USE_SCORING_ENGINE_IN_SCAN),
+        "scan_scoring_mode": mode,
+        "scan_parity_sample_rate": SCAN_PARITY_SAMPLE_RATE if mode == "parity_sample" else None,
         "mode": args.mode,
         "max_results": max_results,
         "buckets": [],

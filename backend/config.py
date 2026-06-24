@@ -84,6 +84,36 @@ REGIME_OVERLAY_ENABLED = _env_bool("REGIME_OVERLAY_ENABLED", "true")
 # --- Institutional quant v2 (phased; see docs/INSTITUTIONAL_QUANT_ARCHITECTURE.md) ---
 SCORE_ENGINE_V2_ENABLED = _env_bool("SCORE_ENGINE_V2_ENABLED", "true")
 USE_SCORING_ENGINE_IN_SCAN = _env_bool("USE_SCORING_ENGINE_IN_SCAN", "false")
+# Stage B scoring mode: legacy | engine | parity_sample (see scan_scoring_config.py).
+# When unset, falls back to legacy unless USE_SCORING_ENGINE_IN_SCAN=true → engine.
+SCAN_SCORING_MODE = os.getenv("SCAN_SCORING_MODE", "").strip().lower()
+SCAN_PARITY_SAMPLE_RATE = float(os.getenv("SCAN_PARITY_SAMPLE_RATE", "0.10"))
+
+# --- Scan final ranking (alpha / confidence / tradability) ---
+SCAN_RANKING_WEIGHTS: dict[str, dict[str, float]] = {
+    "penny": {
+        "alpha": float(os.getenv("SCAN_RANK_ALPHA_WEIGHT_PENNY", "0.65")),
+        "confidence": float(os.getenv("SCAN_RANK_CONFIDENCE_WEIGHT_PENNY", "0.20")),
+        "tradability": float(os.getenv("SCAN_RANK_TRADABILITY_WEIGHT_PENNY", "0.15")),
+    },
+    "medium": {
+        "alpha": float(os.getenv("SCAN_RANK_ALPHA_WEIGHT_MEDIUM", "0.65")),
+        "confidence": float(os.getenv("SCAN_RANK_CONFIDENCE_WEIGHT_MEDIUM", "0.20")),
+        "tradability": float(os.getenv("SCAN_RANK_TRADABILITY_WEIGHT_MEDIUM", "0.15")),
+    },
+    "compounder": {
+        "alpha": float(os.getenv("SCAN_RANK_ALPHA_WEIGHT_COMPOUNDER", "0.60")),
+        "confidence": float(os.getenv("SCAN_RANK_CONFIDENCE_WEIGHT_COMPOUNDER", "0.25")),
+        "tradability": float(os.getenv("SCAN_RANK_TRADABILITY_WEIGHT_COMPOUNDER", "0.15")),
+    },
+}
+SCAN_MAX_PER_SECTOR = int(os.getenv("SCAN_MAX_PER_SECTOR", "3"))
+SCAN_MAX_PER_CORRELATION_CLUSTER = int(os.getenv("SCAN_MAX_PER_CORRELATION_CLUSTER", "2"))
+SCAN_CORRELATION_CLUSTER_THRESHOLD = float(os.getenv("SCAN_CORRELATION_CLUSTER_THRESHOLD", "0.75"))
+SCAN_PERSISTENCE_DELTA = float(os.getenv("SCAN_PERSISTENCE_DELTA", "3.0"))
+SCAN_MIN_RESULTS_AFTER_DIVERSIFICATION = int(os.getenv("SCAN_MIN_RESULTS_AFTER_DIVERSIFICATION", "3"))
+SCAN_PENNY_LOW_CONFIDENCE_MAX = int(os.getenv("SCAN_PENNY_LOW_CONFIDENCE_MAX", "2"))
+SCAN_PENNY_LOW_CONFIDENCE_THRESHOLD = float(os.getenv("SCAN_PENNY_LOW_CONFIDENCE_THRESHOLD", "45.0"))
 PERSIST_SCORE_ATTRIBUTION = _env_bool("PERSIST_SCORE_ATTRIBUTION", "true")
 _default_model_version = (
     "quant-v2-round2" if os.getenv("SLEEVE_FACTORS_V3_ENABLED", "false").lower() in ("1", "true", "yes")
@@ -292,6 +322,8 @@ PENNY_MARKET_CAP_MIN = float(os.getenv("PENNY_MARKET_CAP_MIN", "100000000"))
 PENNY_MARKET_CAP_MAX = float(os.getenv("PENNY_MARKET_CAP_MAX", "300000000"))
 PENNY_MIN_DATA_QUALITY_SCORE = float(os.getenv("PENNY_MIN_DATA_QUALITY_SCORE", "45"))
 PENNY_MIN_SPREAD_SCORE = float(os.getenv("PENNY_MIN_SPREAD_SCORE", "35"))
+# Hard-reject only when intraday range proxy exceeds this % of price (extreme illiquidity).
+PENNY_MAX_SPREAD_PCT = float(os.getenv("PENNY_MAX_SPREAD_PCT", "15.0"))
 
 # --- Medium bucket (deprecated — kept for historical data compatibility) ---
 MEDIUM_PRICE_MIN = float(os.getenv("MEDIUM_PRICE_MIN", "10.0"))
@@ -311,6 +343,13 @@ UNIVERSE_SCAN_BATCH_SIZE = int(os.getenv("UNIVERSE_SCAN_BATCH_SIZE", "100"))
 SCAN_STAGE_B_TOP_N = int(os.getenv("SCAN_STAGE_B_TOP_N", "50"))
 SCAN_STAGE_B_TOP_N_FAST = int(os.getenv("SCAN_STAGE_B_TOP_N_FAST", "15"))
 SCAN_PRICE_DOWNLOAD_MAX_SECONDS = float(os.getenv("SCAN_PRICE_DOWNLOAD_MAX_SECONDS", "45"))
+# Bucket-specific OHLC horizons for two-stage scans (Stage A cheap filter → Stage B deep).
+SCAN_PENNY_STAGE_A_PERIOD = os.getenv("SCAN_PENNY_STAGE_A_PERIOD", "6mo")
+SCAN_PENNY_STAGE_B_PERIOD = os.getenv("SCAN_PENNY_STAGE_B_PERIOD", "6mo")
+SCAN_COMPOUNDER_STAGE_A_PERIOD = os.getenv("SCAN_COMPOUNDER_STAGE_A_PERIOD", "1y")
+SCAN_COMPOUNDER_STAGE_B_PERIOD = os.getenv("SCAN_COMPOUNDER_STAGE_B_PERIOD", "5y")
+# Reuse reconciled fundamental snapshots when younger than this many calendar days.
+FUNDAMENTAL_SNAPSHOT_MAX_AGE_DAYS = int(os.getenv("FUNDAMENTAL_SNAPSHOT_MAX_AGE_DAYS", "1"))
 # Stop Stage B deep-scoring after this many seconds and return partial ranked results.
 SCAN_STAGE_B_TIME_BUDGET_SECONDS = float(os.getenv("SCAN_STAGE_B_TIME_BUDGET_SECONDS", "0"))
 

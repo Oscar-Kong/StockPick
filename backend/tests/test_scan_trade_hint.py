@@ -49,3 +49,23 @@ def test_attach_trade_hint_to_metrics():
     assert metrics["buy_pct"] + metrics["wait_pct"] == 100.0
     assert metrics["recommendation"]
     assert metrics["trade_hint_reason"]
+
+
+def test_penny_trade_hint_uses_raw_volume_ratio_in_reason():
+    hint = compute_scan_trade_hint(
+        score=72.0,
+        sleeve="penny",
+        risk_level=RiskLevel.high,
+        data_quality_score=75.0,
+        metrics={
+            "relative_volume_ratio": 3.2,
+            "relative_volume_score": 100.0,
+            "atr_percent": 7.4,
+            "average_dollar_volume_20d": 4_800_000,
+        },
+    )
+    reason = hint["trade_hint_reason"]
+    assert "3.2x" in reason
+    assert "100/100" in reason or "100" in reason
+    assert "7.4%" in reason
+    assert "4.8M" in reason

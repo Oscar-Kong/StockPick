@@ -1,0 +1,162 @@
+{
+  "run_id": "scan_evaluation:31c12524a160",
+  "run_type": "scan_evaluation",
+  "comparison_id": "cmp1",
+  "created_at": "2024-06-01T00:00:00",
+  "bucket": "penny",
+  "algorithm_versions": [
+    "alphabetical_baseline",
+    "stage_a_v2"
+  ],
+  "config": {
+    "max_universe": 8,
+    "max_symbols": 8,
+    "stage_b_cap": 8,
+    "max_results": 5,
+    "forward_horizons": [
+      5
+    ],
+    "rebalance_frequency": "monthly",
+    "algorithm_versions": [
+      "alphabetical_baseline",
+      "stage_a_v2"
+    ],
+    "apply_penny_friction": true,
+    "spread_bps": 50,
+    "slippage_bps": 25,
+    "start_date": "2024-03-01",
+    "end_date": "2024-05-01",
+    "output_dir": "/private/var/folders/v9/ph69prj576x6g3rq1h4bnq200000gn/T/pytest-of-ok/pytest-129/test_runner_calls_harness_not_0/scan_eval"
+  },
+  "comparison": {
+    "versions": [
+      "alphabetical_baseline",
+      "stage_a_v2"
+    ],
+    "summaries": {
+      "alphabetical_baseline": {
+        "rebalance_count": 2,
+        "stage_a_recall": {
+          "mean_recall_at_10": 0.1,
+          "mean_recall_at_20": 0.2,
+          "mean_recall_at_50": 0.3
+        },
+        "horizons": {
+          "5": {
+            "mean_hit_rate": 0.5,
+            "mean_rank_ic": 0.02
+          }
+        }
+      },
+      "stage_a_v2": {
+        "rebalance_count": 2,
+        "stage_a_recall": {
+          "mean_recall_at_10": 0.4,
+          "mean_recall_at_20": 0.5,
+          "mean_recall_at_50": 0.6
+        },
+        "horizons": {
+          "5": {
+            "mean_hit_rate": 0.6,
+            "mean_rank_ic": 0.08
+          }
+        }
+      }
+    },
+    "metrics_table": [
+      {
+        "algorithm_version": "alphabetical_baseline",
+        "rebalance_count": 2,
+        "recall_at_10": 0.1,
+        "recall_at_20": 0.2,
+        "recall_at_50": 0.3,
+        "mean_rank_ic_20": 0.02,
+        "mean_hit_rate_20": 0.5,
+        "mean_avg_forward_return_20": null,
+        "mean_turnover_20": null
+      },
+      {
+        "algorithm_version": "stage_a_v2",
+        "rebalance_count": 2,
+        "recall_at_10": 0.4,
+        "recall_at_20": 0.5,
+        "recall_at_50": 0.6,
+        "mean_rank_ic_20": 0.08,
+        "mean_hit_rate_20": 0.6,
+        "mean_avg_forward_return_20": null,
+        "mean_turnover_20": null
+      }
+    ]
+  },
+  "full_runs": {
+    "alphabetical_baseline": {
+      "experiment_id": "baseline",
+      "summary": {},
+      "candidates": [],
+      "caveats": [],
+      "run_id": "scan_evaluation:31c12524a160"
+    },
+    "stage_a_v2": {
+      "experiment_id": "stage_a_v2",
+      "summary": {},
+      "candidates": [],
+      "caveats": [],
+      "run_id": "scan_evaluation:31c12524a160"
+    }
+  },
+  "caveats": [
+    "Evaluation experiments do not automatically modify the production scan configuration."
+  ],
+  "artifact_paths": {
+    "root": "data/scan_eval/scan_evaluation:31c12524a160",
+    "charts": "data/scan_eval/scan_evaluation:31c12524a160/charts.json",
+    "per_version": {
+      "alphabetical_baseline": {
+        "json": "data/scan_eval/scan_evaluation:31c12524a160/alphabetical_baseline/baseline_summary.json",
+        "csv": "data/scan_eval/scan_evaluation:31c12524a160/alphabetical_baseline/baseline_candidates.csv",
+        "markdown": "data/scan_eval/scan_evaluation:31c12524a160/alphabetical_baseline/baseline_report.md",
+        "charts": "data/scan_eval/scan_evaluation:31c12524a160/alphabetical_baseline/baseline_charts.json"
+      },
+      "stage_a_v2": {
+        "json": "data/scan_eval/scan_evaluation:31c12524a160/stage_a_v2/stage_a_v2_summary.json",
+        "csv": "data/scan_eval/scan_evaluation:31c12524a160/stage_a_v2/stage_a_v2_candidates.csv",
+        "markdown": "data/scan_eval/scan_evaluation:31c12524a160/stage_a_v2/stage_a_v2_report.md",
+        "charts": "data/scan_eval/scan_evaluation:31c12524a160/stage_a_v2/stage_a_v2_charts.json"
+      }
+    }
+  },
+  "production_impact": "none \u2014 evidence only",
+  "purpose": "offline_scan_selection_evaluation",
+  "quant_lab": {
+    "mode": "comparison",
+    "algorithm_versions": [
+      "alphabetical_baseline",
+      "stage_a_v2"
+    ],
+    "comparison_table": [
+      {
+        "algorithm_version": "alphabetical_baseline",
+        "rebalance_count": 2,
+        "recall_at_10": 0.1,
+        "recall_at_20": 0.2,
+        "recall_at_50": 0.3,
+        "mean_rank_ic_20": 0.02,
+        "mean_hit_rate_20": 0.5,
+        "mean_avg_forward_return_20": null,
+        "mean_turnover_20": null
+      },
+      {
+        "algorithm_version": "stage_a_v2",
+        "rebalance_count": 2,
+        "recall_at_10": 0.4,
+        "recall_at_20": 0.5,
+        "recall_at_50": 0.6,
+        "mean_rank_ic_20": 0.08,
+        "mean_hit_rate_20": 0.6,
+        "mean_avg_forward_return_20": null,
+        "mean_turnover_20": null
+      }
+    ],
+    "rebalance_count": 2
+  }
+}

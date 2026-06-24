@@ -11,7 +11,6 @@ import {
 } from "@/lib/api";
 import { RecommendationBadge } from "@/components/badges/RecommendationBadge";
 import { RiskBadge } from "@/components/badges/RiskBadge";
-import { ScoreBadge } from "@/components/badges/ScoreBadge";
 import { ScoreSourceBadge } from "@/components/ScoreSourceBadge";
 import { FactorAttributionTable } from "@/components/quant/FactorAttributionTable";
 import { BacktestPanel } from "./BacktestPanel";
@@ -19,6 +18,7 @@ import { DataQualityBadge } from "./DataQualityBadge";
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
 import { ResearchReport } from "./ResearchReport";
 import { ScanPickSummaryCell } from "./ScanPickSummaryCell";
+import { ScanScoreBreakdown } from "@/components/scan/ScanScoreBreakdown";
 import { ScanTradeHintCell } from "@/components/scan/ScanTradeHintCell";
 import { ScoreBreakdown } from "./ScoreBreakdown";
 import { UnifiedRiskPanel } from "./UnifiedRiskPanel";
@@ -39,6 +39,7 @@ import type {
   UnifiedRiskV2,
   V2ScoreResponse,
 } from "@/lib/types";
+import { formatPennyLiquidity, hasPennyLiquidityMetrics } from "@/lib/pennyMetrics";
 import { useTranslation, useTRef } from "@/lib/i18n";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -214,6 +215,11 @@ export function StockDetailDrawer({
     .sort((a, b) => a.contribution - b.contribution)
     .slice(0, 2);
 
+  const pennyLiquidity =
+    bucket === "penny" && hasPennyLiquidityMetrics(stock.metrics)
+      ? formatPennyLiquidity(stock.metrics)
+      : null;
+
   return (
     <DetailDrawer
       open
@@ -230,7 +236,7 @@ export function StockDetailDrawer({
           <dl className="grid gap-3 sm:grid-cols-2">
             <StatTile
               label={t.common.score}
-              value={<ScoreBadge score={stock.score} />}
+              value={<ScanScoreBreakdown stock={stock} />}
             />
             <StatTile
               label={t.analysis.scoreSourceLabel}
@@ -264,6 +270,44 @@ export function StockDetailDrawer({
             flags={(stock.metrics?.data_quality_flags as string[] | undefined) ?? undefined}
           />
           <ScanPickSummaryCell stock={stock} variant="drawer" />
+          {pennyLiquidity && (
+            <div className="rounded-lg border border-zinc-800/80 bg-zinc-900/40 p-3">
+              <h3 className="mb-2 text-xs font-semibold uppercase text-zinc-500">{t.scanDrawer.liquidityTitle}</h3>
+              <dl className="grid gap-2 text-xs sm:grid-cols-2">
+                {pennyLiquidity.relativeVolume && (
+                  <div>
+                    <dt className="text-zinc-500">{t.scanDrawer.relativeVolume}</dt>
+                    <dd className="font-medium text-zinc-200">{pennyLiquidity.relativeVolume}</dd>
+                  </div>
+                )}
+                {pennyLiquidity.volumeSignalScore && (
+                  <div>
+                    <dt className="text-zinc-500">{t.scanDrawer.volumeSignalScore}</dt>
+                    <dd className="font-medium text-zinc-200">{pennyLiquidity.volumeSignalScore}</dd>
+                  </div>
+                )}
+                {pennyLiquidity.averageDollarVolume && (
+                  <div>
+                    <dt className="text-zinc-500">{t.scanDrawer.averageDollarVolume}</dt>
+                    <dd className="font-medium text-zinc-200">{pennyLiquidity.averageDollarVolume}</dd>
+                  </div>
+                )}
+                {pennyLiquidity.atr && (
+                  <div>
+                    <dt className="text-zinc-500">{t.scanDrawer.atrLabel}</dt>
+                    <dd className="font-medium text-zinc-200">{pennyLiquidity.atr}</dd>
+                  </div>
+                )}
+              </dl>
+              {pennyLiquidity.warnings.length > 0 && (
+                <ul className="mt-2 space-y-0.5 text-xs text-amber-200/80">
+                  {pennyLiquidity.warnings.slice(0, 4).map((w) => (
+                    <li key={w}>{w.replace(/_/g, " ")}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
           {topPositive.length > 0 && (
             <div>
               <h3 className="mb-1 text-xs font-semibold uppercase text-zinc-500">{t.scanDrawer.topFactors}</h3>

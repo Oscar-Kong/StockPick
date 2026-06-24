@@ -85,7 +85,7 @@ def test_facade_score_matches_scan_stage_b_with_engine_off():
     """When USE_SCORING_ENGINE_IN_SCAN is false (the production default),
     the canonical facade must return the same numeric score, risk, and
     signal list as `score_stage_b_candidate` for the same inputs."""
-    with patch("services.scan_scoring.USE_SCORING_ENGINE_IN_SCAN", False):
+    with patch("services.scan_scoring.resolve_scan_scoring_mode", return_value="legacy"):
         ctx_a = _ctx("AAA")
         scan_screener = _screener_returning(72.0)
         scan_outcome = score_stage_b_candidate(
@@ -123,7 +123,7 @@ def test_facade_defaults_quality_filter_to_empty_dict():
     """Callers that omit `quality_filter` (Watchlist, Analyze) must still get
     a metrics dict with `quality_filter` present so downstream readers do
     not crash on KeyError."""
-    with patch("services.scan_scoring.USE_SCORING_ENGINE_IN_SCAN", False):
+    with patch("services.scan_scoring.resolve_scan_scoring_mode", return_value="legacy"):
         outcome = score_symbol_canonical(
             ctx=_ctx("BBB"),
             screener=_screener_returning(60.0),
@@ -142,7 +142,7 @@ def test_facade_falls_back_to_default_strategy_version_when_omitted():
     fake = MagicMock()
     fake.get_active.return_value = MagicMock(version_id="vAuto")
     with patch("data.strategy_registry.StrategyRegistry", return_value=fake), patch(
-        "services.scan_scoring.USE_SCORING_ENGINE_IN_SCAN", False
+        "services.scan_scoring.resolve_scan_scoring_mode", return_value="legacy"
     ):
         outcome = score_symbol_canonical(
             ctx=_ctx("CCC"),
@@ -186,7 +186,7 @@ def test_facade_propagates_engine_flag_when_enabled():
         summary="engine",
         metrics={},
     )
-    with patch("services.scan_scoring.USE_SCORING_ENGINE_IN_SCAN", True), patch(
+    with patch("services.scan_scoring.resolve_scan_scoring_mode", return_value="engine"), patch(
         "services.scan_scoring.ScoringEngine.score", return_value=fake_scoring
     ):
         outcome = score_symbol_canonical(
