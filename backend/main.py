@@ -43,6 +43,7 @@ from api.routes_trades import router as trades_router
 from api.routes_trader_intel import router as trader_intel_router
 from api.routes_research import router as research_router
 from api.routes_research_lab import router as research_lab_router
+from api.routes_ops_notifications import router as ops_notifications_router
 from api.routes_settings import router as settings_router
 from api.routes_v2 import router as v2_router
 from api.routes_watchlist import router as watchlist_router
@@ -69,6 +70,7 @@ from config import (
     PRIMARY_PRICE_SOURCE,
     QUANDL_API_KEY,
     SCHEDULER_ENABLED,
+    SCAN_EMAIL_ENABLED,
 )
 from data.cache import init_db
 from models.schemas import HealthResponse
@@ -135,6 +137,7 @@ app.include_router(v2_router)
 app.include_router(research_router)
 app.include_router(research_lab_router)
 app.include_router(settings_router)
+app.include_router(ops_notifications_router)
 
 
 def _deferred_startup() -> None:
@@ -172,7 +175,7 @@ def _deferred_startup() -> None:
         except Exception as exc:
             logging.warning("OpenBB warmup skipped: %s", exc)
 
-    if SCHEDULER_ENABLED:
+    if SCHEDULER_ENABLED or SCAN_EMAIL_ENABLED:
         try:
             from services.scheduler import start_scheduler
 

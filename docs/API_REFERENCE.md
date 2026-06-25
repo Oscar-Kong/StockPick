@@ -136,6 +136,16 @@ Configured via `RESEARCH_MAX_ORDINARY_MODIFIER` (default `0` = display-only).
 
 No proposal auto-applies to production configuration.
 
+## Ops — Morning scan email
+
+Protected ops routes for the daily scan digest. `POST /send` requires non-demo mode (`require_non_demo_mode`).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/ops/notifications/morning-scan/send` | Send or dry-run email. Body: `{ "force": false, "dry_run": false }` |
+| `GET` | `/ops/notifications/morning-scan/status` | Enabled flag, masked recipient, schedule, last delivery, scan freshness |
+| `GET` | `/ops/notifications/morning-scan/history?limit=20` | Recent delivery attempts (no secrets) |
+
 ## Related legacy Quant Lab endpoints
 
 See [QUANT_LAB.md](./QUANT_LAB.md) for `/api/v2/quant-lab/evidence`, `/research/walk-forward`, `/research/pairs`, factor performance, and model admin routes.

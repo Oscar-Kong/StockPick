@@ -73,6 +73,7 @@ Use the **exact** production origin (comma-separated for multiple).
 ## D. Free-tier limitations
 
 - **Render sleeps** after ~15 minutes of inactivity; first request may take 30–90s.
+- **Morning scan email** at 9:20 AM ET requires an always-on backend **or** an external cron hitting `POST /ops/notifications/morning-scan/send` (see [RUNBOOK](RUNBOOK.md#morning-scan-email)).
 - **SQLite on Render Free** is **ephemeral** — redeploys/restarts can reset saved watchlist/scans.
 - **Shared demo** — no private accounts; all visitors see the same sample portfolio.
 - **Heavy jobs** (scheduler, IC panel, LEAN, unrestricted scans) are disabled or rate-limited.
@@ -107,6 +108,11 @@ Use the **exact** production origin (comma-separated for multiple).
 | `FINRL_ENABLED` | Render | No | No | FinRL | `false` |
 | `LEAN_EXPORT_ENABLED` | Render | No | No | LEAN export | `false` |
 | `SCHEDULER_ENABLED` | Render | No | No | Background scheduler | `false` |
+| `SCAN_EMAIL_ENABLED` | Render | No | No | Morning scan email job | `false` |
+| `SCAN_EMAIL_TO` | Render | When email on | No | Recipient(s) | — |
+| `SMTP_USER` | Render | When email on | No | Gmail address | — |
+| `SMTP_PASSWORD` | Render | When email on | **Secret** | Gmail App Password | dashboard |
+| `APP_PUBLIC_URL` | Vercel/Render | When email on | No | Public app URL for email links | your Vercel URL |
 
 \*At least one market-data key is recommended for live quotes; AkShare may work without keys for limited US data.
 

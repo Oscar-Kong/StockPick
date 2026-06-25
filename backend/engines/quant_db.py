@@ -14,6 +14,8 @@ from engines.quant_models import (
     FactorLineage,
     FeatureProvenance,
     JobQueueItem,
+    NotificationDelivery,
+    NotificationSentLock,
     PairsResearchRun,
     PositionRecommendation,
     PredictionOutcome,

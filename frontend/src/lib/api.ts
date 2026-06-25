@@ -60,6 +60,8 @@ import type {
   PairsResearchRequest,
   PairsResearchResponse,
   SchedulerStatusResponse,
+  MorningScanEmailSendResponse,
+  MorningScanEmailStatusResponse,
   V2VersionResponse,
   V2AuditResponse,
   V2FactorsAdminResponse,
@@ -925,6 +927,34 @@ export async function getQuantLabEvidence(
 export async function getSchedulerStatus(options?: V2RequestOptions): Promise<SchedulerStatusResponse> {
   const raw = await request<unknown>("/data/scheduler/status", { signal: options?.signal });
   return normalizeSchedulerStatusResponse(raw);
+}
+
+export async function getMorningScanEmailStatus(
+  options?: V2RequestOptions
+): Promise<MorningScanEmailStatusResponse> {
+  return request<MorningScanEmailStatusResponse>("/ops/notifications/morning-scan/status", {
+    signal: options?.signal,
+  });
+}
+
+export async function previewMorningScanEmail(
+  options?: V2RequestOptions
+): Promise<MorningScanEmailSendResponse> {
+  return request<MorningScanEmailSendResponse>("/ops/notifications/morning-scan/send", {
+    method: "POST",
+    signal: options?.signal,
+    body: JSON.stringify({ force: false, dry_run: true }),
+  });
+}
+
+export async function sendMorningScanEmailTest(
+  options?: V2RequestOptions
+): Promise<MorningScanEmailSendResponse> {
+  return request<MorningScanEmailSendResponse>("/ops/notifications/morning-scan/send", {
+    method: "POST",
+    signal: options?.signal,
+    body: JSON.stringify({ force: true, dry_run: false }),
+  });
 }
 
 export function runSchedulerDailyPipeline(

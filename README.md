@@ -192,6 +192,23 @@ Optional LLM profile tuning:
 | `BACKTEST_INSTITUTIONAL` | `true` | Costs/slippage in institutional backtests |
 | `AI_REPORT_SCHEMA` | `v2` | Structured 10-section research report |
 
+### Morning scan email
+
+Pre-market summary at **9:20 AM America/New_York** (Mon–Fri, XNYS calendar). Controlled separately from `SCHEDULER_ENABLED`.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `SCAN_EMAIL_ENABLED` | `false` | Enable scheduled + manual morning email |
+| `SCAN_EMAIL_TO` | — | Comma-separated recipient addresses |
+| `SCAN_EMAIL_FROM` | — | Sender (`Name <email>` — must match Gmail or a Send-as alias) |
+| `SCAN_EMAIL_BUCKETS` | `penny,compounder` | Buckets included in the digest |
+| `SCAN_EMAIL_TOP_N` | `5` | Top candidates per bucket |
+| `SMTP_USER` | — | Gmail address for SMTP auth |
+| `SMTP_PASSWORD` | — | Gmail App Password (server secret) |
+| `APP_PUBLIC_URL` | `http://127.0.0.1:18730` | Links in the email body |
+
+Ops: Settings → **Ops**, or `GET /ops/notifications/morning-scan/status`. Dry-run: `POST /ops/notifications/morning-scan/send` with `{"dry_run":true}`. See [RUNBOOK](docs/RUNBOOK.md#morning-scan-email).
+
 ## Key Product Features
 
 - Bucket scans with async progress polling

@@ -108,6 +108,9 @@ Important for local dev:
 | Variable            | Suggested local                   |
 | ------------------- | --------------------------------- |
 | `SCHEDULER_ENABLED` | `false` — less background load    |
+| `SCAN_EMAIL_ENABLED` | `false` — morning scan email off locally |
+| `SCAN_EMAIL_TO` | recipient(s), comma-separated when enabling email |
+| `SMTP_USER` / `SMTP_PASSWORD` | Gmail + App Password when using SMTP |
 | `OPENBB_ON_SCAN`    | `false` — faster bulk scans       |
 | `OPENBB_ENABLED`    | `true` only when OpenBB installed |
 | Quant flags         | keep `false` until deps installed |
@@ -392,6 +395,56 @@ With `PYPFOPT_ENABLED=false` or package missing, a fallback optimizer runs by de
 - Install: `pip install -r requirements-openbb.txt`
 - Verify: `python backend/scripts/verify_openbb.py`
 - See [OPENBB.md](OPENBB.md)
+
+---
+
+---
+
+## Morning scan email
+
+Scheduled job `morning_scan_email` sends a digest of the **latest persisted** scan results for configured buckets (`SCAN_EMAIL_BUCKETS`, default `penny,compounder`). It does **not** launch a new universe scan.
+
+| Setting | Default | Notes |
+|---------|---------|-------|
+| `SCAN_EMAIL_ENABLED` | `false` | Independent of `SCHEDULER_ENABLED` |
+| `SCAN_EMAIL_CRON` | `20 9 * * 1-5` | Interpreted in `SCAN_EMAIL_TIMEZONE` |
+| `SCAN_EMAIL_TIMEZONE` | `America/New_York` | DST-safe IANA zone |
+| `SCAN_EMAIL_STALE_AFTER_MINUTES` | `1440` | Marks cached scans as stale in the email |
+| `SCAN_EMAIL_RETRY_DELAY_MINUTES` | `5` | Retry when a scan is still running at 9:20 |
+| `SCAN_EMAIL_MAX_RETRIES` | `3` | Max retries before sending best available |
+
+**Gmail SMTP setup:** enable 2-Step Verification on your Google account, create an [App Password](https://myaccount.google.com/apppasswords), then set:
+
+```env
+SCAN_EMAIL_PROVIDER=smtp
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=you@gmail.com
+SMTP_PASSWORD=your-16-char-app-password
+SMTP_USE_TLS=true
+SCAN_EMAIL_FROM=StockPick <you@gmail.com>
+SCAN_EMAIL_TO=you@gmail.com
+```
+
+`SCAN_EMAIL_FROM` must match `SMTP_USER`, or a **Send mail as** alias configured in Gmail settings. Northeastern/other addresses work as **recipients** (`SCAN_EMAIL_TO`) but not as the SMTP sender unless added as a Gmail alias.
+
+**Manual / test:**
+
+```bash
+# Dry-run (build template, no provider call)
+curl -X POST http://127.0.0.1:18730/ops/notifications/morning-scan/send \
+  -H 'Content-Type: application/json' \
+  -d '{"force":false,"dry_run":true}'
+
+# Force test send (respects demo guard; blocked when DEMO_MODE=true)
+curl -X POST http://127.0.0.1:18730/ops/notifications/morning-scan/send \
+  -H 'Content-Type: application/json' \
+  -d '{"force":true,"dry_run":false}'
+```
+
+**Production reliability:** Render Free web services sleep when idle — the in-process APScheduler cannot guarantee 9:20 AM delivery unless the backend is always on. For reliable delivery, either run an always-on backend or configure an **external cron** (GitHub Actions, cron-job.org, etc.) to `POST /ops/notifications/morning-scan/send` on trading days. Do not expose an unauthenticated public cron URL.
+
+Status: `GET /ops/notifications/morning-scan/status` · History: `GET /ops/notifications/morning-scan/history` · UI: Settings → **Ops**.
 
 ---
 

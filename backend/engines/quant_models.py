@@ -489,6 +489,46 @@ class FactorLineage(QuantBase):
     created_at = Column(DateTime, nullable=False, default=_utcnow)
 
 
+class NotificationDelivery(QuantBase):
+    """Persisted notification delivery attempts (morning scan email, etc.)."""
+
+    __tablename__ = "notification_deliveries"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    notification_type = Column(String(64), nullable=False, index=True)
+    market_date = Column(String(10), nullable=False, index=True)
+    scheduled_for = Column(DateTime, nullable=True)
+    recipient_hash = Column(String(64), nullable=False, index=True)
+    delivery_kind = Column(String(16), nullable=False, default="primary")
+    status = Column(String(16), nullable=False, default="pending")
+    provider = Column(String(32), nullable=False, default="")
+    provider_message_id = Column(String(128), nullable=True)
+    attempt_count = Column(Integer, nullable=False, default=0)
+    scan_ids_json = Column(Text, nullable=False, default="{}")
+    error_code = Column(String(64), nullable=True)
+    error_summary = Column(Text, nullable=True)
+    is_resend = Column(Boolean, nullable=False, default=False)
+    is_dry_run = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, nullable=False, default=_utcnow)
+    sent_at = Column(DateTime, nullable=True)
+
+
+class NotificationSentLock(QuantBase):
+    """One successful primary delivery per notification type + market date + recipient."""
+
+    __tablename__ = "notification_sent_locks"
+    __table_args__ = (
+        UniqueConstraint("notification_type", "market_date", "recipient_hash", name="uq_notification_sent_lock"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    notification_type = Column(String(64), nullable=False)
+    market_date = Column(String(10), nullable=False)
+    recipient_hash = Column(String(64), nullable=False)
+    delivery_id = Column(Integer, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=_utcnow)
+
+
 class ChangeProposal(QuantBase):
     __tablename__ = "change_proposals"
 

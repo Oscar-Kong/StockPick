@@ -308,6 +308,16 @@ class ScanManager:
         with self._lock:
             return self._jobs.get(job_id)
 
+    def get_active_jobs_for_buckets(self, buckets: tuple[str, ...] | list[str]) -> list[ScanJob]:
+        allowed = {b.lower() for b in buckets}
+        with self._lock:
+            return [
+                job
+                for job in self._jobs.values()
+                if job.bucket.value in allowed
+                and job.status in (ScanStatus.pending, ScanStatus.running)
+            ]
+
     def get_latest_scan(self, bucket: Bucket) -> dict | None:
         latest = cache_module.get_latest_scan(bucket.value)
         if latest:

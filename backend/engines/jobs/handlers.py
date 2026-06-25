@@ -42,6 +42,17 @@ def _home_refresh(payload: dict[str, Any]) -> dict[str, Any]:
     return refresh_home_dashboard(force=bool(payload.get("force")))
 
 
+def _morning_scan_email(payload: dict[str, Any]) -> dict[str, Any]:
+    from services.morning_scan_email_service import run_morning_scan_email_sync
+
+    return run_morning_scan_email_sync(
+        force=bool(payload.get("force")),
+        dry_run=bool(payload.get("dry_run")),
+        retry_attempt=int(payload.get("retry_attempt") or 0),
+        source=str(payload.get("source") or "job_queue"),
+    )
+
+
 JOB_HANDLERS: dict[str, JobHandler] = {
     "quant_daily_jobs": _quant_daily,
     "daily_pipeline": _daily_pipeline,
@@ -49,6 +60,7 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "market_data_price_refresh": _market_data_price_refresh,
     "penny_scan_refresh": _penny_scan_refresh,
     "home_refresh": _home_refresh,
+    "morning_scan_email": _morning_scan_email,
 }
 
 

@@ -783,6 +783,58 @@ class SchedulerStatusResponse(BaseModel):
     quandl_configured: bool = False
 
 
+class MorningScanEmailDeliveryItem(BaseModel):
+    id: int
+    notification_type: str
+    market_date: str
+    status: str
+    provider: str = ""
+    attempt_count: int = 0
+    error_code: str | None = None
+    error_summary: str | None = None
+    is_resend: bool = False
+    is_dry_run: bool = False
+    created_at: str | None = None
+    sent_at: str | None = None
+
+
+class MorningScanEmailStatusResponse(BaseModel):
+    enabled: bool = False
+    configured: bool = False
+    config_errors: list[str] = []
+    provider: str = "smtp"
+    recipient_masked: str = "—"
+    schedule_label: str = "9:20 AM ET"
+    cron: str = "20 9 * * 1-5"
+    timezone: str = "America/New_York"
+    buckets: list[str] = []
+    top_n: int = 5
+    scheduler_active: bool = False
+    next_run_at: str | None = None
+    last_successful_delivery: MorningScanEmailDeliveryItem | None = None
+    last_attempted_delivery: MorningScanEmailDeliveryItem | None = None
+    scan_freshness: dict[str, Any] = {}
+
+
+class MorningScanEmailHistoryResponse(BaseModel):
+    items: list[MorningScanEmailDeliveryItem] = []
+
+
+class MorningScanEmailSendRequest(BaseModel):
+    force: bool = False
+    dry_run: bool = False
+
+
+class MorningScanEmailSendResponse(BaseModel):
+    status: str
+    message: str
+    delivery_id: int | None = None
+    dry_run: bool = False
+    subject: str | None = None
+    html_preview: str | None = None
+    text_preview: str | None = None
+
+
 class ExplainRequest(BaseModel):
     symbol: str
     bucket: Bucket | None = None

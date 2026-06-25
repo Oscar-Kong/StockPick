@@ -258,6 +258,27 @@ PORTFOLIO_DECISION_ENABLED = _env_bool("PORTFOLIO_DECISION_ENABLED", "true")
 PORTFOLIO_DECISION_CRON = os.getenv("PORTFOLIO_DECISION_CRON", "0 9 * * 1-5")
 PORTFOLIO_DECISION_TZ = os.getenv("PORTFOLIO_DECISION_TZ", "America/New_York")
 
+# --- Morning scan email (pre-market NY; independent of SCHEDULER_ENABLED) ---
+SCAN_EMAIL_ENABLED = _env_bool("SCAN_EMAIL_ENABLED", "false")
+SCAN_EMAIL_PROVIDER = os.getenv("SCAN_EMAIL_PROVIDER", "smtp").strip().lower()
+SCAN_EMAIL_TO = os.getenv("SCAN_EMAIL_TO", "").strip()
+SCAN_EMAIL_FROM = os.getenv("SCAN_EMAIL_FROM", "StockPick <you@gmail.com>").strip()
+SCAN_EMAIL_BUCKETS_RAW = os.getenv("SCAN_EMAIL_BUCKETS", "penny,compounder")
+SCAN_EMAIL_TOP_N = int(os.getenv("SCAN_EMAIL_TOP_N", "5"))
+SCAN_EMAIL_CRON = os.getenv("SCAN_EMAIL_CRON", "20 9 * * 1-5")
+SCAN_EMAIL_TIMEZONE = os.getenv("SCAN_EMAIL_TIMEZONE", "America/New_York")
+SCAN_EMAIL_STALE_AFTER_MINUTES = int(os.getenv("SCAN_EMAIL_STALE_AFTER_MINUTES", "1440"))
+SCAN_EMAIL_RETRY_DELAY_MINUTES = int(os.getenv("SCAN_EMAIL_RETRY_DELAY_MINUTES", "5"))
+SCAN_EMAIL_MAX_RETRIES = int(os.getenv("SCAN_EMAIL_MAX_RETRIES", "3"))
+APP_PUBLIC_URL = os.getenv("APP_PUBLIC_URL", "http://127.0.0.1:18730").rstrip("/")
+
+# Gmail / SMTP delivery for morning scan email
+SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com").strip()
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "").strip()
+SMTP_PASSWORD = _api_key("SMTP_PASSWORD")
+SMTP_USE_TLS = _env_bool("SMTP_USE_TLS", "true")
+
 # --- Market data refresh during trading hours ---
 MARKET_DATA_REFRESH_ENABLED = _env_bool("MARKET_DATA_REFRESH_ENABLED", "true")
 MARKET_DATA_REFRESH_CRON = os.getenv("MARKET_DATA_REFRESH_CRON", "*/15 9-16 * * 1-5")
@@ -396,6 +417,7 @@ else:
 # Demo-safe production defaults (override via env when self-hosting).
 if DEMO_MODE:
     SCHEDULER_ENABLED = _env_bool("SCHEDULER_ENABLED", "false")
+    SCAN_EMAIL_ENABLED = _env_bool("SCAN_EMAIL_ENABLED", "false")
     QUANT_JOBS_ENABLED = _env_bool("QUANT_JOBS_ENABLED", "false")
     LISTING_MASTER_ENABLED = _env_bool("LISTING_MASTER_ENABLED", "false")
     MARKET_DATA_REFRESH_ENABLED = _env_bool("MARKET_DATA_REFRESH_ENABLED", "false")

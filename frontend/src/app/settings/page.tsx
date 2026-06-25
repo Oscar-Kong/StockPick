@@ -3,20 +3,21 @@
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ApiSettingsPanel } from "@/components/ApiSettingsPanel";
-import { LanguageSettingsPanel } from "@/components/LanguageSettingsPanel";
 import { QuantHealthCard } from "@/components/quant/QuantHealthCard";
+import { LanguageSettingsPanel } from "@/components/LanguageSettingsPanel";
+import { MorningScanEmailPanel } from "@/components/settings/MorningScanEmailPanel";
 import { GhostButton } from "@/components/ui/buttons";
 import { useTranslation } from "@/lib/i18n";
 import clsx from "clsx";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect } from "react";
 
-export type SettingsSection = "language" | "quant-health" | "api";
+export type SettingsSection = "language" | "quant-health" | "api" | "ops";
 
-const SECTIONS: SettingsSection[] = ["language", "quant-health", "api"];
+const SECTIONS: SettingsSection[] = ["language", "quant-health", "api", "ops"];
 
 function parseSection(value: string | null): SettingsSection {
-  if (value === "quant-health" || value === "api") return value;
+  if (value === "quant-health" || value === "api" || value === "ops") return value;
   return "language";
 }
 
@@ -55,6 +56,7 @@ function SettingsContent() {
     language: t.settings.sectionLanguage,
     "quant-health": t.settings.sectionQuantHealth,
     api: t.settings.sectionApi,
+    ops: t.settings.sectionOps,
   };
 
   return (
@@ -125,6 +127,15 @@ function SettingsContent() {
                 {t.settings.apiSection}
               </h2>
               <ApiSettingsPanel />
+            </section>
+          )}
+
+          {section === "ops" && (
+            <section aria-labelledby="settings-ops-title">
+              <h2 id="settings-ops-title" className="settings-section__title">
+                {t.settings.sectionOps}
+              </h2>
+              <MorningScanEmailPanel />
             </section>
           )}
         </div>

@@ -185,6 +185,67 @@ def _scheduled_penny_scan_refresh() -> dict:
     return dispatch_job("penny_scan_refresh", {})
 
 
+def _scheduled_morning_scan_email() -> dict:
+    from config import SCAN_EMAIL_ENABLED
+
+    if not SCAN_EMAIL_ENABLED:
+        return {"skipped": True, "reason": "scan_email_disabled"}
+    if not _is_trading_session():
+        logger.info("Skipping morning scan email — not a trading session")
+        return {"skipped": True, "reason": "non_trading_day"}
+    from engines.jobs.queue import dispatch_job
+
+    return dispatch_job("morning_scan_email", {})
+
+
+def _scheduled_morning_scan_email_retry(retry_attempt: int) -> dict:
+    from services.morning_scan_email_service import run_morning_scan_email_sync
+
+    return run_morning_scan_email_sync(retry_attempt=retry_attempt, source="scheduler_retry")
+
+
+def _morning_scan_email_retry_job(retry_attempt: int) -> dict:
+    return _scheduled_morning_scan_email_retry(retry_attempt)
+
+
+def schedule_morning_scan_email_retry(retry_attempt: int, delay_minutes: int) -> None:
+    """Schedule a one-shot retry when scans are still running at send time."""
+    global _scheduler
+    if _scheduler is None:
+        logger.warning("Cannot schedule morning scan email retry — scheduler not running")
+        return
+    try:
+        from apscheduler.triggers.date import DateTrigger
+        from datetime import timedelta
+
+        run_at = datetime.now(timezone.utc) + timedelta(minutes=delay_minutes)
+        job_id = f"morning_scan_email_retry_{retry_attempt}"
+        _scheduler.add_job(
+            _morning_scan_email_retry_job,
+            DateTrigger(run_date=run_at),
+            id=job_id,
+            replace_existing=True,
+            kwargs={"retry_attempt": retry_attempt},
+        )
+        logger.info("Scheduled morning scan email retry #%s at %s", retry_attempt, run_at.isoformat())
+    except Exception as exc:
+        logger.warning("Failed to schedule morning scan email retry: %s", exc)
+
+
+def get_morning_scan_email_scheduler_info() -> dict:
+    global _scheduler
+    if _scheduler is None:
+        return {"active": False, "next_run_at": None}
+    job = _scheduler.get_job("morning_scan_email")
+    if not job:
+        return {"active": False, "next_run_at": None}
+    next_run = job.next_run_time
+    return {
+        "active": True,
+        "next_run_at": next_run.isoformat() if next_run else None,
+    }
+
+
 def start_scheduler() -> None:
     """Start APScheduler for daily jobs if SCHEDULER_ENABLED."""
     global _scheduler
@@ -197,13 +258,16 @@ def start_scheduler() -> None:
         PORTFOLIO_DECISION_CRON,
         PORTFOLIO_DECISION_ENABLED,
         PORTFOLIO_DECISION_TZ,
+        SCAN_EMAIL_CRON,
+        SCAN_EMAIL_ENABLED,
+        SCAN_EMAIL_TIMEZONE,
         SCHEDULER_CRON,
         SCHEDULER_ENABLED,
         SCHEDULER_TZ,
     )
 
-    if not SCHEDULER_ENABLED:
-        logger.info("Scheduler disabled (SCHEDULER_ENABLED=false)")
+    if not SCHEDULER_ENABLED and not SCAN_EMAIL_ENABLED:
+        logger.info("Scheduler disabled (SCHEDULER_ENABLED=false, SCAN_EMAIL_ENABLED=false)")
         return
 
     try:
@@ -216,30 +280,32 @@ def start_scheduler() -> None:
     if _scheduler is not None:
         return
 
-    _scheduler = BackgroundScheduler(timezone=SCHEDULER_TZ)
-    _scheduler.add_job(
-        _scheduled_pipeline,
-        CronTrigger.from_crontab(SCHEDULER_CRON, timezone=SCHEDULER_TZ),
-        id="daily_pipeline",
-        replace_existing=True,
-    )
+    tz = SCHEDULER_TZ if SCHEDULER_ENABLED else SCAN_EMAIL_TIMEZONE
+    _scheduler = BackgroundScheduler(timezone=tz)
+    if SCHEDULER_ENABLED:
+        _scheduler.add_job(
+            _scheduled_pipeline,
+            CronTrigger.from_crontab(SCHEDULER_CRON, timezone=SCHEDULER_TZ),
+            id="daily_pipeline",
+            replace_existing=True,
+        )
     from config import QUANT_IC_CRON, QUANT_JOBS_ENABLED
 
-    if QUANT_JOBS_ENABLED:
+    if SCHEDULER_ENABLED and QUANT_JOBS_ENABLED:
         _scheduler.add_job(
             _scheduled_quant_jobs,
             CronTrigger.from_crontab(QUANT_IC_CRON, timezone=SCHEDULER_TZ),
             id="quant_daily_jobs",
             replace_existing=True,
         )
-    if PORTFOLIO_DECISION_ENABLED:
+    if SCHEDULER_ENABLED and PORTFOLIO_DECISION_ENABLED:
         _scheduler.add_job(
             _scheduled_portfolio_decision,
             CronTrigger.from_crontab(PORTFOLIO_DECISION_CRON, timezone=PORTFOLIO_DECISION_TZ),
             id="daily_portfolio_decision",
             replace_existing=True,
         )
-    if MARKET_DATA_REFRESH_ENABLED:
+    if SCHEDULER_ENABLED and MARKET_DATA_REFRESH_ENABLED:
         _scheduler.add_job(
             _scheduled_market_data_refresh,
             CronTrigger.from_crontab(MARKET_DATA_REFRESH_CRON, timezone=MARKET_DATA_REFRESH_TZ),
@@ -252,14 +318,32 @@ def start_scheduler() -> None:
             id="penny_scan_refresh",
             replace_existing=True,
         )
+    if SCAN_EMAIL_ENABLED:
+        from services.scan_email_config import load_scan_email_settings
+
+        email_settings = load_scan_email_settings()
+        if email_settings.enabled:
+            _scheduler.add_job(
+                _scheduled_morning_scan_email,
+                CronTrigger.from_crontab(SCAN_EMAIL_CRON, timezone=SCAN_EMAIL_TIMEZONE),
+                id="morning_scan_email",
+                replace_existing=True,
+            )
+        else:
+            logger.warning(
+                "Morning scan email not scheduled — configuration invalid: %s",
+                "; ".join(email_settings.config_errors) or "disabled",
+            )
     _scheduler.start()
     logger.info(
-        "Scheduler started — pipeline '%s' (%s); portfolio decision '%s' (%s); market refresh '%s'",
-        SCHEDULER_CRON,
-        SCHEDULER_TZ,
-        PORTFOLIO_DECISION_CRON if PORTFOLIO_DECISION_ENABLED else "off",
+        "Scheduler started — pipeline '%s' (%s); scan email '%s' (%s); portfolio decision '%s' (%s); market refresh '%s'",
+        SCHEDULER_CRON if SCHEDULER_ENABLED else "off",
+        SCHEDULER_TZ if SCHEDULER_ENABLED else "—",
+        SCAN_EMAIL_CRON if SCAN_EMAIL_ENABLED else "off",
+        SCAN_EMAIL_TIMEZONE if SCAN_EMAIL_ENABLED else "—",
+        PORTFOLIO_DECISION_CRON if SCHEDULER_ENABLED and PORTFOLIO_DECISION_ENABLED else "off",
         PORTFOLIO_DECISION_TZ,
-        MARKET_DATA_REFRESH_CRON if MARKET_DATA_REFRESH_ENABLED else "off",
+        MARKET_DATA_REFRESH_CRON if SCHEDULER_ENABLED and MARKET_DATA_REFRESH_ENABLED else "off",
     )
 
 

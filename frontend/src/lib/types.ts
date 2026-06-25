@@ -1678,6 +1678,49 @@ export interface SchedulerStatusResponse {
   quandl_configured?: boolean;
 }
 
+export interface MorningScanEmailDeliveryItem {
+  id: number;
+  notification_type: string;
+  market_date: string;
+  status: string;
+  provider?: string;
+  attempt_count?: number;
+  error_code?: string | null;
+  error_summary?: string | null;
+  is_resend?: boolean;
+  is_dry_run?: boolean;
+  created_at?: string | null;
+  sent_at?: string | null;
+}
+
+export interface MorningScanEmailStatusResponse {
+  enabled: boolean;
+  configured: boolean;
+  config_errors: string[];
+  provider: string;
+  recipient_masked: string;
+  schedule_label: string;
+  cron: string;
+  timezone: string;
+  buckets: string[];
+  top_n: number;
+  scheduler_active: boolean;
+  next_run_at: string | null;
+  last_successful_delivery: MorningScanEmailDeliveryItem | null;
+  last_attempted_delivery: MorningScanEmailDeliveryItem | null;
+  scan_freshness: Record<string, { cache_age_seconds?: number | null; stale?: boolean }>;
+}
+
+export interface MorningScanEmailSendResponse {
+  status: string;
+  message: string;
+  delivery_id?: number | null;
+  dry_run?: boolean;
+  subject?: string | null;
+  html_preview?: string | null;
+  text_preview?: string | null;
+}
+
 export interface V2VersionResponse {
   strategy_version: string;
   factor_model_version: string;
