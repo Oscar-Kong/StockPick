@@ -6,6 +6,7 @@ import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { AppTabBar, AppTabButton } from "@/components/AppTabs";
+import { PrimaryButton, SecondaryButton } from "@/components/ui/buttons";
 import {
   getDailyDashboard,
   getHomeRefreshStatus,
@@ -20,6 +21,9 @@ import { DismissibleNotice } from "@/components/ui/DismissibleNotice";
 import { useTranslation, useTRef } from "@/lib/i18n";
 import { DataFreshnessBanner } from "@/components/dashboard/daily-decision/DataFreshnessBanner";
 import { DemoDataBanner } from "@/components/dashboard/daily-decision/DemoDataBanner";
+import { CockpitStatusPill } from "@/components/dashboard/daily-decision/CockpitStatusPill";
+import { formatDateTime } from "@/lib/datetime";
+import { getCockpitStatus } from "@/lib/dailyDecisionUtils";
 import { PortfolioToday } from "./PortfolioToday";
 import { PortfolioResearch } from "./PortfolioResearch";
 import { PortfolioActivity } from "./PortfolioActivity";
@@ -257,6 +261,42 @@ export function PortfolioWorkspace() {
     return t.portfolio.tabActivity;
   };
 
+  const hasHoldings = (data?.holdings.length ?? 0) > 0;
+  const canRun = Boolean(data && hasHoldings && !data.is_demo_data);
+  const headerMeta = data
+    ? (() => {
+        const f = data.freshness;
+        const lastUpdated =
+          f?.last_decision_run_at
+            ? formatDateTime(f.last_decision_run_at)
+            : f?.last_price_update_at
+              ? formatDateTime(f.last_price_update_at)
+              : t.home.dailyNotSynced;
+        return (
+          <div className="portfolio-workspace__meta">
+            <CockpitStatusPill status={getCockpitStatus(data)} />
+            <span className="portfolio-workspace__source">{data.data_source_label}</span>
+            <span className="portfolio-workspace__sync">
+              {t.home.dailyLastUpdatedLabel}{" "}
+              <span className="finance-value">{lastUpdated}</span>
+            </span>
+          </div>
+        );
+      })()
+    : null;
+
+  const headerActions =
+    tab === "today" && data ? (
+      <div className="flex flex-wrap items-center gap-2">
+        <SecondaryButton onClick={() => void refreshData(true)} disabled={refreshing || running}>
+          {refreshing ? t.home.dailyRefreshing : t.home.dailyRefreshNow}
+        </SecondaryButton>
+        <PrimaryButton onClick={() => void runNow()} disabled={running || refreshing || !canRun}>
+          {running ? t.home.dailyRunning : t.home.dailyRunNow}
+        </PrimaryButton>
+      </div>
+    ) : null;
+
   return (
     <PageContainer className="portfolio-workspace">
       <input
@@ -273,8 +313,17 @@ export function PortfolioWorkspace() {
       <PageHeader
         title={t.portfolio.workspaceTitle}
         subtitle={t.portfolio.workspaceSubtitle}
-        actions={
-          <AppTabBar aria-label={t.portfolio.workspaceTabsAria} className="portfolio-workspace__tabs">
+        actions={headerActions}
+      />
+      {headerMeta && <div className="portfolio-workspace__meta-row">{headerMeta}</div>}
+
+      {loading && !data ? (
+        <LoadingSkeleton variant="home" />
+      ) : error && !data ? (
+        <ErrorState message={error} onRetry={() => void load()} />
+      ) : data ? (
+        <div className="portfolio-workspace__body space-y-4">
+          <AppTabBar aria-label={t.portfolio.workspaceTabsAria} className="portfolio-workspace__tab-row">
             <AppTabButton active={tab === "today"} onClick={() => setTab("today")}>
               {tabLabel("today")}
             </AppTabButton>
@@ -285,35 +334,29 @@ export function PortfolioWorkspace() {
               {tabLabel("activity")}
             </AppTabButton>
           </AppTabBar>
-        }
-      />
 
-      {loading && !data ? (
-        <LoadingSkeleton variant="home" />
-      ) : error && !data ? (
-        <ErrorState message={error} onRetry={() => void load()} />
-      ) : data ? (
-        <div className="space-y-4">
-          {error && <ErrorState message={error} onRetry={() => void load()} />}
-          {data.portfolio_warnings?.map((warning) => (
-            <DismissibleNotice
-              key={warning}
-              noticeId={homeNoticeId.portfolioWarning(warning)}
-              className="rounded-xl border border-amber-500/25 bg-amber-500/8 px-4 py-3 text-sm leading-relaxed text-amber-100"
-            >
-              {warning}
-            </DismissibleNotice>
-          ))}
-          <DataFreshnessBanner data={data} />
-          {data.is_demo_data && <DemoDataBanner />}
+          {(data.portfolio_warnings?.length ?? 0) > 0 || error || data.is_demo_data ? (
+            <div className="portfolio-workspace__notices space-y-2">
+              {error && <ErrorState message={error} onRetry={() => void load()} />}
+              {data.portfolio_warnings?.map((warning) => (
+                <DismissibleNotice
+                  key={warning}
+                  noticeId={homeNoticeId.portfolioWarning(warning)}
+                  className="rounded-xl border border-amber-500/25 bg-amber-500/8 px-4 py-3 text-sm leading-relaxed text-amber-100"
+                >
+                  {warning}
+                </DismissibleNotice>
+              ))}
+              <DataFreshnessBanner data={data} />
+              {data.is_demo_data && <DemoDataBanner />}
+            </div>
+          ) : (
+            <DataFreshnessBanner data={data} />
+          )}
 
           {tab === "today" && (
             <PortfolioToday
               data={data}
-              running={running}
-              refreshing={refreshing}
-              onRunNow={() => void runNow()}
-              onRefreshData={() => void refreshData(true)}
               onImportClick={() => {
                 setTab("activity");
                 triggerImport();

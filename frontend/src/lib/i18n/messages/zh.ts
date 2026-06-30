@@ -420,6 +420,7 @@ export const zh: Messages = {
     tabToday: "今日",
     tabResearch: "研究",
     tabActivity: "活动",
+    holdingsCountLabel: "持仓数",
     tabOptimizeShort: "优化",
     tabExposureShort: "敞口",
     tabAllocationShort: "配置",

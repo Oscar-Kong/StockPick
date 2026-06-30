@@ -427,6 +427,7 @@ export const en = {
     tabToday: "Today",
     tabResearch: "Research",
     tabActivity: "Activity",
+    holdingsCountLabel: "Holdings",
     tabOptimizeShort: "Optimize",
     tabExposureShort: "Exposure",
     tabAllocationShort: "Allocation",

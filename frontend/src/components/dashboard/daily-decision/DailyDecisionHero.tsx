@@ -1,4 +1,3 @@
-import clsx from "clsx";
 import { formatDateTime } from "@/lib/datetime";
 import { formatCurrency, getCockpitStatus } from "@/lib/dailyDecisionUtils";
 import type { DailyDashboardResponse } from "@/lib/types";
@@ -79,9 +78,21 @@ export function DailyDecisionHero({
 
 export function PortfolioSummaryStrip({ data }: { data: DailyDashboardResponse }) {
   const { t } = useTranslation();
+  const f = data.freshness;
+  const lastUpdated =
+    f?.last_decision_run_at
+      ? formatDateTime(f.last_decision_run_at)
+      : f?.last_price_update_at
+        ? formatDateTime(f.last_price_update_at)
+        : t.home.dailyNotSynced;
 
   return (
     <SummaryStrip>
+      <SummaryStripItem
+        label={t.home.dailyPortfolioValue}
+        value={formatCurrency(data.portfolio_value, { compact: true })}
+        tone="positive"
+      />
       <SummaryStripItem label={t.home.dailyCash} value={formatCurrency(data.cash, { compact: true })} />
       <SummaryStripItem
         label={t.home.dailyReservedIpo}
@@ -95,8 +106,15 @@ export function PortfolioSummaryStrip({ data }: { data: DailyDashboardResponse }
       <SummaryStripItem
         label={t.home.dailyCashPct}
         value={`${(data.cash_pct ?? 0).toFixed(1)}%`}
-        className={clsx((data.cash_pct ?? 0) > 40 && "summary-strip__item--warn")}
+        tone={(data.cash_pct ?? 0) > 40 ? "warning" : "default"}
       />
+      {data.active_holdings_count != null && (
+        <SummaryStripItem
+          label={t.portfolio.holdingsCountLabel}
+          value={String(data.active_holdings_count)}
+        />
+      )}
+      <SummaryStripItem label={t.home.dailyLastUpdatedLabel} value={lastUpdated} tone="muted" />
     </SummaryStrip>
   );
 }
