@@ -14,6 +14,7 @@ import { EvidenceToActionBoundary } from "@/components/product/EvidenceToActionB
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
+import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { ResearchOnlyBadge } from "@/components/ui/ResearchOnlyBadge";
 import type { Bucket } from "@/lib/types";
 import {
@@ -83,18 +84,32 @@ function QuantLabContent() {
         <ResearchOnlyBadge tooltip={t.quantLab.researchOnlyWarning} />
       </div>
 
-      <AppTabBar aria-label={t.quantLab.navAria} className="overflow-x-auto">
+      <AppTabBar aria-label={t.quantLab.navAria} className="quant-lab-section-tabs overflow-x-auto">
         {PRIMARY_SECTIONS.map((key) => (
           <AppTabButton key={key} active={section === key} onClick={() => setSection(key)}>
             {sectionLabel[key]}
           </AppTabButton>
         ))}
-        <AppTabButton active={section === "legacy"} onClick={() => setSection("legacy")}>
+        <AppTabButton
+          active={section === "legacy"}
+          onClick={() => setSection("legacy")}
+          className="quant-lab-section-tabs__legacy"
+        >
           {t.quantLab.navLegacy}
         </AppTabButton>
       </AppTabBar>
 
-      <div className="data-panel data-panel--padded min-h-[12rem]">
+      {section === "overview" && (
+        <CollapsibleSection title={t.quantLab.evidenceTitle} defaultOpen={false}>
+          <QuantLabEvidencePanel sleeve={sleeve} onNavigateTab={navigateEvidenceTab} />
+        </CollapsibleSection>
+      )}
+
+      <CollapsibleSection title={t.product.quantLabAffectsScanTitle} defaultOpen={false}>
+        <QuantLabScanRelationshipPanel />
+      </CollapsibleSection>
+
+      <div className="data-panel data-panel--padded min-h-0">
         {section === "overview" && (
           <OverviewTab
             sleeve={sleeve}
@@ -110,25 +125,14 @@ function QuantLabContent() {
         {section === "legacy" && <LegacyQuantLabTabs tab={legacyTab} onTabChange={setLegacyTab} />}
       </div>
 
-      {section === "overview" && (
-        <CollapsibleSection title={t.quantLab.evidenceTitle} defaultOpen={false}>
-          <QuantLabEvidencePanel sleeve={sleeve} onNavigateTab={navigateEvidenceTab} />
-        </CollapsibleSection>
-      )}
-
-      <CollapsibleSection title={t.product.quantLabAffectsScanTitle} defaultOpen={false}>
-        <QuantLabScanRelationshipPanel />
-      </CollapsibleSection>
-
       <EvidenceToActionBoundary />
     </PageContainer>
   );
 }
 
 export function QuantLabPage() {
-  const { t } = useTranslation();
   return (
-    <Suspense fallback={<div className="px-4 py-6 text-sm text-zinc-500">{t.common.loading}</div>}>
+    <Suspense fallback={<LoadingSkeleton lines={4} className="px-4 py-6" />}>
       <QuantLabContent />
     </Suspense>
   );
