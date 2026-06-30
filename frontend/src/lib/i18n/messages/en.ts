@@ -394,6 +394,10 @@ export const en = {
       "The request timed out — the backend may still be starting or under load. Retry in a moment.",
     fetchFailedDetail: "Could not load watchlist and analyze data: {detail}",
     fetchFailedNoUrl: "your configured API",
+    emptyTitle: "Choose a symbol to analyze",
+    importWatchlist: "Import watchlist",
+    browseScan: "Browse scan results",
+    watchlistPreview: "Watchlist preview",
   },
   watchlist: {
     title: "Watchlist",

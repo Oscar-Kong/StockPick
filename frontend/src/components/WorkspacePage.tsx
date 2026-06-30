@@ -5,6 +5,8 @@ import { AnalysisPanel } from "@/components/AnalysisPanel";
 import { WatchlistImport } from "@/components/WatchlistImport";
 import { WatchlistRail } from "@/components/WatchlistRail";
 import { ErrorState } from "@/components/ui/ErrorState";
+import { WorkspaceEmptyPanel } from "@/components/WorkspaceEmptyPanel";
+import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import {
   getAnalyzeWatchlist,
   getWatchlist,
@@ -247,9 +249,12 @@ function WorkspaceContent() {
                   {t.workspace.loading}
                 </div>
               ) : (
-                <div className="flex flex-1 items-center justify-center p-10 text-center text-sm text-zinc-500">
-                  {t.workspace.selectFromWatchlist}
-                </div>
+                <WorkspaceEmptyPanel
+                  items={items}
+                  matrixBySymbol={matrixBySymbol}
+                  onSelect={selectSymbol}
+                  onToggleImport={() => setShowImport(true)}
+                />
               )}
             </div>
           </div>
@@ -263,7 +268,7 @@ export function WorkspacePage() {
   const { t } = useTranslation();
 
   return (
-    <Suspense fallback={<p className="text-sm text-zinc-500">{t.workspace.loading}</p>}>
+    <Suspense fallback={<LoadingSkeleton lines={5} className="p-4" />}>
       <WorkspaceContent />
     </Suspense>
   );

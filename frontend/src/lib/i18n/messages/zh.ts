@@ -387,6 +387,10 @@ export const zh: Messages = {
     fetchFailedTimeout: "请求超时 — 后端可能仍在启动或负载较高，请稍后重试。",
     fetchFailedDetail: "无法加载自选股与分析数据：{detail}",
     fetchFailedNoUrl: "已配置的 API",
+    emptyTitle: "选择要分析的股票",
+    importWatchlist: "导入观察列表",
+    browseScan: "浏览扫描结果",
+    watchlistPreview: "观察列表预览",
   },
   watchlist: {
     title: "自选股",
