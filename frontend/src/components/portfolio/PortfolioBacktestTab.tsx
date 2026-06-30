@@ -272,7 +272,7 @@ export function PortfolioBacktestTab(props: PortfolioBacktestTabProps) {
                     <YAxis tick={{ fontSize: 10 }} domain={["auto", "auto"]} />
                     <Tooltip content={<DarkChartTooltip />} cursor={darkTooltipCursor} />
                     <Legend />
-                    <Line type="monotone" dataKey="equity" name="Portfolio" stroke="#00c805" dot={false} strokeWidth={2} isAnimationActive={false} />
+                    <Line type="monotone" dataKey="equity" name="Portfolio" stroke="#22c55e" dot={false} strokeWidth={2} isAnimationActive={false} />
                     <Line type="monotone" dataKey="benchmark" name="SPY" stroke="#6b7280" dot={false} strokeWidth={1.5} strokeDasharray="4 4" isAnimationActive={false} />
                   </LineChart>
                 </ResponsiveContainer>

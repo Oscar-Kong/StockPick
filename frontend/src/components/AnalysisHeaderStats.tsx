@@ -23,13 +23,13 @@ interface AnalysisHeaderStatsProps {
 }
 
 function dataQualityTone(score: number): string {
-  if (score >= 70) return "text-brand";
+  if (score >= 70) return "text-positive";
   if (score >= 40) return "text-amber-300";
   return "text-red-300";
 }
 
 function scoreSourceTone(source: ScoreSource): string {
-  return source === "scoring_engine_v2" ? "text-emerald-300" : "text-secondary";
+  return source === "scoring_engine_v2" ? "text-primary" : "text-secondary";
 }
 
 export function AnalysisHeaderStats({
@@ -50,13 +50,13 @@ export function AnalysisHeaderStats({
   const { t } = useTranslation();
 
   const riskTone =
-    riskLevel === "high" ? "text-red-300" : riskLevel === "medium" ? "text-amber-300" : "text-brand";
+    riskLevel === "high" ? "text-red-300" : riskLevel === "medium" ? "text-amber-300" : "text-positive";
 
   const changeTone =
     changePct1d == null || Number.isNaN(changePct1d)
       ? "text-secondary"
       : changePct1d >= 0
-        ? "text-brand"
+        ? "text-positive"
         : "text-negative";
 
   const priceFreshnessHint = priceHistoryLastDate

@@ -66,7 +66,7 @@ export function periodChangePct(rows: PriceChartRow[]): number | null {
 }
 
 export const PRICE_CHART_SERIES = [
-  { key: "close" as const, label: "Close", color: "#00c805", width: 2 },
+  { key: "close" as const, label: "Close", color: "#22c55e", width: 2 },
   { key: "ma10" as const, label: "MA10", color: "#38bdf8", width: 1.25 },
   { key: "ma50" as const, label: "MA50", color: "#fbbf24", width: 1.25 },
   { key: "ma200" as const, label: "MA200", color: "#a78bfa", width: 1.25 },

@@ -21,7 +21,7 @@ export function CurrencyText({
 }) {
   const tones = {
     default: "text-zinc-50",
-    positive: "text-brand",
+    positive: "text-positive",
     negative: "text-negative",
     muted: "text-zinc-400",
   };
@@ -38,7 +38,7 @@ export function PercentText({
   if (value == null || Number.isNaN(value)) {
     return <span className={clsx("finance-value text-tertiary", className)}>—</span>;
   }
-  const tone = value >= 0 ? "text-brand" : "text-negative";
+  const tone = value >= 0 ? "text-positive" : "text-negative";
   const sign = value >= 0 ? "+" : "";
   return (
     <span className={clsx("finance-value text-sm font-medium", tone, className)}>

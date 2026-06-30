@@ -295,10 +295,10 @@ export function BucketPage({ bucket, title, description, embedded, onMetaChange 
               </span>
             )}
             {lastScanAt &&
-              (scanStale ? <StaleDataBadge asOf={lastScanAt} /> : <span className="text-sm text-brand">{t.product.dataFresh}</span>)}
+              (scanStale ? <StaleDataBadge asOf={lastScanAt} /> : <span className="text-sm text-positive">{t.product.dataFresh}</span>)}
             <span className="text-sm text-secondary">
               {t.scan.resultCountLabel}{" "}
-              <span className="finance-value text-brand">{results.length || "—"}</span>
+              <span className="finance-value text-foreground">{results.length || "—"}</span>
             </span>
           </div>
         </header>
@@ -356,7 +356,7 @@ export function BucketPage({ bucket, title, description, embedded, onMetaChange 
       {(scanning || status === "running") && <ScanProgressBar progress={progress} message={message} />}
 
       {saveMsg && (
-        <p className={clsx("text-sm", saveMsgSuccess ? "text-brand" : "text-amber-300")} role="status">
+        <p className={clsx("text-sm", saveMsgSuccess ? "text-positive" : "text-amber-300")} role="status">
           {saveMsg}
         </p>
       )}

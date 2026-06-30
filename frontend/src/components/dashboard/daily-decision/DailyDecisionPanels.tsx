@@ -211,7 +211,7 @@ export function PennyOpportunitiesPanel({ items }: { items: PennyOpportunityItem
       subtitle={t.home.dailyPennyOpsNote}
       variant="muted"
       action={
-        <Link href="/scan?bucket=penny" className="text-xs font-medium text-brand hover:underline">
+        <Link href="/scan?bucket=penny" className="text-xs font-medium text-primary hover:underline">
           {t.home.openScan}
         </Link>
       }
@@ -220,7 +220,7 @@ export function PennyOpportunitiesPanel({ items }: { items: PennyOpportunityItem
         {items.map((p) => (
           <li key={p.symbol} className="rounded-xl border border-white/5 px-3 py-3">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <Link href={`/workspace?symbol=${p.symbol}`} className="font-semibold text-brand hover:underline">
+              <Link href={`/workspace?symbol=${p.symbol}`} className="font-semibold text-primary hover:underline">
                 {p.symbol}
               </Link>
               <span className="finance-value text-xs text-tertiary">
@@ -269,7 +269,7 @@ export function ClosedPositionsPanel({
             <div key={c.symbol} className="rounded-lg border border-white/5 px-3 py-2.5 text-sm">
               <div className="flex justify-between font-medium text-zinc-300">
                 <span>{c.symbol}</span>
-                <span className={c.realized_pl >= 0 ? "text-brand" : "text-negative"}>{formatCurrency(c.realized_pl)}</span>
+                <span className={c.realized_pl >= 0 ? "text-positive" : "text-negative"}>{formatCurrency(c.realized_pl)}</span>
               </div>
               <p className="mt-1 text-xs text-tertiary">{c.last_activity || "—"}</p>
             </div>
@@ -288,7 +288,7 @@ export function ClosedPositionsPanel({
               {closed.map((c) => (
                 <tr key={c.symbol} className="border-t border-white/5 text-secondary">
                   <td className="py-2.5 pr-3 font-medium text-zinc-300">{c.symbol}</td>
-                  <td className={`py-2.5 pr-3 text-right finance-value ${c.realized_pl >= 0 ? "text-brand" : "text-negative"}`}>
+                  <td className={`py-2.5 pr-3 text-right finance-value ${c.realized_pl >= 0 ? "text-positive" : "text-negative"}`}>
                     {formatCurrency(c.realized_pl)}
                   </td>
                   <td className="py-2.5 text-xs">{c.last_activity || "—"}</td>

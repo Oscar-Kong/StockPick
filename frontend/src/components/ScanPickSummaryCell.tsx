@@ -76,14 +76,14 @@ export function ScanPickSummaryCell({ stock, variant = "table" }: ScanPickSummar
         className={clsx(
           "inline-flex items-center gap-1 rounded-md border text-xs font-medium transition",
           isDrawer
-            ? "border-zinc-700 bg-zinc-900 px-3 py-1.5 text-zinc-200 hover:border-[#00c805]/40 hover:bg-[#00c805]/10"
-            : "border-zinc-700/80 bg-zinc-950 px-2 py-1 text-zinc-300 hover:border-[#00c805]/50 hover:text-[#7dff8e]",
+            ? "border-zinc-700 bg-zinc-900 px-3 py-1.5 text-zinc-200 hover:border-primary/40 hover:bg-primary/10"
+            : "border-zinc-700/80 bg-zinc-950 px-2 py-1 text-zinc-300 hover:border-primary/50 hover:text-primary",
           loading && "opacity-60"
         )}
       >
         {loading ? "…" : t.scan.summary}
         {data?.source === "llm" && !loading && (
-          <span className="rounded bg-[#00c805]/15 px-1 text-[9px] uppercase tracking-wide text-[#7dff8e]">
+          <span className="rounded bg-primary/15 px-1 text-[9px] uppercase tracking-wide text-primary">
             AI
           </span>
         )}

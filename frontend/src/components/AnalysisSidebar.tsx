@@ -48,11 +48,11 @@ function SignalsList({ signals }: { signals: Signal[] }) {
         <li key={s.name} className="rounded-lg border border-zinc-800/80 bg-zinc-950/40 px-2 py-1.5">
           <div className="flex items-center justify-between gap-2 text-xs">
             <span className="truncate text-zinc-300">{s.name}</span>
-            <span className="shrink-0 font-medium text-[#7dff8e]">{s.contribution.toFixed(1)}</span>
+            <span className="shrink-0 font-medium text-buy">{s.contribution.toFixed(1)}</span>
           </div>
           <div className="mt-1 h-1 overflow-hidden rounded-full bg-zinc-800">
             <div
-              className="h-full rounded-full bg-[#00c805]"
+              className="h-full rounded-full bg-buy"
               style={{ width: `${Math.min(100, s.contribution)}%` }}
             />
           </div>
@@ -88,7 +88,7 @@ function BucketFitMini({
             key={b}
             className={clsx(
               "rounded-lg border px-2 py-1.5 text-center",
-              active ? "border-[#00c805]/40 bg-[#00c805]/10" : "border-zinc-800"
+              active ? "border-primary/40 bg-primary/10" : "border-zinc-800"
             )}
           >
             <p className="text-xs capitalize text-zinc-500">

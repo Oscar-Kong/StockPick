@@ -41,7 +41,7 @@ export function ScoreBreakdown({ signals, className }: ScoreBreakdownProps) {
             cursor={darkTooltipCursor}
             wrapperStyle={{ outline: "none" }}
           />
-          <Bar dataKey="contribution" fill="#00c805" radius={[0, 4, 4, 0]} />
+          <Bar dataKey="contribution" fill="#22c55e" radius={[0, 4, 4, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </ChartMount>

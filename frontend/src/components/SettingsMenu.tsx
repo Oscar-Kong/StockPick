@@ -81,7 +81,7 @@ export function SettingsMenu() {
                 className={clsx(
                   "flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition",
                   locale === code
-                    ? "bg-[#00c805]/20 text-[#7dff8e] ring-1 ring-[#00c805]/40"
+                    ? "bg-primary/20 text-primary ring-1 ring-primary/40"
                     : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
                 )}
               >

@@ -59,13 +59,13 @@ function ScanHubContent() {
             (activeMeta.scanStale ? (
               <StaleDataBadge asOf={activeMeta.lastScanAt} />
             ) : (
-              <span className="text-sm text-brand">{t.product.dataFresh}</span>
+              <span className="text-sm text-positive">{t.product.dataFresh}</span>
             ))}
           <span className="text-sm text-secondary">
             {t.scan.resultCountLabel}{" "}
-            <span className="finance-value text-brand">{activeMeta.resultCount || "—"}</span>
+            <span className="finance-value text-foreground">{activeMeta.resultCount || "—"}</span>
           </span>
-          <Link href="/library?tab=scans" className="text-sm font-medium text-brand hover:underline">
+          <Link href="/library?tab=scans" className="text-sm font-medium text-primary hover:underline">
             {t.nav.library}
           </Link>
         </div>

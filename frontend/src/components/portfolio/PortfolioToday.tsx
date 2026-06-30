@@ -61,7 +61,7 @@ export function PortfolioToday({
         <EmptyPortfolioState onImportClick={onImportClick} />
         <p className="text-center text-sm text-secondary">
           {t.portfolio.activityHint}{" "}
-          <button type="button" className="text-brand hover:underline" onClick={onOpenActivity}>
+          <button type="button" className="text-primary hover:underline" onClick={onOpenActivity}>
             {t.portfolio.tabActivity}
           </button>
         </p>
@@ -112,7 +112,7 @@ export function PortfolioToday({
             subtitle={t.home.dailyHoldingsSubtitle}
             variant="elevated"
             action={
-              <Link href="/scan?bucket=penny" className="text-sm font-medium text-brand hover:underline">
+              <Link href="/scan?bucket=penny" className="text-sm font-medium text-primary hover:underline">
                 {t.home.dailyPennyScan}
               </Link>
             }

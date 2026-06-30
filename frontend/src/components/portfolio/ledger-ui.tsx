@@ -63,7 +63,7 @@ export function LedgerFormField({
 }
 
 export const ledgerInputClass =
-  "ledger-input w-full min-w-0 rounded-xl border border-zinc-700/80 bg-zinc-900/70 px-3 py-2.5 text-sm text-zinc-100 shadow-inner shadow-black/20 outline-none transition-[border-color,box-shadow,background] placeholder:text-zinc-600 focus:border-emerald-500/50 focus:bg-zinc-900/90 focus:ring-2 focus:ring-emerald-500/15";
+  "ledger-input w-full min-w-0 rounded-xl border border-zinc-700/80 bg-zinc-900/70 px-3 py-2.5 text-sm text-zinc-100 shadow-inner shadow-black/20 outline-none transition-[border-color,box-shadow,background] placeholder:text-zinc-600 focus:border-primary/50 focus:bg-zinc-900/90 focus:ring-2 focus:ring-primary/15";
 
 export const ledgerSelectClass = clsx(ledgerInputClass, "cursor-pointer appearance-none pr-8");
 

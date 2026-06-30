@@ -151,7 +151,7 @@ function LibraryContent() {
                   className={clsx(
                     "w-full rounded-lg border px-3 py-2 text-left text-sm",
                     selectedScan?.id === r.id
-                      ? "border-[#00c805] bg-zinc-900"
+                      ? "border-primary bg-zinc-900"
                       : "border-zinc-800 hover:bg-zinc-900/70"
                   )}
                 >
@@ -266,7 +266,7 @@ function LibraryContent() {
                 className={clsx(
                   "w-full rounded-lg border px-3 py-2 text-left text-sm",
                   selectedReport?.id === r.id
-                    ? "border-[#00c805] bg-zinc-900"
+                    ? "border-primary bg-zinc-900"
                     : "border-zinc-800 hover:bg-zinc-900/70"
                 )}
               >

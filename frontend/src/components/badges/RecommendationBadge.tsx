@@ -4,12 +4,12 @@ import clsx from "clsx";
 import { useTranslation } from "@/lib/i18n";
 
 const LABEL_STYLE: Record<string, string> = {
-  strong_buy: "border-emerald-500/40 text-emerald-300",
-  buy: "border-green-500/30 text-green-300",
-  watch: "border-amber-500/30 text-amber-200",
+  strong_buy: "signal-buy border-emerald-500/40",
+  buy: "signal-buy border-green-500/30",
+  watch: "signal-hold border-amber-500/30",
   hold: "border-zinc-600 text-zinc-300",
-  avoid: "border-red-500/30 text-red-300",
-  high_risk_no_decision: "border-red-500/40 text-red-200",
+  avoid: "signal-sell border-red-500/30",
+  high_risk_no_decision: "signal-sell border-red-500/40",
 };
 
 interface RecommendationBadgeProps {

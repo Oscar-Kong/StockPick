@@ -38,7 +38,7 @@ export function ScanProgress({ progress, message, status }: ScanProgressProps) {
       </div>
       <div className="h-2.5 overflow-hidden rounded-full bg-zinc-800">
         <div
-          className="h-full rounded-full bg-[#00c805] transition-all"
+          className="h-full rounded-full bg-primary transition-all"
           style={{ width: `${Math.min(progress, 100)}%` }}
         />
       </div>

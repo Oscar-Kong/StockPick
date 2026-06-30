@@ -37,7 +37,7 @@ const defaultManual: TradeCreateRequest = {
 };
 
 const inputClass =
-  "mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950/80 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-[#00c805]";
+  "mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950/80 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-primary";
 
 function formatDate(value?: string | null): string {
   return formatDateTime(value);
@@ -60,7 +60,7 @@ type TradeSortField = "updated" | "quality" | "pnl";
 type SortDirection = "asc" | "desc";
 
 const compactInputClass =
-  "h-9 w-full min-w-0 rounded-md border border-zinc-700 bg-zinc-950/80 px-2.5 text-sm text-zinc-100 outline-none focus:border-[#00c805]";
+  "h-9 w-full min-w-0 rounded-md border border-zinc-700 bg-zinc-950/80 px-2.5 text-sm text-zinc-100 outline-none focus:border-primary";
 
 export function TradeJournal({
   embedded = false,
@@ -643,7 +643,7 @@ export function TradeJournal({
               <select
                 value={sortField}
                 onChange={(e) => setSortField(e.target.value as TradeSortField)}
-                className="ml-2 rounded-lg border border-zinc-700 bg-zinc-950/80 px-2 py-1 text-zinc-200 outline-none focus:border-[#00c805]"
+                className="ml-2 rounded-lg border border-zinc-700 bg-zinc-950/80 px-2 py-1 text-zinc-200 outline-none focus:border-primary"
               >
                 <option value="updated">{t.journal.sortRecent}</option>
                 <option value="quality">{t.journal.sortQuality}</option>

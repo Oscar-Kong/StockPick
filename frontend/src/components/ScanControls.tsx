@@ -14,7 +14,7 @@ interface ScanControlsProps {
 }
 
 const INPUT_CLASS =
-  "mt-1.5 w-full rounded-lg border border-zinc-700 bg-zinc-950/80 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-[#00c805]";
+  "mt-1.5 w-full rounded-lg border border-zinc-700 bg-zinc-950/80 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-primary";
 
 export function ScanControls({
   bucketLabel,

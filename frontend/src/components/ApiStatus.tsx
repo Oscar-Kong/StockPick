@@ -62,7 +62,7 @@ export function ApiStatus() {
       )}
       <span className={online ? "api-pill api-pill--ok" : "api-pill api-pill--bad"}>
         <span
-          className={`h-1.5 w-1.5 rounded-full ${online ? "bg-[#00c805]" : "bg-red-400"}`}
+          className={`h-1.5 w-1.5 rounded-full ${online ? "bg-primary" : "bg-red-400"}`}
           aria-hidden
         />
         {online ? t.footer.apiOnline : t.footer.apiOffline}
@@ -99,7 +99,7 @@ export function ApiStatus() {
           {t.common.retry}
         </button>
       )}
-      <Link href="/settings" className="api-pill api-pill--muted hover:border-[#00c805]/40 hover:text-zinc-300">
+      <Link href="/settings" className="api-pill api-pill--muted hover:border-primary/40 hover:text-zinc-300">
         {t.footer.configure}
       </Link>
     </div>

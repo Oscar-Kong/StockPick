@@ -91,7 +91,7 @@ export function ScanInlineStatus({
         </span>
         <span className="scan-inline-status__item">
           {t.scan.resultCountLabel}{" "}
-          <span className="finance-value text-brand">{resultCount > 0 ? resultCount : "—"}</span>
+          <span className="finance-value text-foreground">{resultCount > 0 ? resultCount : "—"}</span>
         </span>
         {lastScanAt && (
           <>
@@ -101,7 +101,7 @@ export function ScanInlineStatus({
             {scanStale ? (
               <StaleDataBadge asOf={lastScanAt} />
             ) : (
-              <span className="text-sm text-brand">{t.product.dataFresh}</span>
+              <span className="text-sm text-positive">{t.product.dataFresh}</span>
             )}
           </>
         )}

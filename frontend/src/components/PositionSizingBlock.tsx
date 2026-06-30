@@ -24,12 +24,12 @@ export function PositionSizingBlock({ sizing, loading, error }: PositionSizingBl
   }
 
   return (
-    <div className="space-y-3 rounded-xl border border-[#00c805]/25 bg-[#00c805]/5 p-4">
+    <div className="space-y-3 rounded-xl border border-buy/25 bg-buy/5 p-4">
       <dl className="grid gap-3 sm:grid-cols-2">
         <StatTile
           label={t.quant.recommended}
           value={
-            <span className="tabular-nums text-[#7dff8e]">
+            <span className="tabular-nums text-buy">
               {sizing.recommended_weight_pct.toFixed(1)}%
             </span>
           }

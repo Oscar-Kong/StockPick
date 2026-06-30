@@ -24,7 +24,7 @@ export function LanguageSettingsPanel() {
             className={clsx(
               "rounded-lg px-4 py-2 text-sm font-medium transition",
               locale === code
-                ? "bg-[#00c805]/15 text-[#7dff8e] ring-1 ring-[#00c805]/40"
+                ? "bg-primary/15 text-primary ring-1 ring-primary/40"
                 : "border border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
             )}
           >

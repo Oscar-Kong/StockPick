@@ -95,14 +95,14 @@ export function PriceChart({
           {snapshot && (
             <span className="price-chart__metric">
               {t.common.price}{" "}
-              <span className="finance-value font-semibold text-brand">${snapshot.close.toFixed(2)}</span>
+              <span className="finance-value font-semibold text-foreground">${snapshot.close.toFixed(2)}</span>
             </span>
           )}
           {periodChange != null && (
             <span
               className={clsx(
                 "price-chart__metric finance-value",
-                periodChange >= 0 ? "text-brand" : "text-negative"
+                periodChange >= 0 ? "text-positive" : "text-negative"
               )}
             >
               {range} {periodChange >= 0 ? "+" : ""}
@@ -118,7 +118,7 @@ export function PriceChart({
           {priceHistoryIsStale && lastBarDate ? (
             <StaleDataBadge asOf={lastBarDate} />
           ) : lastBarDate ? (
-            <span className="text-sm text-brand">{t.analysis.priceHistoryFresh}</span>
+            <span className="text-sm text-positive">{t.analysis.priceHistoryFresh}</span>
           ) : null}
           {priceHistoryRefreshedAt && (
             <span className="price-chart__metric text-secondary">

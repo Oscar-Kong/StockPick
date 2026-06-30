@@ -31,7 +31,7 @@ function Toggle({
       onClick={() => onChange(!checked)}
       className={clsx(
         "inline-flex h-7 w-12 shrink-0 items-center rounded-full p-0.5 transition-colors",
-        checked ? "justify-end bg-[#00c805]/80" : "justify-start bg-zinc-700",
+        checked ? "justify-end bg-primary/80" : "justify-start bg-zinc-700",
         disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
       )}
     >
@@ -196,7 +196,7 @@ export function ApiSettingsPanel() {
             {t.settings.resetDefaults}
           </button>
         </div>
-        {message && <p className="mt-3 text-sm text-brand">{message}</p>}
+        {message && <p className="mt-3 text-sm text-positive">{message}</p>}
         {error && <p className="mt-3 text-sm text-negative">{error}</p>}
         <p className="mt-3 text-xs text-tertiary">{t.settings.togglesHint}</p>
       </div>

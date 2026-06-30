@@ -14,7 +14,7 @@ export function DataQualityBadge({ score, flags }: DataQualityBadgeProps) {
 
   const color =
     score >= 70
-      ? "bg-[#00c805]/20 text-[#7dff8e]"
+      ? "bg-buy/20 text-buy"
       : score >= 40
         ? "bg-amber-950/70 text-amber-300"
         : "bg-red-950/70 text-red-300";
