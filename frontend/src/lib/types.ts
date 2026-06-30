@@ -1261,6 +1261,87 @@ export interface BrokerageCsvImportResponse {
   account: Record<string, unknown>;
 }
 
+export interface LedgerEntry {
+  id: number;
+  symbol: string;
+  side: string;
+  row_type: string;
+  quantity: number | null;
+  price: number | null;
+  amount: number | null;
+  trans_code: string | null;
+  description: string | null;
+  activity_date: string | null;
+  process_date: string | null;
+  executed_at: string | null;
+  source: string;
+  row_hash: string;
+  locked: boolean;
+}
+
+export interface LedgerListResponse {
+  rows: LedgerEntry[];
+  open_holdings: Array<{ symbol: string; shares: number; avg_cost: number; bucket?: string }>;
+  closed_positions: Array<{
+    symbol: string;
+    total_bought: number;
+    total_sold: number;
+    realized_pl: number;
+    last_activity: string;
+  }>;
+  ledger_cash_estimate: number;
+  warnings: string[];
+}
+
+export interface LedgerEntryInput {
+  symbol: string;
+  side: string;
+  quantity?: number | null;
+  price?: number | null;
+  amount?: number | null;
+  trans_code?: string | null;
+  description?: string | null;
+  activity_date?: string | null;
+  process_date?: string | null;
+  lock?: boolean;
+}
+
+export interface CsvPreviewRow {
+  client_id: string;
+  included: boolean;
+  is_new: boolean;
+  symbol: string;
+  side: string;
+  row_type: string;
+  quantity: number | null;
+  price: number | null;
+  amount: number | null;
+  trans_code: string | null;
+  description: string | null;
+  activity_date: string | null;
+  process_date: string | null;
+  row_hash: string;
+}
+
+export interface CsvPreviewResponse {
+  filename: string;
+  rows: CsvPreviewRow[];
+  warnings: string[];
+  current_holdings: Array<{ symbol: string; shares: number; avg_cost: number }>;
+  projected_holdings: Array<{ symbol: string; shares: number; avg_cost: number }>;
+  current_cash_estimate: number;
+  projected_cash_estimate: number;
+  new_row_count: number;
+  skipped_existing_count: number;
+}
+
+export interface CsvApproveRequest {
+  filename: string;
+  replace: boolean;
+  cash?: number | null;
+  rows: CsvPreviewRow[];
+}
+
 export interface PortfolioDecisionRunResponse {
   ok: boolean;
   trigger: string;

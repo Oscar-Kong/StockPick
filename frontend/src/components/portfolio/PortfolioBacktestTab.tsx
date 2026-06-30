@@ -3,9 +3,12 @@
 import type { PortfolioPolicyBacktestResponse } from "@/lib/types";
 import { formatDateRange, computeDrawdownSeries, type PortfolioSleeve } from "@/lib/portfolioUtils";
 import { ChartMount } from "@/components/ChartMount";
+import { ChartTextSummary } from "@/components/ui/ChartTextSummary";
 import { DarkChartTooltip, darkTooltipCursor } from "@/components/DarkChartTooltip";
+import { buildEquityChartSummaryLines } from "@/lib/chartSummary";
 import { AsyncSection } from "@/components/AsyncSection";
 import { useTranslation } from "@/lib/i18n";
+import { useMemo } from "react";
 import {
   CartesianGrid,
   Legend,
@@ -65,20 +68,71 @@ export function PortfolioBacktestTab(props: PortfolioBacktestTabProps) {
     onRetry,
   } = props;
 
-  const equityData =
-    result?.equity_curve.map((p, i) => ({
-      date: p.date.slice(5),
-      equity: p.equity,
-      benchmark: result.benchmark_equity_curve?.[i]?.equity,
-    })) ?? [];
+  const equityData = useMemo(
+    () =>
+      result?.equity_curve.map((p, i) => ({
+        date: p.date.slice(5),
+        equity: p.equity,
+        benchmark: result.benchmark_equity_curve?.[i]?.equity,
+      })) ?? [],
+    [result]
+  );
 
-  const drawdownSeries = result ? computeDrawdownSeries(result.equity_curve) : [];
-  const drawdownData = drawdownSeries.map((p) => ({
-    date: p.date.slice(5),
-    drawdown: p.drawdown_pct,
-  }));
+  const drawdownSeries = useMemo(
+    () => (result ? computeDrawdownSeries(result.equity_curve) : []),
+    [result]
+  );
+  const drawdownData = useMemo(
+    () =>
+      drawdownSeries.map((p) => ({
+        date: p.date.slice(5),
+        drawdown: p.drawdown_pct,
+      })),
+    [drawdownSeries]
+  );
 
   const dateRange = formatDateRange(result?.start_date, result?.end_date);
+  const equitySummary = useMemo(() => {
+    if (!equityData.length) return [];
+    const start = equityData[0];
+    const end = equityData[equityData.length - 1];
+    return buildEquityChartSummaryLines({
+      periodLabel: dateRange || lookback,
+      startEquity: start.equity,
+      endEquity: end.equity,
+      benchmarkStart: start.benchmark ?? null,
+      benchmarkEnd: end.benchmark ?? null,
+      maxDrawdownPct: result?.max_drawdown_pct ?? null,
+      latestDate: result?.end_date ?? null,
+    }).map((line) => {
+      const key = line.label.toLowerCase().replace(/\s+/g, "");
+      const labels: Record<string, string> = {
+        period: t.chartSummary.period,
+        startingvalue: t.chartSummary.startingValue,
+        endingvalue: t.chartSummary.endingValue,
+        portfoliochange: t.chartSummary.portfolioChange,
+        benchmarkchange: t.chartSummary.benchmarkChange,
+        maximumdrawdown: t.chartSummary.maxDrawdown,
+        latestdata: t.chartSummary.latestData,
+      };
+      return { label: labels[key] ?? line.label, value: line.value };
+    });
+  }, [equityData, dateRange, lookback, result, t]);
+
+  const drawdownSummary = useMemo(() => {
+    const cs = t.chartSummary;
+    if (!drawdownData.length) return [];
+    const minDd = Math.min(...drawdownData.map((d) => d.drawdown));
+    return [
+      { label: cs.period, value: dateRange || lookback },
+      { label: cs.maxDrawdown, value: `${minDd.toFixed(1)}%` },
+      {
+        label: cs.latestData,
+        value: result?.end_date ?? drawdownData[drawdownData.length - 1]?.date ?? "—",
+      },
+    ];
+  }, [drawdownData, dateRange, lookback, result, t]);
+
   const sectionState =
     loading && !result ? "loading" : error && !result ? "error" : result ? "ready" : "idle";
 
@@ -208,7 +262,9 @@ export function PortfolioBacktestTab(props: PortfolioBacktestTabProps) {
               </div>
             </dl>
             {equityData.length > 0 && (
-              <ChartMount className="h-64 w-full min-w-0">
+              <>
+                <ChartTextSummary lines={equitySummary} className="mb-1" />
+                <ChartMount className="h-64 w-full min-w-0">
                 <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={200}>
                   <LineChart data={equityData}>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
@@ -216,17 +272,19 @@ export function PortfolioBacktestTab(props: PortfolioBacktestTabProps) {
                     <YAxis tick={{ fontSize: 10 }} domain={["auto", "auto"]} />
                     <Tooltip content={<DarkChartTooltip />} cursor={darkTooltipCursor} />
                     <Legend />
-                    <Line type="monotone" dataKey="equity" name="Portfolio" stroke="#00c805" dot={false} strokeWidth={2} />
-                    <Line type="monotone" dataKey="benchmark" name="SPY" stroke="#6b7280" dot={false} strokeWidth={1.5} strokeDasharray="4 4" />
+                    <Line type="monotone" dataKey="equity" name="Portfolio" stroke="#00c805" dot={false} strokeWidth={2} isAnimationActive={false} />
+                    <Line type="monotone" dataKey="benchmark" name="SPY" stroke="#6b7280" dot={false} strokeWidth={1.5} strokeDasharray="4 4" isAnimationActive={false} />
                   </LineChart>
                 </ResponsiveContainer>
               </ChartMount>
+              </>
             )}
             {drawdownData.length > 0 && (
               <div className="space-y-1">
                 <h4 className="text-xs font-medium uppercase tracking-wide text-zinc-500">
                   {t.portfolio.maxDrawdown}
                 </h4>
+                <ChartTextSummary lines={drawdownSummary} className="mb-1" />
                 <ChartMount className="h-36 w-full min-w-0">
                   <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={120}>
                     <AreaChart data={drawdownData}>
@@ -234,7 +292,7 @@ export function PortfolioBacktestTab(props: PortfolioBacktestTabProps) {
                       <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                       <YAxis tick={{ fontSize: 10 }} domain={["dataMin", 0]} />
                       <Tooltip content={<DarkChartTooltip />} cursor={darkTooltipCursor} />
-                      <Area type="monotone" dataKey="drawdown" name="Drawdown %" stroke="#ef4444" fill="#ef444433" strokeWidth={1.5} />
+                      <Area type="monotone" dataKey="drawdown" name="Drawdown %" stroke="#ef4444" fill="#ef444433" strokeWidth={1.5} isAnimationActive={false} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </ChartMount>

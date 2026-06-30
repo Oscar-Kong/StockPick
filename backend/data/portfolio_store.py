@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, Float, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Column, DateTime, Float, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from data.db_engine import get_engine
@@ -77,6 +77,7 @@ class TradeHistory(PortfolioBase):
     order_id = Column(String, nullable=True)
     row_hash = Column(String, nullable=False, index=True)
     source_file_id = Column(Integer, nullable=True)
+    locked = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, nullable=False)
 
 
@@ -135,11 +136,16 @@ def _migrate_trade_history_columns() -> None:
         ("description", "TEXT"),
         ("activity_date", "VARCHAR"),
         ("process_date", "VARCHAR"),
+        ("locked", "BOOLEAN DEFAULT 0"),
     ]
     with get_engine().begin() as conn:
         for col, typ in alters:
             if col not in existing:
                 conn.execute(text(f"ALTER TABLE trade_history ADD COLUMN {col} {typ}"))
+        if "locked" not in existing:
+            conn.execute(
+                text("UPDATE trade_history SET locked = 1 WHERE source_file_id IS NOT NULL")
+            )
 
 
 def _migrate_brokerage_account_columns() -> None:
@@ -415,6 +421,7 @@ def upsert_ledger_rows(
                     executed_at=r.executed_at,
                     row_hash=r.row_hash,
                     source_file_id=source_file_id,
+                    locked=True,
                     created_at=now,
                 )
             )
@@ -423,6 +430,44 @@ def upsert_ledger_rows(
         if imported or updated:
             session.commit()
         return imported, skipped
+    finally:
+        session.close()
+
+
+def repair_phantom_journal_buys(account_id: int = DEFAULT_ACCOUNT_ID) -> int:
+    """Remove zero-cost MANUAL buy legs that duplicate CSV holdings when a journal sell exists."""
+    import re
+
+    session = SessionLocal()
+    removed = 0
+    try:
+        rows = (
+            session.query(TradeHistory)
+            .filter(TradeHistory.account_id == account_id, TradeHistory.trans_code == "MANUAL")
+            .all()
+        )
+        sell_journal_ids = set()
+        for r in rows:
+            if (r.side or "").lower() != "sell":
+                continue
+            m = re.search(r"\[journal #(\d+)\]", r.description or "")
+            if m:
+                sell_journal_ids.add(int(m.group(1)))
+
+        for r in rows:
+            if (r.side or "").lower() != "buy":
+                continue
+            if float(r.price or 0) > 1e-9 or abs(float(r.amount or 0)) > 1e-9:
+                continue
+            m = re.search(r"\[journal #(\d+)\]", r.description or "")
+            if not m:
+                continue
+            if int(m.group(1)) in sell_journal_ids:
+                session.delete(r)
+                removed += 1
+        if removed:
+            session.commit()
+        return removed
     finally:
         session.close()
 
@@ -509,8 +554,7 @@ def clear_csv_sourced_ledger(account_id: int = DEFAULT_ACCOUNT_ID) -> int:
 
 
 def load_all_ledger_rows(account_id: int = DEFAULT_ACCOUNT_ID) -> list:
-    from integrations.robinhood.models import ParsedCsvRow
-    from integrations.robinhood.ledger_dedupe import apply_effective_fill_price, dedupe_parsed_rows
+    from integrations.robinhood.ledger_dedupe import apply_effective_fill_price
 
     session = SessionLocal()
     try:
@@ -520,11 +564,148 @@ def load_all_ledger_rows(account_id: int = DEFAULT_ACCOUNT_ID) -> list:
             .order_by(TradeHistory.executed_at, TradeHistory.id)
             .all()
         )
-        out: list[ParsedCsvRow] = []
-        for r in rows:
-            out.append(apply_effective_fill_price(_parsed_from_trade_history(r)))
-        deduped, _ = dedupe_parsed_rows(out)
-        return deduped
+        return [apply_effective_fill_price(_parsed_from_trade_history(r)) for r in rows]
+    finally:
+        session.close()
+
+
+def _trade_row_to_dict(r: TradeHistory) -> dict:
+    return {
+        "id": int(r.id),
+        "account_id": int(r.account_id),
+        "symbol": r.symbol or "",
+        "side": r.side or "",
+        "quantity": r.quantity,
+        "price": r.price,
+        "fees": float(r.fees or 0),
+        "amount": r.amount,
+        "trans_code": r.trans_code,
+        "description": r.description,
+        "activity_date": r.activity_date,
+        "process_date": r.process_date,
+        "executed_at": r.executed_at.isoformat() if r.executed_at else None,
+        "row_hash": r.row_hash,
+        "source_file_id": r.source_file_id,
+        "locked": bool(getattr(r, "locked", False)),
+    }
+
+
+def list_ledger_rows_detailed(account_id: int = DEFAULT_ACCOUNT_ID) -> list[dict]:
+    session = SessionLocal()
+    try:
+        rows = (
+            session.query(TradeHistory)
+            .filter(TradeHistory.account_id == account_id)
+            .order_by(TradeHistory.executed_at.desc(), TradeHistory.id.desc())
+            .all()
+        )
+        return [_trade_row_to_dict(r) for r in rows]
+    finally:
+        session.close()
+
+
+def get_ledger_row(row_id: int) -> dict | None:
+    session = SessionLocal()
+    try:
+        r = session.get(TradeHistory, row_id)
+        return _trade_row_to_dict(r) if r else None
+    finally:
+        session.close()
+
+
+def insert_ledger_row(
+    account_id: int,
+    parsed: "ParsedCsvRow",
+    *,
+    trans_code_override: str | None = None,
+    source_file_id: int | None = None,
+    locked: bool = False,
+) -> int:
+    from integrations.robinhood.models import ParsedCsvRow
+
+    if not isinstance(parsed, ParsedCsvRow):
+        raise ValueError("Expected ParsedCsvRow")
+    side = "event" if parsed.row_type == "event" else parsed.row_type
+    session = SessionLocal()
+    try:
+        row = TradeHistory(
+            account_id=account_id,
+            symbol=(parsed.instrument or "").upper(),
+            side=side,
+            quantity=parsed.quantity if parsed.quantity is not None else 0.0,
+            price=parsed.price if parsed.price is not None else 0.0,
+            amount=parsed.amount,
+            trans_code=trans_code_override or parsed.trans_code,
+            description=parsed.description,
+            activity_date=parsed.activity_date,
+            process_date=parsed.process_date,
+            executed_at=parsed.executed_at,
+            row_hash=parsed.row_hash,
+            source_file_id=source_file_id,
+            locked=locked,
+            created_at=_utcnow(),
+        )
+        session.add(row)
+        session.commit()
+        session.refresh(row)
+        return int(row.id)
+    finally:
+        session.close()
+
+
+def update_ledger_row(row_id: int, parsed: "ParsedCsvRow") -> None:
+    from integrations.robinhood.models import ParsedCsvRow
+
+    if not isinstance(parsed, ParsedCsvRow):
+        raise ValueError("Expected ParsedCsvRow")
+    side = "event" if parsed.row_type == "event" else parsed.row_type
+    session = SessionLocal()
+    try:
+        row = session.get(TradeHistory, row_id)
+        if not row:
+            raise ValueError("Ledger row not found")
+        if bool(getattr(row, "locked", False)):
+            raise ValueError("Ledger row is locked")
+        row.symbol = (parsed.instrument or "").upper()
+        row.side = side
+        row.quantity = parsed.quantity if parsed.quantity is not None else 0.0
+        row.price = parsed.price if parsed.price is not None else 0.0
+        row.amount = parsed.amount
+        row.trans_code = parsed.trans_code or row.trans_code
+        row.description = parsed.description
+        row.activity_date = parsed.activity_date
+        row.process_date = parsed.process_date
+        row.executed_at = parsed.executed_at
+        row.row_hash = parsed.row_hash
+        session.commit()
+    finally:
+        session.close()
+
+
+def set_ledger_row_locked(row_id: int, locked: bool = True, account_id: int = DEFAULT_ACCOUNT_ID) -> bool:
+    session = SessionLocal()
+    try:
+        row = session.get(TradeHistory, row_id)
+        if not row or int(row.account_id) != account_id:
+            return False
+        row.locked = bool(locked)
+        session.commit()
+        return True
+    finally:
+        session.close()
+
+
+def delete_ledger_row(row_id: int, account_id: int = DEFAULT_ACCOUNT_ID) -> bool:
+    session = SessionLocal()
+    try:
+        row = session.get(TradeHistory, row_id)
+        if not row or int(row.account_id) != account_id:
+            return False
+        if bool(getattr(row, "locked", False)):
+            raise ValueError("Ledger row is locked")
+        session.delete(row)
+        session.commit()
+        return True
     finally:
         session.close()
 

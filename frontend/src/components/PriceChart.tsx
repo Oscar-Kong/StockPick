@@ -22,6 +22,7 @@ import {
   YAxis,
 } from "recharts";
 import { ChartMount } from "./ChartMount";
+import { ChartTextSummary } from "./ui/ChartTextSummary";
 import { PriceChartTooltip, darkTooltipCursor } from "./PriceChartTooltip";
 import { StaleDataBadge } from "./badges/StaleDataBadge";
 
@@ -58,9 +59,26 @@ export function PriceChart({
   );
   const snapshot = latestMaSnapshot(data);
   const periodChange = periodChangePct(data);
-
   const lastBarDate =
     priceHistoryLastDate ?? snapshot?.fullDate ?? (ohlc.length ? ohlc[ohlc.length - 1]?.date : null);
+
+  const summaryLines = (() => {
+    if (!data.length) return [];
+    const cs = t.chartSummary;
+    const lines: { label: string; value: string }[] = [
+      { label: cs.period, value: range },
+      { label: cs.startingValue, value: `$${data[0].close.toFixed(2)}` },
+      { label: cs.endingValue, value: `$${data[data.length - 1].close.toFixed(2)}` },
+    ];
+    if (periodChange != null) {
+      const sign = periodChange >= 0 ? "+" : "";
+      lines.push({ label: cs.change, value: `${sign}${periodChange.toFixed(1)}%` });
+    }
+    if (lastBarDate) {
+      lines.push({ label: cs.latestData, value: lastBarDate });
+    }
+    return lines;
+  })();
 
   const series = showMa ? PRICE_CHART_SERIES : PRICE_CHART_SERIES.filter((s) => s.key === "close");
 
@@ -178,6 +196,7 @@ export function PriceChart({
           </LineChart>
         </ResponsiveContainer>
       </ChartMount>
+      <ChartTextSummary lines={summaryLines} srOnly />
     </div>
   );
 }

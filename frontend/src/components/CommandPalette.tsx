@@ -3,7 +3,7 @@
 import { useTranslation } from "@/lib/i18n";
 import clsx from "clsx";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 type CommandItem = {
   id: string;
@@ -18,6 +18,9 @@ export function openCommandPalette() {
   window.dispatchEvent(new CustomEvent("open-command-palette"));
 }
 
+const FOCUSABLE =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 export function CommandPalette() {
   const router = useRouter();
   const { t } = useTranslation();
@@ -25,14 +28,22 @@ export function CommandPalette() {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const listboxId = useId();
+  const liveId = useId();
+
+  const close = useCallback(() => {
+    setOpen(false);
+    setQuery("");
+  }, []);
 
   const go = useCallback(
     (href: string) => {
-      setOpen(false);
-      setQuery("");
+      close();
       router.push(href);
     },
-    [router]
+    [close, router]
   );
 
   const staticItems: CommandItem[] = useMemo(
@@ -57,7 +68,7 @@ export function CommandPalette() {
       { id: "library", label: t.nav.library, hint: t.nav.library, href: "/library", group: t.command.go },
       { id: "settings", label: t.nav.settings, hint: t.settings.apiSettingsDesc, href: "/settings", group: t.command.go },
       { id: "intel", label: t.command.traderIntel, href: "/trader-intel", group: t.command.go },
-      { id: "journal", label: t.command.tradeJournal, href: "/?tab=activity", group: t.command.go },
+      { id: "journal", label: t.portfolio.ledgerTitle, href: "/?tab=activity", group: t.command.go },
       { id: "penny", label: t.command.scanPenny, href: "/scan?bucket=penny", group: t.command.screens },
       { id: "compound", label: t.command.scanCompound, href: "/scan?bucket=compounder", group: t.command.screens },
     ],
@@ -94,7 +105,6 @@ export function CommandPalette() {
         setOpen((v) => !v);
         setActive(0);
       }
-      if (e.key === "Escape") setOpen(false);
     };
     const onOpen = () => {
       setOpen(true);
@@ -110,9 +120,12 @@ export function CommandPalette() {
 
   useEffect(() => {
     if (open) {
+      previousFocusRef.current = document.activeElement as HTMLElement | null;
       setQuery("");
       setActive(0);
       requestAnimationFrame(() => inputRef.current?.focus());
+    } else {
+      requestAnimationFrame(() => previousFocusRef.current?.focus());
     }
   }, [open]);
 
@@ -120,11 +133,42 @@ export function CommandPalette() {
     setActive(0);
   }, [query]);
 
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        close();
+        return;
+      }
+      if (e.key !== "Tab" || !dialogRef.current) return;
+      const nodes = [...dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+        (el) => el.offsetParent !== null
+      );
+      if (!nodes.length) return;
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+  }, [open, close]);
+
   const run = (item: CommandItem) => {
     if (item.href) go(item.href);
     else item.action?.();
-    setOpen(false);
+    close();
   };
+
+  const activeItem = items[active];
+  const activeOptionId = activeItem ? `command-option-${activeItem.id}` : undefined;
 
   if (!open) return null;
 
@@ -132,11 +176,13 @@ export function CommandPalette() {
     <div
       className="command-overlay"
       role="presentation"
-      onClick={() => setOpen(false)}
+      onClick={close}
     >
       <div
+        ref={dialogRef}
         className="command-dialog"
         role="dialog"
+        aria-modal="true"
         aria-label={t.command.menuLabel}
         onClick={(e) => e.stopPropagation()}
       >
@@ -152,10 +198,15 @@ export function CommandPalette() {
             placeholder={t.command.placeholder}
             className="command-input"
             aria-label={t.command.placeholder}
+            role="combobox"
+            aria-expanded
+            aria-controls={listboxId}
+            aria-activedescendant={activeOptionId}
+            aria-autocomplete="list"
             onKeyDown={(e) => {
               if (e.key === "ArrowDown") {
                 e.preventDefault();
-                setActive((i) => Math.min(i + 1, items.length - 1));
+                setActive((i) => Math.min(i + 1, Math.max(items.length - 1, 0)));
               }
               if (e.key === "ArrowUp") {
                 e.preventDefault();
@@ -169,14 +220,24 @@ export function CommandPalette() {
           />
           <kbd className="command-kbd">esc</kbd>
         </div>
-        <ul className="command-list">
+        <p id={liveId} className="sr-only" aria-live="polite" aria-atomic="true">
+          {activeItem
+            ? `${activeItem.label}${activeItem.hint ? `, ${activeItem.hint}` : ""}`
+            : t.command.noMatches}
+        </p>
+        <ul id={listboxId} className="command-list" role="listbox" aria-label={t.command.menuLabel}>
           {items.length === 0 ? (
-            <li className="command-empty">{t.command.noMatches}</li>
+            <li className="command-empty" role="presentation">
+              {t.command.noMatches}
+            </li>
           ) : (
             items.map((item, idx) => (
-              <li key={item.id}>
+              <li key={item.id} role="presentation">
                 <button
                   type="button"
+                  id={`command-option-${item.id}`}
+                  role="option"
+                  aria-selected={idx === active}
                   className={clsx("command-row", idx === active && "command-row--active")}
                   onMouseEnter={() => setActive(idx)}
                   onClick={() => run(item)}
@@ -205,7 +266,7 @@ export function CommandPaletteTrigger() {
   return (
     <button
       type="button"
-      className="command-trigger"
+      className="command-trigger command-trigger--mobile"
       onClick={() => openCommandPalette()}
       aria-label={t.command.openMenu}
     >

@@ -18,6 +18,7 @@ from data.portfolio_store import (
     purge_duplicate_trades,
     record_upload,
     repair_ledger_fill_prices,
+    repair_phantom_journal_buys,
     save_holdings,
     save_portfolio_snapshot,
     set_account_cash,
@@ -167,6 +168,7 @@ def import_robinhood_csv(content: str | bytes, filename: str, *, cash: float | N
     file_id = record_upload(account_id, filename, len(rows), 0, warnings)
     imported, skipped = upsert_ledger_rows(account_id, rows, source_file_id=file_id)
     purge_duplicate_trades(account_id)
+    repair_phantom_journal_buys(account_id)
 
     journal_verification = _verify_journal_after_import(account_id, rows)
     for check in journal_verification:
@@ -354,25 +356,31 @@ def apply_manual_trade_to_portfolio(
 
     entry_dt = entry_time.replace(tzinfo=None) if getattr(entry_time, "tzinfo", None) else entry_time
     activity, process = _dt_to_csv_dates(entry_dt)
-    buy_amount = -(qty * float(entry_price))
-    buy_hash = _journal_ledger_hash(trade_id, "buy")
-    ledger_rows.append(
-        ParsedCsvRow(
-            activity_date=activity,
-            process_date=process,
-            instrument=sym,
-            description=f"{description} [journal #{trade_id}]",
-            trans_code="MANUAL",
-            quantity=qty,
-            price=float(entry_price),
-            amount=buy_amount,
-            row_type="buy",
-            row_hash=buy_hash,
-            executed_at=entry_dt,
-        )
-    )
+    entry_px = float(entry_price or 0)
+    has_exit = exit_price is not None and float(exit_price) > 0
+    # Closed journal log with no entry price: sell only (position already from CSV).
+    record_buy = not has_exit or entry_px > 0
 
-    if exit_price is not None and float(exit_price) > 0:
+    if record_buy:
+        buy_amount = -(qty * entry_px)
+        buy_hash = _journal_ledger_hash(trade_id, "buy")
+        ledger_rows.append(
+            ParsedCsvRow(
+                activity_date=activity,
+                process_date=process,
+                instrument=sym,
+                description=f"{description} [journal #{trade_id}]",
+                trans_code="MANUAL",
+                quantity=qty,
+                price=entry_px,
+                amount=buy_amount,
+                row_type="buy",
+                row_hash=buy_hash,
+                executed_at=entry_dt,
+            )
+        )
+
+    if has_exit:
         exit_dt = exit_time or entry_dt
         if isinstance(exit_dt, dt_cls) and exit_dt.tzinfo:
             exit_dt = exit_dt.replace(tzinfo=None)
@@ -398,6 +406,7 @@ def apply_manual_trade_to_portfolio(
     imported, skipped = upsert_ledger_rows(account_id, ledger_rows)
     already_synced = imported == 0 and skipped > 0
 
+    repair_phantom_journal_buys(account_id)
     purge_duplicate_trades(account_id)
     rebuild = _rebuild_from_store(account_id)
     source = account.get("source") or "manual"
@@ -452,6 +461,7 @@ def sync_brokerage_if_configured() -> dict:
 def refresh_holdings_snapshot() -> dict:
     account = get_or_create_account()
     repaired = repair_ledger_fill_prices(DEFAULT_ACCOUNT_ID)
+    removed_phantoms = repair_phantom_journal_buys(DEFAULT_ACCOUNT_ID)
     removed = purge_duplicate_trades(DEFAULT_ACCOUNT_ID)
     rebuild = _rebuild_from_store()
     cash = get_account_cash()
@@ -469,6 +479,7 @@ def refresh_holdings_snapshot() -> dict:
         "misc_events": persisted["misc_events"],
         "snapshot": snap or {},
         "duplicates_removed": removed,
+        "phantom_buys_removed": removed_phantoms,
         "prices_repaired": repaired,
     }
 

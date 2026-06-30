@@ -31,6 +31,7 @@ describe("quantLabNavigation", () => {
 
   it("validates section and tab guards", () => {
     expect(isQuantLabSection("ideas")).toBe(true);
+    expect(isQuantLabSection("models")).toBe(true);
     expect(isQuantLabSection("nope")).toBe(false);
     expect(isQuantLabLegacyTab("factor-performance")).toBe(true);
     expect(isQuantLabLegacyTab("nope")).toBe(false);

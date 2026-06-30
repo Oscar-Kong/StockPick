@@ -150,6 +150,64 @@ def test_duplicate_csv_upload_dedupes():
         session.close()
 
 
+def test_upsert_keeps_identical_fills_on_different_dates():
+    from data.portfolio_store import (
+        DEFAULT_ACCOUNT_ID,
+        SessionLocal,
+        TradeHistory,
+        init_portfolio_db,
+        load_all_ledger_rows,
+        upsert_ledger_rows,
+    )
+    from integrations.robinhood.models import ParsedCsvRow
+    from integrations.robinhood.portfolio_rebuilder import rebuild_portfolio
+
+    init_portfolio_db()
+    rows = [
+        ParsedCsvRow(
+            activity_date="2025-05-03",
+            process_date="2025-05-03",
+            instrument="AMC",
+            description="AMC buy 1",
+            trans_code="BUY",
+            quantity=20.0,
+            price=1.95,
+            amount=-39.0,
+            row_type="buy",
+            row_hash="dup-test-a",
+        ),
+        ParsedCsvRow(
+            activity_date="2025-05-10",
+            process_date="2025-05-10",
+            instrument="AMC",
+            description="AMC buy 2",
+            trans_code="BUY",
+            quantity=20.0,
+            price=1.95,
+            amount=-39.0,
+            row_type="buy",
+            row_hash="dup-test-b",
+        ),
+    ]
+
+    session = SessionLocal()
+    try:
+        session.query(TradeHistory).filter(TradeHistory.row_hash.in_(["dup-test-a", "dup-test-b"])).delete()
+        session.commit()
+    finally:
+        session.close()
+
+    imported, skipped = upsert_ledger_rows(DEFAULT_ACCOUNT_ID, rows, source_file_id=9910)
+    assert imported == 2
+    assert skipped == 0
+
+    loaded = load_all_ledger_rows(DEFAULT_ACCOUNT_ID)
+    assert len(loaded) == 2
+    rebuild = rebuild_portfolio(loaded)
+    amc = next(h for h in rebuild.open_holdings if h.symbol == "AMC")
+    assert amc.shares == pytest.approx(40.0)
+
+
 def test_decision_pcts_sum_to_100():
     out = compute_holding_decision(
         DecisionInput(

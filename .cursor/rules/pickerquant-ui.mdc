@@ -1,0 +1,21 @@
+---
+description: PickerQuant frontend and UI design requirements
+alwaysApply: true
+---
+
+# PickerQuant UI requirements
+
+Before modifying frontend code:
+
+1. Read design-system/MASTER.md.
+2. Read the relevant design-system/pages/[page].md file.
+3. Preserve existing backend contracts, calculations and financial data.
+4. Never remove functionality merely to simplify the interface.
+5. Preserve Buy, Hold and Sell percentages and semantic colors.
+6. Prefer shared components and tokens over page-specific styling.
+7. Avoid large empty spaces, oversized cards and low-contrast text.
+8. Keep tables and analytical information compact and readable.
+9. Every changed page must support desktop, laptop and mobile layouts.
+10. Run lint, type checking, tests and production build after changes.---
+alwaysApply: true
+---

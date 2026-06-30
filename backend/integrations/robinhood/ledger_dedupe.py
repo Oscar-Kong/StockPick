@@ -32,16 +32,21 @@ def apply_effective_fill_price(row: ParsedCsvRow) -> ParsedCsvRow:
 
 
 def semantic_ledger_key(row: ParsedCsvRow) -> tuple:
+    """Identity for duplicate detection — includes dates so separate fills are not merged."""
     rt = normalize_row_type(row.row_type)
+    activity = (row.activity_date or "").strip()
+    process = (row.process_date or "").strip()
     if rt == "event":
         return (
             "event",
+            activity,
+            process,
             (row.trans_code or "").upper(),
             round(float(row.amount or 0), 2),
         )
     qty = round(float(row.quantity or 0), 6)
     amount = round(float(row.amount or 0), 2)
-    return (rt, (row.instrument or "").upper(), qty, amount)
+    return (rt, activity, process, (row.instrument or "").upper(), qty, amount)
 
 
 def is_incomplete_ghost_row(row: ParsedCsvRow) -> bool:

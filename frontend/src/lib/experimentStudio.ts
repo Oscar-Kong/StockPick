@@ -35,6 +35,7 @@ export const EXPERIMENT_PRESETS = [
   "quick_check",
   "standard_research",
   "robust_validation",
+  "scan_eval_smoke",
   "custom",
 ] as const;
 

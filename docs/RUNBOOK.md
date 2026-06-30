@@ -66,9 +66,9 @@ Open: `http://127.0.0.1:18730`
 | Scan      | `/scan` → run one bucket                        |
 | Workspace | Add ticker to watchlist → open Research         |
 | Analyze   | Quant tab shows signal bars; Refresh works      |
-| Portfolio | `/` — Today (decisions), Research (optimize/backtest/exposure/allocation), Activity (CSV, journal) |
+| Portfolio | `/` — Today (decisions), Research (optimize/backtest/exposure/allocation), Activity (CSV review, transaction ledger) |
 | Library   | Save a scan or report, visible under `/library` |
-| Journal   | Home → Journal panel (`/?journal=1#home-journal`) |
+| Ledger    | Portfolio → Activity → Transaction ledger (`/?tab=activity`; legacy `/?journal=1` redirects here) |
 
 Investor guide for Analyze: [ANALYZE_PANEL.md](ANALYZE_PANEL.md)
 

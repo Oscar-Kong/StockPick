@@ -5,6 +5,7 @@ import { ExperimentStudio } from "@/components/quant-lab/ExperimentStudio";
 import { IdeasBoardTab } from "@/components/quant-lab/IdeasBoardTab";
 import { LegacyQuantLabTabs } from "@/components/quant-lab/LegacyQuantLabTabs";
 import { ModelMonitorTab } from "@/components/quant-lab/ModelMonitorTab";
+import { ModelsTab } from "@/components/quant-lab/ModelsTab";
 import { OverviewTab } from "@/components/quant-lab/OverviewTab";
 import { ResultsTab } from "@/components/quant-lab/ResultsTab";
 import { QuantLabEvidencePanel } from "@/components/quant-lab/QuantLabEvidencePanel";
@@ -58,6 +59,7 @@ function QuantLabContent() {
     ideas: t.quantLab.navIdeas,
     experiments: t.quantLab.navExperiments,
     results: t.quantLab.navResults,
+    models: t.quantLab.navModels,
     "model-monitor": t.quantLab.navModelMonitor,
   };
 
@@ -103,6 +105,7 @@ function QuantLabContent() {
         {section === "ideas" && <IdeasBoardTab sleeve={sleeve} onSleeveChange={setSleeve} />}
         {section === "experiments" && <ExperimentStudio sleeve={sleeve} onSleeveChange={setSleeve} />}
         {section === "results" && <ResultsTab sleeve={sleeve} onSleeveChange={setSleeve} />}
+        {section === "models" && <ModelsTab />}
         {section === "model-monitor" && <ModelMonitorTab sleeve={sleeve} onSleeveChange={setSleeve} />}
         {section === "legacy" && <LegacyQuantLabTabs tab={legacyTab} onTabChange={setLegacyTab} />}
       </div>

@@ -39,6 +39,32 @@ def test_dedupe_same_trade_with_and_without_date():
     assert deduped[0].activity_date == "2025-05-03"
 
 
+def test_dedupe_keeps_same_fill_on_different_dates():
+    """Two identical-size buys on different days must both survive (regression)."""
+    buy_a = _row(
+        activity_date="2025-05-03",
+        process_date="2025-05-03",
+        quantity=20.0,
+        price=1.95,
+        amount=-39.0,
+        row_hash="a",
+    )
+    buy_b = _row(
+        activity_date="2025-05-10",
+        process_date="2025-05-10",
+        quantity=20.0,
+        price=1.95,
+        amount=-39.0,
+        row_hash="b",
+    )
+    deduped, removed = dedupe_parsed_rows([buy_a, buy_b])
+    assert removed == 0
+    assert len(deduped) == 2
+    rebuild = rebuild_portfolio(deduped)
+    amc = next(h for h in rebuild.open_holdings if h.symbol == "AMC")
+    assert amc.shares == pytest.approx(40.0)
+
+
 def test_dedupe_lidr_lots_from_ghost_reimport():
     dated = [
         _row(instrument="LIDR", quantity=10.123456, price=1.2, amount=-12.15, activity_date="2025-05-05", row_hash="l1"),

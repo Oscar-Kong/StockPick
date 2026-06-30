@@ -1177,6 +1177,93 @@ class BrokerageCsvImportResponse(BaseModel):
     account: dict[str, Any] = {}
 
 
+class LedgerEntryResponse(BaseModel):
+    id: int
+    symbol: str = ""
+    side: str = ""
+    row_type: str = ""
+    quantity: float | None = None
+    price: float | None = None
+    amount: float | None = None
+    trans_code: str | None = None
+    description: str | None = None
+    activity_date: str | None = None
+    process_date: str | None = None
+    executed_at: str | None = None
+    source: str = "manual"
+    row_hash: str = ""
+    locked: bool = False
+
+
+class LedgerListResponse(BaseModel):
+    rows: list[LedgerEntryResponse] = []
+    open_holdings: list[dict[str, Any]] = []
+    closed_positions: list[dict[str, Any]] = []
+    ledger_cash_estimate: float = 0.0
+    warnings: list[str] = []
+
+
+class LedgerEntryCreate(BaseModel):
+    symbol: str
+    side: str = "buy"
+    quantity: float | None = None
+    price: float | None = None
+    amount: float | None = None
+    trans_code: str | None = None
+    description: str | None = None
+    activity_date: str | None = None
+    process_date: str | None = None
+
+
+class LedgerEntryUpdate(BaseModel):
+    symbol: str | None = None
+    side: str | None = None
+    quantity: float | None = None
+    price: float | None = None
+    amount: float | None = None
+    trans_code: str | None = None
+    description: str | None = None
+    activity_date: str | None = None
+    process_date: str | None = None
+    lock: bool | None = None
+
+
+class CsvPreviewRow(BaseModel):
+    client_id: str
+    included: bool = True
+    is_new: bool = True
+    symbol: str = ""
+    side: str = ""
+    row_type: str = ""
+    quantity: float | None = None
+    price: float | None = None
+    amount: float | None = None
+    trans_code: str | None = None
+    description: str | None = None
+    activity_date: str | None = None
+    process_date: str | None = None
+    row_hash: str = ""
+
+
+class CsvPreviewResponse(BaseModel):
+    filename: str
+    rows: list[CsvPreviewRow] = []
+    warnings: list[str] = []
+    current_holdings: list[dict[str, Any]] = []
+    projected_holdings: list[dict[str, Any]] = []
+    current_cash_estimate: float = 0.0
+    projected_cash_estimate: float = 0.0
+    new_row_count: int = 0
+    skipped_existing_count: int = 0
+
+
+class CsvApproveRequest(BaseModel):
+    filename: str
+    replace: bool = False
+    cash: float | None = None
+    rows: list[CsvPreviewRow] = []
+
+
 class CurrentPortfolioResponse(BaseModel):
     account: dict[str, Any] = {}
     cash: float = 0.0

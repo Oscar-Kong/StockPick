@@ -1,9 +1,7 @@
 "use client";
 
-import {
-  SCAN_EVAL_ALGORITHM_VERSIONS,
-  type ExperimentPresetId,
-} from "@/lib/experimentStudio";
+import { SCAN_EVAL_ALGORITHM_VERSIONS } from "@/lib/scanEvaluationDisplay";
+import type { ExperimentPresetId } from "@/lib/experimentStudio";
 import { useTranslation } from "@/lib/i18n";
 
 interface ScanEvaluationConfigFieldsProps {

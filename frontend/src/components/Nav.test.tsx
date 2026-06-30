@@ -8,12 +8,19 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/i18n", async () => {
   const en = await import("@/lib/i18n/messages/en");
-  return { useTranslation: () => ({ t: en.en, locale: "en" as const }) };
+  return {
+    useTranslation: () => ({ t: en.en, locale: "en" as const }),
+    useLocale: () => ({ locale: "en" as const, setLocale: vi.fn() }),
+  };
 });
 
 vi.mock("@/components/CommandPalette", () => ({
   CommandPalette: () => null,
   CommandPaletteTrigger: () => null,
+}));
+
+vi.mock("@/components/MobileBottomNav", () => ({
+  MobileBottomNav: () => null,
 }));
 
 vi.mock("@/components/SettingsMenu", () => ({

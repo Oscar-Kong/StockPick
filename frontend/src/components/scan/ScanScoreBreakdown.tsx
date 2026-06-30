@@ -7,6 +7,7 @@ import {
   hasDecomposedScores,
   hasInformativePillarBreakdown,
   readScanScoreParts,
+  type DisplayPillar,
 } from "@/lib/scanScoreDisplay";
 import type { StockResult } from "@/lib/types";
 

@@ -31,6 +31,8 @@ const baseDetail: ResearchRunDetailResponse = {
     verdict: "inconclusive",
     reliability_score: 50,
     research_notes: "",
+    archived: false,
+    result_reference: { store: "quant_lab", run_id: "scan_evaluation:test", detail_path: null },
   },
   interpretation: {
     verdict: "inconclusive",
@@ -40,7 +42,8 @@ const baseDetail: ResearchRunDetailResponse = {
     supporting_observations: [],
     main_limitation: "Sample",
     suggested_next_action: "Review",
-    reliability: { score: 50, factors: [] },
+    reliability: { score: 50, status: "moderate", reasons: [] },
+    major_evidence_gate: {},
   },
   experiment: null,
   detail: {

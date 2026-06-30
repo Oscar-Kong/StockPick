@@ -16,7 +16,7 @@ From one UI, you can:
 1. **Portfolio** (`/`) — unified workspace with three tabs:
    - **Today** — daily buy/keep/sell decisions, holdings table, risk alerts, penny opportunities
    - **Research** — optimize, backtest, factor exposure, allocation (what-if basket from holdings)
-   - **Activity** — Robinhood CSV import, buying power, trade journal, closed positions
+   - **Activity** — Robinhood CSV import (review & approve), editable transaction ledger, buying power, closed positions
 2. **Scan** a bucket and rank candidates (`/scan`)
 3. **Workspace** — watchlist and single-symbol analyze (primary score from `/api/v2/score` when enabled) (`/workspace`)
 4. **Quant Lab** — research workbench: Overview, Ideas, Experiment Studio, Results, Model Monitor + legacy validation tabs (`/quant-lab`)
@@ -336,6 +336,8 @@ For production-grade models, offline training pipelines still need to be operate
 | [Quant Integration Plan](docs/QUANT_INTEGRATION_PLAN.md) | Roadmap + implementation status |
 | [Institutional Quant Architecture](docs/INSTITUTIONAL_QUANT_ARCHITECTURE.md) | Target v2 engines, formulas, schema, roadmap |
 | **[Cursor Skills quick manual](docs/CURSOR_SKILLS.md)** | **Using `.cursor/skills/` workflows, personas, and commands in this repo** |
+| [UI audit (revised)](docs/UI_AUDIT_REVISED.md) | Frontend redesign — findings, phases, guardrails |
+| [UI baseline (Phase 0)](docs/ui-baseline/BASELINE.md) | Validation baseline before design-system upgrade |
 
 ## Common Commands
 

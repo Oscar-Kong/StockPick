@@ -9,13 +9,13 @@ import { AppTabBar, AppTabButton } from "@/components/AppTabs";
 import {
   getDailyDashboard,
   getHomeRefreshStatus,
-  importRobinhoodCsv,
+  previewRobinhoodCsv,
   refreshHomeData,
   runDailyDecisionNow,
   setBuyingPower,
 } from "@/lib/api";
 import { activeHomeNoticeIds, homeNoticeId, pruneDismissedNotices } from "@/lib/dismissedNotices";
-import type { BrokerageCsvImportResponse, DailyDashboardResponse } from "@/lib/types";
+import type { BrokerageCsvImportResponse, CsvPreviewResponse, DailyDashboardResponse } from "@/lib/types";
 import { DismissibleNotice } from "@/components/ui/DismissibleNotice";
 import { useTranslation, useTRef } from "@/lib/i18n";
 import { DataFreshnessBanner } from "@/components/dashboard/daily-decision/DataFreshnessBanner";
@@ -48,6 +48,8 @@ export function PortfolioWorkspace() {
   const [reservedInput, setReservedInput] = useState("");
   const [replaceImport, setReplaceImport] = useState(true);
   const [lastImport, setLastImport] = useState<BrokerageCsvImportResponse | null>(null);
+  const [csvPreview, setCsvPreview] = useState<CsvPreviewResponse | null>(null);
+  const [ledgerRefreshKey, setLedgerRefreshKey] = useState(0);
   const [refreshJobId, setRefreshJobId] = useState<string | null>(null);
 
   const load = useCallback(async (opts?: { silent?: boolean; skipAutoRefresh?: boolean }) => {
@@ -224,17 +226,24 @@ export function PortfolioWorkspace() {
   const onImport = async (file: File) => {
     setImporting(true);
     setError(null);
+    setCsvPreview(null);
     try {
-      const cash = cashInput.trim() ? Number(cashInput) : undefined;
-      const result = await importRobinhoodCsv(file, cash, replaceImport);
-      setLastImport(result);
-      await load();
+      const preview = await previewRobinhoodCsv(file, replaceImport);
+      setCsvPreview(preview);
+      setTab("activity");
     } catch (e) {
-      setError(e instanceof Error ? e.message : tRef.current.home.dailyImportFailed);
+      setError(e instanceof Error ? e.message : tRef.current.portfolio.csvReviewPreviewFailed);
     } finally {
       setImporting(false);
       if (fileRef.current) fileRef.current.value = "";
     }
+  };
+
+  const onCsvApproved = async (result: BrokerageCsvImportResponse) => {
+    setLastImport(result);
+    setCsvPreview(null);
+    setLedgerRefreshKey((k) => k + 1);
+    await load();
   };
 
   const holdingSymbols = useMemo(
@@ -340,6 +349,14 @@ export function PortfolioWorkspace() {
               savingCash={savingCash}
               importing={importing}
               lastImport={lastImport}
+              csvPreview={csvPreview}
+              onCsvPreviewCancel={() => setCsvPreview(null)}
+              onCsvApproved={(result) => void onCsvApproved(result)}
+              ledgerRefreshKey={ledgerRefreshKey}
+              onLedgerChanged={() => {
+                setLedgerRefreshKey((k) => k + 1);
+                void load();
+              }}
             />
           )}
         </div>

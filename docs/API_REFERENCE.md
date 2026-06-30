@@ -149,3 +149,21 @@ Protected ops routes for the daily scan digest. `POST /send` requires non-demo m
 ## Related legacy Quant Lab endpoints
 
 See [QUANT_LAB.md](./QUANT_LAB.md) for `/api/v2/quant-lab/evidence`, `/research/walk-forward`, `/research/pairs`, factor performance, and model admin routes.
+
+## Brokerage — portfolio ledger & CSV import
+
+Base path: `/api/brokerage` (mutating routes require non-demo mode)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/ledger` | List all ledger rows + computed open holdings |
+| POST | `/ledger` | Create manual ledger row (`LedgerEntryInput`) |
+| PATCH | `/ledger/{id}` | Update draft row; pass `"lock": true` on Save to lock permanently |
+| DELETE | `/ledger/{id}` | Delete row |
+| POST | `/ledger/rebuild` | Recompute holdings from ledger |
+| POST | `/preview/robinhood-csv` | Parse CSV; return editable preview rows + current/projected holdings (Form: `file`, optional `replace=true`) |
+| POST | `/import/robinhood-csv/approve` | Apply reviewed rows from preview (`CsvApproveRequest`: `filename`, `replace`, `rows[]` with `included`, editable fields) |
+| POST | `/import/robinhood-csv` | Legacy direct import (no review step) |
+| POST | `/buying-power` | Save explicit cash / IPO reserved amounts |
+
+**CSV flow:** UI calls preview → user edits/unchecks rows → approve sends the edited payload (not the raw file). Semantic dedupe on append includes activity date, symbol, side, quantity, and price.

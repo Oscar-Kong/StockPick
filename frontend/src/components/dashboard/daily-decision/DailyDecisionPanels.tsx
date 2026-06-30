@@ -173,21 +173,26 @@ export function CsvImportFooter(props: CsvImportFooterProps) {
   const { onImportClick, importing } = props;
 
   return (
-    <div className="home-journal-import">
-      <div className="home-journal-import__row">
-        <GhostButton
+    <div className="rounded-2xl border border-zinc-800/80 bg-zinc-950/40 p-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <PrimaryButton
           onClick={onImportClick}
           disabled={importing}
-          className="home-journal-import__btn rounded-lg px-3 py-1.5 text-xs"
+          size="sm"
+          className="rounded-xl shadow-[0_0_20px_-8px_rgba(56,189,248,0.45)]"
         >
           {importing ? t.common.running : t.home.dailyImportCsv}
-        </GhostButton>
-        <details className="home-journal-import__details">
-          <summary className="home-journal-import__summary">{t.home.journalImportOptions}</summary>
-          <CsvImportOptions {...props} />
+        </PrimaryButton>
+        <details className="group/details">
+          <summary className="cursor-pointer list-none rounded-full border border-zinc-700/80 bg-zinc-900/50 px-3 py-1.5 text-xs font-medium text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-200 [&::-webkit-details-marker]:hidden">
+            {t.home.journalImportOptions}
+          </summary>
+          <div className="mt-3 rounded-xl border border-zinc-800/80 bg-zinc-950/60 p-3">
+            <CsvImportOptions {...props} />
+          </div>
         </details>
       </div>
-      <p className="home-journal-import__hint">{t.home.dailyCsvWhereHint}</p>
+      <p className="ledger-hint mt-3">{t.home.dailyCsvWhereHint}</p>
     </div>
   );
 }

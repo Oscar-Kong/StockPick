@@ -3,6 +3,7 @@
 
 import { AppTabBar, AppTabLink } from "@/components/AppTabs";
 import { CommandPalette, CommandPaletteTrigger } from "@/components/CommandPalette";
+import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { SettingsMenu } from "@/components/SettingsMenu";
 import { useTranslation } from "@/lib/i18n";
 import Link from "next/link";
@@ -84,6 +85,7 @@ export function Nav() {
         </div>
       </header>
       <CommandPalette />
+      <MobileBottomNav />
     </>
   );
 }

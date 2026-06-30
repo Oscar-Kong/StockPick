@@ -1,76 +1,145 @@
-"""Journal trade → Home portfolio sync tests."""
+"""Journal → portfolio ledger sync (exit-only closes, phantom buy repair)."""
 from __future__ import annotations
 
-from unittest.mock import patch
+from datetime import datetime
 
-from services.portfolio_snapshot_service import (
-    _journal_ledger_hash,
-    evaluate_portfolio_sync_result,
-    is_journal_trade_synced,
-    journal_trade_sync_status,
+import pytest
+
+from data.portfolio_store import (
+    DEFAULT_ACCOUNT_ID,
+    SessionLocal,
+    TradeHistory,
+    get_current_holdings,
+    init_portfolio_db,
+    repair_phantom_journal_buys,
+    upsert_ledger_rows,
 )
+from integrations.robinhood.models import ParsedCsvRow
+from integrations.robinhood.portfolio_rebuilder import rebuild_portfolio
+from services.portfolio_snapshot_service import apply_manual_trade_to_portfolio, refresh_holdings_snapshot
 
 
-def test_evaluate_sync_result_imported():
-    ok, msg = evaluate_portfolio_sync_result({"imported": 1, "skipped": 0, "holdings_count": 2})
-    assert ok is True
-    assert msg
+def _clear_symbol(symbol: str) -> None:
+    session = SessionLocal()
+    try:
+        session.query(TradeHistory).filter(TradeHistory.symbol == symbol).delete()
+        session.commit()
+    finally:
+        session.close()
 
 
-def test_evaluate_sync_result_already_synced():
-    ok, msg = evaluate_portfolio_sync_result(
-        {"imported": 0, "skipped": 1, "message": "Portfolio refreshed (trade already synced)"}
+def test_exit_only_journal_sync_closes_csv_position():
+    """Closed journal with entry_price=0 should sell CSV shares, not add phantom buys."""
+    init_portfolio_db()
+    _clear_symbol("HIVE")
+
+    csv_rows = [
+        ParsedCsvRow(
+            activity_date="2026-06-10",
+            process_date="2026-06-10",
+            instrument="HIVE",
+            description="HIVE buy 1",
+            trans_code="BUY",
+            quantity=10.0,
+            price=3.74,
+            amount=-37.4,
+            row_type="buy",
+            row_hash="hive-csv-1",
+        ),
+        ParsedCsvRow(
+            activity_date="2026-06-15",
+            process_date="2026-06-15",
+            instrument="HIVE",
+            description="HIVE buy 2",
+            trans_code="BUY",
+            quantity=10.0,
+            price=3.94,
+            amount=-39.45,
+            row_type="buy",
+            row_hash="hive-csv-2",
+        ),
+    ]
+    upsert_ledger_rows(DEFAULT_ACCOUNT_ID, csv_rows)
+
+    result = apply_manual_trade_to_portfolio(
+        trade_id=99,
+        symbol="HIVE",
+        side="long",
+        entry_time=datetime(2026, 6, 24),
+        entry_price=0.0,
+        quantity=20.0,
+        exit_price=4.62,
+        notes="Closed HIVE",
     )
-    assert ok is True
+    assert result is not None
+    assert result["holdings_count"] == 0
+
+    session = SessionLocal()
+    try:
+        manual_buys = (
+            session.query(TradeHistory)
+            .filter(
+                TradeHistory.symbol == "HIVE",
+                TradeHistory.trans_code == "MANUAL",
+                TradeHistory.side == "buy",
+            )
+            .count()
+        )
+        assert manual_buys == 0
+    finally:
+        session.close()
 
 
-def test_evaluate_sync_result_no_changes():
-    ok, msg = evaluate_portfolio_sync_result({"imported": 0, "skipped": 0, "holdings_count": 0})
-    assert ok is False
-    assert msg
+def test_repair_phantom_journal_buys():
+    init_portfolio_db()
+    _clear_symbol("TEST")
 
+    session = SessionLocal()
+    try:
+        session.add(
+            TradeHistory(
+                account_id=DEFAULT_ACCOUNT_ID,
+                symbol="TEST",
+                side="buy",
+                quantity=20.0,
+                price=0.0,
+                amount=0.0,
+                trans_code="MANUAL",
+                description="Manual trade entry [journal #42]",
+                activity_date="2026-06-24",
+                process_date="2026-06-24",
+                row_hash="phantom-buy-42",
+                created_at=datetime.utcnow(),
+            )
+        )
+        session.add(
+            TradeHistory(
+                account_id=DEFAULT_ACCOUNT_ID,
+                symbol="TEST",
+                side="sell",
+                quantity=20.0,
+                price=4.62,
+                amount=92.4,
+                trans_code="MANUAL",
+                description="Manual trade entry [journal #42]",
+                activity_date="2026-06-24",
+                process_date="2026-06-24",
+                row_hash="phantom-sell-42",
+                created_at=datetime.utcnow(),
+            )
+        )
+        session.commit()
+    finally:
+        session.close()
 
-def test_evaluate_sync_result_ledger_ok_decision_warns():
-    ok, msg = evaluate_portfolio_sync_result(
-        {
-            "imported": 1,
-            "skipped": 0,
-            "message": "Portfolio updated",
-            "decision_error": "price timeout",
-        }
-    )
-    assert ok is True
-    assert "decision refresh" in (msg or "")
+    removed = repair_phantom_journal_buys(DEFAULT_ACCOUNT_ID)
+    assert removed == 1
 
-
-def test_evaluate_sync_result_decision_fail_no_ledger():
-    ok, msg = evaluate_portfolio_sync_result({"imported": 0, "skipped": 0, "decision_error": "no holdings"})
-    assert ok is False
-    assert msg == "no holdings"
-
-
-def test_journal_trade_sync_status_needs_quantity():
-    status, synced = journal_trade_sync_status(trade_id=1, quantity=None)
-    assert status == "needs_quantity"
-    assert synced is False
-
-
-def test_journal_trade_sync_status_pending():
-    with patch("services.portfolio_snapshot_service.is_journal_trade_synced", return_value=False):
-        status, synced = journal_trade_sync_status(trade_id=5, quantity=10)
-    assert status == "pending"
-    assert synced is False
-
-
-def test_journal_trade_sync_status_synced():
-    with patch("services.portfolio_snapshot_service.is_journal_trade_synced", return_value=True):
-        status, synced = journal_trade_sync_status(trade_id=5, quantity=10)
-    assert status == "synced"
-    assert synced is True
-
-
-def test_is_journal_trade_synced_checks_buy_leg_hash():
-    buy_hash = _journal_ledger_hash(42, "buy")
-    with patch("data.portfolio_store.ledger_has_row_hash", return_value=True) as has_hash:
-        assert is_journal_trade_synced(42) is True
-    has_hash.assert_called_once_with(buy_hash)
+    session = SessionLocal()
+    try:
+        buys = session.query(TradeHistory).filter(TradeHistory.symbol == "TEST", TradeHistory.side == "buy").count()
+        sells = session.query(TradeHistory).filter(TradeHistory.symbol == "TEST", TradeHistory.side == "sell").count()
+        assert buys == 0
+        assert sells == 1
+    finally:
+        session.close()

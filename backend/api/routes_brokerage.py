@@ -3,9 +3,27 @@ from __future__ import annotations
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
-from models.schemas import BrokerageCsvImportResponse, CurrentPortfolioResponse
+from models.schemas import (
+    BrokerageCsvImportResponse,
+    CsvApproveRequest,
+    CsvPreviewResponse,
+    CurrentPortfolioResponse,
+    LedgerEntryCreate,
+    LedgerEntryResponse,
+    LedgerEntryUpdate,
+    LedgerListResponse,
+)
 from utils.demo_guard import require_non_demo_mode
 from utils.pydantic_util import model_to_dict
+from services.portfolio_ledger_service import (
+    approve_csv_import,
+    create_ledger_entry,
+    list_ledger_api,
+    preview_robinhood_csv,
+    rebuild_ledger_holdings,
+    remove_ledger_entry,
+    update_ledger_entry,
+)
 from services.portfolio_snapshot_service import (
     get_current_portfolio,
     import_robinhood_csv_and_decide,
@@ -15,6 +33,92 @@ from services.portfolio_snapshot_service import (
 )
 
 router = APIRouter(prefix="/brokerage", tags=["brokerage"])
+
+
+@router.get("/ledger", response_model=LedgerListResponse)
+def get_portfolio_ledger():
+    """All buy/sell/cash ledger rows that drive portfolio holdings."""
+    require_non_demo_mode()
+    return LedgerListResponse(**list_ledger_api())
+
+
+@router.post("/ledger", response_model=LedgerEntryResponse)
+def post_ledger_entry(body: LedgerEntryCreate):
+    require_non_demo_mode()
+    try:
+        return LedgerEntryResponse(**create_ledger_entry(body.model_dump()))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.patch("/ledger/{row_id}", response_model=LedgerEntryResponse)
+def patch_ledger_entry(row_id: int, body: LedgerEntryUpdate):
+    require_non_demo_mode()
+    try:
+        return LedgerEntryResponse(**update_ledger_entry(row_id, body.model_dump(exclude_unset=True)))
+    except ValueError as exc:
+        msg = str(exc)
+        if "locked" in msg.lower():
+            raise HTTPException(status_code=409, detail=msg) from exc
+        raise HTTPException(status_code=404, detail=msg) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.delete("/ledger/{row_id}")
+def delete_ledger_entry_route(row_id: int):
+    require_non_demo_mode()
+    try:
+        remove_ledger_entry(row_id)
+        return {"deleted": True, "id": row_id}
+    except ValueError as exc:
+        msg = str(exc)
+        if "locked" in msg.lower():
+            raise HTTPException(status_code=409, detail=msg) from exc
+        raise HTTPException(status_code=404, detail=msg) from exc
+
+
+@router.post("/ledger/rebuild")
+def rebuild_ledger_route():
+    require_non_demo_mode()
+    try:
+        return rebuild_ledger_holdings()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/preview/robinhood-csv", response_model=CsvPreviewResponse)
+async def preview_robinhood_csv_route(
+    file: UploadFile = File(...),
+    replace: bool = Form(False),
+):
+    """Parse CSV and return editable rows + projected holdings — nothing persisted."""
+    require_non_demo_mode()
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Upload a .csv file")
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Empty file")
+    try:
+        return CsvPreviewResponse(**preview_robinhood_csv(content, file.filename, replace=replace))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"CSV preview failed: {exc}") from exc
+
+
+@router.post("/import/robinhood-csv/approve", response_model=BrokerageCsvImportResponse)
+def approve_robinhood_csv_route(body: CsvApproveRequest):
+    """Persist user-reviewed CSV rows after manual validation."""
+    require_non_demo_mode()
+    try:
+        result = approve_csv_import(
+            filename=body.filename,
+            rows=[r.model_dump() for r in body.rows],
+            replace=body.replace,
+            cash=body.cash,
+        )
+        return BrokerageCsvImportResponse(**result)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"CSV approve failed: {exc}") from exc
 
 
 @router.post("/import/robinhood-csv", response_model=BrokerageCsvImportResponse)

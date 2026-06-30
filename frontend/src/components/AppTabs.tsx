@@ -50,7 +50,11 @@ export function AppTabLink({
   children: ReactNode;
 }) {
   return (
-    <Link href={href} className={clsx("app-tab", active && "app-tab--active", className)}>
+    <Link
+      href={href}
+      className={clsx("app-tab", active && "app-tab--active", className)}
+      aria-current={active ? "page" : undefined}
+    >
       {children}
     </Link>
   );

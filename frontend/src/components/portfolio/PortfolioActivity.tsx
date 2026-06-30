@@ -1,9 +1,10 @@
 "use client";
 
-import type { BrokerageCsvImportResponse, DailyDashboardResponse } from "@/lib/types";
+import type { BrokerageCsvImportResponse, CsvPreviewResponse, DailyDashboardResponse } from "@/lib/types";
 import { useTranslation } from "@/lib/i18n";
-import { TradeJournal } from "@/components/TradeJournal";
 import { CsvImportFooter, ClosedPositionsPanel } from "@/components/dashboard/daily-decision/DailyDecisionPanels";
+import { CsvImportReviewPanel } from "@/components/portfolio/CsvImportReviewPanel";
+import { PortfolioLedgerPanel } from "@/components/portfolio/PortfolioLedgerPanel";
 import { SectionCard } from "@/components/ui/AppCard";
 
 export type PortfolioActivityProps = {
@@ -23,6 +24,11 @@ export type PortfolioActivityProps = {
   savingCash: boolean;
   importing: boolean;
   lastImport: BrokerageCsvImportResponse | null;
+  csvPreview: CsvPreviewResponse | null;
+  onCsvPreviewCancel: () => void;
+  onCsvApproved: (result: BrokerageCsvImportResponse) => void;
+  ledgerRefreshKey: number;
+  onLedgerChanged: () => void;
 };
 
 export function PortfolioActivity({
@@ -42,35 +48,49 @@ export function PortfolioActivity({
   savingCash,
   importing,
   lastImport,
+  csvPreview,
+  onCsvPreviewCancel,
+  onCsvApproved,
+  ledgerRefreshKey,
+  onLedgerChanged,
 }: PortfolioActivityProps) {
   const { t } = useTranslation();
 
   return (
     <div className="space-y-4">
       <SectionCard title={t.portfolio.activityImportTitle} subtitle={t.portfolio.activityImportSubtitle} variant="elevated">
-        <CsvImportFooter
-          cashInput={cashInput}
-          onCashChange={onCashChange}
-          ipoSharesInput={ipoSharesInput}
-          onIpoSharesChange={onIpoSharesChange}
-          ipoListPriceInput={ipoListPriceInput}
-          onIpoListPriceChange={onIpoListPriceChange}
-          reservedInput={reservedInput}
-          onReservedChange={onReservedChange}
-          replaceImport={replaceImport}
-          onReplaceChange={onReplaceChange}
-          onImportClick={onImportClick}
-          onSaveBuyingPower={onSaveBuyingPower}
-          savingCash={savingCash}
-          importing={importing}
-          lastImport={lastImport}
-          csvRowsLoaded={data.csv_rows_loaded}
-          ledgerRowsCount={data.ledger_rows_count}
-        />
+        {csvPreview ? (
+          <CsvImportReviewPanel
+            preview={csvPreview}
+            replace={replaceImport}
+            onCancel={onCsvPreviewCancel}
+            onApproved={onCsvApproved}
+          />
+        ) : (
+          <CsvImportFooter
+            cashInput={cashInput}
+            onCashChange={onCashChange}
+            ipoSharesInput={ipoSharesInput}
+            onIpoSharesChange={onIpoSharesChange}
+            ipoListPriceInput={ipoListPriceInput}
+            onIpoListPriceChange={onIpoListPriceChange}
+            reservedInput={reservedInput}
+            onReservedChange={onReservedChange}
+            replaceImport={replaceImport}
+            onReplaceChange={onReplaceChange}
+            onImportClick={onImportClick}
+            onSaveBuyingPower={onSaveBuyingPower}
+            savingCash={savingCash}
+            importing={importing}
+            lastImport={lastImport}
+            csvRowsLoaded={data.csv_rows_loaded}
+            ledgerRowsCount={data.ledger_rows_count}
+          />
+        )}
       </SectionCard>
 
-      <SectionCard title={t.command.tradeJournal} subtitle={t.portfolio.activityJournalSubtitle} variant="elevated">
-        <TradeJournal compact />
+      <SectionCard title={t.portfolio.ledgerTitle} subtitle={t.portfolio.ledgerSubtitle} variant="elevated">
+        <PortfolioLedgerPanel key={ledgerRefreshKey} onChanged={onLedgerChanged} />
       </SectionCard>
 
       {(data.closed_positions?.length ?? 0) > 0 && (

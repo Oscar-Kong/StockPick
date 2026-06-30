@@ -13,6 +13,11 @@ import type {
   HomeRefreshResponse,
   HomeRefreshStatusResponse,
   BrokerageCsvImportResponse,
+  CsvApproveRequest,
+  CsvPreviewResponse,
+  LedgerEntry,
+  LedgerEntryInput,
+  LedgerListResponse,
   PortfolioOptimizeRequest,
   PortfolioOptimizeResponse,
   PortfolioSummaryResponse,
@@ -341,6 +346,48 @@ export async function importRobinhoodCsv(
     throw new Error(text || `Import failed: ${res.status}`);
   }
   return res.json() as Promise<BrokerageCsvImportResponse>;
+}
+
+export async function previewRobinhoodCsv(file: File, replace = false): Promise<CsvPreviewResponse> {
+  const form = new FormData();
+  form.append("file", file);
+  if (replace) form.append("replace", "true");
+  const res = await fetch(`${API_URL}/brokerage/preview/robinhood-csv`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `Preview failed: ${res.status}`);
+  }
+  return res.json() as Promise<CsvPreviewResponse>;
+}
+
+export async function approveRobinhoodCsv(body: CsvApproveRequest): Promise<BrokerageCsvImportResponse> {
+  return request("/brokerage/import/robinhood-csv/approve", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function getPortfolioLedger(): Promise<LedgerListResponse> {
+  return request("/brokerage/ledger");
+}
+
+export function createLedgerEntry(body: LedgerEntryInput): Promise<LedgerEntry> {
+  return request("/brokerage/ledger", { method: "POST", body: JSON.stringify(body) });
+}
+
+export function updateLedgerEntry(id: number, body: Partial<LedgerEntryInput>): Promise<LedgerEntry> {
+  return request(`/brokerage/ledger/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+export function deleteLedgerEntry(id: number): Promise<{ deleted: boolean; id: number }> {
+  return request(`/brokerage/ledger/${id}`, { method: "DELETE" });
+}
+
+export function rebuildPortfolioLedger(): Promise<{ holdings_count: number; holdings: unknown[]; cash: number }> {
+  return request("/brokerage/ledger/rebuild", { method: "POST" });
 }
 
 export async function setBuyingPower(

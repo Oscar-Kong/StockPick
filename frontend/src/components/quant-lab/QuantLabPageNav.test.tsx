@@ -23,6 +23,7 @@ vi.mock("@/lib/i18n", () => ({
         navIdeas: "Ideas",
         navExperiments: "Experiments",
         navResults: "Results",
+        navModels: "Models",
         navModelMonitor: "Model Monitor",
         navLegacy: "Legacy tools",
         researchOnlyWarning: "Research only",
@@ -50,6 +51,9 @@ vi.mock("@/components/quant-lab/ResultsTab", () => ({
 }));
 vi.mock("@/components/quant-lab/ModelMonitorTab", () => ({
   ModelMonitorTab: () => <div data-testid="model-monitor-tab">Model Monitor</div>,
+}));
+vi.mock("@/components/quant-lab/ModelsTab", () => ({
+  ModelsTab: () => <div data-testid="models-tab">Models</div>,
 }));
 vi.mock("@/components/quant-lab/LegacyQuantLabTabs", () => ({
   LegacyQuantLabTabs: () => <div data-testid="legacy-tabs">Legacy</div>,

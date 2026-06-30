@@ -3,6 +3,7 @@ export const QUANT_LAB_SECTIONS = [
   "ideas",
   "experiments",
   "results",
+  "models",
   "model-monitor",
   "legacy",
 ] as const;

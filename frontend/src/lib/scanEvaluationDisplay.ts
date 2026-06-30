@@ -2,6 +2,15 @@ import type { ResearchRunDetailResponse } from "@/lib/types";
 
 export type ComparisonRow = Record<string, string | number | null | undefined>;
 
+export const SCAN_EVAL_ALGORITHM_VERSIONS = [
+  "alphabetical_baseline",
+  "stage_a_v1",
+  "stage_a_v2",
+  "scoring_engine_v1",
+] as const;
+
+export type ScanEvalAlgorithmVersion = (typeof SCAN_EVAL_ALGORITHM_VERSIONS)[number];
+
 const ALGORITHM_LABELS: Record<string, string> = {
   alphabetical_baseline: "Alphabetical baseline",
   stage_a_v1: "Stage A v1",

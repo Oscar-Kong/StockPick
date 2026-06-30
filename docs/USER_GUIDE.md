@@ -44,14 +44,14 @@ The product focuses on **Penny** (default) and **Compounder**. Legacy **Medium**
 You only need **four routes** for 90% of work:
 
 ```
-Portfolio (/)           → **Portfolio workspace** — Today (decisions), Research (tools), Activity (CSV & journal)
+Portfolio (/)           → **Portfolio workspace** — Today (decisions), Research (tools), Activity (CSV & ledger)
 Screen (/scan)     → discover ranked candidates (Penny + Compounder)
 Research (/workspace) → watchlist + deep dive
 Library (/library) → saved scans & reports
 Quant Lab (/quant-lab) → validation & factor research (not daily workflow)
 ```
 
-Trade journal (log + Robinhood CSV import): **Home** sidebar → `/?journal=1#home-journal`
+Transaction ledger (edit buys/sells + CSV review): **Portfolio → Activity** (`/?tab=activity`)
 
 Inside **Research → Analyze**, use **Overview** for v2 recommendation, valuation, similar-signal, and position sizing (visible on all screen sizes; the right sidebar keeps technicals and factor weights).
 
@@ -85,10 +85,14 @@ Everything else is **secondary**:
 
 ### C. “I traded — log it” (5 min)
 
-1. **Home** → open the **Journal** panel (`/?journal=1#home-journal`).
-2. Manual entry or Robinhood CSV import — **quantity is optional** for manual rows; CSV rebuilds holdings on Home.
-3. Check the badge on each saved trade: **On Home** (in portfolio ledger) vs **Not on Home** (use **Sync to Home**).
-4. Review process-quality score (not just PnL).
+1. **Portfolio** → **Activity** tab.
+2. **Robinhood CSV:** upload triggers a **review screen** — verify each buy/sell row (date, price, shares), uncheck rows to skip, then **Approve & update portfolio**. Use **Replace existing transaction history** when uploading a full export.
+3. **Transaction ledger:** every buy/sell that drives holdings — edit draft rows, then **Save** to lock them (saved rows cannot be changed). CSV-approved rows are locked automatically.
+4. Review projected vs current holdings before approving CSV imports.
+
+**Re-importing Robinhood CSV:** With **Replace** on (default), approving a full Account Activity export replaces CSV-sourced ledger rows. With **Replace** off, only new rows are appended (semantic dedupe includes date + symbol + side + qty + price). You can edit any row in the review table before approving. Buying power is derived from the ledger on import — set it explicitly with **Save buying power** if you need to match Robinhood’s cash line exactly.
+
+**Journal → Home sync:** Legacy trade journal routes still exist for notes and screenshots, but **Portfolio → Activity → Transaction ledger** is the canonical place to add or fix buys/sells. After edits, use **Rebuild holdings** if open positions look stale.
 
 ### D. “I want portfolio-level math” (advanced)
 
@@ -236,7 +240,7 @@ You do **not** need to touch Portfolio, Trader Intel, Round 2 admin APIs, or arc
 |---------|-----|
 | Empty scan | Widen price/volume filters; check backend on `:18731` |
 | Stale watchlist prices | Refresh rail (↻) in Research |
-| Journal trade not on Home | Enter **quantity** when saving; check badge (**On Home** / **Not on Home**); click **Sync to Home** |
+| Wrong holdings after import | Portfolio → Activity → review CSV rows before approve; fix or add rows in **Transaction ledger**, then **Rebuild holdings** |
 | Home stuck on “Updating” | Wait for refresh to finish; use **Refresh data now** once; reload `/` |
 | LLM Summary empty | `LLM_ENABLED` + proxy keys in `.env` |
 | Portfolio optimize fails | Need 2+ symbols with history; optional `requirements-quant.txt` |

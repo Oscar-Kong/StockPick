@@ -55,12 +55,27 @@ Env: `QUANT_LAB_RESEARCH_API_ENABLED`, `RESEARCH_MAX_ORDINARY_MODIFIER` (default
 |---------|-------|----------------|
 | Overview | `section=overview` (default) | `GET /api/v2/research/overview?sleeve=` only |
 | Ideas | `section=ideas` | `GET /api/v2/research/ideas` |
+| Models | `section=models` | Static model library (GBM, HMM, Markowitz, cointegration, GARCH) — no API |
 | Model Monitor | `section=model-monitor` | `GET /api/v2/research/model-monitor` — factor/prediction/data health, jobs, audit, evidence review |
 | Legacy tools | `section=legacy&tab=` | Factor performance, walk-forward, predictions, pairs |
 
 Overview includes deterministic **research brief** findings, recommended ideas, recent activity, and collapsible **evidence maintenance** actions (IC panel, forward labels, resolve outcomes, quant daily jobs, evidence backfill).
 
 Ideas board supports manual create, generate-from-brief, edit/notes/priority, archive, duplicate, and **Configure experiment** (creates experiment record + opens Experiment Studio).
+
+## Model library (`section=models`)
+
+Read-only reference for five core quant models with KaTeX-rendered equations and **In this project** mapping:
+
+| Model | Status | Where used in this repo |
+|-------|--------|-------------------------|
+| Geometric Brownian Motion | Reference | Conceptual baseline; walk-forward and optimizer use empirical returns |
+| Hidden Markov Model | Partial | Target for regime labels; today rule-based SPY vol in `scoring/regime.py` |
+| Markowitz Mean–Variance | Live | `portfolio_optimizer.py` / PyPortfolioOpt — Portfolio → Research |
+| Cointegration & stat arb | Live | `engines/pairs/` — Legacy Pairs tab & Experiment Studio |
+| GARCH | Partial | ATR-based vol regime proxy; full GARCH fit not wired yet |
+
+Route: `/quant-lab?section=models`. No backend API — static catalog in `frontend/src/lib/quantLabModels.ts`.
 
 ## Experiment Studio (Phase 4)
 
@@ -111,6 +126,7 @@ frontend/src/components/quant-lab/
   IdeasBoardTab.tsx         → ideas CRUD + generate
   ExperimentStudio.tsx      → unified experiment wizard
   ResultsTab.tsx            → paginated runs + detail + compare
+  ModelsTab.tsx             → model library (equations + project mapping)
   ModelMonitorTab.tsx       → health, jobs, audit, evidence review
   LegacyQuantLabTabs.tsx    → factor, WF, predictions, pairs
   QuantLabTabShell.tsx      → shared UI helpers

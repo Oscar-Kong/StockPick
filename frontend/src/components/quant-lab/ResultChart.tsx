@@ -1,6 +1,9 @@
 "use client";
 
 import type { ChartSeries } from "@/lib/types";
+import { buildSeriesChartSummaryLines } from "@/lib/chartSummary";
+import { ChartTextSummary } from "@/components/ui/ChartTextSummary";
+import { useMemo } from "react";
 import {
   Bar,
   BarChart,
@@ -35,6 +38,13 @@ function flattenSeries(chart: ChartSeries) {
 }
 
 export function ResultChart({ chart }: ResultChartProps) {
+  const seriesNames = useMemo(() => chart.series.map((s) => s.name), [chart.series]);
+  const data = useMemo(() => flattenSeries(chart), [chart]);
+  const summaryLines = useMemo(
+    () => buildSeriesChartSummaryLines(chart.title, data, seriesNames),
+    [chart.title, data, seriesNames]
+  );
+
   if (chart.empty_reason) {
     return (
       <div className="rounded-lg border border-zinc-800 bg-zinc-950/40 p-3 text-xs text-zinc-500">
@@ -44,7 +54,6 @@ export function ResultChart({ chart }: ResultChartProps) {
     );
   }
 
-  const data = flattenSeries(chart);
   if (!data.length) {
     return (
       <div className="rounded-lg border border-zinc-800 bg-zinc-950/40 p-3 text-xs text-zinc-500">
@@ -54,11 +63,10 @@ export function ResultChart({ chart }: ResultChartProps) {
     );
   }
 
-  const seriesNames = chart.series.map((s) => s.name);
-
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-950/40 p-3">
       <p className="mb-2 text-xs font-medium text-zinc-300">{chart.title}</p>
+      <ChartTextSummary lines={summaryLines} className="mb-2" />
       <div className="h-48 w-full">
         <ResponsiveContainer width="100%" height="100%">
           {chart.chart_type === "bar" ? (
@@ -68,7 +76,7 @@ export function ResultChart({ chart }: ResultChartProps) {
               <YAxis tick={{ fill: "#a1a1aa", fontSize: 10 }} />
               <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #3f3f46" }} />
               {seriesNames.map((name, i) => (
-                <Bar key={name} dataKey={name} fill={i === 0 ? "#38bdf8" : "#a78bfa"} />
+                <Bar key={name} dataKey={name} fill={i === 0 ? "#38bdf8" : "#a78bfa"} isAnimationActive={false} />
               ))}
             </BarChart>
           ) : (
@@ -85,6 +93,7 @@ export function ResultChart({ chart }: ResultChartProps) {
                   stroke={i === 0 ? "#38bdf8" : "#a78bfa"}
                   dot={false}
                   connectNulls={false}
+                  isAnimationActive={false}
                 />
               ))}
             </LineChart>

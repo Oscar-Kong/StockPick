@@ -25,8 +25,9 @@ export function CollapsibleSection({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left hover:bg-zinc-900/40"
+        className="collapsible-section__trigger flex w-full items-center justify-between gap-3 px-5 py-4 text-left hover:bg-zinc-900/40"
         aria-expanded={open}
+        aria-label={`${open ? "Collapse" : "Expand"} ${title}`}
       >
         <span>
           <span className="block text-sm font-semibold text-zinc-100">{title}</span>
@@ -36,7 +37,7 @@ export function CollapsibleSection({
           {open ? "−" : "+"}
         </span>
       </button>
-      {open && <div className="border-t border-white/8 px-5 py-4">{children}</div>}
+      {open && <div className="collapsible-section__body border-t border-white/8 px-5 py-4">{children}</div>}
     </section>
   );
 }

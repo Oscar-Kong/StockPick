@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const frontendDir = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
+  // Avoid picking ~/package-lock.json as the workspace root during build tracing.
+  outputFileTracingRoot: path.join(frontendDir, ".."),
   async redirects() {
     return [
       { source: "/penny", destination: "/scan?bucket=penny", permanent: true },

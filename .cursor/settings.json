@@ -1,0 +1,7 @@
+{
+  "plugins": {
+    "ralph-loop": {
+      "enabled": true
+    }
+  }
+}

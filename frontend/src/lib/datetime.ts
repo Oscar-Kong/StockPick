@@ -1,8 +1,47 @@
+/** Parse Robinhood ledger dates (M/D/YYYY, YYYY-MM-DD, or ISO). Returns ms UTC; NaN if unknown. */
+export function parseLedgerActivityDate(value: string | null | undefined): number {
+  if (!value?.trim()) return NaN;
+  const s = value.trim();
+  if (s.includes("T")) {
+    const t = parseApiDate(s).getTime();
+    if (!Number.isNaN(t)) return t;
+  }
+  const ymd = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (ymd) return Date.UTC(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]));
+  const mdy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (mdy) return Date.UTC(Number(mdy[3]), Number(mdy[1]) - 1, Number(mdy[2]));
+  const t = new Date(s).getTime();
+  return Number.isNaN(t) ? NaN : t;
+}
+
+type LedgerSortable = {
+  activity_date?: string | null;
+  process_date?: string | null;
+  executed_at?: string | null;
+  id?: number;
+};
+
+/** Newest activity first; tie-break by id descending. */
+export function compareLedgerRowsDesc(a: LedgerSortable, b: LedgerSortable): number {
+  const ts = (row: LedgerSortable) => {
+    for (const field of [row.executed_at, row.activity_date, row.process_date]) {
+      const t = parseLedgerActivityDate(field);
+      if (!Number.isNaN(t)) return t;
+    }
+    return NaN;
+  };
+  const aT = ts(a);
+  const bT = ts(b);
+  if (!Number.isNaN(aT) && !Number.isNaN(bT) && aT !== bT) return bT - aT;
+  if (!Number.isNaN(aT) && Number.isNaN(bT)) return -1;
+  if (Number.isNaN(aT) && !Number.isNaN(bT)) return 1;
+  return (b.id ?? 0) - (a.id ?? 0);
+}
+
 /**
  * API timestamps are UTC with a Z suffix (or legacy naive UTC → treat as Z).
  * datetime-local inputs use the browser's local timezone.
  */
-
 export function parseApiDate(value: string | null | undefined): Date {
   if (!value) return new Date(NaN);
   const s = value.trim();
