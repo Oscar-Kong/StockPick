@@ -6,6 +6,7 @@ import { CommandPalette, CommandPaletteTrigger } from "@/components/CommandPalet
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { SettingsMenu } from "@/components/SettingsMenu";
 import { useTranslation } from "@/lib/i18n";
+import clsx from "clsx";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -15,7 +16,7 @@ type NavLink = {
   match?: readonly string[];
 };
 
-function useNavLinks(): NavLink[] {
+function usePrimaryNavLinks(): NavLink[] {
   const { t } = useTranslation();
   return [
     { href: "/", label: t.nav.portfolio },
@@ -26,12 +27,17 @@ function useNavLinks(): NavLink[] {
     },
     {
       href: "/workspace",
-      label: t.nav.workspace,
+      label: t.nav.analyze,
       match: ["/workspace", "/watchlist", "/analyze", "/trades"],
     },
     { href: "/quant-lab", label: t.nav.quantLab, match: ["/quant-lab"] },
+  ];
+}
+
+function useSecondaryNavLinks(): NavLink[] {
+  const { t } = useTranslation();
+  return [
     { href: "/library", label: t.nav.library, match: ["/library", "/scans", "/reports"] },
-    { href: "/settings", label: t.nav.settings, match: ["/settings"] },
   ];
 }
 
@@ -44,23 +50,23 @@ function isActive(pathname: string, href: string, match?: readonly string[]) {
 export function Nav() {
   const pathname = usePathname();
   const { t } = useTranslation();
-  const links = useNavLinks();
+  const primaryLinks = usePrimaryNavLinks();
+  const secondaryLinks = useSecondaryNavLinks();
 
   return (
     <>
       <header className="app-nav sticky top-0 z-40">
         <div className="app-nav-inner">
-          <Link href="/" className="app-brand" aria-label={t.nav.portfolio}>
+          <Link href="/" className="app-brand" aria-label="PickerQuant">
             <span className="app-brand-mark" aria-hidden />
             <span className="app-brand-text">
-              <span className="app-brand-name">Picker</span>
-              <span className="app-brand-sub">Daily</span>
+              <span className="app-brand-name">PickerQuant</span>
             </span>
           </Link>
 
           <div className="app-nav-center">
             <AppTabBar aria-label={t.navAria.main} className="app-nav-tabs">
-              {links.map((link) => (
+              {primaryLinks.map((link) => (
                 <AppTabLink
                   key={link.href}
                   href={link.href}
@@ -73,9 +79,30 @@ export function Nav() {
           </div>
 
           <div className="app-nav-actions">
+            {secondaryLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={clsx(
+                  "hidden rounded-lg px-2.5 py-1.5 text-sm transition md:inline",
+                  isActive(pathname, link.href, link.match)
+                    ? "bg-primary/10 text-primary"
+                    : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
+                )}
+                aria-current={isActive(pathname, link.href, link.match) ? "page" : undefined}
+              >
+                {link.label}
+              </Link>
+            ))}
             <Link
               href="/trader-intel"
-              className="hidden rounded-lg px-2.5 py-1.5 text-sm text-zinc-400 transition hover:bg-zinc-900 hover:text-zinc-200 md:inline"
+              className={clsx(
+                "hidden rounded-lg px-2.5 py-1.5 text-sm transition md:inline",
+                isActive(pathname, "/trader-intel", ["/trader-intel"])
+                  ? "bg-primary/10 text-primary"
+                  : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
+              )}
+              aria-current={isActive(pathname, "/trader-intel", ["/trader-intel"]) ? "page" : undefined}
             >
               {t.nav.traderIntel}
             </Link>

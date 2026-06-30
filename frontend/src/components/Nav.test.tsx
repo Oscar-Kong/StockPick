@@ -44,4 +44,13 @@ describe("Nav", () => {
     expect(labels.filter((l) => l === "Home")).toHaveLength(0);
     expect(labels.filter((l) => l === "Portfolio")).toHaveLength(1);
   });
+
+  it("shows PickerQuant brand and keeps Settings out of primary nav", () => {
+    render(<Nav />);
+    expect(screen.getByLabelText("PickerQuant")).toBeTruthy();
+    const nav = screen.getByRole("navigation", { name: /main/i });
+    const labels = [...nav.querySelectorAll("a")].map((el) => el.textContent);
+    expect(labels).not.toContain("Settings");
+    expect(labels).not.toContain("Library");
+  });
 });
