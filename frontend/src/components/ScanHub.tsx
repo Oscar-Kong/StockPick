@@ -4,6 +4,7 @@
 import { AppTabBar, AppTabButton } from "@/components/AppTabs";
 import { BucketPage, type ScanPageMeta } from "@/components/BucketPage";
 import { PageContainer } from "@/components/ui/PageContainer";
+import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { ACTIVE_BUCKET_ORDER, getBucketMeta, parseBucket } from "@/lib/buckets";
 import { formatDateTime } from "@/lib/datetime";
 import { useTranslation } from "@/lib/i18n";
@@ -40,19 +41,20 @@ function ScanHubContent() {
   };
 
   return (
-    <PageContainer full className="flex min-h-0 flex-1 flex-col gap-2">
-      <header className="scan-page-header">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
+    <PageContainer full className="scan-hub flex min-h-0 flex-1 flex-col gap-2">
+      <header className="scan-page-header scan-page-header--hub">
+        <div className="scan-page-header__primary">
+          <div className="scan-page-header__title-row">
             <h1 className="scan-page-header__title">{t.scan.hubTitle}</h1>
             <span className="chip px-2 py-0.5 text-sm">{activeMeta.bucketLabel}</span>
           </div>
           <p className="scan-page-header__desc">{activeMeta.description}</p>
         </div>
-        <div className="scan-page-header__meta">
+        <div className="scan-page-header__status-cluster" aria-label={t.scan.statusClusterAria}>
           {activeMeta.lastScanAt && (
-            <span className="text-sm text-secondary">
-              {t.scan.lastScanLabel} {formatDateTime(activeMeta.lastScanAt)}
+            <span className="scan-page-header__status-item text-sm text-secondary">
+              {t.scan.lastScanLabel}{" "}
+              <span className="finance-value">{formatDateTime(activeMeta.lastScanAt)}</span>
             </span>
           )}
           {activeMeta.lastScanAt &&
@@ -61,15 +63,18 @@ function ScanHubContent() {
             ) : (
               <span className="text-sm text-positive">{t.product.dataFresh}</span>
             ))}
-          <span className="text-sm text-secondary">
+          <span className="scan-page-header__status-item text-sm text-secondary">
             {t.scan.resultCountLabel}{" "}
             <span className="finance-value text-foreground">{activeMeta.resultCount || "—"}</span>
           </span>
-          <Link href="/library?tab=scans" className="text-sm font-medium text-primary hover:underline">
+          <Link
+            href="/library?tab=scans"
+            className="scan-page-header__library-link text-sm font-medium text-primary hover:underline"
+          >
             {t.nav.library}
           </Link>
         </div>
-        <AppTabBar aria-label={t.scan.bucketsAria} className="w-full sm:w-auto">
+        <AppTabBar aria-label={t.scan.bucketsAria} className="scan-page-header__buckets">
           {ACTIVE_BUCKET_ORDER.map((b) => (
             <AppTabButton key={b} active={bucket === b} onClick={() => setBucket(b)}>
               {bucketMeta[b].label}
@@ -78,7 +83,7 @@ function ScanHubContent() {
         </AppTabBar>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col">
+      <div className="scan-hub__workspace flex min-h-0 flex-1 flex-col">
         <BucketPage key={bucket} bucket={bucket} embedded onMetaChange={setMeta} />
       </div>
     </PageContainer>
@@ -86,8 +91,7 @@ function ScanHubContent() {
 }
 
 function ScanHubLoading() {
-  const { t } = useTranslation();
-  return <p className="text-sm text-secondary">{t.scan.loading}</p>;
+  return <LoadingSkeleton lines={6} className="max-w-3xl" />;
 }
 
 export function ScanHub() {

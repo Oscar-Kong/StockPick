@@ -47,11 +47,15 @@ export function ScanInlineStatus({
 
   const stateLabel =
     scanning || status === "running"
-      ? t.scan.statusRunning
+      ? resultCount > 0
+        ? t.scan.statusPartial
+        : t.scan.statusRunning
       : status === "failed"
         ? t.scan.statusFailed
         : status === "completed"
-          ? t.scan.statusCompleted
+          ? resultCount > 0
+            ? t.scan.statusCompleted
+            : t.scan.statusEmpty
           : t.scan.statusIdle;
 
   return (
@@ -60,8 +64,10 @@ export function ScanInlineStatus({
         <span
           className={clsx(
             "scan-inline-status__state",
-            scanning && "scan-inline-status__state--running",
-            status === "failed" && "scan-inline-status__state--failed"
+            (scanning || status === "running") && "scan-inline-status__state--running",
+            status === "failed" && "scan-inline-status__state--failed",
+            status === "completed" && resultCount === 0 && "scan-inline-status__state--empty",
+            (scanning || status === "running") && resultCount > 0 && "scan-inline-status__state--partial"
           )}
         >
           {stateLabel}

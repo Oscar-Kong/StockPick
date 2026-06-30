@@ -2543,6 +2543,59 @@ body::before {
   border-bottom: 1px solid var(--border-subtle);
 }
 
+.scan-page-header--hub {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.625rem;
+}
+
+@media (min-width: 768px) {
+  .scan-page-header--hub {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "primary status"
+      "buckets buckets";
+  }
+
+  .scan-page-header__primary {
+    grid-area: primary;
+  }
+
+  .scan-page-header__status-cluster {
+    grid-area: status;
+    justify-content: flex-end;
+  }
+
+  .scan-page-header__buckets {
+    grid-area: buckets;
+  }
+}
+
+.scan-page-header__title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.scan-page-header__status-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem 0.75rem;
+}
+
+.scan-page-header__status-item:not(:last-child)::after {
+  content: "·";
+  margin-left: 0.75rem;
+  color: var(--text-tertiary);
+}
+
+.scan-page-header__buckets {
+  width: 100%;
+  flex-wrap: wrap;
+}
+
 .scan-page-header__title {
   font-size: 1.25rem;
   font-weight: 650;
@@ -2564,6 +2617,9 @@ body::before {
 }
 
 .scan-command-bar {
+  position: sticky;
+  top: calc(var(--app-nav-h, 3.5rem) + 0.25rem);
+  z-index: 20;
   border: 1px solid var(--border-subtle);
   border-radius: 0.625rem;
   background: color-mix(in oklab, var(--surface) 90%, transparent);
@@ -2685,6 +2741,14 @@ body::before {
 
 .scan-inline-status__state--running {
   color: var(--color-primary);
+}
+
+.scan-inline-status__state--partial {
+  color: var(--color-hold);
+}
+
+.scan-inline-status__state--empty {
+  color: var(--text-secondary);
 }
 
 .scan-inline-status__state--failed {
