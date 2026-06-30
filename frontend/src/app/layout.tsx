@@ -5,6 +5,7 @@ import { ApiStatus } from "@/components/ApiStatus";
 import { Nav } from "@/components/Nav";
 import { PublicDemoBanner } from "@/components/PublicDemoBanner";
 import { Providers } from "@/components/Providers";
+import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -32,11 +33,16 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      data-theme="dark"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body
         suppressHydrationWarning
-        className="font-sans flex min-h-dvh flex-col text-base text-zinc-100"
+        className="font-sans flex min-h-dvh flex-col text-base text-foreground bg-background"
       >
         <Providers>
           <Nav />
