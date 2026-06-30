@@ -111,9 +111,9 @@ Financial semantics verified: blue interaction, green buy/positive, amber hold, 
 | 4F | `cec0434` | fix(library): improve async reliability and settings UX |
 | 5 | `3138b25` | feat(theme): add validated light theme |
 | 6 | `87ca0ce` | chore(ui): remove obsolete frontend styles and components |
-| 7 | — | docs(ui): independent review (`docs/ui-reviews/FINAL_FRONTEND_REVIEW.md`) |
-| 8 | (this commit) | fix(ui): resolve final design review findings |
-| 9 | — | docs(ui): release validation (this document) |
+| 7 | `b90e6ec` | docs(ui): independent review (`docs/ui-reviews/FINAL_FRONTEND_REVIEW.md`) |
+| 8 | `faced7c` | fix(ui): resolve final design review findings |
+| 9 | `6028fb0` | docs(ui): release validation (this document) |
 
 ---
 

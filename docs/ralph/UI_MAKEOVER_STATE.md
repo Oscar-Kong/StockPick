@@ -69,6 +69,6 @@ Phase 9 — release validation documented in `docs/ui-reviews/RELEASE_VALIDATION
 | 4F | `cec0434` | fix(library): improve async reliability and settings UX |
 | 5 | `3138b25` | feat(theme): add validated light theme |
 | 6 | `87ca0ce` | chore(ui): remove obsolete frontend styles and components |
-| 7 | (docs) | docs(ui): add independent frontend design review |
-| 8 | (pending) | fix(ui): resolve final design review findings |
-| 9 | (docs) | docs(ui): complete frontend release validation |
+| 7 | `b90e6ec` | docs(ui): add independent frontend design review |
+| 8 | `faced7c` | fix(ui): resolve final design review findings |
+| 9 | `6028fb0` | docs(ui): complete frontend release validation |

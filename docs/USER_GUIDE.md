@@ -59,7 +59,7 @@ Everything else is **secondary**:
 
 | Route | Status |
 |-------|--------|
-| `/settings` | API keys & language — set once |
+| `/settings` | Language, appearance (theme), API keys, quant health, ops |
 | `/trader-intel` | Optional strategy templates |
 | `/penny`, `/medium`, `/compounder` | Redirects to `/scan?bucket=…` |
 | `/analyze`, `/watchlist`, `/trades`, `/reports`, `/scans` | Redirects — old bookmarks |
@@ -198,6 +198,8 @@ Check **Data quality %** badge; below ~60%, treat fundamentals and LLM as weak.
 ## 8. Language
 
 Gear icon (top right) → **English** / **中文**. UI labels and buttons translate instantly — **scores, scans, and analysis data are not re-fetched** when you switch language. API-generated report or pick-summary text stays in the language it was generated until you explicitly request a new run.
+
+**Appearance:** Open **Settings → Appearance** (`/settings?section=theme`) to choose **Dark** (default), **Light**, or **System**. Your choice is saved in this browser.
 
 ---
 

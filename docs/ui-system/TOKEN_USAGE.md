@@ -118,9 +118,3 @@ Use `PRICE_CHART_SERIES` from `@/lib/chartSeries` for price charts.
 |-------|-----------|--------|
 | `--brand` | `--color-buy` | Retained in CSS for compatibility; component usages migrated |
 | `.text-brand` | buy green | Avoid — use `.text-primary` or `.text-buy` |
-
----
-
-## Theme modes (legacy note)
-
-See **Theme modes (Phase 5)** above.
