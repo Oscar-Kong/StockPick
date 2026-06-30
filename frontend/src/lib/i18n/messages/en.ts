@@ -119,6 +119,12 @@ export const en = {
     sectionApi: "API integrations",
     sectionOps: "Ops",
     mobileSectionLabel: "Settings section",
+    sectionTheme: "Appearance",
+    themeSection: "Theme",
+    themeDark: "Dark (default)",
+    themeLight: "Light",
+    themeSystem: "System",
+    themeHint: "Dark mode is the default. Your choice is saved locally in this browser.",
   },
   morningScanEmail: {
     title: "Morning Scan Email",
@@ -755,6 +761,8 @@ export const en = {
     analyzeSymbol: "Analyze {symbol}",
     saveTitleNotes: "Save title/notes",
     sectionsAria: "Library sections",
+    loadFailed: "Could not load library data. Check your connection and try again.",
+    retryLoad: "Retry",
   },
   scan: {
     hubTitle: "Screen",

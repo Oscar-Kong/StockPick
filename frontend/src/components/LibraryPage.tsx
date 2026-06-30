@@ -4,6 +4,8 @@
 import { AppTabBar, AppTabButton } from "@/components/AppTabs";
 import { deleteSavedReport, deleteSavedScan, listSavedAnalyze, listSavedReports, listSavedScans, updateSavedReport } from "@/lib/api";
 import { ResearchReport } from "@/components/ResearchReport";
+import { AsyncStateShell } from "@/components/ui/AsyncStateShell";
+import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import type { SavedAnalyzeItem, SavedReportItem, SavedScanItem, StockResearchReport } from "@/lib/types";
 import clsx from "clsx";
 import Link from "next/link";
@@ -41,6 +43,7 @@ function LibraryContent() {
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const loadScans = useCallback(async () => {
@@ -70,12 +73,21 @@ function LibraryContent() {
     setSnapshots(data);
   }, []);
 
-  useEffect(() => {
+  const reloadAll = useCallback(async () => {
     setLoading(true);
-    Promise.all([loadScans(), loadReports(), loadSnapshots()])
-      .catch(() => undefined)
-      .finally(() => setLoading(false));
-  }, [loadScans, loadReports, loadSnapshots]);
+    setLoadError(null);
+    try {
+      await Promise.all([loadScans(), loadReports(), loadSnapshots()]);
+    } catch {
+      setLoadError(t.library.loadFailed);
+    } finally {
+      setLoading(false);
+    }
+  }, [loadScans, loadReports, loadSnapshots, t.library.loadFailed]);
+
+  useEffect(() => {
+    void reloadAll();
+  }, [reloadAll]);
 
   useEffect(() => {
     if (!selectedReport) return;
@@ -108,7 +120,7 @@ function LibraryContent() {
           <h1>{t.library.title}</h1>
           <p className="page-toolbar-meta">
             {t.library.subtitle}{" "}
-            <Link href="/workspace" className="text-[#7dff8e] underline">
+            <Link href="/workspace" className="text-primary underline">
               {t.library.workspaceLink}
             </Link>
           </p>
@@ -129,13 +141,17 @@ function LibraryContent() {
       </header>
 
       <div className="workspace-panel-scroll min-h-0 flex-1 pt-2">
-      {loading ? (
-        <p className="text-sm text-zinc-500">{t.library.loading}</p>
-      ) : tab === "scans" ? (
+      <AsyncStateShell
+        state={loading ? "loading" : loadError ? "error" : "success"}
+        errorMessage={loadError}
+        onRetry={() => void reloadAll()}
+        skeletonLines={4}
+      >
+      {tab === "scans" ? (
         scans.length === 0 ? (
-          <div className="surface-card border-dashed p-8 text-sm text-zinc-500">
+          <div className="surface-card border-dashed p-8 text-sm text-secondary">
             {t.library.noScans}{" "}
-            <Link href="/scan" className="underline text-[#7dff8e]">
+            <Link href="/scan" className="text-primary underline">
               {t.library.scanPage}
             </Link>{" "}
             {t.library.noScansEnd}
@@ -205,7 +221,7 @@ function LibraryContent() {
                             <td className="py-2">
                               <Link
                                 href={`/workspace?symbol=${x.symbol}`}
-                                className="text-[#7dff8e] underline text-xs"
+                                className="text-primary underline text-xs"
                               >
                                 {t.library.openInWorkspace}
                               </Link>
@@ -241,7 +257,7 @@ function LibraryContent() {
                     <td className="py-2">{s.bucket}</td>
                     <td className="py-2 tabular-nums">{s.score?.toFixed(1) ?? "—"}</td>
                     <td className="py-2">
-                      <Link href={`/workspace?symbol=${s.symbol}`} className="text-[#7dff8e] underline text-xs">
+                      <Link href={`/workspace?symbol=${s.symbol}`} className="text-primary underline text-xs">
                         {t.library.openInWorkspace}
                       </Link>
                     </td>
@@ -305,14 +321,14 @@ function LibraryContent() {
           </section>
         </div>
       )}
+      </AsyncStateShell>
       </div>
     </div>
   );
 }
 
 function LibraryLoading() {
-  const { t } = useTranslation();
-  return <p className="text-sm text-zinc-500">{t.library.loading}</p>;
+  return <LoadingSkeleton lines={4} className="px-4 py-6" />;
 }
 
 export function LibraryPage() {

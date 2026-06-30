@@ -116,6 +116,12 @@ export const zh: Messages = {
     sectionApi: "API 集成",
     sectionOps: "运维",
     mobileSectionLabel: "设置分区",
+    sectionTheme: "外观",
+    themeSection: "主题",
+    themeDark: "深色（默认）",
+    themeLight: "浅色",
+    themeSystem: "跟随系统",
+    themeHint: "默认为深色模式。您的选择会保存在本浏览器中。",
   },
   morningScanEmail: {
     title: "晨间扫描邮件",
@@ -744,6 +750,8 @@ export const zh: Messages = {
     analyzeSymbol: "分析 {symbol}",
     saveTitleNotes: "保存标题/备注",
     sectionsAria: "资料库板块",
+    loadFailed: "无法加载资料库数据。请检查网络连接后重试。",
+    retryLoad: "重试",
   },
   scan: {
     hubTitle: "筛选",

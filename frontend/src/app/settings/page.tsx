@@ -6,18 +6,19 @@ import { ApiSettingsPanel } from "@/components/ApiSettingsPanel";
 import { QuantHealthCard } from "@/components/quant/QuantHealthCard";
 import { LanguageSettingsPanel } from "@/components/LanguageSettingsPanel";
 import { MorningScanEmailPanel } from "@/components/settings/MorningScanEmailPanel";
+import { ThemeSettingsPanel } from "@/components/settings/ThemeSettingsPanel";
 import { GhostButton } from "@/components/ui/buttons";
 import { useTranslation } from "@/lib/i18n";
 import clsx from "clsx";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect } from "react";
 
-export type SettingsSection = "language" | "quant-health" | "api" | "ops";
+export type SettingsSection = "language" | "theme" | "quant-health" | "api" | "ops";
 
-const SECTIONS: SettingsSection[] = ["language", "quant-health", "api", "ops"];
+const SECTIONS: SettingsSection[] = ["language", "theme", "quant-health", "api", "ops"];
 
 function parseSection(value: string | null): SettingsSection {
-  if (value === "quant-health" || value === "api" || value === "ops") return value;
+  if (value === "theme" || value === "quant-health" || value === "api" || value === "ops") return value;
   return "language";
 }
 
@@ -54,6 +55,7 @@ function SettingsContent() {
 
   const sectionLabels: Record<SettingsSection, string> = {
     language: t.settings.sectionLanguage,
+    theme: t.settings.sectionTheme,
     "quant-health": t.settings.sectionQuantHealth,
     api: t.settings.sectionApi,
     ops: t.settings.sectionOps,
@@ -109,6 +111,16 @@ function SettingsContent() {
               </h2>
               <p className="mb-4 text-sm text-secondary">{t.settings.languageHint}</p>
               <LanguageSettingsPanel />
+            </section>
+          )}
+
+          {section === "theme" && (
+            <section aria-labelledby="settings-theme-title">
+              <h2 id="settings-theme-title" className="settings-section__title">
+                {t.settings.themeSection}
+              </h2>
+              <p className="mb-4 text-sm text-secondary">{t.settings.themeHint}</p>
+              <ThemeSettingsPanel />
             </section>
           )}
 

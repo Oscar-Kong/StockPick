@@ -20,6 +20,12 @@ vi.mock("@/components/LanguageSettingsPanel", () => ({
 vi.mock("@/components/quant/QuantHealthCard", () => ({
   QuantHealthCard: () => <div>Quant health panel</div>,
 }));
+vi.mock("@/components/settings/ThemeSettingsPanel", () => ({
+  ThemeSettingsPanel: () => <div>Theme panel</div>,
+}));
+vi.mock("@/components/settings/MorningScanEmailPanel", () => ({
+  MorningScanEmailPanel: () => <div>Ops panel</div>,
+}));
 vi.mock("@/components/ApiSettingsPanel", () => ({
   ApiSettingsPanel: () => <div>API panel</div>,
 }));
