@@ -26,7 +26,7 @@ export function DecisionMixBar({
       <div className="flex h-3 overflow-hidden rounded-full bg-zinc-800">
         {buy > 0 && (
           <div
-            className="bg-brand transition-all"
+            className="bg-buy transition-all"
             style={{ width: `${buy}%` }}
             title={`${t.home.dailyMixBuy} ${buyPct.toFixed(0)}%`}
           />

@@ -2,7 +2,7 @@ import clsx from "clsx";
 import { formatDecision, getDecisionTone } from "@/lib/dailyDecisionUtils";
 
 const STYLES = {
-  buy: "text-brand border-brand/40 bg-brand/15",
+  buy: "text-buy border-buy/40 bg-buy/15",
   keep: "text-zinc-200 border-zinc-600/50 bg-zinc-800/60",
   sell: "text-negative border-red-500/40 bg-red-500/15",
   review: "text-amber-200 border-amber-500/40 bg-amber-500/15",

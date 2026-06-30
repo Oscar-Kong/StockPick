@@ -21,7 +21,7 @@ export function DailyActionQueue({ items }: { items: PortfolioDecisionItem[] }) 
           {queue.map((item) => (
             <li
               key={item.symbol}
-              className="rounded-xl border border-white/8 bg-zinc-900/35 px-4 py-3.5 transition-colors hover:border-brand/20 hover:bg-zinc-900/55"
+              className="rounded-xl border border-white/8 bg-zinc-900/35 px-4 py-3.5 transition-colors hover:border-buy/20 hover:bg-zinc-900/55"
             >
               <div className="flex items-start justify-between gap-2">
                 <Link href={`/workspace?symbol=${item.symbol}`} className="text-base font-semibold text-primary hover:underline">

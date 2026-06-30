@@ -18,7 +18,7 @@ interface ScanCommandBarProps {
 }
 
 const INPUT_COMPACT =
-  "h-9 w-16 rounded-md border border-zinc-700 bg-zinc-950/80 px-2 text-sm tabular-nums text-zinc-100 outline-none focus:border-brand";
+  "h-9 w-16 rounded-md border border-zinc-700 bg-zinc-950/80 px-2 text-sm tabular-nums text-zinc-100 outline-none focus:border-primary";
 
 export function ScanCommandBar({
   options,

@@ -3,8 +3,8 @@ import type { CockpitStatus } from "@/lib/dailyDecisionUtils";
 import { useTranslation } from "@/lib/i18n";
 
 const STYLES: Record<CockpitStatus, string> = {
-  ready: "border-brand/35 bg-brand/10 text-brand",
-  fresh: "border-brand/35 bg-brand/10 text-brand",
+  ready: "border-buy/35 bg-buy/10 text-buy",
+  fresh: "border-buy/35 bg-buy/10 text-buy",
   needs_review: "border-amber-500/35 bg-amber-500/10 text-amber-200",
   demo: "border-amber-500/35 bg-amber-500/10 text-amber-200",
   import_needed: "border-sky-500/35 bg-sky-500/10 text-sky-200",

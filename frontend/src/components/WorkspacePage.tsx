@@ -265,8 +265,6 @@ function WorkspaceContent() {
 }
 
 export function WorkspacePage() {
-  const { t } = useTranslation();
-
   return (
     <Suspense fallback={<LoadingSkeleton lines={5} className="p-4" />}>
       <WorkspaceContent />
