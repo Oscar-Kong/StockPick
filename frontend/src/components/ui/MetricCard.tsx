@@ -1,6 +1,6 @@
 "use client";
 
-import clsx from "clsx";
+import { MetricTile, type MetricTileTone } from "./MetricTile";
 
 interface MetricCardProps {
   label: string;
@@ -10,19 +10,23 @@ interface MetricCardProps {
   className?: string;
 }
 
-const TONE: Record<NonNullable<MetricCardProps["tone"]>, string> = {
-  default: "text-zinc-50",
-  ok: "text-positive",
-  warn: "text-amber-300",
-  error: "text-negative",
+const TONE_MAP: Record<NonNullable<MetricCardProps["tone"]>, MetricTileTone> = {
+  default: "default",
+  ok: "positive",
+  warn: "warning",
+  error: "negative",
 };
 
+/** Card-style metric — wraps MetricTile (card variant). */
 export function MetricCard({ label, value, hint, tone = "default", className }: MetricCardProps) {
   return (
-    <div className={clsx("metric-tile", className)}>
-      <p className="metric-tile__label">{label}</p>
-      <p className={clsx("metric-tile__value finance-value", TONE[tone])}>{value}</p>
-      {hint && <p className="metric-tile__hint">{hint}</p>}
-    </div>
+    <MetricTile
+      label={label}
+      value={value}
+      hint={hint}
+      tone={TONE_MAP[tone]}
+      variant="card"
+      className={className}
+    />
   );
 }

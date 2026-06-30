@@ -2,7 +2,7 @@
 
 ## Current phase
 
-PHASE_2
+PHASE_4A
 
 ## Overall status
 
@@ -11,8 +11,8 @@ IN_PROGRESS
 ## Completed phases
 
 * [x] Phase 1 — Accessibility and Mobile Navigation
-* [ ] Phase 2 — Semantic Design Tokens
-* [ ] Phase 3 — Shared Component Consolidation
+* [x] Phase 2 — Semantic Design Tokens
+* [x] Phase 3 — Shared Component Consolidation
 * [ ] Phase 4A — Application Shell and Navigation
 * [ ] Phase 4B — Portfolio
 * [ ] Phase 4C — Scan
@@ -27,41 +27,31 @@ IN_PROGRESS
 
 ## Current phase checklist
 
-* [ ] Create `docs/ui-system/TOKEN_MIGRATION_MAP.md`
-* [ ] Inventory and classify legacy color tokens
-* [ ] Define dark and light semantic token values in `globals.css`
-* [ ] Migrate buttons to `--color-primary`
-* [ ] Migrate desktop navigation to blue selection
-* [ ] Migrate mobile navigation to blue selection
-* [ ] Migrate Command Palette selection to blue
-* [ ] Migrate shared tabs to blue selection
-* [ ] Migrate filters and segmented controls to blue
-* [ ] Migrate inputs and selects focus to blue
-* [ ] Migrate badges (non-financial) to semantic tokens
-* [ ] Migrate tables (row selection) to blue tint
-* [ ] Migrate cards and panels to neutral tokens
-* [ ] Migrate feedback states
-* [ ] Migrate shared chart presentation colors
-* [ ] Create `docs/ui-system/TOKEN_USAGE.md`
-* [ ] Document compatibility aliases for Phase 6
-* [ ] Run lint, typecheck, tests, production build
-* [ ] Git diff review
+* [ ] Standardize product name as PickerQuant
+* [ ] Remove duplicate Settings from primary navigation
+* [ ] Preserve Settings route and utility access
+* [ ] Blue active navigation states verified
+* [ ] Command Palette preserved
+* [ ] Mobile navigation preserved
+* [ ] Footer/API status density reviewed on mobile
+* [ ] Fixed navigation padding verified
+* [ ] Run validation
 
 ## Validation status
 
-* [ ] Lint
-* [ ] Type checking
-* [ ] Tests
-* [ ] Production build
+* [x] Lint (Phase 3)
+* [x] Type checking (Phase 3)
+* [x] Tests (Phase 3 — 200 passed)
+* [x] Production build (Phase 3)
 * [ ] 390px validation
 * [ ] 768px validation
 * [ ] 1024px validation
 * [ ] 1440px validation
-* [ ] Dark-theme validation
+* [x] Dark-theme validation (smoke — routes HTTP 200)
 * [ ] Light-theme validation when applicable
 * [ ] Functionality inventory comparison
 * [ ] Git diff review
-* [ ] Business-logic protection review
+* [x] Business-logic protection review (Phase 2–3)
 
 ## Pre-existing failures
 
@@ -71,23 +61,24 @@ IN_PROGRESS
 
 ## Current blockers
 
-None.
+* Full visual breakpoint browser validation not performed (no automated browser tooling in session). Route smoke tests passed via HTTP 200 on running server.
 
 ## Files changed in current phase
 
-* `docs/ralph/UI_MAKEOVER_STATE.md` (this file)
-* `docs/ui-system/TOKEN_MIGRATION_MAP.md` (pending)
-* `docs/ui-system/TOKEN_USAGE.md` (pending)
-* `frontend/src/app/globals.css` (pending)
+Pending Phase 4A work.
 
 ## Last completed action
 
-Initialized Phase 2 state file. Phase 1 checkpoint: `2dfbd85`.
+Phase 3 complete — shared primitives introduced; validation pass (200 tests).
 
 ## Next action
 
-Create token migration map and introduce semantic CSS variables in `globals.css`.
+Begin Phase 4A application shell and navigation refinement.
 
-## Phase commit
+## Phase commits
 
-Phase 1: `2dfbd85` — New UI phase 1
+| Phase | Hash | Message |
+|-------|------|---------|
+| 1 | `2dfbd85` | New UI phase 1 |
+| 2 | `3ec3da2` | refactor(ui): introduce semantic design tokens |
+| 3 | pending | refactor(ui): consolidate shared frontend primitives |

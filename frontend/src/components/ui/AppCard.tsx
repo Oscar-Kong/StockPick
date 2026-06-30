@@ -1,14 +1,15 @@
 "use client";
 
 import clsx from "clsx";
+import { Surface, type SurfaceVariant } from "./Surface";
 
 export type AppCardVariant = "default" | "elevated" | "muted" | "ghost";
 
-const VARIANT: Record<AppCardVariant, string> = {
-  default: "app-card",
-  elevated: "app-card app-card--elevated",
-  muted: "app-card app-card--muted",
-  ghost: "app-card app-card--ghost",
+const LEGACY_VARIANT: Record<AppCardVariant, SurfaceVariant> = {
+  default: "default",
+  elevated: "raised",
+  muted: "inset",
+  ghost: "default",
 };
 
 interface AppCardProps {
@@ -18,8 +19,15 @@ interface AppCardProps {
   as?: "div" | "section" | "article";
 }
 
+/** Legacy card wrapper — prefer Surface for new code. */
 export function AppCard({ children, className, variant = "default", as: Tag = "div" }: AppCardProps) {
-  return <Tag className={clsx(VARIANT[variant], className)}>{children}</Tag>;
+  const surfaceVariant = LEGACY_VARIANT[variant];
+  const ghostClass = variant === "ghost" ? "app-card app-card--ghost" : undefined;
+  return (
+    <Surface as={Tag} variant={surfaceVariant} className={clsx(ghostClass, className)}>
+      {children}
+    </Surface>
+  );
 }
 
 interface SectionCardProps {
@@ -45,3 +53,6 @@ export function SectionCard({ title, subtitle, action, children, className, vari
     </AppCard>
   );
 }
+
+export { Surface, SurfaceLink, InteractiveSurface } from "./Surface";
+export type { SurfaceVariant } from "./Surface";

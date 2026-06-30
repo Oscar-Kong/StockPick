@@ -1,6 +1,7 @@
 "use client";
 
 import clsx from "clsx";
+import { MetricTile } from "./MetricTile";
 
 interface SummaryStripProps {
   children: React.ReactNode;
@@ -19,20 +20,25 @@ interface SummaryStripItemProps {
   className?: string;
 }
 
-const TONE: Record<NonNullable<SummaryStripItemProps["tone"]>, string> = {
-  default: "summary-strip__value--default",
-  positive: "summary-strip__value--positive",
-  negative: "summary-strip__value--negative",
-  warning: "summary-strip__value--warning",
-  muted: "summary-strip__value--muted",
-};
-
-export function SummaryStripItem({ label, value, hint, tone = "default", className }: SummaryStripItemProps) {
+export function SummaryStripItem({ label,  value, hint, tone = "default", className }: SummaryStripItemProps) {
   return (
-    <div className={clsx("summary-strip__item", className)}>
-      <span className="summary-strip__label">{label}</span>
-      <span className={clsx("summary-strip__value finance-value", TONE[tone])}>{value}</span>
-      {hint && <span className="summary-strip__hint">{hint}</span>}
-    </div>
+    <MetricTile
+      label={label}
+      value={value}
+      hint={hint}
+      tone={
+        tone === "positive"
+          ? "positive"
+          : tone === "negative"
+            ? "negative"
+            : tone === "warning"
+              ? "warning"
+              : tone === "muted"
+                ? "muted"
+                : "default"
+      }
+      variant="summary"
+      className={className}
+    />
   );
 }

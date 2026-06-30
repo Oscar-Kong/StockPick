@@ -1,7 +1,6 @@
 "use client";
 
-import clsx from "clsx";
-import { useTranslation } from "@/lib/i18n";
+import { AsyncStateShell, legacyAsyncState } from "@/components/ui/AsyncStateShell";
 
 type AsyncSectionState = "idle" | "loading" | "error" | "empty" | "ready";
 
@@ -18,48 +17,41 @@ interface AsyncSectionProps {
   refreshing?: boolean;
 }
 
+/** Compatibility wrapper — prefer AsyncStateShell for new code. */
 export function AsyncSection({
   state,
-  loadingText = "Loading…",
+  loadingText,
   errorText,
-  emptyText = "No data.",
+  emptyText,
   onRetry,
   children,
   className,
   preserveOnRefresh = false,
   refreshing = false,
 }: AsyncSectionProps) {
-  const { t } = useTranslation();
-  if (state === "loading" && preserveOnRefresh && refreshing) {
+  if (state === "loading" && !preserveOnRefresh) {
     return (
-      <div className={className}>
-        <p className="mb-2 text-xs text-zinc-500">{loadingText}</p>
-        {children}
-      </div>
+      <p className={`text-xs text-zinc-500${className ? ` ${className}` : ""}`} role="status">
+        {loadingText ?? "Loading…"}
+      </p>
     );
   }
-  if (state === "loading") {
-    return <p className={clsx("text-xs text-zinc-500", className)}>{loadingText}</p>;
-  }
-  if (state === "error" && errorText) {
-    return (
-      <div className={clsx("space-y-2", className)}>
-        <p className="text-xs text-red-400/90">{errorText}</p>
-        {onRetry && (
-          <button type="button" onClick={onRetry} className="btn-ghost px-2 py-1 text-xs">
-            {t.common.retry}
-          </button>
-        )}
-      </div>
-    );
-  }
-  if (state === "empty") {
-    return <p className={clsx("text-xs text-zinc-500", className)}>{emptyText}</p>;
-  }
-  if (state !== "ready") {
-    return null;
-  }
-  return <div className={className}>{children}</div>;
+
+  const shellState = legacyAsyncState(state, { refreshing: preserveOnRefresh && refreshing });
+
+  return (
+    <AsyncStateShell
+      state={shellState}
+      className={className}
+      preserveContent={preserveOnRefresh}
+      loadingText={loadingText}
+      emptyMessage={emptyText}
+      errorMessage={errorText}
+      onRetry={onRetry}
+    >
+      {children}
+    </AsyncStateShell>
+  );
 }
 
 export function fmtPct(value: number | null | undefined, digits = 1): string {

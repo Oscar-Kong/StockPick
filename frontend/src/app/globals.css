@@ -3978,7 +3978,165 @@ body::before {
   height: 1rem;
   width: 1rem;
   cursor: pointer;
-  accent-color: rgb(16 185 129);
+  accent-color: var(--color-primary);
   border-radius: 0.25rem;
+}
+
+/* —— Phase 3 shared primitives —— */
+.surface {
+  border-radius: var(--radius-md, 0.5rem);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.surface--raised {
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.18));
+}
+
+.surface--interactive {
+  cursor: pointer;
+  transition: background-color 180ms ease, border-color 180ms ease;
+}
+
+.surface--interactive:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-border-strong);
+}
+
+.surface--data {
+  background: var(--color-surface);
+}
+
+.surface--inset {
+  background: var(--color-background-subtle);
+}
+
+.surface--overlay {
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-lg, 0 18px 44px rgba(0, 0, 0, 0.32));
+}
+
+.async-state-banner {
+  margin-bottom: 0.5rem;
+  padding: 0.375rem 0.625rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.async-state-banner--info {
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
+.async-state-banner--warn {
+  color: var(--color-hold);
+  background: var(--color-hold-subtle);
+}
+
+.async-state-banner--error {
+  color: var(--color-sell);
+  background: var(--color-sell-subtle);
+}
+
+.filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.25rem;
+  padding: 0.375rem 0.625rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: 0.875rem;
+  color: var(--color-foreground-secondary);
+  cursor: pointer;
+  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
+}
+
+.filter-toggle:hover {
+  color: var(--color-foreground);
+  background: var(--color-surface-hover);
+}
+
+.filter-toggle--active {
+  color: var(--color-primary);
+  border-color: color-mix(in oklab, var(--color-primary) 35%, var(--color-border));
+  background: var(--color-primary-subtle);
+}
+
+.segmented-control {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.125rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-background-subtle);
+}
+
+.content-tab-list {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.content-tab {
+  min-height: 2.375rem;
+  padding: 0 0.625rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-foreground-muted);
+  cursor: pointer;
+}
+
+.content-tab--selected {
+  color: var(--color-foreground);
+  border-bottom-color: var(--color-primary);
+}
+
+.metric-tile-tone--default { color: var(--color-foreground); }
+.metric-tile-tone--positive { color: var(--color-buy); }
+.metric-tile-tone--negative { color: var(--color-sell); }
+.metric-tile-tone--warning { color: var(--color-hold); }
+.metric-tile-tone--muted { color: var(--color-foreground-muted); }
+.metric-tile-tone--primary { color: var(--color-primary); }
+
+.metric-tile--inline {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.metric-tile--inline .metric-tile__label {
+  margin: 0;
+}
+
+.metric-tile__value--emphasized {
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.chart-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.chart-shell__date {
+  margin: 0;
+}
+
+.dense-table__empty-cell {
+  padding: 1.5rem 0.75rem !important;
+  text-align: center;
+}
+
+.dense-table__loading-row td {
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
 }
 
