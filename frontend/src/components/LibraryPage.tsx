@@ -167,12 +167,12 @@ function LibraryContent() {
                   className={clsx(
                     "w-full rounded-lg border px-3 py-2 text-left text-sm",
                     selectedScan?.id === r.id
-                      ? "border-primary bg-zinc-900"
-                      : "border-zinc-800 hover:bg-zinc-900/70"
+                      ? "border-primary bg-[var(--surface-selected)]"
+                      : "border-[var(--border-subtle)] hover:bg-[var(--surface-hover)]"
                   )}
                 >
                   <p className="font-medium">{r.name}</p>
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-secondary">
                     {fmt(t.library.resultCount, { bucket: r.bucket, count: r.result_count })}
                   </p>
                 </button>
@@ -180,7 +180,7 @@ function LibraryContent() {
             </aside>
             <section className="surface-card p-4">
               {!selectedScan ? (
-                <p className="text-sm text-zinc-500">{t.library.selectScan}</p>
+                <p className="text-sm text-secondary">{t.library.selectScan}</p>
               ) : (
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -206,7 +206,7 @@ function LibraryContent() {
                   </div>
                   <div className="overflow-x-auto">
                     <table className="min-w-full text-sm">
-                      <thead className="text-left text-xs text-zinc-500">
+                      <thead className="text-left text-xs text-secondary">
                         <tr>
                           <th className="py-2 pr-4">{t.common.symbol}</th>
                           <th className="py-2 pr-4">{t.common.score}</th>
@@ -238,7 +238,7 @@ function LibraryContent() {
         )
       ) : tab === "snapshots" ? (
         snapshots.length === 0 ? (
-          <div className="surface-card border-dashed p-8 text-sm text-zinc-500">{t.library.noSnapshots}</div>
+          <div className="surface-card border-dashed p-8 text-sm text-secondary">{t.library.noSnapshots}</div>
         ) : (
           <div className="surface-card overflow-x-auto p-4">
             <table className="min-w-full text-sm">
@@ -268,7 +268,7 @@ function LibraryContent() {
           </div>
         )
       ) : reports.length === 0 ? (
-        <div className="surface-card border-dashed p-8 text-sm text-zinc-500">
+        <div className="surface-card border-dashed p-8 text-sm text-secondary">
           {t.library.noReports}
         </div>
       ) : (
@@ -282,8 +282,8 @@ function LibraryContent() {
                 className={clsx(
                   "w-full rounded-lg border px-3 py-2 text-left text-sm",
                   selectedReport?.id === r.id
-                    ? "border-primary bg-zinc-900"
-                    : "border-zinc-800 hover:bg-zinc-900/70"
+                    ? "border-primary bg-[var(--surface-selected)]"
+                    : "border-[var(--border-subtle)] hover:bg-[var(--surface-hover)]"
                 )}
               >
                 <p className="font-medium">{r.title}</p>

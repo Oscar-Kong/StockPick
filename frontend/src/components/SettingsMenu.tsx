@@ -36,7 +36,7 @@ export function SettingsMenu() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="settings-nav-btn flex items-center gap-1 rounded-lg px-2 py-2 text-zinc-500 transition hover:bg-zinc-900 hover:text-zinc-200"
+        className="settings-nav-btn flex items-center gap-1 rounded-lg px-2 py-2 text-secondary transition hover:bg-[var(--surface-hover)] hover:text-foreground"
         title={t.settings.menuTitle}
         aria-label={t.settings.menuTitle}
         aria-expanded={open}
@@ -63,8 +63,8 @@ export function SettingsMenu() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-lg border border-zinc-700 bg-zinc-950 py-1 shadow-xl">
-          <p className="px-3 py-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+        <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1 shadow-xl">
+          <p className="px-3 py-2 text-xs font-medium uppercase tracking-wide text-secondary">
             {t.settings.language}
           </p>
           <div className="flex gap-1 px-2 pb-2">

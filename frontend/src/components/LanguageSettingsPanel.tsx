@@ -8,8 +8,8 @@ export function LanguageSettingsPanel() {
 
   return (
     <section className="surface-card mb-6 p-4 sm:p-5">
-      <h2 className="text-sm font-semibold text-zinc-100">{t.settings.languageSection}</h2>
-      <p className="mt-1 text-xs text-zinc-500">{t.settings.languageHint}</p>
+      <h2 className="text-sm font-semibold text-foreground">{t.settings.languageSection}</h2>
+      <p className="mt-1 text-xs text-secondary">{t.settings.languageHint}</p>
       <div className="mt-3 flex gap-2">
         {(
           [
@@ -25,7 +25,7 @@ export function LanguageSettingsPanel() {
               "rounded-lg px-4 py-2 text-sm font-medium transition",
               locale === code
                 ? "bg-primary/15 text-primary ring-1 ring-primary/40"
-                : "border border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
+                : "border border-[var(--border-subtle)] text-secondary hover:border-[var(--border-strong)] hover:text-foreground"
             )}
           >
             {label}
