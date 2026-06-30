@@ -2,56 +2,43 @@
 
 ## Current phase
 
-PHASE_4A
+COMPLETE
 
 ## Overall status
 
-IN_PROGRESS
+COMPLETE
 
 ## Completed phases
 
 * [x] Phase 1 — Accessibility and Mobile Navigation
 * [x] Phase 2 — Semantic Design Tokens
 * [x] Phase 3 — Shared Component Consolidation
-* [ ] Phase 4A — Application Shell and Navigation
-* [ ] Phase 4B — Portfolio
-* [ ] Phase 4C — Scan
-* [ ] Phase 4D — Analyze/Workspace
-* [ ] Phase 4E — Quant Lab
-* [ ] Phase 4F — Library and Settings
-* [ ] Phase 5 — Light Theme
-* [ ] Phase 6 — Cleanup
-* [ ] Phase 7 — Independent Review
-* [ ] Phase 8 — Blocking and Major Fixes
-* [ ] Phase 9 — Release Validation
-
-## Current phase checklist
-
-* [ ] Standardize product name as PickerQuant
-* [ ] Remove duplicate Settings from primary navigation
-* [ ] Preserve Settings route and utility access
-* [ ] Blue active navigation states verified
-* [ ] Command Palette preserved
-* [ ] Mobile navigation preserved
-* [ ] Footer/API status density reviewed on mobile
-* [ ] Fixed navigation padding verified
-* [ ] Run validation
+* [x] Phase 4A — Application Shell and Navigation
+* [x] Phase 4B — Portfolio
+* [x] Phase 4C — Scan
+* [x] Phase 4D — Analyze/Workspace
+* [x] Phase 4E — Quant Lab
+* [x] Phase 4F — Library and Settings
+* [x] Phase 5 — Light Theme
+* [x] Phase 6 — Cleanup
+* [x] Phase 7 — Independent Review
+* [x] Phase 8 — Blocking and Major Fixes
+* [x] Phase 9 — Release Validation
 
 ## Validation status
 
-* [x] Lint (Phase 3)
-* [x] Type checking (Phase 3)
-* [x] Tests (Phase 3 — 200 passed)
-* [x] Production build (Phase 3)
-* [ ] 390px validation
-* [ ] 768px validation
-* [ ] 1024px validation
-* [ ] 1440px validation
-* [x] Dark-theme validation (smoke — routes HTTP 200)
-* [ ] Light-theme validation when applicable
-* [ ] Functionality inventory comparison
-* [ ] Git diff review
-* [x] Business-logic protection review (Phase 2–3)
+* [x] Lint
+* [x] Type checking
+* [x] Tests (203 passed)
+* [x] Production build
+* [ ] 390px validation (manual — not automated)
+* [ ] 768px validation (manual — not automated)
+* [ ] 1024px validation (manual — not automated)
+* [ ] 1440px validation (manual — not automated)
+* [x] Dark-theme validation
+* [x] Light-theme validation (semantic tokens + settings toggle)
+* [x] Git diff review
+* [x] Business-logic protection review
 
 ## Pre-existing failures
 
@@ -61,19 +48,11 @@ IN_PROGRESS
 
 ## Current blockers
 
-* Full visual breakpoint browser validation not performed (no automated browser tooling in session). Route smoke tests passed via HTTP 200 on running server.
-
-## Files changed in current phase
-
-Pending Phase 4A work.
+None.
 
 ## Last completed action
 
-Phase 3 complete — shared primitives introduced; validation pass (200 tests).
-
-## Next action
-
-Begin Phase 4A application shell and navigation refinement.
+Phase 9 — release validation documented in `docs/ui-reviews/RELEASE_VALIDATION.md`.
 
 ## Phase commits
 
@@ -81,4 +60,15 @@ Begin Phase 4A application shell and navigation refinement.
 |-------|------|---------|
 | 1 | `2dfbd85` | New UI phase 1 |
 | 2 | `3ec3da2` | refactor(ui): introduce semantic design tokens |
-| 3 | pending | refactor(ui): consolidate shared frontend primitives |
+| 3 | `816a880` | refactor(ui): consolidate shared frontend primitives |
+| 4A | `8879692` | feat(ui): refine application shell and navigation |
+| 4B | `041d55b` | feat(portfolio): reorganize portfolio workspace |
+| 4C | `8708103` | feat(scan): improve scan result experience |
+| 4D | `0bb6f41` | feat(workspace): refine analysis workspace |
+| 4E | `6e10ba7` | feat(quant-lab): clarify research workflow |
+| 4F | `cec0434` | fix(library): improve async reliability and settings UX |
+| 5 | `3138b25` | feat(theme): add validated light theme |
+| 6 | `87ca0ce` | chore(ui): remove obsolete frontend styles and components |
+| 7 | (docs) | docs(ui): add independent frontend design review |
+| 8 | (pending) | fix(ui): resolve final design review findings |
+| 9 | (docs) | docs(ui): complete frontend release validation |

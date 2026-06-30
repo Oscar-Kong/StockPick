@@ -82,7 +82,20 @@ Registered in `@theme inline`:
 
 - `text-primary`, `bg-primary`, `border-primary` → interaction blue
 - `text-buy`, `bg-buy`, `border-buy` → financial green
-- `text-brand` → **deprecated alias** to buy green (Phase 6 removal)
+- `text-buy`, `bg-buy`, `border-buy` → financial green
+
+---
+
+## Theme modes (Phase 5)
+
+- **Default:** dark — applied when no saved preference exists
+- **Light:** `[data-theme="light"]` — full legacy alias set mirrors dark block
+- **System:** follows `prefers-color-scheme` when selected
+- **Persistence:** `localStorage` key `pickerquant-theme` (`dark` | `light` | `system`)
+- **FOUC prevention:** inline init script in `frontend/src/app/layout.tsx` sets `data-theme` before paint
+- **User control:** Settings → Appearance (`/settings?section=theme`) or `ThemeProvider` API
+
+Components must reference semantic tokens only — no duplicate light/dark implementations per component.
 
 ---
 
@@ -99,19 +112,15 @@ Use `PRICE_CHART_SERIES` from `@/lib/chartSeries` for price charts.
 
 ---
 
-## Deprecated aliases (Phase 6 removal)
+## Deprecated aliases (removed from new code)
 
-| Alias | Points to | Do not use for |
-|-------|-----------|----------------|
-| `--brand` | `--color-buy` | New interaction code |
-| `--brand-text` | `--color-buy` | Links |
-| `--brand-soft` | `--color-buy-subtle` | Selection states |
-| `.text-brand` | buy green | Links (use `.text-primary`) |
+| Alias | Points to | Status |
+|-------|-----------|--------|
+| `--brand` | `--color-buy` | Retained in CSS for compatibility; component usages migrated |
+| `.text-brand` | buy green | Avoid — use `.text-primary` or `.text-buy` |
 
 ---
 
-## Theme modes
+## Theme modes (legacy note)
 
-- **Default:** dark (`:root` / `[data-theme="dark"]`)
-- **Light:** `[data-theme="light"]` — values defined; toggle in Phase 5
-- Components must reference semantic tokens only — no duplicate light/dark implementations per component.
+See **Theme modes (Phase 5)** above.
