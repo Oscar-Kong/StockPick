@@ -48,25 +48,6 @@ DEFAULT_STRATEGIES: dict[str, dict[str, Any]] = {
         },
         "backtest": {"hold_days": 10, "stop_pct": 0.10, "target_pct": 0.15},
     },
-    "medium_v1": {
-        "bucket": "medium",
-        "version": "medium_v1",
-        "hold_horizon_days": 20,
-        "weights": {
-            "trend": 0.20,
-            "breakout": 0.20,
-            "relative_strength": 0.20,
-            "ml_signal": 0.15,
-            "sector_strength": 0.10,
-            "fundamentals": 0.15,
-        },
-        "hard_filters": {
-            "min_price": 10.0,
-            "max_price": 150.0,
-            "min_volume": 1_000_000,
-        },
-        "backtest": {"hold_days": 20, "stop_pct": 0.07, "target_pct": 0.10},
-    },
     "compounder_v1": {
         "bucket": "compounder",
         "version": "compounder_v1",

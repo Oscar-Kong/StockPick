@@ -21,5 +21,4 @@ def test_normalize_sleeve_unknown_defaults_penny():
 
 
 def test_normalize_bucket_medium():
-    assert normalize_bucket(Bucket.medium) == Bucket.penny
     assert normalize_bucket("medium") == Bucket.penny

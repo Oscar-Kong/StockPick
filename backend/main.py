@@ -35,6 +35,7 @@ from api.routes_ml import router as ml_router
 from api.routes_brokerage import router as brokerage_router, router_portfolio as portfolio_holdings_router
 from api.routes_home import router as home_router
 from api.routes_portfolio_decision import router as portfolio_decision_router
+from api.routes_daily_trading_plan import router as daily_trading_plan_router
 from api.routes_portfolio import router as portfolio_router
 from api.routes_scan import router as scan_router
 from api.routes_saved import router as saved_router
@@ -127,6 +128,7 @@ app.include_router(data_router)
 app.include_router(analyze_router)
 app.include_router(portfolio_router)
 app.include_router(portfolio_decision_router)
+app.include_router(daily_trading_plan_router)
 app.include_router(portfolio_holdings_router)
 app.include_router(brokerage_router)
 app.include_router(home_router)
@@ -229,14 +231,18 @@ def _database_status() -> str:
 @app.get("/health", response_model=HealthResponse, response_model_exclude_none=True)
 def health():
     """Lightweight liveness check — no external providers or heavy work."""
+    import config as _cfg
+
+    demo_mode = bool(_cfg.DEMO_MODE)
+    app_env = _cfg.APP_ENV
     base = HealthResponse(
         status="ok",
-        environment=APP_ENV,
-        demo_mode=DEMO_MODE,
+        environment=app_env,
+        demo_mode=demo_mode,
         database=_database_status(),
         version=app.version,
     )
-    if DEMO_MODE or APP_ENV == "production":
+    if demo_mode or app_env == "production":
         return base
 
     from data.openbb_client import openbb_ready
@@ -270,11 +276,13 @@ def health():
 
 @app.get("/health/ready", response_model=HealthResponse, response_model_exclude_none=True)
 def health_ready():
+    import config as _cfg
+
     status = _database_status()
     return HealthResponse(
         status="ok" if status == "available" else "degraded",
-        environment=APP_ENV,
-        demo_mode=DEMO_MODE,
+        environment=_cfg.APP_ENV,
+        demo_mode=bool(_cfg.DEMO_MODE),
         database=status,
         version=app.version,
     )

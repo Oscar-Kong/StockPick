@@ -36,6 +36,10 @@ class ScanEmailSettings:
         return hash_recipients(self.recipients)
 
 
+def parse_recipients(raw: str) -> list[str]:
+    return _parse_recipients(raw)
+
+
 def _parse_recipients(raw: str) -> list[str]:
     parts = [p.strip() for p in (raw or "").split(",") if p.strip()]
     return parts
@@ -69,19 +73,23 @@ def load_scan_email_settings() -> ScanEmailSettings:
         SCAN_EMAIL_RETRY_DELAY_MINUTES,
         SCAN_EMAIL_STALE_AFTER_MINUTES,
         SCAN_EMAIL_TIMEZONE,
-        SCAN_EMAIL_TO,
         SCAN_EMAIL_TOP_N,
         SMTP_PASSWORD,
         SMTP_USER,
     )
+    from services.mailing_list_store import resolve_scan_email_recipients
 
-    recipients = _parse_recipients(SCAN_EMAIL_TO)
+    recipients_raw, _source = resolve_scan_email_recipients()
+    recipients = list(recipients_raw)
     buckets = _parse_buckets(SCAN_EMAIL_BUCKETS_RAW) or tuple(ACTIVE_BUCKETS)
     errors: list[str] = []
 
     if SCAN_EMAIL_ENABLED:
         if not recipients:
-            errors.append("SCAN_EMAIL_TO is required when SCAN_EMAIL_ENABLED=true")
+            errors.append(
+                "At least one recipient is required when SCAN_EMAIL_ENABLED=true "
+                "(add emails in Settings → Ops → Mailing list, or set SCAN_EMAIL_TO in .env)"
+            )
         else:
             for addr in recipients:
                 if not _EMAIL_RE.match(addr):
@@ -146,3 +154,24 @@ def mask_recipients(recipients: tuple[str, ...] | list[str]) -> str:
     if len(masked) == 1:
         return masked[0]
     return f"{masked[0]} (+{len(masked) - 1} more)"
+
+
+def extract_email_address(value: str) -> str:
+    """Return bare email from 'Name <email@domain>' or plain address."""
+    value = (value or "").strip()
+    if not value:
+        return ""
+    match = _FROM_RE.match(value)
+    if match:
+        email = match.group(2) or match.group("plain")
+        return (email or "").strip()
+    return value
+
+
+def format_recipient_list(recipients: tuple[str, ...] | list[str]) -> str:
+    cleaned = [r.strip() for r in recipients if r and r.strip()]
+    if not cleaned:
+        return "—"
+    if len(cleaned) == 1:
+        return cleaned[0]
+    return ", ".join(cleaned)

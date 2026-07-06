@@ -49,6 +49,9 @@ export function MorningScanEmailPanel() {
 
   useEffect(() => {
     void load();
+    const onMailingListChanged = () => void load();
+    window.addEventListener("mailing-list-changed", onMailingListChanged);
+    return () => window.removeEventListener("mailing-list-changed", onMailingListChanged);
   }, [load]);
 
   const showToast = (message: string) => {
@@ -126,9 +129,25 @@ export function MorningScanEmailPanel() {
               <dt className="text-xs uppercase tracking-wide text-zinc-500">{t.morningScanEmail.provider}</dt>
               <dd className="text-zinc-200">{status.provider}</dd>
             </div>
-            <div>
+            <div className="sm:col-span-2">
               <dt className="text-xs uppercase tracking-wide text-zinc-500">{t.morningScanEmail.recipient}</dt>
-              <dd className="text-zinc-200">{status.recipient_masked}</dd>
+              <dd className="text-zinc-200">
+                {status.recipients.length > 0
+                  ? status.recipients.join(", ")
+                  : status.recipient_masked}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-zinc-500">
+                {t.morningScanEmail.recipientSource}
+              </dt>
+              <dd className="text-zinc-200">
+                {status.recipient_source === "settings"
+                  ? t.morningScanEmail.sourceSettings
+                  : status.recipient_source === "env"
+                    ? t.morningScanEmail.sourceEnv
+                    : t.morningScanEmail.sourceNone}
+              </dd>
             </div>
             <div>
               <dt className="text-xs uppercase tracking-wide text-zinc-500">{t.morningScanEmail.schedule}</dt>
@@ -179,6 +198,13 @@ export function MorningScanEmailPanel() {
           )}
 
           <div className="flex flex-wrap gap-2 pt-2">
+            {status.recipients.length > 0 ? (
+              <p className="w-full text-xs text-zinc-400">
+                {t.morningScanEmail.testSendHint} {status.recipients.join(", ")}
+              </p>
+            ) : (
+              <p className="w-full text-xs text-amber-300">{t.morningScanEmail.noRecipientsConfigured}</p>
+            )}
             <PrimaryButton
               type="button"
               disabled={!!actionPending || !status.configured}
@@ -188,7 +214,7 @@ export function MorningScanEmailPanel() {
             </PrimaryButton>
             <GhostButton
               type="button"
-              disabled={!!actionPending || !status.enabled}
+              disabled={!!actionPending || !status.configured || status.recipients.length === 0}
               onClick={() => void onTestSend()}
             >
               {actionPending === "test" ? t.common.loading : t.morningScanEmail.sendTest}

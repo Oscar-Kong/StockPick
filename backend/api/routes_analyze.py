@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 from fastapi import APIRouter, HTTPException, Query
 
 from config import ANALYZE_ROUTE_TIMEOUT_SECONDS, COMPARE_ROUTE_TIMEOUT_SECONDS, REPORT_ROUTE_TIMEOUT_SECONDS
+from buckets import parse_bucket_query
 from models.schemas import (
     AnalyzeCompareResponse,
     AnalyzeSymbolResponse,
@@ -88,22 +89,23 @@ def analyze_symbol_diagnostics(
 
 
 @router.get("/{symbol}/report")
-def analyze_symbol_report(symbol: str, bucket: Bucket | None = None):
+def analyze_symbol_report(symbol: str, bucket: str | None = Query(None, description="penny | compounder (legacy medium → penny)")):
     from services.research_report import build_research_report, get_cached_report
 
     sym = symbol.upper()
     if sym == "COMPARE":
         raise HTTPException(status_code=404, detail="Invalid symbol")
 
-    sleeve = bucket.value if bucket else None
+    bucket_val = Bucket(parse_bucket_query(bucket)) if bucket else None
+    sleeve = bucket_val.value if bucket_val else None
     cached = get_cached_report(sym, sleeve)
-    if cached and not bucket:
+    if cached and not bucket_val:
         return cached
     try:
         data = _run_with_timeout(
             build_research_report,
             sym,
-            bucket,
+            bucket_val,
             timeout_seconds=REPORT_ROUTE_TIMEOUT_SECONDS,
         )
     except FuturesTimeout as exc:
@@ -116,7 +118,7 @@ def analyze_symbol_report(symbol: str, bucket: Bucket | None = None):
         raise HTTPException(status_code=404, detail=data["error"])
     cache_module.save_report_snapshot(
         symbol=sym,
-        bucket=bucket.value if bucket else None,
+        bucket=bucket_val.value if bucket_val else None,
         report=data,
         title=f"{sym} report",
         notes="Auto-saved from /analyze/{symbol}/report",
@@ -127,13 +129,13 @@ def analyze_symbol_report(symbol: str, bucket: Bucket | None = None):
 @router.get("/{symbol}", response_model=AnalyzeSymbolResponse)
 def analyze_symbol_route(
     symbol: str,
-    bucket: Bucket | None = None,
+    bucket: str | None = Query(None, description="penny | compounder (legacy medium → penny)"),
     refresh: bool = Query(False, description="Bypass in-memory cache"),
-    include_bucket_fit: bool = Query(False, description="Score all three buckets (slower)"),
+    include_bucket_fit: bool = Query(False, description="Score penny and compounder (slower)"),
 ):
     if symbol.upper() == "COMPARE":
         raise HTTPException(status_code=404, detail="Use /analyze/compare")
-    selected_bucket = bucket or Bucket.penny
+    selected_bucket = Bucket(parse_bucket_query(bucket))
     if not refresh:
         cached = get_cached_symbol_analysis(symbol, selected_bucket)
         if cached and not cached.get("error"):

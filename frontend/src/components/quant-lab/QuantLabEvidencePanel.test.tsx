@@ -39,7 +39,7 @@ describe("QuantLabEvidencePanel", () => {
 
   it("renders last-run cards with available data", async () => {
     mocked.getQuantLabEvidence.mockResolvedValue({
-      sleeve: "medium",
+      sleeve: "penny",
       generated_at: "2026-06-05",
       validation_copy: en.quantLab.validationCopy,
       factor_ic: {
@@ -71,7 +71,7 @@ describe("QuantLabEvidencePanel", () => {
 
   it("shows no saved run and stale badges", async () => {
     mocked.getQuantLabEvidence.mockResolvedValue({
-      sleeve: "medium",
+      sleeve: "penny",
       generated_at: "2026-06-05",
       validation_copy: en.quantLab.validationCopy,
       factor_ic: {
@@ -100,7 +100,7 @@ describe("QuantLabEvidencePanel", () => {
   it("navigates on view details without running research", async () => {
     const onNavigate = vi.fn();
     mocked.getQuantLabEvidence.mockResolvedValue({
-      sleeve: "medium",
+      sleeve: "penny",
       generated_at: "2026-06-05",
       validation_copy: en.quantLab.validationCopy,
       factor_ic: unavailable("factor_ic"),

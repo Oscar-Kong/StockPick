@@ -51,7 +51,7 @@ Verify:
 ```bash
 curl -s http://127.0.0.1:18731/health
 curl -s http://127.0.0.1:18731/api/v2/admin/round2-stats | jq
-curl -s "http://127.0.0.1:18731/api/v2/score/AAPL?sleeve=medium" | jq '.recommendation,.valuation.sensitivity_grid'
+curl -s "http://127.0.0.1:18731/api/v2/score/AAPL?sleeve=penny" | jq '.recommendation,.valuation.sensitivity_grid'
 ```
 
 Open **Analyze → AAPL** — sidebar should show Round 2 quant block (recommendation, valuation grid, earnings, similar-signal).

@@ -57,26 +57,6 @@ def factor_score_at_window(
                 from scoring.technical import breakout_score
 
                 return breakout_score(hist)
-        elif sleeve == "medium":
-            spy_w = spy if spy is not None and not spy.empty else hist
-            if SLEEVE_FACTORS_V3_ENABLED:
-                from scoring.medium_factors import medium_expanded_scores
-
-                scores = medium_expanded_scores(symbol, hist, {}, {})
-                if key in scores:
-                    return scores[key]
-            if key == "rs_vs_spy":
-                return relative_strength_vs_spy(hist, spy_w, days=20)
-            if key == "technical_setup":
-                return (macd_score(hist) + breakout_score(hist) + trend_score(hist)) / 3
-            if key == "sector_rs":
-                return relative_strength_vs_spy(hist, spy_w, days=20) * 0.95
-            if key == "qlib_alpha":
-                return momentum_score(hist, 20)
-            if key == "sentiment":
-                return combined_sentiment_score(symbol, include_news=True)["score"]
-            if key == "governance":
-                return 70.0
         elif sleeve == "compounder":
             if SLEEVE_FACTORS_V3_ENABLED:
                 from scoring.compounder_v3 import compounder_expanded_scores

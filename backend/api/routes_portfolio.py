@@ -13,6 +13,7 @@ from models.schemas import (
     PortfolioOptimizeResponse,
     PortfolioPolicyBacktestRequest,
     PortfolioPolicyBacktestResponse,
+    PortfolioPerformanceResponse,
     PortfolioSummaryResponse,
     RebalancePreviewRequest,
     RebalancePreviewResponse,
@@ -22,12 +23,32 @@ from services.institutional_backtest_service import run_portfolio_backtest
 from services.factor_exposure_service import build_factor_exposure_report
 from services.portfolio_decision_service import run_portfolio_daily_decision
 from services.portfolio_summary_service import build_portfolio_summary
+from services.portfolio_performance_service import build_portfolio_performance
 from services.rebalance_service import compute_rebalance_preview
 from utils.api_errors import portfolio_error
 from utils.demo_guard import enforce_backtest_symbols, require_non_demo_mode
 from config import DEMO_MODE
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
+
+
+@router.get("/performance", response_model=PortfolioPerformanceResponse)
+def portfolio_performance():
+    """P/L summary and mark-to-market equity curves (1d–1y) for current holdings."""
+    try:
+        from data.portfolio_store import get_latest_portfolio_snapshot
+
+        snap = get_latest_portfolio_snapshot() or {}
+        closed = snap.get("closed_positions") or []
+        return PortfolioPerformanceResponse(**build_portfolio_performance(closed_positions=closed))
+    except Exception as exc:
+        raise portfolio_error(
+            code="PORTFOLIO_PERFORMANCE_FAILED",
+            message="Could not load portfolio performance.",
+            status_code=500,
+            retryable=True,
+            log_detail=str(exc),
+        ) from exc
 
 
 @router.get("/summary", response_model=PortfolioSummaryResponse)

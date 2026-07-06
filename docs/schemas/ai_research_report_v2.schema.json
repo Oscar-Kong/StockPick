@@ -23,7 +23,7 @@
   "properties": {
     "schema_version": { "type": "string", "const": "2.0.0" },
     "symbol": { "type": "string", "pattern": "^[A-Z][A-Z0-9.\\-]{0,9}$" },
-    "sleeve": { "enum": ["penny", "medium", "compounder"] },
+    "sleeve": { "enum": ["penny", "compounder"] },
     "as_of": { "type": "string", "format": "date-time" },
     "final_rating": {
       "type": "object",

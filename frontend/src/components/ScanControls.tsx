@@ -80,7 +80,7 @@ export function ScanControls({
             type="button"
             onClick={onScan}
             disabled={scanning}
-            className="btn-primary px-4 py-2.5 text-sm disabled:opacity-50"
+            className="btn-action px-4 py-2.5 text-sm disabled:opacity-50"
           >
             {scanning ? t.common.scanning : t.scan.runScan}
           </button>

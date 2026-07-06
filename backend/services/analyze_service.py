@@ -31,7 +31,6 @@ logger = logging.getLogger(__name__)
 
 _SCREENERS = {
     Bucket.penny: PennyScreener,
-    Bucket.medium: PennyScreener,
     Bucket.compounder: CompounderScreener,
 }
 
@@ -81,10 +80,10 @@ def _quick_technicals(symbol: str, ps: PriceService, *, db_only: bool = False) -
 
 
 def score_all_buckets(symbol: str, ps: PriceService | None = None) -> dict[str, Any]:
-    """Score symbol under penny, medium, compounder (for bucket-fit)."""
+    """Score symbol under penny and compounder (for bucket-fit)."""
     ps = ps or PriceService()
     scores: dict[str, Any] = {}
-    for bucket in (Bucket.penny, Bucket.medium, Bucket.compounder):
+    for bucket in (Bucket.penny, Bucket.compounder):
         screener = _SCREENERS[bucket]()
         if hasattr(screener, "ps"):
             screener.ps = ps
@@ -222,7 +221,7 @@ def build_watchlist_matrix() -> list[dict[str, Any]]:
 
     for item in items:
         sym = item["symbol"]
-        bucket = item.get("bucket", "medium")
+        bucket = item.get("bucket", "penny")
         stale = _is_stale(item.get("last_scanned_at"))
         technicals = _quick_technicals(sym, ps, db_only=True)
 
@@ -295,7 +294,7 @@ def build_compare(symbols: list[str]) -> dict[str, Any]:
             }
 
             if wl:
-                bucket = wl.get("bucket", "medium")
+                bucket = wl.get("bucket", "penny")
                 alerts = compute_alerts(
                     sym,
                     bucket=bucket,

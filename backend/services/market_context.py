@@ -60,7 +60,7 @@ def enrich_metrics(
     metrics["news_headlines"] = news_data.get("headlines", [])
 
     warnings: list[str] = []
-    if bucket in (Bucket.medium, Bucket.compounder):
+    if bucket == Bucket.compounder:
         warnings = valuation_warnings(info, fundamentals)
     elif earnings.get("earnings_soon"):
         warnings = ["Earnings within 7 days — high volatility risk"]

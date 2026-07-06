@@ -16,6 +16,7 @@ export const EXPERIMENT_TYPES = [
   "pairs_discovery",
   "similar_signal",
   "portfolio_policy",
+  "scan_evaluation",
 ] as const;
 
 export type ExperimentType = (typeof EXPERIMENT_TYPES)[number];
@@ -95,5 +96,20 @@ export function defaultWalkForwardDates(): { start_date: string; end_date: strin
   return {
     start_date: start.toISOString().slice(0, 10),
     end_date: end.toISOString().slice(0, 10),
+  };
+}
+
+export function defaultScanEvaluationParams(): Record<string, unknown> {
+  const dates = defaultWalkForwardDates();
+  return {
+    ...dates,
+    algorithm_versions: ["alphabetical_baseline", "stage_a_v2"],
+    forward_horizons: [5, 20],
+    rebalance_frequency: "monthly",
+    stage_b_cap: 20,
+    max_universe: 25,
+    spread_bps: 50,
+    slippage_bps: 25,
+    apply_penny_friction: true,
   };
 }

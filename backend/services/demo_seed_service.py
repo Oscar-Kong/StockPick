@@ -31,7 +31,7 @@ _DEMO_HOLDINGS = [
 _DEMO_WATCHLIST = [
     ("AMD", Bucket.penny, "Semiconductor momentum watch"),
     ("COST", Bucket.compounder, "Quality compounder example"),
-    ("TSLA", Bucket.medium, "High-beta swing candidate"),
+    ("TSLA", Bucket.penny, "High-beta swing candidate"),
 ]
 
 
@@ -40,7 +40,7 @@ def _portfolio_needs_seed() -> bool:
     holdings = get_current_holdings()
     if account.get("source") == "demo" and holdings:
         return False
-    if account.get("source") in ("csv", "snaptrade") and holdings:
+    if account.get("source") in ("csv", "snaptrade", "robinhood_mcp") and holdings:
         return False
     return not holdings
 

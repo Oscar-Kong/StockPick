@@ -5,7 +5,7 @@
 -- Factor catalog
 CREATE TABLE IF NOT EXISTS factor_definitions (
     factor_id       VARCHAR(64) PRIMARY KEY,
-    sleeve          VARCHAR(16) NOT NULL,  -- penny | medium | compounder | all
+    sleeve          VARCHAR(16) NOT NULL,  -- penny | compounder | all
     display_name    VARCHAR(128) NOT NULL,
     tier            VARCHAR(16) NOT NULL,  -- critical | important | secondary
     formula_version VARCHAR(32) NOT NULL,

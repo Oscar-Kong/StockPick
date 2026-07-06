@@ -2,7 +2,7 @@ import { formatDateTime } from "@/lib/datetime";
 import { formatCurrency, getCockpitStatus } from "@/lib/dailyDecisionUtils";
 import type { DailyDashboardResponse } from "@/lib/types";
 import { useTranslation } from "@/lib/i18n";
-import { GhostButton, PrimaryButton, SecondaryButton } from "@/components/ui/buttons";
+import { ActionButton, GhostButton, SecondaryButton } from "@/components/ui/buttons";
 import { CurrencyText } from "@/components/ui/typography";
 import { SummaryStrip, SummaryStripItem } from "@/components/ui/SummaryStrip";
 import { CockpitStatusPill } from "./CockpitStatusPill";
@@ -68,9 +68,9 @@ export function DailyDecisionHero({
         {onImportClick && (
           <GhostButton onClick={onImportClick}>{t.home.dailyImportCsv}</GhostButton>
         )}
-        <PrimaryButton onClick={onRunNow} disabled={running || refreshing || !canRun}>
+        <ActionButton onClick={onRunNow} disabled={running || refreshing || !canRun}>
           {running ? t.home.dailyRunning : t.home.dailyRunNow}
-        </PrimaryButton>
+        </ActionButton>
       </div>
     </header>
   );

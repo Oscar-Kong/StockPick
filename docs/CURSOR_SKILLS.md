@@ -1,6 +1,15 @@
 # Cursor Skills — Quick Manual
 
-This repo includes the **[agent-skills](https://github.com/addyosmani/agent-skills)** pack under `.cursor/skills/`. Skills are step-by-step workflows the agent follows (not passive reference docs). Use them when you want consistent quality gates: spec before code, tests before merge, structured reviews, etc.
+This repo uses two complementary skill packs:
+
+| Pack | Location | Best for |
+|------|----------|----------|
+| **Matt Pocock engineering skills** | `~/.agents/skills/` (install: `npx skills@latest add mattpocock/skills`) | TDD, diagnosis, domain modeling, issue breakdown, branch review |
+| **agent-skills lifecycle pack** | `.cursor/skills/` ([addyosmani/agent-skills](https://github.com/addyosmani/agent-skills)) | Spec/plan/build/review/ship workflows, specialist personas |
+
+**Project configuration for Matt Pocock skills:** [AGENTS.md](../AGENTS.md) at the repo root, plus [docs/agents/](./agents/) and [CONTEXT.md](../CONTEXT.md). Setup was run once for GitHub Issues and StockPick domain language.
+
+Skills are step-by-step workflows the agent follows (not passive reference docs). Use them when you want consistent quality gates: spec before code, tests before merge, structured reviews, etc.
 
 ---
 
@@ -9,13 +18,14 @@ This repo includes the **[agent-skills](https://github.com/addyosmani/agent-skil
 Paste the block below into a **new Cursor Agent chat** to run the full skills workflow on this repo. Replace the task line with what you want done today.
 
 ```markdown
-You are working in the Stock Picker 美股 repo (FastAPI backend + Next.js frontend).
+You are working in the StockPick repo (FastAPI backend + Next.js frontend).
 
 ## Task
-[PASTE YOUR TASK HERE — e.g. "Fix Home portfolio refresh slowness" or "Add manual trade sync indicator on Journal"]
+[PASTE YOUR TASK HERE — e.g. "Fix Portfolio Today refresh slowness" or "Add manual trade sync indicator on Activity"]
 
 ## Mandatory process
-1. Read `.cursor/skills/skills/using-agent-skills/SKILL.md` and pick the matching skills for this task.
+0. Read `AGENTS.md` and `CONTEXT.md` — use StockPick domain terms; respect Scan vs Quant Lab vs Portfolio boundaries.
+1. Read `.cursor/skills/skills/using-agent-skills/SKILL.md` (or `~/.agents/skills/ask-matt/SKILL.md`) and pick matching skills.
 2. Read `.cursor/rules/update-documentation.mdc` — update affected docs in the same change (README, docs/API_REFERENCE.md, etc.).
 3. For non-trivial work: follow `.cursor/skills/skills/spec-driven-development/SKILL.md` (short inline spec in chat is OK if the change is small).
 4. Implement with:
@@ -240,10 +250,29 @@ Cursor also ships user-level skills under `~/.cursor/skills-cursor/` (e.g. **can
 
 ---
 
+## Matt Pocock skills (user-level)
+
+Installed under `~/.agents/skills/`. Key entry points:
+
+| Skill | Use when |
+|-------|----------|
+| `tdd` | Building features or fixes test-first |
+| `diagnosing-bugs` | Reproduce → minimize → fix → regression test |
+| `grill-with-docs` / `domain-modeling` | Sharpen requirements; update `CONTEXT.md` / ADRs |
+| `to-issues` | Break a plan into GitHub Issues |
+| `review` | Standards + spec review since a fixed git point |
+| `codebase-design` | Deep-module vocabulary for refactors |
+
+Re-run `setup-matt-pocock-skills` only when switching issue trackers.
+
 ## Related docs
 
 | Doc | Purpose |
 |-----|---------|
+| [AGENTS.md](../AGENTS.md) | StockPick agent guide + completion checklist |
+| [CONTEXT.md](../CONTEXT.md) | Domain glossary for skills and tests |
+| [docs/agents/](./agents/) | Issue tracker, triage labels, domain doc rules |
+| [docs/adr/](./adr/) | Architectural decision records |
 | [`.cursor/skills/docs/getting-started.md`](../.cursor/skills/docs/getting-started.md) | Upstream quick start |
 | [`.cursor/skills/docs/cursor-setup.md`](../.cursor/skills/docs/cursor-setup.md) | Rules directory setup |
 | [`.cursor/skills/agents/README.md`](../.cursor/skills/agents/README.md) | Personas vs skills vs commands |

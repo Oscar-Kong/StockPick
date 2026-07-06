@@ -464,7 +464,6 @@ export function TradeJournal({
               >
                 <option value="">{t.buckets.autoDetect}</option>
                 <option value="penny">{t.buckets.penny.label}</option>
-                <option value="medium">{t.buckets.medium.label}</option>
                 <option value="compounder">{t.buckets.compounder.label}</option>
               </select>
             </label>

@@ -1,0 +1,20 @@
+{
+  "factor_id": "disc_penny_momentum_v1",
+  "version": "1.0.0",
+  "display_name": "126d momentum rank",
+  "hypothesis_id": "hyp_momentum_001",
+  "expression": {
+    "kind": "CROSS_SECTIONAL",
+    "op": "RANK",
+    "child": {
+      "kind": "FIELD",
+      "field_id": "return_126d"
+    }
+  },
+  "expected_direction": "HIGHER_IS_BETTER",
+  "intended_universe": "penny",
+  "rebalance_frequency": "weekly",
+  "holding_period_sessions": 5,
+  "data_source_policy_id": "research_adjusted_daily_v1",
+  "lifecycle_status": "DRAFT"
+}

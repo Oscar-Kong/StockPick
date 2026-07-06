@@ -10,6 +10,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from data.candidate_builder import build_candidate
+from data.candidate_gate import CandidateGateResult
 from data.quality_filters import QualityFilterResult
 from models.schemas import Bucket, ScanStatus
 from screeners.base import CandidateContext
@@ -100,10 +101,10 @@ def test_partial_data_fallback_candidates_returned_when_strict_filters_reject_al
     saved: dict = {}
 
     with (
-        patch("services.scan_manager.get_universe", return_value=[symbol]),
-        patch("services.scan_manager.UNIVERSE_SCAN_BATCH_SIZE", 0),
+        patch("services.scan_pipeline.get_universe", return_value=[symbol]),
+        patch("services.scan_pipeline.UNIVERSE_SCAN_BATCH_SIZE", 0),
         patch(
-            "services.scan_manager.rank_stage_a_candidates",
+            "services.scan_pipeline.rank_stage_a_candidates",
             return_value=StageARankingResult(
                 ranked=[
                     StageACandidate(
@@ -116,28 +117,27 @@ def test_partial_data_fallback_candidates_returned_when_strict_filters_reject_al
                 excluded=[],
             ),
         ),
-        patch("services.scan_manager.should_exclude_low_quality", return_value=(False, "")),
         patch(
-            "services.scan_manager.apply_quality_filters",
-            return_value=QualityFilterResult(passed=True, reasons=[]),
+            "services.scan_pipeline.evaluate_stage_b_gate",
+            return_value=CandidateGateResult(passed=False, quality_filter={}, skip_reason="hard_filter"),
         ),
         patch(
-            "services.scan_manager.enrich_scan_display",
+            "services.scan_pipeline.enrich_scan_display",
             side_effect=lambda info, fund, hist, metrics, legacy_summary="": (legacy_summary, metrics),
         ),
-        patch("services.scan_manager.build_candidate", return_value=ctx),
-        patch("services.scan_manager.StrategyRegistry") as reg_cls,
-        patch("services.scan_manager.HistoricalStore"),
-        patch("services.scan_manager.cache_module.save_scan_snapshot"),
+        patch("services.scan_pipeline._resolve_stage_b_context", return_value=ctx),
+        patch("services.scan_pipeline.StrategyRegistry") as reg_cls,
+        patch("services.scan_pipeline.HistoricalStore"),
+        patch("services.scan_pipeline.cache_module.save_scan_snapshot"),
         patch(
-            "services.scan_manager.cache_module.save_scan_results",
+            "services.scan_pipeline.cache_module.save_scan_results",
             side_effect=lambda bucket, results, completed_at, ttl, **kw: saved.update(
                 {"results": results, "metadata": kw.get("metadata")}
             ),
         ),
-        patch("services.scan_manager.cache_module.clear_scan_attempt_failure"),
+        patch("services.scan_pipeline.cache_module.clear_scan_attempt_failure"),
         patch.object(manager, "_get_screener", return_value=mock_screener),
-        patch("services.scan_manager.PriceService") as ps_cls,
+        patch("services.scan_pipeline.PriceService") as ps_cls,
     ):
         ps_cls.return_value.download_batch.return_value = bulk_hist
         reg_cls.return_value.get_active.return_value = MagicMock(version_id="test-v1")
@@ -159,10 +159,10 @@ def test_scan_records_skip_reason_when_history_missing():
     saved: dict = {}
 
     with (
-        patch("services.scan_manager.get_universe", return_value=[symbol]),
-        patch("services.scan_manager.UNIVERSE_SCAN_BATCH_SIZE", 0),
+        patch("services.scan_pipeline.get_universe", return_value=[symbol]),
+        patch("services.scan_pipeline.UNIVERSE_SCAN_BATCH_SIZE", 0),
         patch(
-            "services.scan_manager.rank_stage_a_candidates",
+            "services.scan_pipeline.rank_stage_a_candidates",
             return_value=StageARankingResult(
                 ranked=[
                     StageACandidate(
@@ -175,19 +175,19 @@ def test_scan_records_skip_reason_when_history_missing():
                 excluded=[],
             ),
         ),
-        patch("services.scan_manager.build_candidate", return_value=None),
-        patch("services.scan_manager.StrategyRegistry") as reg_cls,
-        patch("services.scan_manager.HistoricalStore"),
-        patch("services.scan_manager.cache_module.save_scan_snapshot"),
+        patch("services.scan_pipeline.build_candidate", return_value=None),
+        patch("services.scan_pipeline.StrategyRegistry") as reg_cls,
+        patch("services.scan_pipeline.HistoricalStore"),
+        patch("services.scan_pipeline.cache_module.save_scan_snapshot"),
         patch(
-            "services.scan_manager.cache_module.save_scan_results",
+            "services.scan_pipeline.cache_module.save_scan_results",
             side_effect=lambda bucket, results, completed_at, ttl, **kw: saved.update(
                 {"metadata": kw.get("metadata")}
             ),
         ),
-        patch("services.scan_manager.cache_module.clear_scan_attempt_failure"),
+        patch("services.scan_pipeline.cache_module.clear_scan_attempt_failure"),
         patch.object(manager, "_get_screener", return_value=MagicMock()),
-        patch("services.scan_manager.PriceService") as ps_cls,
+        patch("services.scan_pipeline.PriceService") as ps_cls,
     ):
         ps_cls.return_value.download_batch.return_value = {}
         reg_cls.return_value.get_active.return_value = MagicMock(version_id="test-v1")
@@ -211,10 +211,10 @@ def test_scan_records_strict_filter_rejection_reason():
     saved: dict = {}
 
     with (
-        patch("services.scan_manager.get_universe", return_value=[symbol]),
-        patch("services.scan_manager.UNIVERSE_SCAN_BATCH_SIZE", 0),
+        patch("services.scan_pipeline.get_universe", return_value=[symbol]),
+        patch("services.scan_pipeline.UNIVERSE_SCAN_BATCH_SIZE", 0),
         patch(
-            "services.scan_manager.rank_stage_a_candidates",
+            "services.scan_pipeline.rank_stage_a_candidates",
             return_value=StageARankingResult(
                 ranked=[
                     StageACandidate(
@@ -227,22 +227,24 @@ def test_scan_records_strict_filter_rejection_reason():
                 excluded=[],
             ),
         ),
-        patch("services.scan_manager.should_exclude_low_quality", return_value=(False, "")),
-        patch("services.scan_manager.build_candidate", return_value=ctx),
-        patch("services.scan_manager.StrategyRegistry") as reg_cls,
-        patch("services.scan_manager.HistoricalStore"),
-        patch("services.scan_manager.cache_module.save_scan_snapshot"),
+        patch("services.scan_pipeline.build_candidate", return_value=ctx),
+        patch("services.scan_pipeline.StrategyRegistry") as reg_cls,
+        patch("services.scan_pipeline.HistoricalStore"),
+        patch("services.scan_pipeline.cache_module.save_scan_snapshot"),
         patch(
-            "services.scan_manager.cache_module.save_scan_results",
+            "services.scan_pipeline.cache_module.save_scan_results",
             side_effect=lambda bucket, results, completed_at, ttl, **kw: saved.update(
                 {"metadata": kw.get("metadata")}
             ),
         ),
-        patch("services.scan_manager.cache_module.clear_scan_attempt_failure"),
+        patch("services.scan_pipeline.cache_module.clear_scan_attempt_failure"),
+        patch("services.scan_scoring_config.resolve_scan_scoring_mode", return_value="legacy"),
+        patch("services.scan_pipeline.resolve_scan_scoring_mode", return_value="legacy"),
+        patch("data.candidate_gate.should_exclude_low_quality", return_value=(False, "")),
         patch.object(manager, "_get_screener", return_value=mock_screener),
-        patch("services.scan_manager.PriceService") as ps_cls,
+        patch("services.scan_pipeline.PriceService") as ps_cls,
         patch(
-            "services.scan_manager.enrich_scan_display",
+            "services.scan_pipeline.enrich_scan_display",
             side_effect=lambda info, fund, hist, metrics, legacy_summary="": (legacy_summary, metrics),
         ),
     ):

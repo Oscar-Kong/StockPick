@@ -24,7 +24,6 @@ type BacktestEngine = "default" | "vectorbt";
 
 const HORIZONS: Record<Bucket, string[]> = {
   penny: ["1y", "3y"],
-  medium: ["1y", "3y", "5y"],
   compounder: ["3y", "5y"],
 };
 

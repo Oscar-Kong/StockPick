@@ -7,18 +7,26 @@ import { useTranslation } from "@/lib/i18n";
 import { SectionCard } from "@/components/ui/AppCard";
 import { ActiveHoldingsDecisionTable } from "@/components/dashboard/daily-decision/ActiveHoldingsDecisionTable";
 import { DailyActionQueue } from "@/components/dashboard/daily-decision/DailyActionQueue";
-import { PortfolioSummaryStrip } from "@/components/dashboard/daily-decision/DailyDecisionHero";
 import { EmptyPortfolioState, PennyOpportunitiesPanel } from "@/components/dashboard/daily-decision/DailyDecisionPanels";
 import { RiskAlertsPanel } from "@/components/dashboard/daily-decision/RiskAlertsPanel";
+import { PortfolioPerformancePanel } from "@/components/portfolio/PortfolioPerformancePanel";
 import { useState } from "react";
 
 export interface PortfolioTodayProps {
   data: DailyDashboardResponse;
-  onImportClick: () => void;
+  robinhoodAuthenticated?: boolean;
+  onSyncRobinhood?: () => void;
   onOpenActivity: () => void;
+  performanceRefreshKey?: number;
 }
 
-export function PortfolioToday({ data, onImportClick, onOpenActivity }: PortfolioTodayProps) {
+export function PortfolioToday({
+  data,
+  robinhoodAuthenticated,
+  onSyncRobinhood,
+  onOpenActivity,
+  performanceRefreshKey,
+}: PortfolioTodayProps) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState<string | null>(null);
   const hasHoldings = (data.holdings.length ?? 0) > 0;
@@ -32,7 +40,10 @@ export function PortfolioToday({ data, onImportClick, onOpenActivity }: Portfoli
   if (!hasHoldings) {
     return (
       <div className="space-y-4">
-        <EmptyPortfolioState onImportClick={onImportClick} />
+        <EmptyPortfolioState
+          robinhoodAuthenticated={robinhoodAuthenticated}
+          onSyncRobinhood={onSyncRobinhood}
+        />
         <p className="text-center text-sm text-secondary">
           {t.portfolio.activityHint}{" "}
           <button type="button" className="text-primary hover:underline" onClick={onOpenActivity}>
@@ -44,17 +55,22 @@ export function PortfolioToday({ data, onImportClick, onOpenActivity }: Portfoli
   }
 
   return (
-    <div className="portfolio-today space-y-4">
-      <PortfolioSummaryStrip data={data} />
+    <div className="portfolio-today portfolio-today--modern space-y-4">
+      <PortfolioPerformancePanel hasHoldings={hasHoldings} refreshKey={performanceRefreshKey} />
 
-      <DailyActionQueue items={items} />
+      <div className="portfolio-today__workspace">
+        <aside className="portfolio-today__sidebar portfolio-today__sidebar--glass space-y-4">
+          <DailyActionQueue items={items} density="sidebar" />
+          {showPennyOps && <PennyOpportunitiesPanel items={data.top_penny_opportunities} />}
+          <RiskAlertsPanel alerts={data.risk_alerts ?? []} />
+        </aside>
 
-      <div className="portfolio-today__grid grid gap-4 lg:grid-cols-12">
-        <div className="portfolio-today__primary space-y-4 lg:col-span-8">
+        <div className="portfolio-today__main portfolio-today__main--glass space-y-4">
           <SectionCard
             title={t.home.dailyHoldingsTitle}
             subtitle={t.home.dailyHoldingsSubtitle}
             variant="elevated"
+            className="portfolio-holdings-card"
             action={
               <Link href="/scan?bucket=penny" className="text-sm font-medium text-primary hover:underline">
                 {t.home.dailyPennyScan}
@@ -67,11 +83,7 @@ export function PortfolioToday({ data, onImportClick, onOpenActivity }: Portfoli
               onToggle={(sym) => setExpanded((cur) => (cur === sym ? null : sym))}
             />
           </SectionCard>
-          {showPennyOps && <PennyOpportunitiesPanel items={data.top_penny_opportunities} />}
         </div>
-        <aside className="portfolio-today__risk lg:col-span-4">
-          <RiskAlertsPanel alerts={data.risk_alerts ?? []} />
-        </aside>
       </div>
     </div>
   );

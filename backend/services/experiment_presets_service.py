@@ -73,6 +73,22 @@ BASE_PRESETS: dict[str, dict[str, Any]] = {
         "institutional_backtest": True,
         "regime_analysis": True,
     },
+    "scan_eval_smoke": {
+        "title": "Scan Eval Smoke",
+        "description": "Short offline scan replay for smoke testing — not for production decisions.",
+        "major_evidence_eligible": False,
+        "verdict_ceiling": "exploratory",
+        "max_universe": 8,
+        "max_symbols": 8,
+        "stage_b_cap": 8,
+        "max_results": 5,
+        "forward_horizons": [5],
+        "rebalance_frequency": "monthly",
+        "algorithm_versions": ["alphabetical_baseline", "stage_a_v2"],
+        "apply_penny_friction": True,
+        "cost_assumption_bps": 0,
+        "slippage_bps": 0,
+    },
 }
 
 TEMPLATE_META: dict[str, dict[str, Any]] = {
@@ -124,6 +140,28 @@ TEMPLATE_META: dict[str, dict[str, Any]] = {
             "custom_symbols",
         ],
     },
+    "scan_evaluation": {
+        "title": "Scan Selection Evaluation",
+        "description": "Offline Stage A/B replay with forward-return labels — does not change live scan rankings.",
+        "required_fields": ["sleeve", "start_date", "end_date", "algorithm_versions"],
+        "optional_fields": [
+            "forward_horizons",
+            "max_universe",
+            "stage_b_cap",
+            "max_results",
+            "rebalance_frequency",
+            "apply_penny_friction",
+        ],
+        "universe_sources": ["full_bucket", "latest_scan", "custom_symbols"],
+    },
+    "factor_discovery": {
+        "title": "Factor Discovery (disabled)",
+        "description": "LLM-assisted factor research — not enabled in this release.",
+        "required_fields": ["sleeve"],
+        "optional_fields": [],
+        "universe_sources": ["full_bucket"],
+        "enabled": False,
+    },
 }
 
 
@@ -151,6 +189,12 @@ def merge_parameters(
         merged.update({k: v for k, v in user_params.items() if v is not None})
     if experiment_type == "walk_forward" and "forward_horizons" in merged:
         merged["forward_horizons"] = list(merged["forward_horizons"])
+    if experiment_type == "scan_evaluation":
+        sleeve = merged.get("sleeve") or merged.get("bucket")
+        if sleeve and not merged.get("bucket"):
+            merged["bucket"] = sleeve
+        if not merged.get("algorithm_versions"):
+            merged["algorithm_versions"] = ["alphabetical_baseline", "stage_a_v2"]
     return merged
 
 
@@ -186,6 +230,7 @@ def list_templates() -> ExperimentTemplatesResponse:
             universe_sources=meta["universe_sources"],
         )
         for exp_type, meta in TEMPLATE_META.items()
+        if meta.get("enabled", True)
     ]
     return ExperimentTemplatesResponse(templates=templates)
 

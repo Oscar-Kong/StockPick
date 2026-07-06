@@ -35,6 +35,7 @@ async def send_morning_scan_email(body: MorningScanEmailSendRequest):
         subject=result.subject,
         html_preview=result.html_preview,
         text_preview=result.text_preview,
+        recipients=list(result.recipients),
     )
 
 

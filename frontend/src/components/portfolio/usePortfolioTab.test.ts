@@ -7,7 +7,8 @@ describe("usePortfolioTab parsers", () => {
     expect(parsePortfolioTab("bogus")).toBe("today");
   });
 
-  it("parses research and activity tabs", () => {
+  it("parses plan, research, and activity tabs", () => {
+    expect(parsePortfolioTab("plan")).toBe("plan");
     expect(parsePortfolioTab("research")).toBe("research");
     expect(parsePortfolioTab("activity")).toBe("activity");
   });

@@ -42,7 +42,7 @@ PriceService            DataReconciler            FinnhubClient
     │                         │
     ▼                         ▼
  Screeners              data_quality_score
- (penny/medium/         + canonical PE, ROE…
+ (penny/compounder/         + canonical PE, ROE…
   compounder)                    │
     │                            ▼
     ├─ Medium/Compounder:  "SEC / insider governance" signal (5%)
@@ -65,7 +65,7 @@ PriceService            DataReconciler            FinnhubClient
 
 `FredClient.macro_regime_score()` uses OpenBB’s FRED provider when enabled, then falls back to direct FRED HTTP. Powers the **Macro regime** signal (10% weight) for long-term compounders.
 
-### 3. Governance risk (medium + compounder)
+### 3. Governance risk (compounder)
 
 **New signal:** `SEC / insider governance` (5% weight, rescales other legs).
 
@@ -103,7 +103,7 @@ PriceService            DataReconciler            FinnhubClient
 | `backend/scoring/openbb_governance.py` | Score adjustment from governance |
 | `backend/data/reconciler.py` | 4th reconcile source |
 | `backend/data/fred_client.py` | Macro via OpenBB |
-| `backend/screeners/medium.py`, `compounder.py` | Governance signal |
+| `backend/screeners/compounder.py` | Governance signal |
 | `backend/services/scan_manager.py` | Scan score finalize |
 | `backend/api/routes_data.py` | `/data/openbb/risk/{symbol}` |
 

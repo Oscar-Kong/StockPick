@@ -70,6 +70,63 @@ def load_detail_payload(summary: ResearchRunSummary) -> dict[str, Any]:
             pairs = json.loads(row.pairs_json or "[]")
             return {**config, **summary_data, "pairs": pairs}
 
+    if store == "factor_discovery_runs" or summary.run_type == "factor_discovery":
+        from engines.factor_discovery_models import FactorDiscoveryRun, FactorValidationArtifactRecord
+        from services.factor_discovery.artifact_integrity import load_and_verify_artifact_record
+        from services.factor_discovery.repositories import FactorStatusEventRepository
+        from services.research_json import json_loads
+
+        with Session(engine) as session:
+            run = session.get(FactorDiscoveryRun, run_id)
+            if not run:
+                return {}
+            closed = None
+            opened = None
+            if run.closed_artifact_hash:
+                closed_row = (
+                    session.query(FactorValidationArtifactRecord)
+                    .filter(FactorValidationArtifactRecord.validation_artifact_hash == run.closed_artifact_hash)
+                    .one_or_none()
+                )
+                if closed_row:
+                    closed = load_and_verify_artifact_record(closed_row).model_dump(mode="json")
+            if run.opened_artifact_hash:
+                opened_row = (
+                    session.query(FactorValidationArtifactRecord)
+                    .filter(FactorValidationArtifactRecord.validation_artifact_hash == run.opened_artifact_hash)
+                    .one_or_none()
+                )
+                if opened_row:
+                    opened = load_and_verify_artifact_record(opened_row).model_dump(mode="json")
+            events = FactorStatusEventRepository().list_for_factor(run.factor_id, run.factor_version)
+            return {
+                "run": {
+                    "run_id": run.run_id,
+                    "status": run.status,
+                    "error_code": run.error_code,
+                    "error_summary": run.error_summary,
+                    "formula_hash": run.formula_hash,
+                    "plan_hash": run.plan_hash,
+                    "panel_hash": run.panel_hash,
+                    "canonical_session_hash": run.canonical_session_hash,
+                },
+                "closed_artifact": closed,
+                "opened_sealed_artifact": opened,
+                "lifecycle_events": [
+                    {
+                        "event_id": e.event_id,
+                        "previous_status": e.previous_status,
+                        "new_status": e.new_status,
+                        "actor_identifier": e.actor_identifier,
+                        "reason": e.reason,
+                        "created_at": e.created_at.isoformat() if e.created_at else None,
+                    }
+                    for e in events
+                ],
+                "period_split": json_loads(run.period_split_json, {}),
+                "validation_config": json_loads(run.validation_config_json, {}),
+            }
+
     if store == "factor_ic_history" or summary.run_type == "factor_ic_panel":
         sleeve = summary.sleeve or summary.parameters.get("sleeve")
         as_of = summary.data_cutoff or summary.parameters.get("as_of_date")
@@ -325,6 +382,11 @@ def build_charts(run_type: str, summary: ResearchRunSummary, detail: dict[str, A
                 ],
             )
         )
+
+    elif run_type == "scan_evaluation":
+        from services.scan_evaluation_charts import charts_from_artifact
+
+        charts.extend(charts_from_artifact(detail))
 
     return charts
 

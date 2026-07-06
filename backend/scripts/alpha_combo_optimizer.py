@@ -5,7 +5,7 @@ Usage:
   cd backend
   .venv/bin/python scripts/alpha_batch_eval.py --universe sp500 --export
   .venv/bin/python scripts/alpha_combo_optimizer.py
-  .venv/bin/python scripts/alpha_combo_optimizer.py --sleeve medium --top 3
+  .venv/bin/python scripts/alpha_combo_optimizer.py --sleeve penny --top 3
 """
 from __future__ import annotations
 
@@ -85,7 +85,7 @@ def optimize_combo(report: dict, sleeve: str | None, top_k: int) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="OpenAlpha-inspired factor combo optimizer")
-    parser.add_argument("--sleeve", choices=("penny", "medium", "compounder"))
+    parser.add_argument("--sleeve", choices=("penny", "compounder"))
     parser.add_argument("--top", type=int, default=5, help="Max factors in search pool")
     parser.add_argument("--export", action="store_true")
     args = parser.parse_args()

@@ -29,9 +29,15 @@ describe("quantLabNavigation", () => {
     expect(buildQuantLabHref("legacy", { legacyTab: "pairs" })).toContain("tab=pairs");
   });
 
+  it("redirects retired models section to model monitor", () => {
+    const params = new URLSearchParams("section=models");
+    expect(resolveQuantLabRoute(params).section).toBe("model-monitor");
+  });
+
   it("validates section and tab guards", () => {
     expect(isQuantLabSection("ideas")).toBe(true);
-    expect(isQuantLabSection("models")).toBe(true);
+    expect(isQuantLabSection("model-monitor")).toBe(true);
+    expect(isQuantLabSection("models")).toBe(false);
     expect(isQuantLabSection("nope")).toBe(false);
     expect(isQuantLabLegacyTab("factor-performance")).toBe(true);
     expect(isQuantLabLegacyTab("nope")).toBe(false);

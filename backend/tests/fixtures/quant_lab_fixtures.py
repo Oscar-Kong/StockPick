@@ -84,7 +84,7 @@ def build_price_panel_8_symbols() -> dict[str, pd.DataFrame]:
     return panel
 
 
-def seed_factor_ic(*, sleeve: str = "medium", as_of: date | None = None) -> date:
+def seed_factor_ic(*, sleeve: str = "penny", as_of: date | None = None) -> date:
     as_of = as_of or date.today()
     engine = get_engine()
     with Session(engine) as session:
@@ -105,7 +105,7 @@ def seed_factor_ic(*, sleeve: str = "medium", as_of: date | None = None) -> date
     return as_of
 
 
-def seed_walk_forward_run(*, sleeve: str = "medium", run_id: str = "wf_test_001") -> str:
+def seed_walk_forward_run(*, sleeve: str = "penny", run_id: str = "wf_test_001") -> str:
     summary = {
         "status": "completed",
         "sleeve": sleeve,
@@ -142,7 +142,7 @@ def seed_predictions(*, resolved: int = 3, unresolved: int = 2) -> None:
         for i in range(resolved + unresolved):
             snap = PredictionSnapshot(
                 symbol=f"SYM{i}",
-                sleeve="medium",
+                sleeve="penny",
                 created_at=now - timedelta(days=30 - i),
                 price=100.0 + i,
                 recommendation="hold",
@@ -232,7 +232,7 @@ def seed_job_queue(*, status: str = "completed", job_name: str = "ic_panel") -> 
     return job_id
 
 
-def seed_quant_lab_demo(*, sleeve: str = "medium") -> dict[str, Any]:
+def seed_quant_lab_demo(*, sleeve: str = "penny") -> dict[str, Any]:
     """Populate an isolated DB with representative Quant Lab evidence."""
     seed_factor_ic(sleeve=sleeve)
     wf_id = seed_walk_forward_run(sleeve=sleeve)

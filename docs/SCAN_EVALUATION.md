@@ -96,7 +96,9 @@ Run the same harness from **Quant Lab → Experiments → Scan Selection Evaluat
 |-----------|------|
 | Runner adapter | `services/scan_evaluation_experiment_runner.py` → `ScanEvaluationExperimentRunner.run()` |
 | Chart adapter | `services/scan_evaluation_charts.py` → `charts_from_artifact()` |
-| Launch | `services/experiment_launch_service.py` → `_run_scan_evaluation_job()` |
+| Launch | `services/experiment_launch_service.py` → `_run_scan_evaluation()` |
+| Index | `services/research_run_service.py` → `adapter_scan_evaluation()` |
+| Job stages | `services/experiment_job_service.py` → `stage_order_for_experiment("scan_evaluation")` |
 | Results UI | `frontend/src/components/quant-lab/ScanEvaluationResultPanel.tsx` |
 
 ### Artifact layout (Quant Lab run)

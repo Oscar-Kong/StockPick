@@ -2,7 +2,7 @@
 
 > **Route:** `/settings?section=`  
 > **Component:** `app/settings/page.tsx` + panels (language, quant-health, API, ops)  
-> **Audit:** `docs/UI_AUDIT.md` §12.6, §7.2, §15 Phase 4 (#7 Settings polish), §16  
+> **Audit:** `docs/UI_AUDIT_REVISED.md` §12.6, §7.2, §15 Phase 4 (#7 Settings polish), §16  
 > **Implementation phase:** Phase 1 (focus, nav cleanup) · Phase 5 (theme toggle) — **minimal Phase 4 visual churn**  
 > **Parent:** `design-system/MASTER.md`  
 > **ui-ux-pro-max pattern:** Real-Time Operations / clinical config — trust signals, status colors, scannable health indicators
@@ -124,7 +124,11 @@ Other pages should import this pattern from Settings ops panels.
 
 After makeover:
 - Top nav: Home, Scan, Analyze, Portfolio, Quant Lab only
-- Settings: gear icon → `/settings` or dropdown item
+- Settings: gear button (matches search trigger styling) opens a quick menu:
+  - **All settings** → `/settings` (primary CTA with page subtitle)
+  - **Language** — EN / 中文 segmented toggle (instant apply)
+  - **Quick links** — Appearance, API integrations, Quant health
+- Desktop (768px+): gear + “Settings” label on the trigger; mobile: icon-only
 - Command palette: keep settings entry
 
 ---

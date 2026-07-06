@@ -22,6 +22,15 @@ export function PrimaryButton({ size = "md", className, children, ...props }: Bu
   );
 }
 
+/** Green workflow CTA — Run scan, Run daily decision, etc. */
+export function ActionButton({ size = "md", className, children, ...props }: ButtonBaseProps) {
+  return (
+    <button type="button" className={clsx("btn-action font-medium", SIZE[size], className)} {...props}>
+      {children}
+    </button>
+  );
+}
+
 export function SecondaryButton({ size = "md", className, children, ...props }: ButtonBaseProps) {
   return (
     <button type="button" className={clsx("btn-secondary font-medium", SIZE[size], className)} {...props}>

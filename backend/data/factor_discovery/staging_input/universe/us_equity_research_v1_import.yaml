@@ -1,0 +1,15 @@
+schema_version: factor-universe-import-v1
+environment: staging
+universe_id: us_equity_research_v1
+source_id: manual_staging_curated_v1
+source_version: "2026-07-02"
+input_format: interval_csv
+input_path: universe/us_equity_research_v1_intervals.csv
+symbol_mapping_version: symbol_mapping_v1
+calendar_id: us_equity_observed_union_v1
+effective_date_policy: inclusive_start_inclusive_end
+conflict_policy: replace_staging_bucket
+research_start: "2019-03-01"
+research_end: "2023-12-29"
+actor: staging-operator
+reason: Phase 9B.1 curated staging universe with entry/exit examples for reproducibility audit

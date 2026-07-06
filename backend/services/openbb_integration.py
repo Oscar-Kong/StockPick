@@ -79,7 +79,7 @@ def enrich_research_risks(symbol: str, risk_pool: list[str]) -> list[str]:
 
 
 def bucket_uses_governance_signal(bucket: Bucket) -> bool:
-    return bucket in (Bucket.medium, Bucket.compounder)
+    return bucket == Bucket.compounder
 
 
 def append_governance_signal(

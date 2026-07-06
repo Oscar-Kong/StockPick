@@ -61,7 +61,7 @@ def _mock_screener(bucket: Bucket) -> MagicMock:
     return screener
 
 
-def _mock_scoring_result(*, final: float = 68.0, sleeve: str = "medium") -> SimpleNamespace:
+def _mock_scoring_result(*, final: float = 68.0, sleeve: str = "penny") -> SimpleNamespace:
     signals = [WeightedSignal("Engine signal", 68.0, 1.0, "engine")]
     factors = [
         SimpleNamespace(
@@ -112,7 +112,7 @@ def test_legacy_path_preserves_result_shape():
         patch("services.scan_scoring.enrich_metrics", side_effect=_enrich_side_effect),
         patch("services.scan_scoring._apply_openbb_adjustment", side_effect=lambda score, metrics: score),
     ):
-        for bucket in (Bucket.penny, Bucket.medium, Bucket.compounder):
+        for bucket in (Bucket.penny, Bucket.compounder):
             ctx = _mock_ctx(f"LEG{bucket.value[:3].upper()}")
             screener = _mock_screener(bucket)
             outcome = score_stage_b_candidate(
@@ -145,7 +145,7 @@ def test_engine_path_bounded_score_and_shape():
         patch("services.scan_scoring._apply_openbb_adjustment", side_effect=lambda score, metrics: score),
         patch("services.scan_scoring.ScoringEngine.score") as mock_engine_score,
     ):
-        for bucket in (Bucket.penny, Bucket.medium, Bucket.compounder):
+        for bucket in (Bucket.penny, Bucket.compounder):
             ctx = _mock_ctx(f"ENG{bucket.value[:3].upper()}")
             screener = _mock_screener(bucket)
             mock_engine_score.return_value = _mock_scoring_result(final=71.3, sleeve=bucket.value)
@@ -183,11 +183,11 @@ def test_parity_delta_recorded_and_logged():
         mock_engine_score.return_value = _mock_scoring_result(final=60.0)
 
         ctx = _mock_ctx("PARITY")
-        screener = _mock_screener(Bucket.medium)
+        screener = _mock_screener(Bucket.penny)
         outcome = score_stage_b_candidate(
             ctx=ctx,
             screener=screener,
-            bucket=Bucket.medium,
+            bucket=Bucket.penny,
             symbol=ctx.symbol,
             quality_score=80.0,
             strategy_version="test-v2",
@@ -206,7 +206,7 @@ def test_parity_delta_recorded_and_logged():
 
     record = log_score_parity(
         symbol="PARITY",
-        sleeve="medium",
+        sleeve="penny",
         legacy_score=72.5,
         engine_score=60.0,
         factors=_mock_scoring_result().factors,
@@ -217,11 +217,10 @@ def test_parity_delta_recorded_and_logged():
 
 
 def test_engine_path_per_bucket_parity_summary():
-    """Penny, medium, compounder each produce aggregatable parity records."""
+    """Penny and compounder each produce aggregatable parity records."""
     records = []
     engine_scores = {
         Bucket.penny: 55.0,
-        Bucket.medium: 60.0,
         Bucket.compounder: 78.0,
     }
     with (
@@ -231,7 +230,7 @@ def test_engine_path_per_bucket_parity_summary():
         patch("services.scan_scoring.ScoringEngine.score") as mock_engine_score,
         patch("services.scan_scoring.legacy_parity_comparison_enabled", return_value=True),
     ):
-        for bucket in (Bucket.penny, Bucket.medium, Bucket.compounder):
+        for bucket in (Bucket.penny, Bucket.compounder):
             ctx = _mock_ctx(f"SUM{bucket.value[:3].upper()}")
             screener = _mock_screener(bucket)
             final = engine_scores[bucket]
@@ -252,7 +251,7 @@ def test_engine_path_per_bucket_parity_summary():
 
     summary = aggregate_scan_parity_summary(records, scoring_mode="parity_sample", sample_rate=1.0)
     assert summary is not None
-    assert summary.symbol_count == 3
+    assert summary.symbol_count == 2
     assert summary.max_delta >= 0
     assert summary.average_delta >= 0
 

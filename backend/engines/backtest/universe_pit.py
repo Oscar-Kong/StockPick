@@ -16,7 +16,7 @@ def _today() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
-def seed_universe_pit(symbols: list[str], *, as_of_date: str | None = None, bucket_hint: str = "medium") -> int:
+def seed_universe_pit(symbols: list[str], *, as_of_date: str | None = None, bucket_hint: str = "penny") -> int:
     """Insert active symbols for a snapshot date."""
     from engines.quant_db import init_quant_db
 

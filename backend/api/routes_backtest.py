@@ -8,7 +8,6 @@ from data.price_service import PriceService
 from data.reconciler import DataReconciler
 from data.strategy_registry import StrategyRegistry
 from ml.backtest_compounder import run_compounder_backtest
-from ml.backtest_medium import run_medium_backtest
 from ml.backtest_penny import run_penny_backtest
 from ml.entry_strategies import list_entry_variants
 from ml.sweep_validation import annotate_sweep_results
@@ -76,18 +75,6 @@ def _run_bucket_backtest(
     target_pct_override: float | None = None,
     entry_variant: str | None = None,
 ):
-    if bucket == "medium":
-        return run_medium_backtest(
-            stock_df,
-            spy_df,
-            horizon=horizon,
-            multi_horizon=multi_horizon,
-            engine=engine,
-            hold_days_override=hold_days_override,
-            stop_pct_override=stop_pct_override,
-            target_pct_override=target_pct_override,
-            entry_variant=entry_variant,
-        )
     if bucket == "penny":
         return run_penny_backtest(
             stock_df,
@@ -119,7 +106,7 @@ def _run_bucket_backtest(
 
 @router.get("/entry-variants/{bucket}", response_model=EntryVariantListResponse)
 def list_bucket_entry_variants(bucket: str):
-    if bucket not in ("penny", "medium", "compounder"):
+    if bucket not in ("penny", "compounder"):
         raise HTTPException(status_code=400, detail="Invalid bucket")
     variants = [EntryVariantItem(**v) for v in list_entry_variants(bucket)]
     return EntryVariantListResponse(bucket=Bucket(bucket), variants=variants)
@@ -154,57 +141,6 @@ def _default_sweep_values(bucket: str, request: BacktestSweepRequest):
         ]
     target_pct = list(dict.fromkeys(target_pct))
     return hold_days, stop_pct, target_pct
-
-
-@router.get("/medium/{symbol}")
-def backtest_medium(
-    symbol: str,
-    horizon: str = Query("3y", pattern="^(1y|2y|3y|5y)$"),
-    multi_horizon: bool = Query(False),
-    engine: str = Query("default", pattern="^(default|vectorbt)$"),
-    hold_days: int | None = Query(None, ge=1, le=400),
-    stop_pct: float | None = Query(None, gt=0, lt=1),
-    target_pct: float | None = Query(None, gt=0, lt=2),
-    entry_variant: str | None = Query(None),
-):
-    symbol = symbol.upper()
-    stock_df = _get_history(symbol, horizon)
-    spy_df = PriceService().get_spy_history(period=horizon if horizon != "2y" else "2y")
-    if stock_df.empty:
-        raise HTTPException(status_code=404, detail=f"No data for {symbol}")
-
-    selected_engine = _normalize_engine(engine)
-
-    if multi_horizon:
-        result = _run_bucket_backtest(
-            bucket="medium",
-            symbol=symbol,
-            stock_df=stock_df,
-            spy_df=spy_df,
-            horizon=horizon,
-            multi_horizon=True,
-            engine=selected_engine,
-            hold_days_override=hold_days,
-            stop_pct_override=stop_pct,
-            target_pct_override=target_pct,
-            entry_variant=entry_variant,
-        )
-        return MultiHorizonBacktestResponse(**result)
-
-    result = _run_bucket_backtest(
-        bucket="medium",
-        symbol=symbol,
-        stock_df=stock_df,
-        spy_df=spy_df,
-        horizon=horizon,
-        multi_horizon=False,
-        engine=selected_engine,
-        hold_days_override=hold_days,
-        stop_pct_override=stop_pct,
-        target_pct_override=target_pct,
-        entry_variant=entry_variant,
-    )
-    return _as_backtest_result(result)
 
 
 @router.get("/penny/{symbol}")
@@ -311,7 +247,7 @@ def backtest_compounder(
 
 @router.get("/strategy-version/{bucket}")
 def backtest_strategy_version(bucket: str):
-    if bucket not in ("penny", "medium", "compounder"):
+    if bucket not in ("penny", "compounder"):
         raise HTTPException(status_code=400, detail="Invalid bucket")
     cfg = StrategyRegistry().get_active(bucket)
     return {"version_id": cfg.version_id, "backtest_params": cfg.backtest_params}
@@ -324,14 +260,14 @@ def sweep_backtest_params(
     request: BacktestSweepRequest,
     engine: str = Query("default", pattern="^(default|vectorbt)$"),
 ):
-    if bucket not in ("penny", "medium", "compounder"):
+    if bucket not in ("penny", "compounder"):
         raise HTTPException(status_code=400, detail="Invalid bucket")
 
     symbol = symbol.upper()
     selected_engine = _normalize_engine(engine)
 
-    horizon = request.horizon or ("1y" if bucket == "penny" else "5y" if bucket == "compounder" else "3y")
-    allowed = {"penny": {"1y", "3y"}, "medium": {"1y", "2y", "3y", "5y"}, "compounder": {"3y", "5y"}}
+    horizon = request.horizon or ("1y" if bucket == "penny" else "5y")
+    allowed = {"penny": {"1y", "3y"}, "compounder": {"3y", "5y"}}
     if horizon not in allowed[bucket]:
         raise HTTPException(status_code=400, detail=f"Invalid horizon for {bucket}: {horizon}")
 

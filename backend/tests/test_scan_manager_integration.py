@@ -18,6 +18,7 @@ if "ta" not in sys.modules:
     sys.modules["ta.trend"] = _ta.trend
     sys.modules["ta.volatility"] = _ta.volatility
 
+from data.candidate_gate import CandidateGateResult
 from data.quality_filters import QualityFilterResult
 from models.schemas import Bucket, RiskLevel, ScanStatus
 from screeners.base import CandidateContext, WeightedSignal
@@ -99,7 +100,7 @@ def _mock_scoring_result(*, final: float) -> SimpleNamespace:
         )
     ]
     return SimpleNamespace(
-        sleeve="medium",
+        sleeve="penny",
         signals=[WeightedSignal("Engine", final, 1.0, "engine")],
         factors=factors,
         raw_score=final,
@@ -169,43 +170,42 @@ def _run_scan_with_mocks(
         return _mock_scoring_result(final=final)
 
     with ExitStack() as stack:
-        stack.enter_context(patch("services.scan_manager.get_universe", return_value=[s.upper() for s in universe]))
-        stack.enter_context(patch("services.scan_manager.UNIVERSE_SCAN_BATCH_SIZE", 0))
-        stack.enter_context(patch("services.scan_manager.SCAN_STAGE_B_TOP_N", stage_b_top_n))
-        stack.enter_context(patch("services.scan_manager.SCAN_STAGE_B_TOP_N_FAST", stage_b_top_n_fast))
+        stack.enter_context(patch("services.scan_pipeline.get_universe", return_value=[s.upper() for s in universe]))
+        stack.enter_context(patch("services.scan_pipeline.UNIVERSE_SCAN_BATCH_SIZE", 0))
+        stack.enter_context(patch("services.scan_pipeline.SCAN_STAGE_B_TOP_N", stage_b_top_n))
+        stack.enter_context(patch("services.scan_pipeline.SCAN_STAGE_B_TOP_N_FAST", stage_b_top_n_fast))
         stack.enter_context(
             patch(
-                "services.scan_manager.rank_stage_a_candidates",
+                "services.scan_pipeline.rank_stage_a_candidates",
                 return_value=_mock_stage_a_result(stage_a_symbols),
             )
         )
-        stack.enter_context(patch("services.scan_manager.should_exclude_low_quality", return_value=(False, "")))
         stack.enter_context(
             patch(
-                "services.scan_manager.apply_quality_filters",
-                return_value=QualityFilterResult(passed=True, reasons=[]),
+                "services.scan_pipeline.evaluate_stage_b_gate",
+                return_value=CandidateGateResult(passed=True, quality_filter={}),
             )
         )
         stack.enter_context(
             patch(
-                "services.scan_manager.enrich_scan_display",
+                "services.scan_pipeline.enrich_scan_display",
                 side_effect=lambda info, fund, hist, metrics, legacy_summary="": (legacy_summary, metrics),
             )
         )
-        stack.enter_context(patch("services.scan_manager.HistoricalStore"))
+        stack.enter_context(patch("services.scan_pipeline.HistoricalStore"))
         stack.enter_context(
             patch(
-                "services.scan_manager.build_candidate",
+                "services.scan_pipeline.build_candidate",
                 side_effect=lambda symbol, **kw: _make_ctx(
                     symbol, base=score_map.get(symbol.upper(), 10.0)
                 ),
             )
         )
-        reg_cls = stack.enter_context(patch("services.scan_manager.StrategyRegistry"))
+        reg_cls = stack.enter_context(patch("services.scan_pipeline.StrategyRegistry"))
         stack.enter_context(
-            patch("services.scan_manager.cache_module.save_scan_results", side_effect=_capture_save)
+            patch("services.scan_pipeline.cache_module.save_scan_results", side_effect=_capture_save)
         )
-        stack.enter_context(patch("services.scan_manager.cache_module.save_scan_snapshot"))
+        stack.enter_context(patch("services.scan_pipeline.cache_module.save_scan_snapshot"))
         attempt_marker: dict = {}
 
         def _record_failure(bucket_name, error, *, ttl_seconds=3600.0):
@@ -217,10 +217,10 @@ def _run_scan_with_mocks(
             attempt_marker["cleared_for"] = bucket_name
 
         stack.enter_context(
-            patch("services.scan_manager.cache_module.record_scan_attempt_failure", side_effect=_record_failure)
+            patch("services.scan_pipeline.cache_module.record_scan_attempt_failure", side_effect=_record_failure)
         )
         stack.enter_context(
-            patch("services.scan_manager.cache_module.clear_scan_attempt_failure", side_effect=_clear_failure)
+            patch("services.scan_pipeline.cache_module.clear_scan_attempt_failure", side_effect=_clear_failure)
         )
         saved["_attempt_marker"] = attempt_marker
         stack.enter_context(patch.object(manager, "_get_screener", return_value=mock_screener))
@@ -233,7 +233,7 @@ def _run_scan_with_mocks(
             patch("services.scan_scoring_config.resolve_scan_scoring_mode", return_value=scoring_mode)
         )
         stack.enter_context(
-            patch("services.scan_manager.resolve_scan_scoring_mode", return_value=scoring_mode)
+            patch("services.scan_pipeline.resolve_scan_scoring_mode", return_value=scoring_mode)
         )
         stack.enter_context(
             patch("services.scan_scoring.resolve_scan_scoring_mode", return_value=scoring_mode)
@@ -255,7 +255,7 @@ def _run_scan_with_mocks(
         stack.enter_context(
             patch("services.scan_scoring._apply_openbb_adjustment", side_effect=lambda score, metrics: score)
         )
-        ps_cls = stack.enter_context(patch("services.scan_manager.PriceService"))
+        ps_cls = stack.enter_context(patch("services.scan_pipeline.PriceService"))
         if download_side_effect is not None:
             ps_cls.return_value.download_batch.side_effect = download_side_effect
         else:
@@ -283,7 +283,7 @@ def test_stage_a_filters_stage_b_symbols():
     score_map = {"ALPHA": 70.0, "BETA": 85.0, "GAMMA": 60.0}
 
     job, screener, _saved = _run_scan_with_mocks(
-        bucket=Bucket.medium,
+        bucket=Bucket.penny,
         universe=universe,
         stage_a_symbols=stage_a,
         score_map=score_map,
@@ -301,7 +301,7 @@ def test_stage_b_ranking_and_max_results_truncation():
     score_map = {"HIGH": 92.0, "MID": 78.0, "LOW": 55.0}
 
     job, _screener, saved = _run_scan_with_mocks(
-        bucket=Bucket.medium,
+        bucket=Bucket.penny,
         universe=stage_a,
         stage_a_symbols=stage_a,
         score_map=score_map,
@@ -331,7 +331,7 @@ def test_cache_metadata_and_parity_summary_when_engine_enabled():
     engine_scores = {"ENG1": 58.0, "ENG2": 62.0}
 
     job, _screener, saved = _run_scan_with_mocks(
-        bucket=Bucket.medium,
+        bucket=Bucket.penny,
         universe=stage_a,
         stage_a_symbols=stage_a,
         score_map=legacy_scores,
@@ -361,7 +361,7 @@ def test_scan_records_stage_a_and_stage_b_timings():
     render timing badges and ops can spot slow provider fetches."""
     stage_a = ["A1", "A2", "A3"]
     job, _screener, saved = _run_scan_with_mocks(
-        bucket=Bucket.medium,
+        bucket=Bucket.penny,
         universe=stage_a,
         stage_a_symbols=stage_a,
         score_map={"A1": 70.0, "A2": 60.0, "A3": 55.0},
@@ -387,7 +387,7 @@ def test_scan_options_fast_mode_caps_stage_b_at_fast_top_n():
     score_map = {sym: 70.0 - i * 0.5 for i, sym in enumerate(stage_a)}
 
     job, screener, _saved = _run_scan_with_mocks(
-        bucket=Bucket.medium,
+        bucket=Bucket.penny,
         universe=stage_a,
         stage_a_symbols=stage_a,
         score_map=score_map,
@@ -405,7 +405,7 @@ def test_scan_options_deep_mode_uses_stage_b_top_n():
     stage_a = [f"D{i:02d}" for i in range(8)]
     score_map = {sym: 60.0 for sym in stage_a}
     job, screener, _saved = _run_scan_with_mocks(
-        bucket=Bucket.medium,
+        bucket=Bucket.penny,
         universe=stage_a,
         stage_a_symbols=stage_a,
         score_map=score_map,

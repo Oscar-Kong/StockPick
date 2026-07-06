@@ -82,7 +82,7 @@ def _seed_listing_snapshot(symbols: list[str]) -> str:
 def test_universe_is_sorted_and_unique():
     _seed_listing_snapshot(["AAPL", "MSFT", "GOOGL"])
     with patch("data.universe._load_sp500_from_cache", return_value=[]):
-        symbols = get_universe("medium")
+        symbols = get_universe("compounder")
     assert symbols == sorted(symbols)
     assert len(symbols) == len(set(symbols))
 
@@ -105,7 +105,7 @@ def test_stock_buckets_exclude_sector_etfs():
     etf = sorted(SECTOR_ETFS)[0]
     _seed_listing_snapshot([etf, "AAPL"])
     with patch("data.universe._load_sp500_from_cache", return_value=[]):
-        symbols = get_universe("medium")
+        symbols = get_universe("compounder")
     assert etf not in symbols
     assert "AAPL" in symbols
 
@@ -114,7 +114,7 @@ def test_supported_class_share_symbol_is_preserved():
     assert normalize_symbol("BRK.B") == "BRK-B"
     _seed_listing_snapshot(["BRK-B", "AAPL"])
     with patch("data.universe._load_sp500_from_cache", return_value=[]):
-        symbols = get_universe("medium")
+        symbols = get_universe("compounder")
     assert "BRK-B" in symbols
 
 
@@ -157,14 +157,14 @@ def test_listing_master_keeps_supported_ordinary_equities():
 def test_get_universe_uses_active_listing_intersection():
     _seed_listing_snapshot(["AAPL"])
     with patch("data.universe._load_sp500_from_cache", return_value=[]):
-        symbols = get_universe("medium")
+        symbols = get_universe("compounder")
     assert symbols == ["AAPL"]
 
 
 def test_get_universe_falls_back_when_listing_master_missing():
     with patch("data.listing_master.get_active_listing_symbols", return_value=None):
         with patch("data.universe._load_sp500_from_cache", return_value=[]):
-            symbols = get_universe("medium")
+            symbols = get_universe("compounder")
     assert symbols
     assert "AAPL" in symbols
     assert all(s not in STALE_OR_DELISTED for s in symbols)
@@ -192,7 +192,7 @@ def test_get_universe_falls_back_when_refresh_fails():
 def test_revision_change_invalidates_lru_cache():
     _seed_listing_snapshot(["AAPL"])
     with patch("data.universe._load_sp500_from_cache", return_value=[]):
-        first = get_universe("medium")
+        first = get_universe("compounder")
     cache = Cache()
     cache.set(
         lm.CACHE_KEY_REVISION,
@@ -205,7 +205,7 @@ def test_revision_change_invalidates_lru_cache():
         ttl_seconds=86400,
     )
     with patch("data.universe._load_sp500_from_cache", return_value=[]):
-        second = get_universe("medium")
+        second = get_universe("compounder")
     assert "MSFT" in second
     assert len(second) >= len(first)
 

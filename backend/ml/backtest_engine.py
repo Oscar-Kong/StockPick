@@ -56,7 +56,7 @@ def run_simulation(
     target_pct: float | None = 0.10,
     initial_capital: float = 10_000.0,
     warmup: int = 55,
-    sleeve: str | None = "medium",
+    sleeve: str | None = "penny",
     apply_costs: bool | None = None,
 ) -> tuple[list[dict], list[float], float]:
     """Run a generic long-only simulation with stop/target/time exits."""

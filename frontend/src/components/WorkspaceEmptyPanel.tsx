@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { AnalyzeWatchlistRow, WatchlistItem } from "@/lib/types";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { GlassPanel } from "@/components/ui/GlassPanel";
 import { PrimaryButton } from "@/components/ui/buttons";
 import { useTranslation } from "@/lib/i18n";
 
@@ -40,8 +41,8 @@ export function WorkspaceEmptyPanel({
       />
 
       {preview.length > 0 && (
-        <section className="workspace-empty__preview mx-auto w-full max-w-2xl">
-          <h2 className="text-label-caps mb-2">{t.workspace.watchlistPreview}</h2>
+        <GlassPanel variant="hero" className="workspace-empty__preview mx-auto w-full max-w-2xl">
+          <h2 className="text-label-caps">{t.workspace.watchlistPreview}</h2>
           <ul className="grid gap-2 sm:grid-cols-2">
             {preview.map((item) => {
               const row = matrixBySymbol.get(item.symbol.toUpperCase());
@@ -50,21 +51,21 @@ export function WorkspaceEmptyPanel({
                   <button
                     type="button"
                     onClick={() => onSelect(item.symbol)}
-                    className="workspace-empty__symbol-btn flex w-full items-center justify-between gap-2 rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2.5 text-left transition hover:border-primary/40 hover:bg-primary/5"
+                    className="workspace-empty__symbol-btn flex w-full items-center justify-between gap-2 rounded-lg border border-subtle bg-background/40 px-3 py-2.5 text-left transition hover:border-primary/40 hover:bg-primary/5"
                   >
                     <span>
                       <span className="font-mono text-sm font-semibold text-foreground">{item.symbol}</span>
                       <span className="ml-2 text-xs text-tertiary">{item.bucket}</span>
                     </span>
                     {row?.score != null && (
-                      <span className="finance-value text-sm text-secondary">{row.score.toFixed(0)}</span>
+                      <span className="finance-value text-sm text-buy">{row.score.toFixed(0)}</span>
                     )}
                   </button>
                 </li>
               );
             })}
           </ul>
-        </section>
+        </GlassPanel>
       )}
     </div>
   );

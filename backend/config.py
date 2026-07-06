@@ -96,11 +96,6 @@ SCAN_RANKING_WEIGHTS: dict[str, dict[str, float]] = {
         "confidence": float(os.getenv("SCAN_RANK_CONFIDENCE_WEIGHT_PENNY", "0.20")),
         "tradability": float(os.getenv("SCAN_RANK_TRADABILITY_WEIGHT_PENNY", "0.15")),
     },
-    "medium": {
-        "alpha": float(os.getenv("SCAN_RANK_ALPHA_WEIGHT_MEDIUM", "0.65")),
-        "confidence": float(os.getenv("SCAN_RANK_CONFIDENCE_WEIGHT_MEDIUM", "0.20")),
-        "tradability": float(os.getenv("SCAN_RANK_TRADABILITY_WEIGHT_MEDIUM", "0.15")),
-    },
     "compounder": {
         "alpha": float(os.getenv("SCAN_RANK_ALPHA_WEIGHT_COMPOUNDER", "0.60")),
         "confidence": float(os.getenv("SCAN_RANK_CONFIDENCE_WEIGHT_COMPOUNDER", "0.25")),
@@ -149,7 +144,6 @@ OPENALPHA_FACTORS_ENABLED = _env_bool("OPENALPHA_FACTORS_ENABLED", "false")
 # --- Phase 4: unified risk + position sizing + report v2 ---
 SLEEVE_MAX_WEIGHT = {
     "penny": float(os.getenv("SLEEVE_MAX_WEIGHT_PENNY", "0.03")),
-    "medium": float(os.getenv("SLEEVE_MAX_WEIGHT_MEDIUM", "0.08")),
     "compounder": float(os.getenv("SLEEVE_MAX_WEIGHT_COMPOUNDER", "0.15")),
 }
 DEFAULT_PORTFOLIO_EXPOSURE = float(os.getenv("DEFAULT_PORTFOLIO_EXPOSURE", "0.5"))
@@ -188,6 +182,58 @@ PIT_FUNDAMENTALS_ENABLED = _env_bool("PIT_FUNDAMENTALS_ENABLED", "true")
 
 # --- Quant Lab research foundation ---
 QUANT_LAB_RESEARCH_API_ENABLED = _env_bool("QUANT_LAB_RESEARCH_API_ENABLED", "true")
+FACTOR_DISCOVERY_ENABLED = _env_bool("FACTOR_DISCOVERY_ENABLED", "false")
+FACTOR_RESEARCH_DATA_PROVIDER = os.getenv("FACTOR_RESEARCH_DATA_PROVIDER", "disabled").strip().lower()
+FACTOR_DISCOVERY_LLM_ENABLED = _env_bool("FACTOR_DISCOVERY_LLM_ENABLED", "false")
+FACTOR_DISCOVERY_LLM_PROVIDER = os.getenv("FACTOR_DISCOVERY_LLM_PROVIDER", "disabled").strip().lower()
+FACTOR_DISCOVERY_LLM_MAX_HYPOTHESES = int(os.getenv("FACTOR_DISCOVERY_LLM_MAX_HYPOTHESES", "5"))
+FACTOR_DISCOVERY_LLM_MAX_FORMULAS = int(os.getenv("FACTOR_DISCOVERY_LLM_MAX_FORMULAS", "3"))
+FACTOR_DISCOVERY_LLM_MAX_RETRIES = int(os.getenv("FACTOR_DISCOVERY_LLM_MAX_RETRIES", "2"))
+FACTOR_DISCOVERY_LLM_TIMEOUT_SEC = float(os.getenv("FACTOR_DISCOVERY_LLM_TIMEOUT_SEC", "35"))
+FACTOR_DISCOVERY_LLM_MAX_TOKENS = int(os.getenv("FACTOR_DISCOVERY_LLM_MAX_TOKENS", "1200"))
+FACTOR_DISCOVERY_LLM_DAILY_CALLS_PER_FAMILY = int(os.getenv("FACTOR_DISCOVERY_LLM_DAILY_CALLS_PER_FAMILY", "50"))
+FACTOR_DISCOVERY_LOOP_ENABLED = _env_bool("FACTOR_DISCOVERY_LOOP_ENABLED", "false")
+FACTOR_DISCOVERY_LOOP_MODE = os.getenv("FACTOR_DISCOVERY_LOOP_MODE", "disabled").strip().lower()
+FACTOR_DISCOVERY_LOOP_MAX_ADVANCE_STEPS = int(os.getenv("FACTOR_DISCOVERY_LOOP_MAX_ADVANCE_STEPS", "10"))
+FACTOR_DISCOVERY_LOOP_DEFAULT_MAX_REVISION_ROUNDS = int(
+    os.getenv("FACTOR_DISCOVERY_LOOP_DEFAULT_MAX_REVISION_ROUNDS", "2")
+)
+FACTOR_DISCOVERY_LOOP_DEFAULT_MAX_EVALUATED_FORMULAS = int(
+    os.getenv("FACTOR_DISCOVERY_LOOP_DEFAULT_MAX_EVALUATED_FORMULAS", "10")
+)
+FACTOR_DISCOVERY_LOOP_DEFAULT_MAX_VALIDATION_EXPOSURES = int(
+    os.getenv("FACTOR_DISCOVERY_LOOP_DEFAULT_MAX_VALIDATION_EXPOSURES", "2")
+)
+# Phase 9B — staging validation (disabled by default; CLI/test may enable)
+FACTOR_DISCOVERY_STAGING_ENABLED = _env_bool("FACTOR_DISCOVERY_STAGING_ENABLED", "false")
+# Phase 10 — promotion governance and shadow scoring (advisory only; no live scan mutation)
+FACTOR_PROMOTION_GOVERNANCE_ENABLED = _env_bool("FACTOR_PROMOTION_GOVERNANCE_ENABLED", "false")
+FACTOR_SHADOW_SCORING_ENABLED = _env_bool("FACTOR_SHADOW_SCORING_ENABLED", "false")
+FACTOR_RESEARCH_SNAPSHOT_ROOT = os.getenv(
+    "FACTOR_RESEARCH_SNAPSHOT_ROOT",
+    str(Path(__file__).resolve().parent / "data" / "factor_discovery" / "snapshots"),
+)
+FACTOR_RESEARCH_STAGING_INPUT_ROOT = os.getenv(
+    "FACTOR_RESEARCH_STAGING_INPUT_ROOT",
+    str(Path(__file__).resolve().parent / "data" / "factor_discovery" / "staging_input"),
+)
+FACTOR_RESEARCH_STAGING_AUDIT_ROOT = os.getenv(
+    "FACTOR_RESEARCH_STAGING_AUDIT_ROOT",
+    str(Path(__file__).resolve().parent / "data" / "factor_discovery" / "staging_audits"),
+)
+FACTOR_RESEARCH_EXTENDED_STAGING_ROOT = os.getenv(
+    "FACTOR_RESEARCH_EXTENDED_STAGING_ROOT",
+    str(Path(__file__).resolve().parent / "data" / "factor_discovery" / "extended_staging"),
+)
+FACTOR_RESEARCH_ACCEPTANCE_ROOT = os.getenv(
+    "FACTOR_RESEARCH_ACCEPTANCE_ROOT",
+    str(Path(__file__).resolve().parent / "data" / "factor_discovery" / "acceptance"),
+)
+FACTOR_RESEARCH_PROMOTION_EVIDENCE_ROOT = os.getenv(
+    "FACTOR_RESEARCH_PROMOTION_EVIDENCE_ROOT",
+    str(Path(__file__).resolve().parent / "data" / "factor_discovery" / "promotion_evidence"),
+)
+FACTOR_RESEARCH_STAGING_DATABASE = os.getenv("FACTOR_RESEARCH_STAGING_DATABASE", "").strip()
 RESEARCH_MAX_ORDINARY_MODIFIER = float(os.getenv("RESEARCH_MAX_ORDINARY_MODIFIER", "0"))
 
 # --- Phase 7: production hardening ---
@@ -279,6 +325,14 @@ SMTP_USER = os.getenv("SMTP_USER", "").strip()
 SMTP_PASSWORD = _api_key("SMTP_PASSWORD")
 SMTP_USE_TLS = _env_bool("SMTP_USE_TLS", "true")
 
+# Optional fallback SMTP (e.g. Gmail when primary 163 is unreachable)
+SMTP_FALLBACK_HOST = os.getenv("SMTP_FALLBACK_HOST", "").strip()
+SMTP_FALLBACK_PORT = int(os.getenv("SMTP_FALLBACK_PORT", "587") or "587")
+SMTP_FALLBACK_USER = os.getenv("SMTP_FALLBACK_USER", "").strip()
+SMTP_FALLBACK_PASSWORD = _api_key("SMTP_FALLBACK_PASSWORD")
+SMTP_FALLBACK_USE_TLS = _env_bool("SMTP_FALLBACK_USE_TLS", "true")
+SCAN_EMAIL_FROM_FALLBACK = os.getenv("SCAN_EMAIL_FROM_FALLBACK", "").strip()
+
 # --- Market data refresh during trading hours ---
 MARKET_DATA_REFRESH_ENABLED = _env_bool("MARKET_DATA_REFRESH_ENABLED", "true")
 MARKET_DATA_REFRESH_CRON = os.getenv("MARKET_DATA_REFRESH_CRON", "*/15 9-16 * * 1-5")
@@ -317,6 +371,7 @@ PRICE_CACHE_TTL = int(os.getenv("PRICE_CACHE_TTL", "300"))
 FUNDAMENTALS_CACHE_TTL = int(os.getenv("FUNDAMENTALS_CACHE_TTL", "604800"))
 SCAN_RESULT_TTL = int(os.getenv("SCAN_RESULT_TTL", "900"))
 ANALYZE_RESULT_TTL = int(os.getenv("ANALYZE_RESULT_TTL", "1800"))
+PORTFOLIO_PERFORMANCE_CACHE_TTL = int(os.getenv("PORTFOLIO_PERFORMANCE_CACHE_TTL", "120"))
 
 # --- Route runtime caps (seconds) ---
 ANALYZE_ROUTE_TIMEOUT_SECONDS = float(os.getenv("ANALYZE_ROUTE_TIMEOUT_SECONDS", "35"))
@@ -349,14 +404,6 @@ PENNY_MIN_DATA_QUALITY_SCORE = float(os.getenv("PENNY_MIN_DATA_QUALITY_SCORE", "
 PENNY_MIN_SPREAD_SCORE = float(os.getenv("PENNY_MIN_SPREAD_SCORE", "35"))
 # Hard-reject only when intraday range proxy exceeds this % of price (extreme illiquidity).
 PENNY_MAX_SPREAD_PCT = float(os.getenv("PENNY_MAX_SPREAD_PCT", "15.0"))
-
-# --- Medium bucket (deprecated — kept for historical data compatibility) ---
-MEDIUM_PRICE_MIN = float(os.getenv("MEDIUM_PRICE_MIN", "10.0"))
-MEDIUM_PRICE_MAX = float(os.getenv("MEDIUM_PRICE_MAX", "200.0"))
-MEDIUM_MIN_VOLUME = int(os.getenv("MEDIUM_MIN_VOLUME", "2000000"))
-MEDIUM_MIN_DOLLAR_VOLUME_20D = float(os.getenv("MEDIUM_MIN_DOLLAR_VOLUME_20D", "20000000"))
-MEDIUM_MARKET_CAP_MIN = float(os.getenv("MEDIUM_MARKET_CAP_MIN", "2000000000"))
-MEDIUM_MARKET_CAP_MAX = float(os.getenv("MEDIUM_MARKET_CAP_MAX", "10000000000"))
 
 # --- Compounder bucket ---
 COMPOUNDER_MARKET_CAP_MIN = float(os.getenv("COMPOUNDER_MARKET_CAP_MIN", "10000000000"))

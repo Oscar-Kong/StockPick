@@ -1,7 +1,9 @@
 """Portfolio snapshots, CSV import orchestration, holdings reconstruction."""
 from __future__ import annotations
 
+import asyncio
 import logging
+import os
 from datetime import datetime
 
 from data.portfolio_store import (
@@ -14,6 +16,7 @@ from data.portfolio_store import (
     list_uploads,
     load_all_ledger_rows,
     mark_sync,
+    clear_trade_ledger,
     clear_csv_sourced_ledger,
     purge_duplicate_trades,
     record_upload,
@@ -31,7 +34,9 @@ from integrations.robinhood.csv_importer import parse_robinhood_csv
 from integrations.robinhood.journal_verifier import verify_journal_trades_against_ledger
 from integrations.robinhood.models import MiscEventRow, PortfolioRebuildResult
 from integrations.robinhood.portfolio_rebuilder import rebuild_portfolio, validation_report
+from integrations.robinhood.mcp_client import RobinhoodMcpClient
 from integrations.robinhood.snaptrade_client import SnapTradeClient
+from core.sleeve import normalize_bucket
 from models.schemas import Bucket, PortfolioHolding
 from utils.pydantic_util import model_to_dict
 
@@ -119,7 +124,7 @@ def _verify_journal_after_import(account_id: int, csv_rows) -> list[dict]:
 def _holdings_drift_from_ledger(account_id: int = DEFAULT_ACCOUNT_ID) -> bool:
     """True when saved holdings disagree with ledger reconstruction."""
     account = get_or_create_account()
-    if account.get("source") not in ("csv", "snaptrade"):
+    if account.get("source") not in ("csv", "snaptrade", "robinhood_mcp"):
         return False
     rows = load_all_ledger_rows(account_id)
     if not rows:
@@ -141,6 +146,10 @@ def _holdings_drift_from_ledger(account_id: int = DEFAULT_ACCOUNT_ID) -> bool:
 
 def ensure_holdings_reconciled(account_id: int = DEFAULT_ACCOUNT_ID) -> bool:
     """Repair ledger fill prices and rebuild holdings when reconstruction drifts."""
+    account = get_or_create_account()
+    if account.get("source") == "robinhood_mcp":
+        # Live Robinhood positions are authoritative; ledger is trade history only.
+        return False
     repaired = repair_ledger_fill_prices(account_id)
     drift = _holdings_drift_from_ledger(account_id)
     if repaired or drift:
@@ -450,16 +459,156 @@ def apply_manual_trade_to_portfolio(
     return portfolio_result
 
 
-def sync_brokerage_if_configured() -> dict:
-    client = SnapTradeClient()
+def import_robinhood_mcp_and_decide(*, run_decision: bool = False) -> dict:
+    """Pull live holdings, order history, and buying power from Robinhood MCP."""
+    client = RobinhoodMcpClient()
     if not client.is_configured():
-        return {"synced": False, "source": get_or_create_account().get("source", "manual"), "message": "No brokerage API configured"}
-    result = client.sync_holdings()
+        raise ValueError(
+            "Robinhood MCP not authenticated. Run: cd backend && python scripts/robinhood_mcp_login.py"
+        )
+
+    snapshot = asyncio.run(client.fetch_live_portfolio(include_orders=True))
+    account = get_or_create_account()
+    account_id = account["id"]
+
+    orders_imported = 0
+    orders_skipped = 0
+    ledger_rebuild: PortfolioRebuildResult | None = None
+    cleared_ledger = clear_trade_ledger(account_id)
+    if snapshot.order_rows:
+        orders_imported, orders_skipped = upsert_ledger_rows(account_id, snapshot.order_rows)
+        purge_duplicate_trades(account_id)
+        repair_phantom_journal_buys(account_id)
+        ledger_rebuild = _rebuild_from_store(account_id)
+
+    # Live MCP positions are the source of truth for open holdings. Rebuilding from
+    # the ledger merges incomplete MCP order history with legacy CSV rows and drifts
+    # away from what Robinhood reports today.
+    rebuild = PortfolioRebuildResult(
+        open_holdings=snapshot.holdings,
+        closed_positions=ledger_rebuild.closed_positions if ledger_rebuild else [],
+        cash_delta=snapshot.buying_power,
+        event_ledger=ledger_rebuild.event_ledger if ledger_rebuild else [],
+        excluded_rows=[],
+        unknown_trans_codes=[],
+        warnings=(
+            ["Holdings from live Robinhood positions; trade history replaced on each MCP sync"]
+            if snapshot.order_rows
+            else (
+                [f"Cleared {cleared_ledger} stale ledger rows; no MCP order history returned"]
+                if cleared_ledger
+                else ["No MCP order history returned — using live positions only"]
+            )
+        ),
+    )
+
+    persisted = _apply_ledger_to_portfolio(
+        account_id,
+        rebuild,
+        source="robinhood_mcp",
+        cash_override=snapshot.buying_power,
+    )
+    acct = update_account_source("robinhood_mcp", cash=persisted["cash"])
+    mark_sync(
+        account_id,
+        "robinhood_mcp",
+        trades_imported=orders_imported,
+        trades_skipped=orders_skipped,
+        message=f"MCP sync: {persisted['holdings_count']} positions, {orders_imported} order rows",
+    )
+
+    from data.freshness_store import clear_freshness_flag, mark_freshness_updated
+
+    mark_freshness_updated(
+        "portfolio_holdings",
+        source="robinhood_mcp",
+        extra={"holdings": persisted["holdings_count"]},
+    )
+    clear_freshness_flag("portfolio_holdings", "holdings_dirty")
+
+    result = {
+        "holdings_count": persisted["holdings_count"],
+        "holdings": persisted["holdings"],
+        "cash": persisted["cash"],
+        "portfolio_value": snapshot.portfolio_value,
+        "account_id": snapshot.account_id,
+        "robinhood_account_number": snapshot.account_id,
+        "data_source": "robinhood_mcp",
+        "orders_imported": orders_imported,
+        "orders_skipped": orders_skipped,
+        "ledger_rows_count": len(snapshot.order_rows),
+        "account": acct,
+    }
+
+    if run_decision and persisted["holdings_count"] >= 0:
+        try:
+            from services.portfolio_decision_service import run_stored_portfolio_decision
+
+            decision = run_stored_portfolio_decision(trigger="robinhood_mcp", persist=True)
+            result["decision"] = model_to_dict(decision)
+            mark_freshness_updated("daily_decision", source="robinhood_mcp")
+        except Exception as exc:
+            result["decision_error"] = str(exc)[:200]
+
+    return result
+
+
+def robinhood_mcp_status() -> dict:
+    client = RobinhoodMcpClient()
+    return {
+        "enabled": bool(os.getenv("ROBINHOOD_MCP_ENABLED", "true").strip().lower() not in ("0", "false", "no", "off")),
+        "authenticated": client.is_configured(),
+        "endpoint": os.getenv("ROBINHOOD_MCP_URL", "https://agent.robinhood.com/mcp/trading"),
+    }
+
+
+def sync_brokerage_if_configured() -> dict:
+    mcp = RobinhoodMcpClient()
+    if mcp.is_configured():
+        try:
+            result = import_robinhood_mcp_and_decide(run_decision=False)
+            return {
+                "synced": True,
+                "source": "robinhood_mcp",
+                "holdings_count": result.get("holdings_count", 0),
+                "orders_imported": result.get("orders_imported", 0),
+                "message": (
+                    f"MCP sync: {result.get('holdings_count', 0)} positions, "
+                    f"{result.get('orders_imported', 0)} order rows"
+                ),
+            }
+        except Exception as exc:
+            logger.exception("Robinhood MCP auto-sync failed")
+            return {"synced": False, "source": "robinhood_mcp", "message": str(exc)[:200]}
+
+    snap = SnapTradeClient()
+    if not snap.is_configured():
+        return {
+            "synced": False,
+            "source": get_or_create_account().get("source", "manual"),
+            "message": "No live brokerage sync configured — run robinhood_mcp_login.py",
+        }
+    result = snap.sync_holdings()
     return {"synced": False, "source": "snaptrade", "message": result.message}
 
 
 def refresh_holdings_snapshot() -> dict:
     account = get_or_create_account()
+    if account.get("source") == "robinhood_mcp":
+        snap = get_latest_portfolio_snapshot()
+        holdings = get_current_holdings()
+        cash = get_account_cash()
+        return {
+            "holdings": holdings,
+            "cash": cash,
+            "closed_positions": (snap or {}).get("closed_positions") or [],
+            "misc_events": (snap or {}).get("misc_events") or [],
+            "snapshot": snap or {},
+            "duplicates_removed": 0,
+            "phantom_buys_removed": 0,
+            "prices_repaired": 0,
+            "skipped_ledger_rebuild": True,
+        }
     repaired = repair_ledger_fill_prices(DEFAULT_ACCOUNT_ID)
     removed_phantoms = repair_phantom_journal_buys(DEFAULT_ACCOUNT_ID)
     removed = purge_duplicate_trades(DEFAULT_ACCOUNT_ID)
@@ -569,7 +718,7 @@ def holdings_to_request() -> tuple[float, float, list[PortfolioHolding]]:
             symbol=r["symbol"],
             shares=r["shares"],
             avg_cost=r["avg_cost"],
-            bucket=Bucket(r["bucket"]) if r["bucket"] in ("penny", "compounder", "medium") else Bucket.penny,
+            bucket=normalize_bucket(r["bucket"]),
         )
         for r in rows
     ]

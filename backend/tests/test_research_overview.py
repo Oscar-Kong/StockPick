@@ -33,8 +33,8 @@ def client(research_db):
 
 
 def test_overview_empty_database(research_db):
-    overview = get_research_overview("medium")
-    assert overview.sleeve == "medium"
+    overview = get_research_overview("penny")
+    assert overview.sleeve == "penny"
     assert overview.research_confidence_score >= 0
     assert isinstance(overview.findings, list)
     assert isinstance(overview.maintenance_actions, list)
@@ -42,18 +42,18 @@ def test_overview_empty_database(research_db):
 
 
 def test_overview_with_seeded_evidence(research_db):
-    seed_factor_ic(sleeve="medium")
+    seed_factor_ic(sleeve="penny")
     seed_walk_forward_run()
-    overview = get_research_overview("medium")
+    overview = get_research_overview("penny")
     assert overview.factor_ic is not None
     assert overview.factor_ic.available is True
     assert overview.walk_forward is not None
 
 
 def test_brief_ic_drift_finding(research_db):
-    seed_factor_ic(sleeve="medium", as_of=date.today())
+    seed_factor_ic(sleeve="penny", as_of=date.today())
     findings = build_research_brief(
-        sleeve="medium",
+        sleeve="penny",
         factor_ic_rows=[
             {"factor_id": "momentum", "horizon_days": 20, "ic": 0.12, "sample_n": 150},
         ],
@@ -84,7 +84,7 @@ def test_brief_ic_drift_finding(research_db):
 
 def test_brief_skips_when_data_absent(research_db):
     findings = build_research_brief(
-        sleeve="medium",
+        sleeve="penny",
         factor_ic_rows=[],
         factor_ic_history=[],
         walk_forward=None,
@@ -101,7 +101,7 @@ def test_brief_skips_when_data_absent(research_db):
 
 
 def test_generate_ideas_dedup(research_db):
-    overview = get_research_overview("medium")
+    overview = get_research_overview("penny")
     if not overview.findings:
         overview.findings = [
             __import__("models.schemas_research", fromlist=["ResearchBriefFinding"]).ResearchBriefFinding(
@@ -114,12 +114,12 @@ def test_generate_ideas_dedup(research_db):
                 confidence=0.8,
                 evidence_impact="informational",
                 suggested_experiment_type="factor_validation",
-                suggested_parameters={"sleeve": "medium"},
+                suggested_parameters={"sleeve": "penny"},
             )
         ]
-    first = generate_ideas_from_findings(overview.findings, sleeve="medium", limit=5)
+    first = generate_ideas_from_findings(overview.findings, sleeve="penny", limit=5)
     assert len(first.created) >= 1
-    second = generate_ideas_from_findings(overview.findings, sleeve="medium", limit=5)
+    second = generate_ideas_from_findings(overview.findings, sleeve="penny", limit=5)
     assert second.skipped_duplicates >= 1
 
 
@@ -132,7 +132,7 @@ def test_duplicate_idea(research_db):
 
 
 def test_overview_api_contract(client):
-    r = client.get("/api/v2/research/overview?sleeve=medium")
+    r = client.get("/api/v2/research/overview?sleeve=penny")
     assert r.status_code == 200, r.text
     body = r.json()
     for key in (
@@ -147,6 +147,6 @@ def test_overview_api_contract(client):
 
 
 def test_generate_ideas_api(client, research_db):
-    r = client.post("/api/v2/research/ideas/generate", json={"sleeve": "medium", "limit": 3})
+    r = client.post("/api/v2/research/ideas/generate", json={"sleeve": "penny", "limit": 3})
     assert r.status_code == 200, r.text
     assert "created" in r.json()

@@ -3,12 +3,6 @@ from __future__ import annotations
 
 from config import (
     COMPOUNDER_MARKET_CAP_MIN,
-    MEDIUM_MARKET_CAP_MAX,
-    MEDIUM_MARKET_CAP_MIN,
-    MEDIUM_MIN_DOLLAR_VOLUME_20D,
-    MEDIUM_MIN_VOLUME,
-    MEDIUM_PRICE_MAX,
-    MEDIUM_PRICE_MIN,
     PENNY_MARKET_CAP_MAX,
     PENNY_MARKET_CAP_MIN,
     PENNY_MIN_DOLLAR_VOLUME_20D,
@@ -44,13 +38,6 @@ def check_bucket_eligibility(
         if avg_vol < PENNY_MIN_VOLUME or dollar_vol < PENNY_MIN_DOLLAR_VOLUME_20D:
             return False, "insufficient_liquidity"
         if mcap and (mcap < PENNY_MARKET_CAP_MIN or mcap > PENNY_MARKET_CAP_MAX):
-            return False, "market_cap_out_of_range"
-    elif bucket == Bucket.medium:
-        if not (MEDIUM_PRICE_MIN <= price <= MEDIUM_PRICE_MAX):
-            return False, "price_out_of_range"
-        if avg_vol < MEDIUM_MIN_VOLUME or dollar_vol < MEDIUM_MIN_DOLLAR_VOLUME_20D:
-            return False, "insufficient_liquidity"
-        if mcap and (mcap < MEDIUM_MARKET_CAP_MIN or mcap > MEDIUM_MARKET_CAP_MAX):
             return False, "market_cap_out_of_range"
     else:  # compounder
         if mcap and mcap < COMPOUNDER_MARKET_CAP_MIN:

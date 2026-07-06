@@ -13,23 +13,23 @@ import { parseApiError } from "@/lib/apiError";
 import type { Bucket, ResearchOverviewResponse } from "@/lib/types";
 import { useTranslation, useTRef } from "@/lib/i18n";
 import { useCallback, useEffect, useState } from "react";
-import { BucketSelect } from "./QuantLabTabShell";
 import { ErrorState } from "@/components/ui/ErrorState";
+import { GlassPanel } from "@/components/ui/GlassPanel";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
-import { ResearchOnlyBadge } from "@/components/ui/ResearchOnlyBadge";
+import { MetricTile, type MetricTileTone } from "@/components/ui/MetricTile";
 
-function confidenceTone(status: string): string {
-  if (status === "reliable") return "text-emerald-400";
-  if (status === "usable_with_warnings") return "text-amber-300";
-  if (status === "insufficient_data") return "text-red-400";
-  return "text-zinc-300";
+function confidenceTone(status: string): MetricTileTone {
+  if (status === "reliable") return "positive";
+  if (status === "usable_with_warnings") return "warning";
+  if (status === "insufficient_data") return "negative";
+  return "default";
 }
 
-function freshnessTone(freshness: string): string {
-  if (freshness === "fresh") return "text-emerald-400";
-  if (freshness === "stale" || freshness === "degraded") return "text-amber-300";
-  if (freshness === "critical") return "text-red-400";
-  return "text-zinc-400";
+function freshnessTone(freshness: string): MetricTileTone {
+  if (freshness === "fresh") return "positive";
+  if (freshness === "stale" || freshness === "degraded") return "warning";
+  if (freshness === "critical") return "negative";
+  return "muted";
 }
 
 async function runMaintenanceAction(actionId: string): Promise<void> {
@@ -56,11 +56,10 @@ async function runMaintenanceAction(actionId: string): Promise<void> {
 
 interface OverviewTabProps {
   sleeve: Bucket;
-  onSleeveChange: (sleeve: Bucket) => void;
   onOpenIdeas: () => void;
 }
 
-export function OverviewTab({ sleeve, onSleeveChange, onOpenIdeas }: OverviewTabProps) {
+export function OverviewTab({ sleeve, onOpenIdeas }: OverviewTabProps) {
   const { t } = useTranslation();
   const tRef = useTRef();
   const [data, setData] = useState<ResearchOverviewResponse | null>(null);
@@ -118,38 +117,37 @@ export function OverviewTab({ sleeve, onSleeveChange, onOpenIdeas }: OverviewTab
 
   return (
     <div className="space-y-4 text-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <BucketSelect label={t.common.bucket} value={sleeve} onChange={(v) => onSleeveChange(v as Bucket)} />
-        <ResearchOnlyBadge tooltip={t.quantLab.researchOnlyWarning} />
-      </div>
-
       {error && <p className="text-xs text-amber-300">{error}</p>}
 
-      <section className="surface-card grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4" aria-label={t.quantLab.navOverview}>
-        <div>
-          <p className="text-xs text-zinc-500">{t.quantLab.overviewConfidence}</p>
-          <p className={`text-base font-semibold tabular-nums ${confidenceTone(overview.research_confidence_status)}`}>
-            {overview.research_confidence_score}/100 · {overview.research_confidence_status.replace(/_/g, " ")}
-          </p>
+      <GlassPanel variant="hero" aria-label={t.quantLab.navOverview}>
+        <div className="quant-lab-overview-kpis">
+          <MetricTile
+            variant="card"
+            label={t.quantLab.overviewConfidence}
+            value={`${overview.research_confidence_score}/100`}
+            hint={overview.research_confidence_status.replace(/_/g, " ")}
+            tone={confidenceTone(overview.research_confidence_status)}
+          />
+          <MetricTile
+            variant="card"
+            label={t.quantLab.overviewFreshness}
+            value={overview.data_freshness}
+            tone={freshnessTone(overview.data_freshness)}
+          />
+          <MetricTile
+            variant="card"
+            label={t.quantLab.overviewVersions}
+            value={overview.strategy_version}
+            hint={overview.factor_model_version}
+          />
+          <MetricTile
+            variant="card"
+            label={t.quantLab.overviewPredictions}
+            value={overview.predictions_resolved}
+            hint={`${overview.predictions_unresolved} ${t.quantLab.overviewUnresolved}`}
+          />
         </div>
-        <div>
-          <p className="text-xs text-zinc-500">{t.quantLab.overviewFreshness}</p>
-          <p className={`text-base font-medium ${freshnessTone(overview.data_freshness)}`}>{overview.data_freshness}</p>
-        </div>
-        <div>
-          <p className="text-xs text-zinc-500">{t.quantLab.overviewVersions}</p>
-          <p className="text-sm text-zinc-300 tabular-nums">
-            {overview.strategy_version} · {overview.factor_model_version}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs text-zinc-500">{t.quantLab.overviewPredictions}</p>
-          <p className="text-sm text-zinc-200 tabular-nums">
-            {overview.predictions_resolved} {t.quantLab.resolved.toLowerCase()} · {overview.predictions_unresolved}{" "}
-            {t.quantLab.overviewUnresolved}
-          </p>
-        </div>
-      </section>
+      </GlassPanel>
 
       {overview.major_warnings.length > 0 && (
         <section className="rounded-lg border border-amber-900/50 bg-amber-950/20 px-3 py-2">
@@ -162,9 +160,9 @@ export function OverviewTab({ sleeve, onSleeveChange, onOpenIdeas }: OverviewTab
         </section>
       )}
 
-      <section className="surface-card p-4">
+      <GlassPanel variant="compact">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold text-zinc-100">{t.quantLab.overviewBrief}</h3>
+          <h3 className="text-sm font-semibold text-foreground">{t.quantLab.overviewBrief}</h3>
           <button
             type="button"
             className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-900"
@@ -187,11 +185,11 @@ export function OverviewTab({ sleeve, onSleeveChange, onOpenIdeas }: OverviewTab
             ))}
           </ul>
         )}
-      </section>
+      </GlassPanel>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <section className="surface-card p-4">
-          <h3 className="mb-2 text-sm font-semibold text-zinc-100">{t.quantLab.overviewRecommendedIdeas}</h3>
+        <GlassPanel variant="compact">
+          <h3 className="mb-2 text-sm font-semibold text-foreground">{t.quantLab.overviewRecommendedIdeas}</h3>
           {overview.recommended_ideas.length === 0 ? (
             <p className="text-sm text-zinc-500">{t.quantLab.overviewNoIdeas}</p>
           ) : (
@@ -204,10 +202,10 @@ export function OverviewTab({ sleeve, onSleeveChange, onOpenIdeas }: OverviewTab
               ))}
             </ul>
           )}
-        </section>
+        </GlassPanel>
 
-        <section className="surface-card p-4">
-          <h3 className="mb-2 text-sm font-semibold text-zinc-100">{t.quantLab.overviewRecentActivity}</h3>
+        <GlassPanel variant="compact">
+          <h3 className="mb-2 text-sm font-semibold text-foreground">{t.quantLab.overviewRecentActivity}</h3>
           {overview.recent_activity.length === 0 ? (
             <p className="text-sm text-zinc-500">{t.quantLab.overviewNoActivity}</p>
           ) : (
@@ -220,10 +218,10 @@ export function OverviewTab({ sleeve, onSleeveChange, onOpenIdeas }: OverviewTab
               ))}
             </ul>
           )}
-        </section>
+        </GlassPanel>
       </div>
 
-      <details className="surface-card p-3">
+      <details className="analysis-glass-panel analysis-glass-panel--compact p-3">
         <summary className="cursor-pointer text-sm font-medium text-zinc-300">{t.quantLab.overviewMaintenance}</summary>
         <ul className="mt-3 space-y-2">
           {overview.maintenance_actions.map((action) => (

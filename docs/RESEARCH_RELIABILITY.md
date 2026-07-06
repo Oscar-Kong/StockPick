@@ -1,123 +1,49 @@
-# Research Reliability
+# Research Reliability Audit
 
-Quant Lab **Research Reliability** is a client-side validation layer that scores whether each tab’s evidence is trustworthy enough to inform future model or scoring changes. It does **not** change live scan rankings.
+Phase 11 statistical and methodological controls for Quant Lab factor research.
 
-## Status levels
+## Controls in place
 
-| Status | Meaning |
-|--------|---------|
-| **Reliable** | Score ≥ 80, no warnings or blockers, data fresh |
-| **Usable with warnings** | Evidence exists but caveats apply — review warnings before acting |
-| **Weak evidence** | Thin sample, poor metrics, or heavy research gaps |
-| **Insufficient data** | Missing or empty inputs — do not draw conclusions |
-| **Stale** | Persisted evidence is older than freshness thresholds (e.g. IC > 7 days) |
-| **Disabled** | Backend feature flag off (e.g. `SCORE_ENGINE_V2_ENABLED`) |
-| **Research only** | Offline research (walk-forward, pairs) — never auto-applied to scans |
+| Control | Implementation |
+|---------|------------------|
+| Point-in-time universe | `universe_pit`, membership audits, preflight |
+| Forward labels separated | Validation engine; leakage audit + negative controls |
+| Sealed test reservations | `sealed_test_service.py` — metrics hidden until opened |
+| Acceptance gate per run | `engines/factor/discovery/acceptance.py` |
+| Staging negative controls | `negative_controls.py` — shuffle, future mutation, empty universe |
+| Reproducibility hashing | `result_hashing.py`, `reproduce.py`, extended staging repro checks |
+| Multiple-testing awareness | `multiple_testing_service.py` (research context) |
+| Attempt ledger | `FactorDiscoveryAttempt`, mining evaluations |
+| Promotion gates (17) | `gate_policy_v1.json` — blocking failures visible |
+| Evidence bundles | Immutable `fpev_*.json` with hash verification |
 
-Each tab shows a **0–100 score**, top reasons, warnings, blockers, and a **suggested next action**.
+## Risks and mitigations
 
-## How scores are computed
+| Risk | Mitigation | Residual |
+|------|------------|----------|
+| False discovery | Acceptance thresholds; weak factors flagged not promoted | Small staging universe inflates significance |
+| Selection bias | Walk-forward slices; extended staging matrix | Regime slices may be omitted |
+| Repeated tuning | Sealed test + separate validation periods | Same panel reused across matrix cells |
+| Regime dependence | SPY vol/stress slices when data allows | Often N/A on current import |
+| Factor correlation | Redundancy in validation artifacts | No auto portfolio dedup |
+| Cost / turnover | Reported when artifact includes metrics | Often N/A in staging panel |
+| Concentration | Robustness fields when sector/mcap available | N/A on price-only panel |
 
-Implementation: `frontend/src/lib/researchReliability.ts`
+## Review labels
 
-### Factor Performance
+Use distinct meanings in UI and reports:
 
-Inputs: IC `as_of_date` freshness, factor count, average `sample_n`, mean IC, horizon coverage.
+1. **Statistically interesting** — metric present; may fail acceptance
+2. **Economically meaningful** — spread/cost analysis when available
+3. **Robust enough for shadow** — blocking gates pass; human promoted to shadow
+4. **Approved for manual integration** — governance terminal state; integration is external
 
-- Stale IC → **stale** status
-- Empty factors → **insufficient_data**
-- Strong fresh IC across ≥5 factors → **reliable**
+## Audit commands
 
-**Factor lifecycle** (per factor row):
+```bash
+python backend/scripts/factor_discovery_staging_preflight.py --allow-test
+python backend/scripts/run_factor_mining_extended_staging.py --dry-run
+python backend/scripts/run_factor_research_acceptance.py --mode fixture
+```
 
-| Badge | Criteria (primary horizon) |
-|-------|----------------------------|
-| **Promote** | IC ≥ 0.05, n ≥ 100, IC panel fresh |
-| **Keep** | IC ≥ 0.02, adequate sample |
-| **Watch** | IC ≥ 0, stale IC, or borderline sample |
-| **Retire** | IC < 0 with adequate sample |
-| **Insufficient evidence** | n < 30 or missing IC |
-
-### Walk-Forward
-
-Inputs: `periods_scored`, rebalance windows, horizons, aggregate rank IC / hit rate / spread, run staleness.
-
-Always capped as **research only** — walk-forward validates history; it does not prove future edge.
-
-**Overfitting warnings** (also listed in reliability warnings):
-
-- Too few windows or scored periods
-- No transaction costs modeled
-- No purged / embargo cross-validation (CPCV not implemented)
-- No deflated Sharpe / **PBO not implemented** (`pbo_available: false`)
-- Result reflects a single best run, not a trial distribution
-
-See [Why walk-forward alone can overfit](#why-walk-forward-alone-can-overfit).
-
-### Prediction Outcomes
-
-Inputs: resolved vs unresolved counts, outcome age, `mean_prediction_error_pct`, missing realized returns.
-
-### Pairs Trading
-
-Inputs: symbol count, cointegrated pairs, p-values / statsmodels availability, observation length.
-
-Always **research only** — pairs are not mixed into scan rankings.
-
-### Data Quality
-
-Inputs: Quant Health overall + sections, scheduler enabled, failed job count, stale scan/IC hints from health sections.
-
-### Model Admin
-
-Inputs: v2 version loaded, factor catalog, dynamic weights flag, audit events, per-panel load errors.
-
-## Evidence → action boundary
-
-Component: `frontend/src/components/product/EvidenceToActionBoundary.tsx`
-
-> Quant Lab validates the model. It does not change live scan rankings. To affect future scans, research evidence must be reviewed and applied through an explicit model or weight change.
-
-- No Quant Lab UI **auto-applies** weights or scoring changes
-- `ApplyChangesNotice` / `ApplyChangesConfirm` gate any future apply actions behind explicit confirmation
-
-## Why walk-forward alone can overfit
-
-Walk-forward backtests often look strong because:
-
-1. **Multiple configurations** — trying many date ranges, horizons, or sleeves and keeping the best run inflates apparent Sharpe (multiple-testing bias).
-2. **No transaction costs** — turnover and spreads erode paper returns.
-3. **Leakage** — without purged k-fold or embargo (CPCV), labels can leak across train/test splits.
-4. **Single best run** — one saved run is a point estimate, not a distribution.
-
-**Not implemented yet** (placeholders warn in UI):
-
-- **PBO** (Probability of Backtest Overfitting)
-- **CPCV** (Combinatorial Purged Cross-Validation)
-- **Deflated Sharpe** ratio adjustment
-- Trial count / config search metadata from backend
-
-### Model Monitor (Phase 6–7)
-
-Aggregates factor health, prediction calibration readiness, data integrity blockers, research job history, and **evidence review** queue. Integrity blockers are listed explicitly — they never produce a positive score modifier.
-
-Server-side **decision boundary** (`backend/services/research_decision_boundary.py`):
-
-| Setting | Default | Effect |
-|---------|---------|--------|
-| `RESEARCH_MAX_ORDINARY_MODIFIER` | `0` | Supporting evidence does not change live scores |
-| Major / integrity impacts | gated | Require evidence review before any modifier |
-
-Audit events: `research_evidence_consumed` when boundary is invoked with `audit=True`.
-
-## What Research Reliability is not
-
-- Not a trading signal or scan rank
-- Not a substitute for institutional-grade backtest hygiene
-- Not persisted server-side for tab cards (recomputed on render); server persists run-level `evidence_impact` on the unified index
-
-## Related docs
-
-- [Quant Lab](./QUANT_LAB.md)
-- [Quant Lab Redesign Final Report](./QUANT_LAB_REDESIGN_FINAL_REPORT.md)
-- [Research Reliability verification](./RESEARCH_RELIABILITY_VERIFICATION.md)
+See [FACTOR_RESEARCH_LIMITATIONS.md](./FACTOR_RESEARCH_LIMITATIONS.md).

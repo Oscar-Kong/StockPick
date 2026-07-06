@@ -39,7 +39,7 @@ def quant_lab_client(client, monkeypatch):
     monkeypatch.setenv("SCORE_ENGINE_V2_ENABLED", "true")
     monkeypatch.setenv("TRADE_FEEDBACK_ENABLED", "true")
     monkeypatch.setenv("DEMO_MODE", "false")
-    seed_quant_lab_demo(sleeve="medium")
+    seed_quant_lab_demo(sleeve="penny")
     return client
 
 
@@ -54,7 +54,7 @@ def _assert_disabled_503(r, *, feature: str):
 
 
 def test_factors_performance_enabled_contract(quant_lab_client):
-    r = quant_lab_client.get("/api/v2/factors/performance?sleeve=medium")
+    r = quant_lab_client.get("/api/v2/factors/performance?sleeve=penny")
     assert r.status_code == 200, r.text
     body = r.json()
     assert "as_of_date" in body
@@ -65,7 +65,7 @@ def test_factors_performance_enabled_contract(quant_lab_client):
 
 def test_factors_performance_disabled_contract(client, monkeypatch):
     monkeypatch.setattr("api.routes_v2.SCORE_ENGINE_V2_ENABLED", False)
-    r = client.get("/api/v2/factors/performance?sleeve=medium")
+    r = client.get("/api/v2/factors/performance?sleeve=penny")
     _assert_disabled_503(r, feature="score")
 
 
@@ -95,10 +95,10 @@ def test_feedback_disabled_contract(client, monkeypatch):
 
 
 def test_weights_contract(quant_lab_client):
-    r = quant_lab_client.get("/api/v2/weights/medium")
+    r = quant_lab_client.get("/api/v2/weights/penny")
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["sleeve"] == "medium"
+    assert body["sleeve"] == "penny"
     assert "weights" in body
 
 
@@ -109,7 +109,7 @@ def test_audit_contract(quant_lab_client):
 
 
 def test_factors_admin_contract(quant_lab_client):
-    r = quant_lab_client.get("/api/v2/factors/admin?sleeve=medium")
+    r = quant_lab_client.get("/api/v2/factors/admin?sleeve=penny")
     assert r.status_code == 200, r.text
     assert isinstance(r.json()["factors"], list)
 
@@ -126,7 +126,7 @@ def test_walk_forward_validation(quant_lab_client):
     r = quant_lab_client.post(
         "/research/walk-forward",
         json={
-            "sleeve": "medium",
+            "sleeve": "penny",
             "start_date": "2026-01-01",
             "end_date": "2025-01-01",
             "forward_horizons": [20],
@@ -136,7 +136,7 @@ def test_walk_forward_validation(quant_lab_client):
 
 
 def test_walk_forward_latest_with_seed(quant_lab_client):
-    r = quant_lab_client.get("/research/walk-forward/latest?sleeve=medium")
+    r = quant_lab_client.get("/research/walk-forward/latest?sleeve=penny")
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["available"] is True
@@ -169,7 +169,7 @@ def test_pairs_research_real_service(quant_lab_client):
 
 
 def test_quant_lab_evidence_contract(quant_lab_client):
-    r = quant_lab_client.get("/api/v2/quant-lab/evidence?sleeve=medium")
+    r = quant_lab_client.get("/api/v2/quant-lab/evidence?sleeve=penny")
     assert r.status_code == 200, r.text
     body = r.json()
     for key in ("factor_ic", "walk_forward", "predictions", "pairs", "jobs"):
@@ -195,7 +195,7 @@ def test_evidence_empty_database(client, monkeypatch):
 
     monkeypatch.setattr(config, "SCORE_ENGINE_V2_ENABLED", True, raising=False)
     monkeypatch.setattr(config, "TRADE_FEEDBACK_ENABLED", True, raising=False)
-    r = client.get("/api/v2/quant-lab/evidence?sleeve=medium")
+    r = client.get("/api/v2/quant-lab/evidence?sleeve=penny")
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["factor_ic"]["available"] is False

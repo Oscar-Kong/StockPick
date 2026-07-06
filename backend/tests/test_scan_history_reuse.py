@@ -15,7 +15,7 @@ from data.price_service import PriceService
 from models.schemas import Bucket
 from models.schemas import Bucket
 from services.scan_data_flow import ScanDataFlowMetrics
-from services.scan_manager import _resolve_stage_b_context
+from services.scan_pipeline import _resolve_stage_b_context
 
 
 def _make_history(*, bars: int = 120, base: float = 2.0) -> pd.DataFrame:

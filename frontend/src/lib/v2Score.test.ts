@@ -11,7 +11,7 @@ import {
 
 const legacyBase: AnalyzeSymbolResponse = {
   symbol: "TEST",
-  assigned_bucket: "medium",
+  assigned_bucket: "penny",
   price: 100,
   score: 72,
   risk_level: "medium",
@@ -25,7 +25,7 @@ const legacyBase: AnalyzeSymbolResponse = {
   data_quality_score: 80,
   reconcile: {},
   technicals: {},
-  bucket_fit: { scores: {}, best_bucket: "medium" },
+  bucket_fit: { scores: {}, best_bucket: "penny" },
   alerts: [],
   ohlc: [],
   fundamentals: {},
@@ -33,7 +33,7 @@ const legacyBase: AnalyzeSymbolResponse = {
 
 const v2Base: V2ScoreResponse = {
   symbol: "TEST",
-  sleeve: "medium",
+  sleeve: "penny",
   score: 68,
   summary: "Engine summary",
   risk_level: "medium",

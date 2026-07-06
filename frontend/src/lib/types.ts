@@ -1,5 +1,5 @@
 // Shared TypeScript types for backend responses and UI state.
-export type Bucket = "penny" | "medium" | "compounder";
+export type Bucket = "penny" | "compounder";
 
 export type RiskLevel = "low" | "medium" | "high";
 
@@ -553,7 +553,7 @@ export interface TradeManualResponse extends TradeItem {
 
 export interface TradeCreateRequest {
   symbol: string;
-  sleeve?: "penny" | "medium" | "compounder" | null;
+  sleeve?: "penny" | "compounder" | null;
   side: "long" | "short";
   entry_time: string;
   exit_time?: string | null;
@@ -963,7 +963,7 @@ export interface PortfolioPolicyBacktestRequest {
   max_weight?: number;
   cash_buffer?: number;
   institutional?: boolean;
-  sleeve?: "penny" | "medium" | "compounder";
+  sleeve?: "penny" | "compounder";
   fee_bps?: number;
   slip_bps?: number;
   use_universe_pit?: boolean;
@@ -1047,6 +1047,29 @@ export interface PortfolioSummaryResponse {
   stale: boolean;
   warnings: string[];
   freshness?: Record<string, unknown> | null;
+  disclaimer: string;
+}
+
+export interface PortfolioPerformancePoint {
+  date: string;
+  value: number;
+}
+
+export interface PortfolioPerformanceResponse {
+  total_value: number;
+  invested_value: number;
+  cash: number;
+  as_of?: string | null;
+  today_pl: number;
+  today_pl_pct?: number | null;
+  unrealized_pl: number;
+  unrealized_pl_pct?: number | null;
+  realized_pl: number;
+  realized_pl_equity?: number | null;
+  realized_pl_events?: number | null;
+  realized_pl_source?: string | null;
+  curves: Partial<Record<"1d" | "1w" | "1m" | "6m" | "1y", PortfolioPerformancePoint[]>>;
+  period_change_pct: Partial<Record<"1d" | "1w" | "1m" | "6m" | "1y", number | null>>;
   disclaimer: string;
 }
 
@@ -1248,6 +1271,111 @@ export interface DailyDashboardResponse {
   ledger_rows_count?: number | null;
   ledger_cash_estimate?: number | null;
   cash_source?: string | null;
+  daily_trading_plan?: DailyTradingPlanResponse | null;
+  robinhood_mcp_enabled?: boolean;
+  robinhood_mcp_authenticated?: boolean;
+}
+
+export type DailyTradingPlanDecision =
+  | "buy"
+  | "manage"
+  | "reduce"
+  | "exit"
+  | "watch"
+  | "stay_in_cash";
+
+export interface DailyTradingPlanFocusItem {
+  symbol: string;
+  rank: number;
+  status: "qualified" | "watch" | "rejected" | string;
+  reasons: string[];
+  rejection_reasons: string[];
+}
+
+export interface DailyTradingPlanCandidate {
+  symbol: string;
+  action: string;
+  entry_not_before: string;
+  entry_condition: string;
+  reference_entry_price: number;
+  maximum_position_value: number;
+  maximum_portfolio_weight_pct: number;
+  stop_price: number;
+  stop_loss_pct: number;
+  first_target_price: number;
+  first_target_gain_pct: number;
+  first_target_sell_fraction_pct: number;
+  remaining_position_plan: string;
+  trend_state: string;
+  sector_leadership: Record<string, unknown>;
+  volume_classification: string;
+  news_classification: string;
+  risk_reward_ratio: number;
+  data_confidence: number;
+  supporting_evidence: string[];
+  risk_flags: string[];
+}
+
+export interface DailyTradingPlanRuleCheck {
+  rule_id: string;
+  label: string;
+  status: "pass" | "fail" | "unavailable" | string;
+  evidence: string;
+}
+
+export interface DailyTradingPlanHolidayRisk {
+  is_pre_holiday_session: boolean;
+  recommend_reduce_exposure: boolean;
+  reason?: string | null;
+}
+
+export interface DailyTradingPlanResponse {
+  plan_id: string;
+  as_of: string;
+  market_session: string;
+  decision: DailyTradingPlanDecision;
+  confidence: number;
+  summary: string;
+  current_short_term_exposure_pct: number;
+  maximum_short_term_exposure_pct: number;
+  available_risk_capacity_pct: number;
+  active_short_term_positions: number;
+  focus_list: DailyTradingPlanFocusItem[];
+  primary_candidate?: DailyTradingPlanCandidate | null;
+  cash_reason?: string | null;
+  rule_checklist: DailyTradingPlanRuleCheck[];
+  rejected_candidates: Array<Record<string, unknown>>;
+  holiday_risk: DailyTradingPlanHolidayRisk;
+  review_prompts: string[];
+  data_freshness: Record<string, unknown>;
+  disclaimer: string;
+}
+
+export interface DailyTradingPlanReviewRequest {
+  trading_date: string;
+  plan_id: string;
+  planned_decision: string;
+  primary_candidate?: string | null;
+  plan_followed?: boolean | null;
+  actual_action?: string | null;
+  overridden_rules?: string[];
+  user_notes?: string;
+  end_of_day_outcome?: string | null;
+}
+
+export interface DailyTradingPlanReviewResponse {
+  id: number;
+  trading_date: string;
+  plan_id: string;
+  planned_decision: string;
+  primary_candidate?: string | null;
+  plan_followed?: boolean | null;
+  actual_action?: string | null;
+  overridden_rules: string[];
+  user_notes: string;
+  end_of_day_outcome?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface BrokerageCsvImportResponse {
@@ -1780,6 +1908,9 @@ export interface MorningScanEmailStatusResponse {
   config_errors: string[];
   provider: string;
   recipient_masked: string;
+  recipients: string[];
+  recipient_count: number;
+  recipient_source: string;
   schedule_label: string;
   cron: string;
   timezone: string;
@@ -1800,6 +1931,28 @@ export interface MorningScanEmailSendResponse {
   subject?: string | null;
   html_preview?: string | null;
   text_preview?: string | null;
+  recipients?: string[];
+}
+
+export interface MailingListSubscriberItem {
+  id: string;
+  email: string;
+  label: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MailingListResponse {
+  subscribers: MailingListSubscriberItem[];
+  active_count: number;
+  recipient_source: string;
+  recipient_count: number;
+  read_only: boolean;
+}
+
+export interface MailingListImportEnvResponse extends MailingListResponse {
+  imported: number;
 }
 
 export interface V2VersionResponse {

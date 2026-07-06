@@ -11,7 +11,7 @@ from data.finnhub_client import FinnhubClient
 from data.price_service import PriceService
 from data.reconciler import DataReconciler
 from data.strategy_registry import StrategyRegistry
-from ml.backtest_medium import run_medium_backtest
+from ml.backtest_penny import run_penny_backtest
 from models.schemas import Bucket, OHLCPoint, StockDetail
 from scoring.valuation import valuation_warnings
 from screeners.compounder import CompounderScreener
@@ -25,7 +25,6 @@ _EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix="stock-routes")
 
 SCREENERS = {
     Bucket.penny: PennyScreener,
-    Bucket.medium: PennyScreener,
     Bucket.compounder: CompounderScreener,
 }
 
@@ -114,11 +113,11 @@ def _build_stock_detail(symbol: str, bucket: Bucket, include_backtest: bool) -> 
     )
 
     backtest = None
-    if include_backtest and bucket == Bucket.medium:
-        spy = ps.get_spy_history(period="3y")
-        stock3y = ps.get_history(symbol, period="3y")
-        if not stock3y.empty:
-            backtest = run_medium_backtest(stock3y, spy, horizon="3y", multi_horizon=True)
+    if include_backtest and bucket == Bucket.penny:
+        spy = ps.get_spy_history(period="1y")
+        stock1y = ps.get_history(symbol, period="1y")
+        if not stock1y.empty:
+            backtest = run_penny_backtest(stock1y, spy, horizon="1y", multi_horizon=True)
 
     return StockDetail(
         symbol=symbol,

@@ -45,7 +45,7 @@ def run_institutional_policy_backtest(
     initial_capital: float = 10_000.0,
     max_weight: float = 0.35,
     cash_buffer: float = 0.0,
-    sleeve: str | None = "medium",
+    sleeve: str | None = "penny",
     fee_bps: float | None = None,
     slip_bps: float | None = None,
     participation_rate: float | None = None,

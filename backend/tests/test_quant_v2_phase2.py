@@ -68,13 +68,13 @@ def test_classify_spy_dataframe():
 
 
 def test_overlay_defaults_one():
-    assert overlay_multiplier("medium", "bull", "medium_qlib_alpha") == 1.0
-    assert overlay_multiplier("medium", "bull", "medium_rs_vs_spy") == 1.25
+    assert overlay_multiplier("penny", "bull", "penny_qlib_alpha") == 1.0
+    assert overlay_multiplier("penny", "bull", "penny_volume_spike") == 1.20
 
 
 def test_regime_overlay_renormalizes():
-    base = {"medium_rs_vs_spy": 0.5, "medium_sentiment": 0.5}
-    out = apply_regime_overlay(base, "medium", "bull")
+    base = {"penny_volume_spike": 0.5, "penny_social_buzz": 0.5}
+    out = apply_regime_overlay(base, "penny", "bull")
     assert abs(sum(out.values()) - 1.0) < 1e-6
 
 

@@ -67,6 +67,8 @@ import type {
   SchedulerStatusResponse,
   MorningScanEmailSendResponse,
   MorningScanEmailStatusResponse,
+  MailingListImportEnvResponse,
+  MailingListResponse,
   V2VersionResponse,
   V2AuditResponse,
   V2FactorsAdminResponse,
@@ -101,6 +103,7 @@ import type {
   GenerateIdeasResponse,
   ResearchIdeaStatus,
 } from "./types";
+import { normalizeBucket } from "./buckets";
 import type { Locale } from "@/lib/i18n";
 import { normalizeLastRunSummary, normalizeQuantLabEvidence } from "./quantLabLastRun";
 import {
@@ -132,281 +135,65 @@ import {
   normalizeResearchOverviewResponse,
 } from "./researchOverviewNormalizers";
 
-const API_URL = getApiBaseUrl();
+import { request, DEFAULT_REQUEST_TIMEOUT_MS, resolveApiBaseUrl } from "./api/client";
 
-const DEFAULT_REQUEST_TIMEOUT_MS = 45_000;
+export {
+  startScan,
+  getScanStatus,
+  getLatestScan,
+  getScanPickSummary,
+  listSavedScans,
+  saveScanSnapshot,
+  deleteSavedScan,
+  getStock,
+  getBacktest,
+  listEntryVariants,
+  runBacktestSweep,
+} from "./api/scan";
+
+export {
+  getPortfolioSummary,
+  getPortfolioRebalancePreview,
+  optimizePortfolio,
+  runPortfolioPolicyBacktest,
+  runPortfolioDailyDecision,
+  getDailyDashboard,
+  refreshHomeData,
+  getHomeRefreshStatus,
+  runDailyDecisionNow,
+  getDailyTradingPlanReview,
+  saveDailyTradingPlanReview,
+  importRobinhoodCsv,
+  previewRobinhoodCsv,
+  approveRobinhoodCsv,
+  getPortfolioLedger,
+  createLedgerEntry,
+  updateLedgerEntry,
+  deleteLedgerEntry,
+  rebuildPortfolioLedger,
+  setBuyingPower,
+  getRobinhoodMcpStatus,
+  syncRobinhoodMcp,
+} from "./api/portfolio";
+
+export {
+  postResearchRunsBackfill,
+  listResearchRuns,
+  getResearchRunDetail,
+  compareResearchRunsDetail,
+  exportResearchRun,
+  patchResearchRunNotes,
+  patchResearchRunArchive,
+  duplicateResearchRunExperiment,
+  createResearchRunFollowUpIdea,
+} from "./api/research/runs";
+
+export type { V2RequestOptions } from "./api/research/runs";
+
+import type { V2RequestOptions } from "./api/research/runs";
+import { getLatestScan } from "./api/scan";
+
 const ANALYZE_REQUEST_TIMEOUT_MS = 40_000;
-
-async function request<T>(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<T> {
-  const { timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS, signal: callerSignal, ...rest } = init ?? {};
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-  if (callerSignal) {
-    if (callerSignal.aborted) {
-      controller.abort();
-    } else {
-      callerSignal.addEventListener("abort", () => controller.abort(), { once: true });
-    }
-  }
-
-  try {
-    const res = await fetch(`${API_URL}${path}`, {
-      ...rest,
-      signal: controller.signal,
-      headers: {
-        "Content-Type": "application/json",
-        ...rest.headers,
-      },
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(parseApiError(new Error(text || `Request failed: ${res.status}`)));
-    }
-    return res.json() as Promise<T>;
-  } catch (err) {
-    if (err instanceof DOMException && err.name === "AbortError") {
-      throw new Error(`Request timed out after ${Math.round(timeoutMs / 1000)}s`);
-    }
-    throw err;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
-export function startScan(bucket: Bucket, options?: ScanOptions): Promise<ScanJobResponse> {
-  return request(`/scan/${bucket}`, {
-    method: "POST",
-    body: JSON.stringify(options ?? {}),
-    timeoutMs: SCAN_REQUEST_TIMEOUT_MS,
-  });
-}
-
-export function getScanStatus(jobId: string): Promise<ScanStatusResponse> {
-  return request(`/scan/${jobId}`, {
-    timeoutMs: SCAN_STATUS_REQUEST_TIMEOUT_MS,
-  });
-}
-
-export function getLatestScan(bucket: Bucket): Promise<LatestScanResponse> {
-  return request(`/scan/latest/${bucket}`);
-}
-
-export function getScanPickSummary(
-  bucket: Bucket,
-  stock: StockResult,
-  locale: Locale = "en"
-): Promise<ScanPickSummaryResponse> {
-  return request(`/scan/${bucket}/${stock.symbol}/pick-summary`, {
-    method: "POST",
-    body: JSON.stringify({
-      score: stock.score,
-      summary: stock.summary,
-      signals: stock.signals,
-      metrics: stock.metrics ?? {},
-      locale,
-    }),
-  });
-}
-
-export function listSavedScans(bucket?: Bucket): Promise<SavedScanItem[]> {
-  const qs = bucket ? `?bucket=${bucket}` : "";
-  return request(`/saved/scans${qs}`);
-}
-
-export function saveScanSnapshot(body: SavedScanCreateRequest): Promise<SavedScanItem> {
-  return request("/saved/scans", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
-export function deleteSavedScan(scanId: number): Promise<{ ok: boolean }> {
-  return request(`/saved/scans/${scanId}`, { method: "DELETE" });
-}
-
-export function getStock(
-  symbol: string,
-  bucket?: Bucket,
-  includeBacktest = false
-): Promise<StockDetail> {
-  const params = new URLSearchParams();
-  if (bucket) params.set("bucket", bucket);
-  if (includeBacktest) params.set("include_backtest", "true");
-  const qs = params.toString() ? `?${params}` : "";
-  return request(`/stock/${symbol}${qs}`);
-}
-
-export function getBacktest(
-  bucket: Bucket,
-  symbol: string,
-  horizon = "3y",
-  multiHorizon = false,
-  engine: "default" | "vectorbt" = "default",
-  overrides?: BacktestParamOverrides
-): Promise<BacktestResult | MultiHorizonBacktestResponse> {
-  const params = new URLSearchParams({
-    horizon,
-    multi_horizon: String(multiHorizon),
-    engine,
-  });
-  if (overrides?.hold_days != null) params.set("hold_days", String(overrides.hold_days));
-  if (overrides?.stop_pct != null) params.set("stop_pct", String(overrides.stop_pct));
-  if (overrides?.target_pct != null) params.set("target_pct", String(overrides.target_pct));
-  if (overrides?.entry_variant) params.set("entry_variant", overrides.entry_variant);
-  return request(`/backtest/${bucket}/${symbol}?${params}`);
-}
-
-export function listEntryVariants(bucket: Bucket): Promise<{ bucket: Bucket; variants: EntryVariantItem[] }> {
-  return request(`/backtest/entry-variants/${bucket}`);
-}
-
-export function runBacktestSweep(
-  bucket: Bucket,
-  symbol: string,
-  body: BacktestSweepRequest,
-  engine: "default" | "vectorbt" = "default"
-): Promise<BacktestSweepResponse> {
-  return request(`/backtest/${bucket}/${symbol}/sweep?engine=${engine}`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
-export function getPortfolioSummary(): Promise<PortfolioSummaryResponse> {
-  return request("/portfolio/summary");
-}
-
-export function getPortfolioRebalancePreview(
-  body: RebalancePreviewRequest
-): Promise<RebalancePreviewResponse> {
-  return request("/portfolio/rebalance-preview", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
-export function optimizePortfolio(body: PortfolioOptimizeRequest): Promise<PortfolioOptimizeResponse> {
-  return request("/portfolio/optimize", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
-export function runPortfolioPolicyBacktest(
-  body: PortfolioPolicyBacktestRequest
-): Promise<PortfolioPolicyBacktestResponse> {
-  return request("/portfolio/policy-backtest", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
-export function runPortfolioDailyDecision(
-  body: PortfolioDecisionRequest
-): Promise<PortfolioDecisionResponse> {
-  return request("/portfolio/daily-decision", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
-export function getDailyDashboard(opts?: { skipAutoRefresh?: boolean }): Promise<DailyDashboardResponse> {
-  const qs = opts?.skipAutoRefresh ? "?skip_auto_refresh=true" : "";
-  return request(`/home/daily-dashboard${qs}`);
-}
-
-export function refreshHomeData(force = false): Promise<HomeRefreshResponse> {
-  return request(`/home/refresh?force=${force ? "true" : "false"}`, { method: "POST" });
-}
-
-export function getHomeRefreshStatus(jobId: string): Promise<HomeRefreshStatusResponse> {
-  return request(`/home/refresh-status/${encodeURIComponent(jobId)}`);
-}
-
-export function runDailyDecisionNow(): Promise<PortfolioDecisionRunResponse> {
-  return request("/portfolio/daily-decision/run", { method: "POST" });
-}
-
-export async function importRobinhoodCsv(
-  file: File,
-  cash?: number,
-  replace = false
-): Promise<BrokerageCsvImportResponse> {
-  const form = new FormData();
-  form.append("file", file);
-  if (cash != null) form.append("cash", String(cash));
-  if (replace) form.append("replace", "true");
-  const res = await fetch(`${API_URL}/brokerage/import/robinhood-csv`, {
-    method: "POST",
-    body: form,
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || `Import failed: ${res.status}`);
-  }
-  return res.json() as Promise<BrokerageCsvImportResponse>;
-}
-
-export async function previewRobinhoodCsv(file: File, replace = false): Promise<CsvPreviewResponse> {
-  const form = new FormData();
-  form.append("file", file);
-  if (replace) form.append("replace", "true");
-  const res = await fetch(`${API_URL}/brokerage/preview/robinhood-csv`, {
-    method: "POST",
-    body: form,
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || `Preview failed: ${res.status}`);
-  }
-  return res.json() as Promise<CsvPreviewResponse>;
-}
-
-export async function approveRobinhoodCsv(body: CsvApproveRequest): Promise<BrokerageCsvImportResponse> {
-  return request("/brokerage/import/robinhood-csv/approve", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
-export function getPortfolioLedger(): Promise<LedgerListResponse> {
-  return request("/brokerage/ledger");
-}
-
-export function createLedgerEntry(body: LedgerEntryInput): Promise<LedgerEntry> {
-  return request("/brokerage/ledger", { method: "POST", body: JSON.stringify(body) });
-}
-
-export function updateLedgerEntry(id: number, body: Partial<LedgerEntryInput>): Promise<LedgerEntry> {
-  return request(`/brokerage/ledger/${id}`, { method: "PATCH", body: JSON.stringify(body) });
-}
-
-export function deleteLedgerEntry(id: number): Promise<{ deleted: boolean; id: number }> {
-  return request(`/brokerage/ledger/${id}`, { method: "DELETE" });
-}
-
-export function rebuildPortfolioLedger(): Promise<{ holdings_count: number; holdings: unknown[]; cash: number }> {
-  return request("/brokerage/ledger/rebuild", { method: "POST" });
-}
-
-export async function setBuyingPower(
-  cash: number,
-  reservedCash = 0,
-  ipo?: { shares?: number; listPrice?: number }
-): Promise<{ cash: number; reserved_cash: number }> {
-  const form = new FormData();
-  form.append("cash", String(cash));
-  form.append("reserved_cash", String(reservedCash));
-  if (ipo?.shares != null && ipo.shares > 0) form.append("ipo_shares", String(ipo.shares));
-  if (ipo?.listPrice != null && ipo.listPrice > 0) form.append("ipo_list_price", String(ipo.listPrice));
-  const res = await fetch(`${API_URL}/brokerage/buying-power`, { method: "POST", body: form });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || `Update buying power failed: ${res.status}`);
-  }
-  return res.json() as Promise<{ cash: number; reserved_cash: number }>;
-}
 
 export function runV2PortfolioBacktest(
   body: PortfolioPolicyBacktestRequest
@@ -505,6 +292,37 @@ export function resetApiSettings(keys?: string[]): Promise<ApiSettingsResponse> 
   });
 }
 
+export function getMailingList(): Promise<MailingListResponse> {
+  return request("/settings/mailing-list");
+}
+
+export function addMailingListSubscriber(email: string, label = ""): Promise<MailingListResponse> {
+  return request("/settings/mailing-list", {
+    method: "POST",
+    body: JSON.stringify({ email, label }),
+  });
+}
+
+export function patchMailingListSubscriber(
+  subscriberId: string,
+  patch: { enabled?: boolean; label?: string }
+): Promise<MailingListResponse> {
+  return request(`/settings/mailing-list/${subscriberId}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
+export function removeMailingListSubscriber(subscriberId: string): Promise<MailingListResponse> {
+  return request(`/settings/mailing-list/${subscriberId}`, {
+    method: "DELETE",
+  });
+}
+
+export function importMailingListFromEnv(): Promise<MailingListImportEnvResponse> {
+  return request("/settings/mailing-list/import-env", { method: "POST" });
+}
+
 export function getWatchlist(): Promise<WatchlistItem[]> {
   return request("/watchlist");
 }
@@ -557,7 +375,7 @@ export function getAnalyzeSymbol(
   options?: AnalyzeSymbolOptions
 ): Promise<AnalyzeSymbolResponse> {
   const params = new URLSearchParams();
-  if (bucket) params.set("bucket", bucket);
+  if (bucket) params.set("bucket", normalizeBucket(bucket));
   if (options?.refresh) params.set("refresh", "1");
   if (options?.includeBucketFit) params.set("include_bucket_fit", "1");
   const qs = params.toString();
@@ -589,7 +407,7 @@ export function getResearchReport(
   symbol: string,
   bucket?: Bucket
 ): Promise<StockResearchReport> {
-  const qs = bucket ? `?bucket=${bucket}` : "";
+  const qs = bucket ? `?bucket=${normalizeBucket(bucket)}` : "";
   return request(`/analyze/${symbol}/report${qs}`);
 }
 
@@ -681,7 +499,7 @@ export function syncTradeToPortfolio(tradeId: number): Promise<TradeManualRespon
 }
 
 export async function createTradeUpload(body: FormData): Promise<TradeManualResponse> {
-  const res = await fetch(`${API_URL}/trades/upload`, {
+  const res = await fetch(`${resolveApiBaseUrl()}/trades/upload`, {
     method: "POST",
     body,
   });
@@ -751,8 +569,6 @@ export function getV2UnifiedRisk(
   const qs = bucket ? `?sleeve=${bucket}` : "";
   return request(`/api/v2/risk/${symbol}${qs}`, { signal: options?.signal });
 }
-
-export type V2RequestOptions = { signal?: AbortSignal };
 
 export function getV2Regime(
   refresh = false,
@@ -1325,117 +1141,6 @@ export function postForwardLabelsJob(options?: V2RequestOptions): Promise<Record
 
 export function postResolveOutcomesJob(options?: V2RequestOptions): Promise<Record<string, unknown>> {
   return request("/api/v2/jobs/resolve-outcomes", { method: "POST", signal: options?.signal });
-}
-
-export function postResearchRunsBackfill(
-  limit = 100,
-  options?: V2RequestOptions
-): Promise<Record<string, unknown>> {
-  return request(`/api/v2/research/runs/backfill?limit=${limit}`, {
-    method: "POST",
-    signal: options?.signal,
-  });
-}
-
-export async function listResearchRuns(
-  params: {
-    run_type?: string;
-    sleeve?: string;
-    status?: string;
-    verdict?: string;
-    evidence_impact?: string;
-    search?: string;
-    date_from?: string;
-    date_to?: string;
-    include_archived?: boolean;
-    offset?: number;
-    limit?: number;
-  } = {},
-  options?: V2RequestOptions
-): Promise<import("./types").ResearchRunListResponse> {
-  const qs = new URLSearchParams();
-  for (const [k, v] of Object.entries(params)) {
-    if (v !== undefined && v !== "") qs.set(k, String(v));
-  }
-  return request(`/api/v2/research/runs?${qs.toString()}`, { signal: options?.signal });
-}
-
-export async function getResearchRunDetail(
-  runId: string,
-  refresh = false,
-  options?: V2RequestOptions
-): Promise<import("./types").ResearchRunDetailResponse> {
-  return request(
-    `/api/v2/research/runs/${encodeURIComponent(runId)}/detail?refresh=${refresh}`,
-    { signal: options?.signal }
-  );
-}
-
-export async function compareResearchRunsDetail(
-  runIds: string[],
-  options?: V2RequestOptions
-): Promise<import("./types").ResearchRunCompareDetailResponse> {
-  return request(
-    `/api/v2/research/runs/compare/detail?run_ids=${encodeURIComponent(runIds.join(","))}`,
-    { signal: options?.signal }
-  );
-}
-
-export async function exportResearchRun(
-  runId: string,
-  format: "json" | "csv",
-  options?: V2RequestOptions
-): Promise<unknown> {
-  return request(
-    `/api/v2/research/runs/${encodeURIComponent(runId)}/export?format=${format}`,
-    { signal: options?.signal }
-  );
-}
-
-export async function patchResearchRunNotes(
-  runId: string,
-  notes: string,
-  options?: V2RequestOptions
-): Promise<import("./types").ResearchRunListItem> {
-  return request(`/api/v2/research/runs/${encodeURIComponent(runId)}/notes`, {
-    method: "PATCH",
-    body: JSON.stringify({ notes }),
-    signal: options?.signal,
-  });
-}
-
-export async function patchResearchRunArchive(
-  runId: string,
-  archived: boolean,
-  options?: V2RequestOptions
-): Promise<import("./types").ResearchRunListItem> {
-  return request(`/api/v2/research/runs/${encodeURIComponent(runId)}/archive`, {
-    method: "PATCH",
-    body: JSON.stringify({ archived }),
-    signal: options?.signal,
-  });
-}
-
-export async function duplicateResearchRunExperiment(
-  runId: string,
-  options?: V2RequestOptions
-): Promise<{ experiment_id: string; run_id: string }> {
-  return request(`/api/v2/research/runs/${encodeURIComponent(runId)}/duplicate-experiment`, {
-    method: "POST",
-    signal: options?.signal,
-  });
-}
-
-export async function createResearchRunFollowUpIdea(
-  runId: string,
-  body: { title?: string; hypothesis?: string } = {},
-  options?: V2RequestOptions
-): Promise<import("./types").ResearchRunListItem> {
-  return request(`/api/v2/research/runs/${encodeURIComponent(runId)}/follow-up-idea`, {
-    method: "POST",
-    body: JSON.stringify(body),
-    signal: options?.signal,
-  });
 }
 
 export async function getModelMonitor(

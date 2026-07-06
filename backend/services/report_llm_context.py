@@ -29,7 +29,7 @@ def _serialize(obj: Any) -> Any:
 
 def system_rating_from_score(score: V2ScoreResponse, *, sleeve: str) -> dict[str, Any]:
     """Authoritative system rating — never derived from LLM output."""
-    horizon_map = {"penny": "3-10 days", "medium": "4-8 weeks", "compounder": "3-10+ years"}
+    horizon_map = {"penny": "3-10 days", "compounder": "3-10+ years"}
     horizon = horizon_map.get(sleeve, "1-3 months")
 
     if score.recommendation:

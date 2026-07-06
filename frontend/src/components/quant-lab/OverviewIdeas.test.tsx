@@ -104,7 +104,7 @@ describe("OverviewTab", () => {
   afterEach(() => cleanup());
 
   it("renders overview confidence on load", async () => {
-    render(<OverviewTab sleeve="penny" onSleeveChange={() => undefined} onOpenIdeas={() => undefined} />);
+    render(<OverviewTab sleeve="penny" onOpenIdeas={() => undefined} />);
     await waitFor(() => expect(screen.getByText(/72\/100/)).toBeInTheDocument());
     expect(screen.getByText(/Today's research brief/i)).toBeInTheDocument();
     expect(mocked.getResearchOverview).toHaveBeenCalledWith("penny");
@@ -112,25 +112,25 @@ describe("OverviewTab", () => {
 
   it("shows empty findings copy when none", async () => {
     mocked.getResearchOverview.mockResolvedValue({ ...sampleOverview, findings: [] });
-    render(<OverviewTab sleeve="penny" onSleeveChange={() => undefined} onOpenIdeas={() => undefined} />);
+    render(<OverviewTab sleeve="penny" onOpenIdeas={() => undefined} />);
     await waitFor(() => expect(screen.getByText(/No deterministic findings/i)).toBeInTheDocument());
   });
 
   it("renders research brief finding details", async () => {
-    render(<OverviewTab sleeve="penny" onSleeveChange={() => undefined} onOpenIdeas={() => undefined} />);
+    render(<OverviewTab sleeve="penny" onOpenIdeas={() => undefined} />);
     await waitFor(() => expect(screen.getByText("IC drift detected")).toBeInTheDocument());
     expect(screen.getByText("delta=0.05")).toBeInTheDocument();
   });
 
   it("shows error state on load failure", async () => {
     mocked.getResearchOverview.mockRejectedValue(new Error("network"));
-    render(<OverviewTab sleeve="penny" onSleeveChange={() => undefined} onOpenIdeas={() => undefined} />);
+    render(<OverviewTab sleeve="penny" onOpenIdeas={() => undefined} />);
     await waitFor(() => expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument());
   });
 
   it("shows partial failure banner after maintenance error", async () => {
     mocked.postResearchRunsBackfill.mockRejectedValue(new Error("job failed"));
-    render(<OverviewTab sleeve="penny" onSleeveChange={() => undefined} onOpenIdeas={() => undefined} />);
+    render(<OverviewTab sleeve="penny" onOpenIdeas={() => undefined} />);
     await waitFor(() => screen.getByText(/Evidence maintenance/i));
     fireEvent.click(screen.getByText("Evidence maintenance"));
     const runBtn = await screen.findByRole("button", { name: /^Run$/i });
@@ -141,7 +141,7 @@ describe("OverviewTab", () => {
 
   it("runs maintenance action", async () => {
     mocked.postResearchRunsBackfill.mockResolvedValue({ indexed: 1 });
-    render(<OverviewTab sleeve="penny" onSleeveChange={() => undefined} onOpenIdeas={() => undefined} />);
+    render(<OverviewTab sleeve="penny" onOpenIdeas={() => undefined} />);
     await waitFor(() => screen.getByText(/Evidence maintenance/i));
     fireEvent.click(screen.getByText("Evidence maintenance"));
     const runBtn = await screen.findByRole("button", { name: /^Run$/i });
@@ -152,7 +152,7 @@ describe("OverviewTab", () => {
   it("generates ideas and opens ideas section", async () => {
     const onOpenIdeas = vi.fn();
     mocked.generateResearchIdeas.mockResolvedValue({ created: [], skipped_duplicates: 0, findings_used: 1 });
-    render(<OverviewTab sleeve="penny" onSleeveChange={() => undefined} onOpenIdeas={onOpenIdeas} />);
+    render(<OverviewTab sleeve="penny" onOpenIdeas={onOpenIdeas} />);
     await waitFor(() => screen.getByText(/Generate ideas from brief/i));
     fireEvent.click(screen.getByText(/Generate ideas from brief/i));
     await waitFor(() => expect(mocked.generateResearchIdeas).toHaveBeenCalled());

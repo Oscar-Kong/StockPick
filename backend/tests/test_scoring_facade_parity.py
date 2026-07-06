@@ -91,7 +91,7 @@ def test_facade_score_matches_scan_stage_b_with_engine_off():
         scan_outcome = score_stage_b_candidate(
             ctx=ctx_a,
             screener=scan_screener,
-            bucket=Bucket.medium,
+            bucket=Bucket.penny,
             symbol="AAA",
             quality_score=80.0,
             strategy_version="vTest",
@@ -104,7 +104,7 @@ def test_facade_score_matches_scan_stage_b_with_engine_off():
         facade_outcome = score_symbol_canonical(
             ctx=ctx_b,
             screener=facade_screener,
-            bucket=Bucket.medium,
+            bucket=Bucket.penny,
             symbol="AAA",
             quality_score=80.0,
             strategy_version="vTest",
@@ -127,7 +127,7 @@ def test_facade_defaults_quality_filter_to_empty_dict():
         outcome = score_symbol_canonical(
             ctx=_ctx("BBB"),
             screener=_screener_returning(60.0),
-            bucket=Bucket.medium,
+            bucket=Bucket.penny,
             symbol="BBB",
             quality_score=70.0,
             strategy_version="vTest",
@@ -170,7 +170,7 @@ def test_facade_propagates_engine_flag_when_enabled():
         )
     ]
     fake_scoring = SimpleNamespace(
-        sleeve="medium",
+        sleeve="penny",
         signals=[WeightedSignal("Engine", 70.0, 1.0, "engine")],
         factors=fake_factors,
         raw_score=70.0,
@@ -192,7 +192,7 @@ def test_facade_propagates_engine_flag_when_enabled():
         outcome = score_symbol_canonical(
             ctx=_ctx("DDD"),
             screener=_screener_returning(50.0),
-            bucket=Bucket.medium,
+            bucket=Bucket.penny,
             symbol="DDD",
             quality_score=80.0,
             strategy_version="vTest",

@@ -32,7 +32,7 @@ from services.report_narrative import DISCLAIMER_FOOTER, generate_report_narrati
 def _mock_score() -> V2ScoreResponse:
     return V2ScoreResponse(
         symbol="TEST",
-        sleeve="medium",
+        sleeve="penny",
         score=72.0,
         market_regime="risk_on",
         summary="Momentum and quality supportive.",
@@ -86,7 +86,7 @@ def _mock_score() -> V2ScoreResponse:
 
 def test_system_rating_from_recommendation_engine():
     score = _mock_score()
-    rating = system_rating_from_score(score, sleeve="medium")
+    rating = system_rating_from_score(score, sleeve="penny")
     assert rating["action"] == RECOMMENDATION_TO_RATING_ACTION["buy"]
     assert rating["system_label"] == "buy"
     assert rating["conviction"] == 72.0
@@ -96,7 +96,7 @@ def test_system_rating_from_recommendation_engine():
 def test_system_rating_fallback_without_recommendation():
     score = _mock_score()
     score.recommendation = None
-    rating = system_rating_from_score(score, sleeve="medium")
+    rating = system_rating_from_score(score, sleeve="penny")
     assert rating["action"] == "hold"
     assert rating["system_label"] == "unavailable"
     assert rating["source"] == "score_fallback"
@@ -107,7 +107,7 @@ def test_build_quant_report_context_shape(mock_diag):
     mock_diag.return_value = {"interpretation": "mostly noise", "sufficient_data": True}
     score = _mock_score()
     rec = SimpleNamespace(quality_score=80.0, flags=["peers_missing"])
-    ctx = build_quant_report_context(score, sleeve="medium", reconcile=rec, include_diagnostics=True)
+    ctx = build_quant_report_context(score, sleeve="penny", reconcile=rec, include_diagnostics=True)
 
     assert ctx["symbol"] == "TEST"
     assert "system_rating" in ctx
@@ -118,7 +118,7 @@ def test_build_quant_report_context_shape(mock_diag):
 
 
 def test_generate_report_narrative_rules_fallback():
-    ctx = build_quant_report_context(_mock_score(), sleeve="medium", include_diagnostics=False)
+    ctx = build_quant_report_context(_mock_score(), sleeve="penny", include_diagnostics=False)
     with patch("services.report_narrative.LLM_ENABLED", False):
         out = generate_report_narrative(ctx)
     assert out["source"] == "rules"
@@ -141,7 +141,7 @@ def test_generate_report_narrative_llm_does_not_add_rating(mock_llm):
     with patch("services.report_narrative.LLM_ENABLED", True), patch(
         "services.report_narrative.LLM_API_KEY", "test-key"
     ):
-        out = generate_report_narrative(build_quant_report_context(_mock_score(), sleeve="medium"))
+        out = generate_report_narrative(build_quant_report_context(_mock_score(), sleeve="penny"))
     assert out["source"] == "llm"
     assert "buy" in out["executive_summary"].lower()
     assert "action" not in out
@@ -160,10 +160,10 @@ def test_llm_explainer_uses_quant_context(mock_narrative):
         "disclaimer": DISCLAIMER_FOOTER,
         "source": "rules",
     }
-    ctx = build_quant_report_context(_mock_score(), sleeve="medium")
+    ctx = build_quant_report_context(_mock_score(), sleeve="penny")
     result = generate_explanation(
         "TEST",
-        "medium",
+        "penny",
         72.0,
         "summary",
         {},

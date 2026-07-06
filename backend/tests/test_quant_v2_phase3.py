@@ -59,8 +59,8 @@ def test_penny_delisting_filter(monkeypatch):
 def test_hard_filter_table_has_sleeves():
     sleeves = {r.sleeve for r in HARD_FILTER_TABLE}
     assert "penny" in sleeves
-    assert "medium" in sleeves
     assert "compounder" in sleeves
+    assert "medium" not in sleeves
 
 
 if __name__ == "__main__":

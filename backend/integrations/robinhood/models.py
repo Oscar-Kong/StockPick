@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Literal
 
-BrokerageSource = Literal["manual", "csv", "snaptrade", "demo"]
+BrokerageSource = Literal["manual", "csv", "snaptrade", "robinhood_mcp", "demo"]
 RowType = Literal["buy", "sell", "event", "excluded"]
 # Legacy DB rows may still use side cash | income — normalized to "event" on read.
 

@@ -240,20 +240,6 @@ PENNY_DISCOVERY_SEEDS = sorted(
 # Backward-compatible alias — prefer PENNY_DISCOVERY_SEEDS in new code.
 PENNY_CANDIDATES = PENNY_DISCOVERY_SEEDS
 
-MEDIUM_CANDIDATES = [
-    "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "AMD", "INTC", "QCOM",
-    "CRM", "NOW", "ADBE", "ORCL", "PANW", "SNPS", "CDNS", "CRWD", "ZS", "DDOG",
-    "NET", "SNOW", "MDB", "TEAM", "SHOP", "XYZ", "PYPL", "UBER", "ABNB", "DASH",
-    "ROKU", "PINS", "SNAP", "TTD", "RBLX", "U", "DKNG", "PENN", "MGM", "WYNN",
-    "LVS", "CZR", "MAR", "HLT", "H", "EXPE", "BKNG", "DAL", "UAL",
-    "LUV", "AAL", "JBLU", "ALK", "FDX", "UPS", "XPO", "ODFL", "JBHT", "CHRW",
-    "DE", "CAT", "EMR", "ETN", "ROK", "PH", "ITW", "CMI", "PCAR", "URI",
-    "COST", "WMT", "TGT", "HD", "LOW", "DG", "DLTR", "ROST", "TJX", "BBY",
-    "NKE", "LULU", "DECK", "ONON", "SKX", "UAA", "VFC", "PVH", "RL", "TPR",
-    "PLTR", "SOFI", "HOOD", "COIN", "MSTR", "SMCI", "ARM", "AVGO", "MU", "LRCX",
-    "KLAC", "AMAT", "MRVL", "ON", "SWKS", "MPWR", "ENPH", "FSLR", "CEG", "VST",
-]
-
 COMPOUNDER_CANDIDATES = [
     "COST", "MSFT", "AAPL", "GOOGL", "V", "MA", "UNH", "JNJ", "PG", "KO",
     "PEP", "HD", "LOW", "MCD", "SBUX", "NKE", "TMO", "ABT", "DHR", "SYK",
@@ -329,11 +315,6 @@ def _resolve_bucket_seeds(bucket: str) -> list[str]:
     sp500 = _load_sp500_from_cache()
     if bucket == "penny":
         return list(PENNY_DISCOVERY_SEEDS)
-    if bucket == "medium":
-        base = MEDIUM_CANDIDATES + LARGE_CAP_SEEDS
-        if sp500:
-            base = base + sp500
-        return base
     if bucket == "compounder":
         base = list(COMPOUNDER_CANDIDATES)
         if sp500:
@@ -371,5 +352,8 @@ def _get_universe_cached(bucket: str, revision: str) -> tuple[str, ...]:
 
 def get_universe(bucket: str) -> list[str]:
     """Return sorted unique tickers for a scan bucket."""
+    from core.sleeve import normalize_sleeve
+
+    bucket = normalize_sleeve(bucket)
     revision = get_universe_revision()
     return list(_get_universe_cached(bucket, revision))

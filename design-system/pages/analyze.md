@@ -3,7 +3,7 @@
 > **RouteMap:** Audit §5.1 and §15 use filename `workspace.md` for this route; this file is the same scope.  
 > **Route:** `/workspace?symbol=` (legacy `/analyze` redirects here)  
 > **Components:** `WorkspacePage`, `WatchlistRail`, `AnalysisPanel`, `AnalysisTabNav`  
-> **Audit:** `docs/UI_AUDIT.md` §12.3, §9.1, §9.3, §15 Phase 4 (#4 Analyze), §16  
+> **Audit:** `docs/UI_AUDIT_REVISED.md` §12.3, §9.1, §9.3, §15 Phase 4 (#4 Analyze), §16  
 > **Implementation phase:** Phase 4 — chart a11y and focus in Phase 1  
 > **Parent:** `design-system/MASTER.md` · **Alias file:** `workspace.md`  
 > **ui-ux-pro-max pattern:** Two-column analytical workspace — content-first, minimal nav clutter, persistent metrics rail
@@ -27,6 +27,8 @@
 - Keep price chart and current decision visible where possible
 - Show latest data date prominently in toolbar
 - Use inspector/drawer for secondary evidence below `lg`
+
+**Shared surfaces:** `GlassPanel` (`components/ui/GlassPanel.tsx`) — `hero` for price hero + watchlist preview; `default`/`compact` for chart and side panels (`analysis-glass-panel` tokens).
 
 ---
 
@@ -64,9 +66,9 @@ ui-ux-pro-max: **minimal single-column focus on mobile** — one primary task pe
 |------|---------|----------|----------|
 | Empty state | Centered text, large dead zone | Split layout always visible: watchlist + “Select a symbol” panel with search + import CTA | Major |
 | Metrics rail | Hidden until `lg` — empty right gap on md | Show **compact horizontal stat strip** at md; vertical rail at lg+ | Major |
-| Tab nav | Segmented `AppTabBar` style mixed with analysis tabs | Group tabs (core / research / tools); underline style for content tabs (Master §10.5) | Moderate |
-| Toolbar | Multiple rows (meta + stats) | Single toolbar with **latest data date** prominent; stats inline scroll on mobile | Moderate |
-| Watchlist rail | Hidden on mobile; native `<select>` | Keep select but add **watchlist sheet** (bottom drawer) showing scores + rec badges | Major |
+| Tab nav | Segmented `AppTabBar` style mixed with analysis tabs | Group tabs (core / research / tools); underline style for content tabs (Master §10.5) | Done |
+| Toolbar | Multiple rows (meta + stats) | Single toolbar with **latest data date** prominent; stats inline scroll on mobile | Partial — hero shows score/risk/bucket/quality/bar; score source moved to Score tab context |
+| Watchlist rail | Hidden on mobile; native `<select>` | Keep select but add **watchlist sheet** (bottom drawer) showing scores + rec badges | Partial — desktop rail upgraded (score bar, skeleton, glass header) |
 
 ---
 
@@ -170,9 +172,9 @@ Keep in main column: price chart, recommendation/score summary, unified risk hea
 ### Phase 4 — Analyze/Workspace
 - [ ] Browser-confirm 1024–1279px empty margin
 - [ ] Empty workspace: search + recent symbols + watchlist preview (§12.3)
-- [ ] Group related tabs; underline content-tab style
+- [x] Group related tabs; underline content-tab style (2026-07-03)
 - [ ] Inspector drawer for secondary evidence on narrow screens
 - [ ] md horizontal stats strip (if validated)
 - [ ] Mobile watchlist bottom sheet — keep native `<select>` unless usability test proves replacement (§16)
-- [ ] Complete tab `aria-controls` on **content** tabs only
-- [ ] Preserve all analysis fetch logic and tab configs (§16)
+- [x] Complete tab `aria-controls` on **content** tabs only (2026-07-03)
+- [x] Preserve all analysis fetch logic and tab configs (§16)

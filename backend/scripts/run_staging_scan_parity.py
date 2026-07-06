@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run penny / medium / compounder scans with USE_SCORING_ENGINE_IN_SCAN=true and emit parity JSON.
+"""Run penny / compounder scans with USE_SCORING_ENGINE_IN_SCAN=true and emit parity JSON.
 
 Modes:
   full (default) — ScanManager.run_scan (live providers; may fall back on API errors)
@@ -118,7 +118,6 @@ def _ctx_from_store(symbol: str, bucket: Bucket, *, min_bars: int = 90) -> Candi
     avg_vol = avg_volume_from_history(df)
     mcap_by_bucket = {
         Bucket.penny: 200_000_000,
-        Bucket.medium: 15_000_000_000,
         Bucket.compounder: 200_000_000_000,
     }
     return CandidateContext(
@@ -150,7 +149,7 @@ def run_bucket_cached_parity(bucket: Bucket, max_symbols: int) -> dict:
     records = []
     scored: list[tuple[str, float]] = []
 
-    min_bars = {Bucket.penny: 90, Bucket.medium: 90, Bucket.compounder: 252}.get(bucket, 90)
+    min_bars = {Bucket.penny: 90, Bucket.compounder: 252}.get(bucket, 90)
 
     for sym in get_universe(bucket.value):
         if len(records) >= max_symbols:
@@ -277,7 +276,7 @@ def main() -> int:
         "buckets": [],
     }
 
-    for bucket in (Bucket.penny, Bucket.medium, Bucket.compounder):
+    for bucket in (Bucket.penny, Bucket.compounder):
         print(f"Running staging scan ({args.mode}): {bucket.value}...", file=sys.stderr)
         if args.mode == "cached":
             report["buckets"].append(run_bucket_cached_parity(bucket, args.max_symbols))

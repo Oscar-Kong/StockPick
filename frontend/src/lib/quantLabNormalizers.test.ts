@@ -27,7 +27,7 @@ describe("quantLabNormalizers", () => {
         {
           id: 1,
           symbol: "AAPL",
-          sleeve: "medium",
+          sleeve: "penny",
           source: "v2",
           created_at: "2026-01-01T00:00:00Z",
           alpha_score: 72,

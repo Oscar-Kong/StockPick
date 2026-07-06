@@ -7,7 +7,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from services.walk_forward_research_service import _truncate_history
+from data.pit_history import truncate_history
 from utils.trading_calendar import (
     align_price_index_to_session,
     forward_return_sessions,
@@ -15,9 +15,6 @@ from utils.trading_calendar import (
     session_index_for_date,
     forward_session_index,
 )
-
-# Re-export for tests and replay modules.
-truncate_history = _truncate_history
 
 DEFAULT_FORWARD_HORIZONS = (1, 5, 20, 60)
 

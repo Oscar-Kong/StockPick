@@ -11,11 +11,11 @@ describe("researchOverviewNormalizers", () => {
 
   it("normalizes partial overview payload", () => {
     const out = normalizeResearchOverviewResponse({
-      sleeve: "medium",
+      sleeve: "penny",
       research_confidence_score: 55,
       findings: [{ finding_id: "f1", title: "Test" }],
     });
-    expect(out.sleeve).toBe("medium");
+    expect(out.sleeve).toBe("penny");
     expect(out.research_confidence_score).toBe(55);
     expect(out.findings).toHaveLength(1);
     expect(out.findings[0]?.title).toBe("Test");

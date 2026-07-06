@@ -11,6 +11,7 @@ const PRIMARY_SECTIONS = [
   "overview",
   "ideas",
   "experiments",
+  "factor-discovery",
   "results",
   "model-monitor",
 ] as const;
@@ -40,7 +41,10 @@ test.describe("Quant Lab", () => {
       await page.goto(`/quant-lab?section=${section}`);
       await expect(page).toHaveURL(new RegExp(`section=${section}`));
       await expect(page.locator(".data-panel")).toBeVisible();
-      expect(errors.filter((e) => !e.includes("favicon"))).toEqual([]);
+      // Factor Discovery returns 503 when mining is disabled — UI still renders with banner.
+      if (section !== "factor-discovery") {
+        expect(errors.filter((e) => !e.includes("favicon"))).toEqual([]);
+      }
     });
   }
 
@@ -48,7 +52,7 @@ test.describe("Quant Lab", () => {
     test(`legacy tab ${tab} renders`, async ({ page }) => {
       await page.goto(`/quant-lab?section=legacy&tab=${tab}`);
       await expect(page).toHaveURL(new RegExp(`tab=${tab}`));
-      await expect(page.locator(".data-panel")).toBeVisible();
+      await expect(page.getByText(/Compatibility path for existing experiment tabs/i)).toBeVisible();
     });
   }
 
@@ -64,7 +68,7 @@ test.describe("Quant Lab", () => {
 
   test("4. experiment studio choose step lists templates", async ({ page }) => {
     await page.goto("/quant-lab?section=experiments&step=choose");
-    await expect(page.getByText(/walk.?forward|factor|pairs|prediction|similar|portfolio/i).first()).toBeVisible({
+    await expect(page.getByText(/walk.?forward|factor|pairs|prediction|similar|portfolio|scan/i).first()).toBeVisible({
       timeout: 15_000,
     });
   });
@@ -99,6 +103,11 @@ test.describe("Quant Lab", () => {
     await page.goto("/quant-lab?section=experiments&step=configure&template=walk_forward");
     await expect(page).toHaveURL(/template=walk_forward/);
     await expect(page.locator(".data-panel")).toBeVisible();
+  });
+
+  test("9b. experiment studio scan_evaluation configure fields", async ({ page }) => {
+    await page.goto("/quant-lab?section=experiments&step=configure&template=scan_evaluation");
+    await expect(page.getByText(/alphabetical_baseline|stage_a_v2/i).first()).toBeVisible({ timeout: 15_000 });
   });
 
   test("10. results compare query accepted", async ({ page }) => {

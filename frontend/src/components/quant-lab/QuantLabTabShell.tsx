@@ -24,13 +24,10 @@ export function BucketSelect({
   value,
   onChange,
   label,
-  includeDeprecated = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   label: string;
-  /** Show legacy medium for historical data only */
-  includeDeprecated?: boolean;
 }) {
   return (
     <label className="text-xs text-zinc-500">
@@ -45,9 +42,6 @@ export function BucketSelect({
             {b}
           </option>
         ))}
-        {includeDeprecated && value === "medium" && (
-          <option value="medium">medium (legacy)</option>
-        )}
       </select>
     </label>
   );

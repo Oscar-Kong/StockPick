@@ -14,11 +14,11 @@ import type { FactorPerformanceFactor, FactorPerformanceResponse } from "./types
 
 const sampleFactor = (id: string, ic: number, n: number): FactorPerformanceFactor => ({
   factor_id: id,
-  sleeve: "medium",
+  sleeve: "penny",
   horizons: {
     "20": {
       factor_id: id,
-      sleeve: "medium",
+      sleeve: "penny",
       horizon_days: 20,
       ic,
       ir: ic * 2,
@@ -109,7 +109,7 @@ describe("researchReliability", () => {
         result: {
           run_id: "abc",
           status: "completed",
-          sleeve: "medium",
+          sleeve: "penny",
           start_date: "2024-01-01",
           end_date: "2025-01-01",
           rebalance_frequency: "monthly",
@@ -138,7 +138,7 @@ describe("researchReliability", () => {
       const flags = computeWalkForwardOverfittingWarnings({
         run_id: "x",
         status: "completed",
-        sleeve: "medium",
+        sleeve: "penny",
         start_date: "2024-01-01",
         end_date: "2025-01-01",
         rebalance_frequency: "monthly",

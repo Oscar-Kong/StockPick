@@ -16,10 +16,16 @@ describe("apiConfig", () => {
     expect(getApiBaseUrl()).toBe("https://api.example.com");
   });
 
-  it("falls back locally when unset", () => {
+  it("falls back locally when unset in development", () => {
     vi.stubEnv("NEXT_PUBLIC_API_URL", "");
     vi.stubEnv("NODE_ENV", "development");
     expect(getApiBaseUrl()).toContain("127.0.0.1");
+  });
+
+  it("uses relative URLs in production when unset (Next rewrites proxy)", () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "");
+    vi.stubEnv("NODE_ENV", "production");
+    expect(getApiBaseUrl()).toBe("");
   });
 
   it("requires URL in production", () => {

@@ -2,7 +2,7 @@
 
 > **Route:** `/?tab=research` · `/?tab=activity` · `?panel=`  
 > **Components:** `PortfolioResearch`, `PortfolioActivity`, sub-tabs (optimize, backtest, exposure, rebalance, ledger, CSV)  
-> **Audit:** `docs/UI_AUDIT.md` §12.1, §9.2, §9.3, §15 Phase 4 (#2 Portfolio), §16  
+> **Audit:** `docs/UI_AUDIT_REVISED.md` §12.1, §9.2, §9.3, §15 Phase 4 (#2 Portfolio), §16  
 > **Implementation phase:** Phase 4 — correlation/chart a11y items also in Phase 1 (§15)  
 > **Parent:** `design-system/MASTER.md`  
 > **ui-ux-pro-max pattern:** Portfolio Grid + institutional research — neutral surfaces, data-first, minimal decorative accent
@@ -93,7 +93,7 @@ Mirror **Settings page pattern** (side nav desktop + mobile `<select>`) — alre
 - Error rows: inline `ErrorState` per section, not silent skip
 
 ### Activity — Ledger
-- `ledger-ui.tsx`: migrate `emerald-*` / `zinc-*` to semantic tokens
+- `ledger-ui.tsx`: uses shared `DenseTable`, `input-field`, `ModuleToolbar`, and semantic tokens (no glass/emerald glow)
 - Dense table row height 44px; right-align amounts
 
 ---

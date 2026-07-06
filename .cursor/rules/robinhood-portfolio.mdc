@@ -1,0 +1,18 @@
+---
+description: Live Robinhood portfolio via MCP read tools — sync into StockPick, no CSV.
+alwaysApply: false
+globs:
+  - "**/*"
+---
+
+# Robinhood MCP — live portfolio (read-only)
+
+For **live** Robinhood holdings in StockPick (daily trader workflow):
+
+1. **Sync script:** `./scripts/sync-robinhood-mcp.sh` or `POST /api/brokerage/sync/robinhood-mcp`
+2. **First-time auth:** `./scripts/robinhood-mcp-login.sh` (tokens → `storage/robinhood_mcp/`)
+3. **Docs:** [docs/ROBINHOOD_MCP.md](../../docs/ROBINHOOD_MCP.md)
+
+Read-only MCP tools only: `get_accounts`, `get_portfolio`, `get_equity_positions`. Do **not** call trade tools unless the user explicitly requests agentic trading.
+
+Cursor IDE MCP (`robinhood-trading` in `.cursor/mcp.json`) is separate — use StockPick sync to persist into the app database.

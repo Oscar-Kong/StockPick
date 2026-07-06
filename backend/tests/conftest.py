@@ -58,6 +58,13 @@ def _reset_runtime_state() -> None:
         _get_universe_cached.cache_clear()
     except Exception:
         pass
+    try:
+        import config
+        from utils.runtime_flags import get_registry
+
+        get_registry(config.DATA_DIR).reset()
+    except Exception:
+        pass
 
 
 @pytest.fixture(autouse=True)

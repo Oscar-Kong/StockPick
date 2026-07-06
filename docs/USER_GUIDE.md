@@ -10,6 +10,7 @@ This guide is the **mental map** for the project. Use it when the app feels crow
 | **24/7 scans without exhausting APIs** | [QUANT_247_OPS.md](QUANT_247_OPS.md) |
 | OpenAlpha-inspired research factors | [OPENALPHA_INTEGRATION.md](OPENALPHA_INTEGRATION.md) |
 | API keys & toggles | [RUNBOOK.md](RUNBOOK.md) |
+| Live Robinhood portfolio (MCP) | [ROBINHOOD_MCP.md](ROBINHOOD_MCP.md) |
 | Business meaning of Analyze tabs | [ANALYZE_PANEL.md](ANALYZE_PANEL.md) |
 | **Every Analyze stat explained** | [ANALYZE_PANEL_STATS_GUIDE.md](ANALYZE_PANEL_STATS_GUIDE.md) |
 | Full product route list | [PROJECT_INVENTORY.md](PROJECT_INVENTORY.md) |
@@ -33,7 +34,7 @@ The product focuses on **Penny** (default) and **Compounder**. Legacy **Medium**
 | **Penny** | Days → ~2 weeks | Momentum / volume / catalyst trades; **daily portfolio decisions** |
 | **Compounder** | Years | Quality growers, macro + governance matter |
 
-**Rule of thumb:** Import your Robinhood CSV on **Home** for reconstructed holdings. The app auto-assigns **penny** for most speculative names; **compounder** only for obvious long-term quality tickers.
+**Rule of thumb:** For **daily trading**, sync live holdings via Robinhood MCP (`./scripts/sync-robinhood-mcp.sh`). CSV import on **Home → Activity** is optional for full transaction ledger history. The app auto-assigns **penny** for most speculative names; **compounder** only for obvious long-term quality tickers.
 
 **Disclaimer:** Daily decisions are model-generated research outputs, not financial advice. Review before trading. The app does not place trades.
 
@@ -44,7 +45,7 @@ The product focuses on **Penny** (default) and **Compounder**. Legacy **Medium**
 You only need **four routes** for 90% of work:
 
 ```
-Portfolio (/)           → **Portfolio workspace** — Today (decisions), Research (tools), Activity (CSV & ledger)
+Portfolio (/)           → **Portfolio workspace** — Today (holdings & action queue), Daily Plan, Research (tools), Activity (CSV & ledger)
 Screen (/scan)     → discover ranked candidates (Penny + Compounder)
 Research (/workspace) → watchlist + deep dive
 Library (/library) → saved scans & reports
@@ -61,7 +62,7 @@ Everything else is **secondary**:
 |-------|--------|
 | `/settings` | Language, appearance (theme), API keys, quant health, ops |
 | `/trader-intel` | Optional strategy templates |
-| `/penny`, `/medium`, `/compounder` | Redirects to `/scan?bucket=…` |
+| `/penny`, `/compounder` | Redirects to `/scan?bucket=…` (`/medium` → penny for legacy bookmarks) |
 | `/analyze`, `/watchlist`, `/trades`, `/reports`, `/scans` | Redirects — old bookmarks |
 
 **Ignore until you need them:** allocation API, LEAN export, alpha ingest UI, scheduler — they exist but have no dedicated page ([PROJECT_INVENTORY.md](PROJECT_INVENTORY.md)).
@@ -100,9 +101,19 @@ Everything else is **secondary**:
 2. **Optimize weights** or **Policy backtest** for basket-level math (optional).
 3. Decision percentages are **model outputs, not financial advice** — see Portfolio tab disclaimer.
 
-### E. “I want to research new factors” (offline)
+### E. “I want to research new factors” (Quant Lab)
 
-See [OPENALPHA_INTEGRATION.md](OPENALPHA_INTEGRATION.md) — batch IC eval, combo optimizer, optional live toggle.
+Use **Quant Lab → Factor Discovery** for the governed research workflow (ideas → experiments → staging → promotion review). This path is **research only** — it does not change live scan rankings.
+
+Final acceptance check:
+
+```bash
+python scripts/run_factor_research_acceptance.py --mode fixture
+```
+
+See [QUANT_LAB.md](QUANT_LAB.md), [FACTOR_RESEARCH_FINAL_ACCEPTANCE.md](FACTOR_RESEARCH_FINAL_ACCEPTANCE.md).
+
+For offline OpenAlpha-style batch IC: [OPENALPHA_INTEGRATION.md](OPENALPHA_INTEGRATION.md).
 
 ---
 
@@ -172,7 +183,7 @@ FINNHUB_ENABLED=true   # if you have a key
 |------|------|
 | `LLM_ENABLED` | AI narrative, scan Summary blurbs |
 | `OPENBB_ENABLED` | Governance / macro enrichments |
-| `QLIB_ENABLED` | ML alpha leg in medium/compounder |
+| `QLIB_ENABLED` | ML alpha leg in penny/compounder |
 | `OPENALPHA_FACTORS_ENABLED` | Experimental formula legs in live scans |
 | `PYPFOPT_ENABLED` | Real portfolio optimizer (else fallback) |
 | `VBT_ENABLED` | VectorBT backtest engine |
@@ -227,7 +238,7 @@ Researching factor ideas offline?
 
 A good session ends with:
 
-1. **1 sleeve** chosen intentionally (penny *or* medium *or* compounder).
+1. **1 sleeve** chosen intentionally (penny *or* compounder).
 2. **≤10 watchlist** names you will actually follow up.
 3. **Notes or journal entry** on names you might trade.
 4. Optional: **one saved scan** or **one saved report** in Library.

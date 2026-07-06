@@ -22,16 +22,23 @@ vi.mock("@/lib/i18n", () => ({
         navOverview: "Overview",
         navIdeas: "Ideas",
         navExperiments: "Experiments",
+        navFactorDiscovery: "Factor Discovery",
         navResults: "Results",
-        navModels: "Models",
         navModelMonitor: "Model Monitor",
         navLegacy: "Legacy tools",
+        navGroupWorkflow: "Workflow",
+        navMore: "More",
         researchOnlyWarning: "Research only",
-        evidenceTitle: "Evidence",
+        infoDrawerButton: "Guide",
+        sectionHintOverview: "Overview hint",
+        sectionHintIdeas: "Ideas hint",
+        sectionHintExperiments: "Experiments hint",
+        sectionHintFactorDiscovery: "FD hint",
+        sectionHintResults: "Results hint",
+        sectionHintModelMonitor: "Monitor hint",
       },
-      product: { quantLabAffectsScanTitle: "Scan relation" },
-      reliability: { evidenceBoundaryTitle: "Boundary", evidenceBoundaryCopy: "Copy" },
       common: { loading: "Loading", bucket: "Sleeve" },
+      product: { researchOnlyBadge: "Research only" },
     },
     locale: "en",
   }),
@@ -46,26 +53,20 @@ vi.mock("@/components/quant-lab/IdeasBoardTab", () => ({
 vi.mock("@/components/quant-lab/ExperimentStudio", () => ({
   ExperimentStudio: () => <div data-testid="experiments-tab">Experiments</div>,
 }));
+vi.mock("@/components/quant-lab/factor-discovery/FactorDiscoveryWorkspace", () => ({
+  FactorDiscoveryWorkspace: () => <div data-testid="factor-discovery-tab">Factor Discovery</div>,
+}));
 vi.mock("@/components/quant-lab/ResultsTab", () => ({
   ResultsTab: () => <div data-testid="results-tab">Results</div>,
 }));
 vi.mock("@/components/quant-lab/ModelMonitorTab", () => ({
   ModelMonitorTab: () => <div data-testid="model-monitor-tab">Model Monitor</div>,
 }));
-vi.mock("@/components/quant-lab/ModelsTab", () => ({
-  ModelsTab: () => <div data-testid="models-tab">Models</div>,
-}));
 vi.mock("@/components/quant-lab/LegacyQuantLabTabs", () => ({
   LegacyQuantLabTabs: () => <div data-testid="legacy-tabs">Legacy</div>,
 }));
-vi.mock("@/components/quant-lab/QuantLabEvidencePanel", () => ({
-  QuantLabEvidencePanel: () => <div>Evidence panel</div>,
-}));
-vi.mock("@/components/product/QuantLabScanRelationshipPanel", () => ({
-  QuantLabScanRelationshipPanel: () => <div>Scan relation</div>,
-}));
-vi.mock("@/components/product/EvidenceToActionBoundary", () => ({
-  EvidenceToActionBoundary: () => <div>Boundary</div>,
+vi.mock("@/components/quant-lab/QuantLabInfoDrawer", () => ({
+  QuantLabInfoDrawer: ({ open }: { open: boolean }) => (open ? <div data-testid="info-drawer">Drawer</div> : null),
 }));
 
 describe("QuantLabPage navigation", () => {
@@ -78,6 +79,13 @@ describe("QuantLabPage navigation", () => {
   it("defaults to overview section", () => {
     render(<QuantLabPage />);
     expect(screen.getAllByTestId("overview-tab").length).toBeGreaterThan(0);
+    expect(screen.getByText("Overview hint")).toBeInTheDocument();
+  });
+
+  it("opens factor discovery when section query is set", () => {
+    searchParams = new URLSearchParams("section=factor-discovery");
+    render(<QuantLabPage />);
+    expect(screen.getByTestId("factor-discovery-tab")).toBeInTheDocument();
   });
 
   it("navigates to ideas section via click", () => {
@@ -114,5 +122,18 @@ describe("QuantLabPage navigation", () => {
     fireEvent.keyDown(ideasBtn, { key: "Enter" });
     fireEvent.click(ideasBtn);
     expect(push).toHaveBeenCalledWith(expect.stringContaining("section=ideas"));
+  });
+
+  it("redirects retired models section to model monitor", () => {
+    searchParams = new URLSearchParams("section=models");
+    render(<QuantLabPage />);
+    expect(screen.getByTestId("model-monitor-tab")).toBeInTheDocument();
+  });
+
+  it("opens the info drawer from the guide button", () => {
+    render(<QuantLabPage />);
+    expect(screen.queryByTestId("info-drawer")).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByTestId("quant-lab-guide-btn")[0]!);
+    expect(screen.getByTestId("info-drawer")).toBeInTheDocument();
   });
 });

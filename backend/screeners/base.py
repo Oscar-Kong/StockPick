@@ -123,10 +123,9 @@ class BaseScreener(ABC):
 
     @staticmethod
     def composite_score(signals: list[WeightedSignal]) -> float:
-        total_weight = sum(s.weight for s in signals)
-        if total_weight <= 0:
-            return 0.0
-        return sum(s.contribution for s in signals) / total_weight
+        from engines.factor.composite import composite_score as _composite_score
+
+        return _composite_score(signals)
 
     def apply_regime(self, ctx: CandidateContext, raw_score: float) -> tuple[float, dict]:
         from scoring.regime import apply_regime_to_score

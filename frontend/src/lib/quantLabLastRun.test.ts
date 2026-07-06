@@ -34,7 +34,7 @@ describe("quantLabLastRun", () => {
 
   it("normalizes full evidence response", () => {
     const e = normalizeQuantLabEvidence({
-      sleeve: "medium",
+      sleeve: "penny",
       generated_at: "2026-06-05",
       factor_ic: { available: true, id: "factor_ic", stale: false, warnings: [], trust_indicator: "fresh", research_only: false },
       walk_forward: { available: false, id: "walk_forward", stale: false, warnings: [], trust_indicator: "no_saved_run", research_only: true },

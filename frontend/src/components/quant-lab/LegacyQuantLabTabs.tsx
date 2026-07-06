@@ -27,21 +27,24 @@ export function LegacyQuantLabTabs({ tab, onTabChange }: LegacyQuantLabTabsProps
   };
 
   return (
-    <>
-      <p className="text-xs text-zinc-500">{t.quantLab.legacyTabsHint}</p>
-      <AppTabBar aria-label={t.quantLab.legacyTabsAria} className="overflow-x-auto">
+    <div className="quant-lab-legacy space-y-3">
+      <div className="quant-lab-legacy-banner" role="status">
+        <p className="text-sm font-medium text-zinc-400">{t.quantLab.navLegacy}</p>
+        <p className="mt-0.5 text-xs text-zinc-500">{t.quantLab.legacyTabsHint}</p>
+      </div>
+      <AppTabBar aria-label={t.quantLab.legacyTabsAria} className="overflow-x-auto quant-lab-legacy-tabs">
         {LEGACY_TABS.map((key) => (
           <AppTabButton key={key} active={tab === key} onClick={() => onTabChange(key)}>
             {tabLabel[key]}
           </AppTabButton>
         ))}
       </AppTabBar>
-      <div className="data-panel data-panel--padded min-h-[12rem]">
+      <div className="min-h-0">
         {tab === "factor-performance" && <FactorPerformanceTab />}
         {tab === "walk-forward" && <WalkForwardTab />}
         {tab === "predictions" && <PredictionsTab />}
         {tab === "pairs" && <PairsTab />}
       </div>
-    </>
+    </div>
   );
 }

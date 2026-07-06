@@ -15,8 +15,8 @@ from engines.feedback.predictions import (
 
 
 def test_expected_return_mapping():
-    assert expected_return_from_score(80, "medium") > 0
-    assert expected_return_from_score(40, "medium") < 0
+    assert expected_return_from_score(80, "penny") > 0
+    assert expected_return_from_score(40, "penny") < 0
     assert horizon_days_for_sleeve("penny") == 14
 
 

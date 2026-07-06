@@ -54,3 +54,11 @@ OpenBB/
 # --- Research exports (can be large; regenerate locally) ---
 backend/data_store/research/
 *.parquet
+
+# --- Regenerable evaluation & factor-discovery artifacts ---
+backend/data/scan_eval/
+backend/data/factor_discovery/snapshots/
+backend/data/factor_discovery/acceptance/
+backend/data/factor_discovery/extended_staging/
+backend/data/factor_discovery/staging_input/batches/
+backend/services/data/factor_discovery/

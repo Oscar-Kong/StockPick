@@ -7,8 +7,6 @@ from typing import Any
 import pandas as pd
 
 from config import (
-    MEDIUM_MIN_VOLUME,
-    MEDIUM_PRICE_MIN,
     MIN_HISTORY_BARS,
     PENNY_MIN_VOLUME,
     PENNY_PRICE_MAX,
@@ -100,8 +98,6 @@ def apply_quality_filters(
     required_bars = MIN_HISTORY_BARS
     if bucket == Bucket.penny:
         required_bars = min(80, MIN_HISTORY_BARS)
-    elif bucket == Bucket.medium:
-        required_bars = min(90, MIN_HISTORY_BARS)
 
     if history is None or history.empty or len(history) < required_bars:
         reasons.append(f"Insufficient history (<{required_bars} bars)")
@@ -112,10 +108,6 @@ def apply_quality_filters(
         if not (PENNY_PRICE_MIN <= price <= PENNY_PRICE_MAX):
             reasons.append(f"Price outside penny range ({PENNY_PRICE_MIN}-{PENNY_PRICE_MAX})")
         vol_thresh = min_volume or PENNY_MIN_VOLUME
-    elif bucket == Bucket.medium:
-        if price < MEDIUM_PRICE_MIN:
-            reasons.append(f"Price below medium minimum ({MEDIUM_PRICE_MIN})")
-        vol_thresh = min_volume or MEDIUM_MIN_VOLUME
     else:
         vol_thresh = min_volume or 500_000
 

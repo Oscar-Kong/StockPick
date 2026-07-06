@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { describe, expect, it, vi, afterEach } from "vitest";
+import { render, screen, waitFor, cleanup } from "@testing-library/react";
 import { en } from "@/lib/i18n/messages/en";
 import { ResultsTab } from "./ResultsTab";
 
@@ -15,7 +15,7 @@ vi.mock("@/lib/i18n", () => ({
   useTRef: () => tRef,
 }));
 
-vi.mock("@/lib/api", () => ({
+vi.mock("@/lib/api/research/runs", () => ({
   listResearchRuns: vi.fn().mockResolvedValue({ runs: [], total: 0, offset: 0, limit: 20 }),
   getResearchRunDetail: vi.fn(),
   compareResearchRunsDetail: vi.fn(),
@@ -27,6 +27,10 @@ vi.mock("@/lib/api", () => ({
 }));
 
 describe("ResultsTab", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   it("renders results index hint", async () => {
     render(<ResultsTab sleeve="penny" onSleeveChange={() => {}} />);
     await waitFor(() => {

@@ -5,7 +5,7 @@ Stock Picker is a local-first US equities research dashboard focused on **two ac
 - **Penny** (primary): short-term momentum scanner, daily portfolio decisions, volume/catalyst setups (days to ~2 weeks)
 - **Compounder**: long-term quality growers (multi-year)
 
-The legacy **Medium** swing bucket is deprecated in the UI; saved medium scans and watchlist tags still load for history.
+Legacy API input `medium` and old bookmarks (`/medium`) normalize to **penny** for backward compatibility.
 
 It combines rule-based screening, data reconciliation, optional OpenBB governance/macro signals, backtesting, portfolio tooling, and quant integration scaffolding (vectorbt / PyPortfolioOpt / Qlib / FinRL / LEAN handoff).
 
@@ -36,6 +36,8 @@ Top navigation: **Portfolio · Scan · Workspace · Quant Lab · Library · Sett
 | **Heavy jobs** | Scan button only | Analyze on open | Experiment Studio launch only |
 
 **Flow:** Market Data → ScoringEngine → Scan Results → Workspace. Quant Lab validates factors, weights, and outcomes through **ideas, experiments, and reviewable change proposals** — not today's live ranking. See [docs/QUANT_LAB.md](docs/QUANT_LAB.md) and [docs/QUANT_LAB_REDESIGN_FINAL_REPORT.md](docs/QUANT_LAB_REDESIGN_FINAL_REPORT.md).
+
+**Factor discovery (Phases 0–11):** Research idea → snapshot → supervised run → extended staging → promotion review → shadow scoring → **manual integration outside Quant Lab**. Final acceptance: [docs/FACTOR_RESEARCH_FINAL_ACCEPTANCE.md](docs/FACTOR_RESEARCH_FINAL_ACCEPTANCE.md). Run `python backend/scripts/run_factor_research_acceptance.py --mode fixture`.
 
 **Wiring in progress:** allocation recommendation, LEAN export.
 
@@ -199,7 +201,7 @@ Pre-market summary at **9:20 AM America/New_York** (Mon–Fri, XNYS calendar). C
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `SCAN_EMAIL_ENABLED` | `false` | Enable scheduled + manual morning email |
-| `SCAN_EMAIL_TO` | — | Comma-separated recipient addresses |
+| `SCAN_EMAIL_TO` | — | Fallback comma-separated recipients when Settings mailing list is empty |
 | `SCAN_EMAIL_FROM` | — | Sender (`Name <email>` — must match Gmail or a Send-as alias) |
 | `SCAN_EMAIL_BUCKETS` | `penny,compounder` | Buckets included in the digest |
 | `SCAN_EMAIL_TOP_N` | `5` | Top candidates per bucket |
@@ -207,7 +209,7 @@ Pre-market summary at **9:20 AM America/New_York** (Mon–Fri, XNYS calendar). C
 | `SMTP_PASSWORD` | — | Gmail App Password (server secret) |
 | `APP_PUBLIC_URL` | `http://127.0.0.1:18730` | Links in the email body |
 
-Ops: Settings → **Ops**, or `GET /ops/notifications/morning-scan/status`. Dry-run: `POST /ops/notifications/morning-scan/send` with `{"dry_run":true}`. See [RUNBOOK](docs/RUNBOOK.md#morning-scan-email).
+Ops: Settings → **Ops** (morning scan status + **Mailing list**), or `GET /ops/notifications/morning-scan/status`. Manage recipients in Settings → Ops → Mailing list (`GET /settings/mailing-list`). Dry-run: `POST /ops/notifications/morning-scan/send` with `{"dry_run":true}`. See [RUNBOOK](docs/RUNBOOK.md#morning-scan-email).
 
 ## Key Product Features
 
@@ -325,6 +327,7 @@ For production-grade models, offline training pipelines still need to be operate
 | [Architecture](docs/ARCHITECTURE.md) | Developers — modules and extension points |
 | [API Reference](docs/API_REFERENCE.md) | Developers — HTTP endpoints |
 | [Runbook](docs/RUNBOOK.md) | Ops — start, flags, troubleshooting |
+| [Robinhood MCP sync](docs/ROBINHOOD_MCP.md) | Live portfolio pull — no CSV |
 | [Scan evaluation harness](docs/SCAN_EVALUATION.md) | Quant — offline Stage A/B replay & forward-return labels |
 | [Deployment (Vercel + Render demo)](docs/DEPLOYMENT.md) | Free public demo — env vars, CORS, limits |
 | [Postgres migration](docs/POSTGRES_MIGRATION.md) | After demo — Neon, auth, per-user data |
@@ -335,9 +338,13 @@ For production-grade models, offline training pipelines still need to be operate
 | [Quant Stack](docs/QUANT_STACK.md) | Quant runtime split |
 | [Quant Integration Plan](docs/QUANT_INTEGRATION_PLAN.md) | Roadmap + implementation status |
 | [Institutional Quant Architecture](docs/INSTITUTIONAL_QUANT_ARCHITECTURE.md) | Target v2 engines, formulas, schema, roadmap |
-| **[Cursor Skills quick manual](docs/CURSOR_SKILLS.md)** | **Using `.cursor/skills/` workflows, personas, and commands in this repo** |
+| [Factor discovery audit (Quant Lab)](docs/quant-lab/factor-discovery-audit.md) | Pre-implementation audit for LLM-assisted factor research |
+| **[AGENTS.md](AGENTS.md)** | **AI agents — StockPick constraints, skill routing, completion checklist** |
+| [CONTEXT.md](CONTEXT.md) | Domain glossary (Scan, Quant Lab, Portfolio, research-integrity terms) |
+| **[Cursor Skills quick manual](docs/CURSOR_SKILLS.md)** | **Matt Pocock + `.cursor/skills/` workflows in this repo** |
 | [UI audit (revised)](docs/UI_AUDIT_REVISED.md) | Frontend redesign — findings, phases, guardrails |
 | [UI baseline (Phase 0)](docs/ui-baseline/BASELINE.md) | Validation baseline before design-system upgrade |
+| [Project inventory](docs/PROJECT_INVENTORY.md) | Routes, API-only features, sleeve map |
 
 ## Common Commands
 

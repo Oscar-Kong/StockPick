@@ -61,9 +61,9 @@ def _position_rows(
         item = decision_by_sym.get(sym)
         price = float(item.price) if item and item.price_available else None
         if price is None:
-            hist = ps.get_history(sym, period="5d")
-            if not hist.empty:
-                price = float(hist["close"].iloc[-1])
+            latest = ps.get_latest_price(sym)
+            if latest is not None:
+                price = latest
         market_value = shares * price if price is not None else None
         if market_value is None and item:
             market_value = float(item.market_value or 0) or None

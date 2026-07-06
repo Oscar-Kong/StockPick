@@ -3,15 +3,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-export type PortfolioTab = "today" | "research" | "activity";
+export type PortfolioTab = "today" | "plan" | "research" | "activity";
 
 export type ResearchPanel = "optimize" | "backtest" | "exposure" | "allocation";
 
-const TABS: PortfolioTab[] = ["today", "research", "activity"];
+const TABS: PortfolioTab[] = ["today", "plan", "activity", "research"];
 const RESEARCH_PANELS: ResearchPanel[] = ["optimize", "backtest", "exposure", "allocation"];
 
 export function parsePortfolioTab(raw: string | null): PortfolioTab {
-  if (raw === "research" || raw === "activity") return raw;
+  if (raw === "plan" || raw === "research" || raw === "activity") return raw;
   return "today";
 }
 

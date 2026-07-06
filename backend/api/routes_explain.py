@@ -12,7 +12,6 @@ router = APIRouter(prefix="/explain", tags=["explain"])
 
 SCREENERS = {
     Bucket.penny: PennyScreener,
-    Bucket.medium: PennyScreener,
     Bucket.compounder: CompounderScreener,
 }
 

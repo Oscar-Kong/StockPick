@@ -1,6 +1,7 @@
 "use client";
 
 import { QuantLabTrustBadge } from "./QuantLabTrustBadge";
+import { GlassPanel } from "@/components/ui/GlassPanel";
 import { StatTile } from "@/components/ui/StatTile";
 import {
   USER_TRIGGERED_LAST_RUN_IDS,
@@ -38,7 +39,7 @@ export function QuantLabLastRunCard({
   ];
 
   return (
-    <article className="app-card app-card--elevated flex h-full min-h-0 flex-col p-4 sm:p-5">
+    <GlassPanel as="article" variant="default" className="flex h-full min-h-0 flex-col">
       <div className="mb-4 flex min-w-0 items-start justify-between gap-2">
         <h3 className="min-w-0 text-sm font-semibold leading-snug text-zinc-100">{title}</h3>
         <QuantLabTrustBadge indicator={summary.trust_indicator} />
@@ -117,6 +118,6 @@ export function QuantLabLastRunCard({
           </PrimaryButton>
         )}
       </div>
-    </article>
+    </GlassPanel>
   );
 }

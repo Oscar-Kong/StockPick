@@ -18,7 +18,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Evaluate scan Stage A/B ranking offline (no production changes)",
     )
-    parser.add_argument("--bucket", required=True, help="penny | medium | compounder")
+    parser.add_argument("--bucket", required=True, help="penny | compounder")
     parser.add_argument("--start-date", required=True, help="YYYY-MM-DD")
     parser.add_argument("--end-date", required=True, help="YYYY-MM-DD")
     parser.add_argument(

@@ -81,7 +81,7 @@ export function ScanStatusPanel({
         <StatTile
           label={t.scan.resultCountLabel}
           value={
-            <span className="tabular-nums text-[#7dff8e]">
+            <span className="tabular-nums text-buy">
               {resultCount > 0 ? resultCount : "—"}
             </span>
           }
@@ -143,7 +143,7 @@ export function ScanStatusPanel({
         />
       </dl>
 
-      {(bucket === "penny" || bucket === "medium") && (
+      {bucket === "penny" && (
         <p className="mt-4 rounded-lg border border-amber-900/30 bg-amber-950/20 px-3 py-2 text-xs leading-relaxed text-amber-200/90">
           {t.scan.rescanHint}
         </p>

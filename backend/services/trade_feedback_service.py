@@ -70,9 +70,9 @@ def record_prediction_for_trade(
 ) -> dict[str, Any] | None:
     if not TRADE_FEEDBACK_ENABLED:
         return None
-    sleeve_val = (sleeve or infer_sleeve(symbol, setup_tags)).lower()
-    if sleeve_val not in ("penny", "medium", "compounder"):
-        sleeve_val = "medium"
+    from core.sleeve import normalize_sleeve
+
+    sleeve_val = normalize_sleeve(sleeve or infer_sleeve(symbol, setup_tags))
 
     from engines.prediction.snapshots import find_today_snapshot, link_trade_to_snapshot
 

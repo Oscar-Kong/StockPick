@@ -11,6 +11,7 @@ from config import (
     POSITION_SIZING_V2,
     SLEEVE_MAX_WEIGHT,
 )
+from core.sleeve import normalize_sleeve
 from engines.scoring.data_quality import dq_multiplier
 @dataclass
 class SizingResult:
@@ -27,10 +28,9 @@ class SizingResult:
 
 
 class PositionSizingEngine:
-    _STOP_ATR_MULT = {"penny": 2.5, "medium": 1.8, "compounder": 3.0}
+    _STOP_ATR_MULT = {"penny": 2.5, "compounder": 3.0}
     _STOP_BOUNDS = {
         "penny": (8.0, 20.0),
-        "medium": (5.0, 12.0),
         "compounder": (15.0, 35.0),
     }
 
@@ -49,7 +49,7 @@ class PositionSizingEngine:
         if not POSITION_SIZING_V2:
             return None
 
-        w_max = float(SLEEVE_MAX_WEIGHT.get(sleeve, 0.08))
+        w_max = float(SLEEVE_MAX_WEIGHT.get(normalize_sleeve(sleeve), 0.08))
         c = max(0.0, min(1.0, (final_score - 50.0) / 50.0))
         w_base = w_max * (c**2)
 
@@ -101,8 +101,9 @@ class PositionSizingEngine:
 
     @classmethod
     def _stop_loss_pct(cls, sleeve: str, history: pd.DataFrame | None) -> float:
-        mult = cls._STOP_ATR_MULT.get(sleeve, 1.8)
-        lo, hi = cls._STOP_BOUNDS.get(sleeve, (5.0, 12.0))
+        key = normalize_sleeve(sleeve)
+        mult = cls._STOP_ATR_MULT.get(key, 2.5)
+        lo, hi = cls._STOP_BOUNDS.get(key, (8.0, 20.0))
         atr = 5.0
         if history is not None and not getattr(history, "empty", True):
             try:

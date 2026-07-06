@@ -16,7 +16,7 @@ def _ts(hours_ago: float = 0) -> str:
 
 
 def test_fresh_prices_do_not_trigger_refresh():
-    ro._last_price_refresh_at = None
+    ro.portfolio_refresh._last_price_refresh_at = None
     with patch("services.refresh_orchestrator.assess_freshness") as assess:
         assess.return_value = DataFreshnessStatus(
             key="latest_prices",
@@ -32,7 +32,7 @@ def test_fresh_prices_do_not_trigger_refresh():
 
 
 def test_stale_prices_trigger_price_refresh():
-    ro._last_price_refresh_at = None
+    ro.portfolio_refresh._last_price_refresh_at = None
     with patch("services.refresh_orchestrator.assess_freshness") as assess:
         assess.return_value = DataFreshnessStatus(key="latest_prices", is_stale=True)
         with patch("services.refresh_orchestrator.get_current_holdings", return_value=[{"symbol": "AMC"}]):
@@ -57,11 +57,11 @@ def test_stale_holdings_trigger_decision_refresh_chain():
             return DataFreshnessStatus(key=key, is_stale=False)
 
         assess.side_effect = _side
-        with patch.object(ro, "_refresh_holdings", return_value={"holdings": 2}) as rh:
-            with patch.object(ro, "refresh_prices_for_holdings", return_value={"skipped": True}):
-                with patch.object(ro, "refresh_penny_scan_if_needed", return_value={"skipped": True}):
-                    with patch.object(ro, "refresh_daily_decision_if_needed", return_value={"status": "ok"}) as rd:
-                        with patch.object(ro, "mark_freshness_updated"):
+        with patch.object(ro.portfolio_refresh, "_refresh_holdings", return_value={"holdings": 2}) as rh:
+            with patch.object(ro.portfolio_refresh, "refresh_prices_for_holdings", return_value={"skipped": True}):
+                with patch.object(ro.portfolio_refresh, "refresh_penny_scan_if_needed", return_value={"skipped": True}):
+                    with patch.object(ro.portfolio_refresh, "refresh_daily_decision_if_needed", return_value={"status": "ok"}) as rd:
+                        with patch("services.refresh_orchestrator.mark_freshness_updated"):
                             result = ro._execute_home_refresh(force=False)
     assert rh.called
     assert rd.called
@@ -106,28 +106,28 @@ def test_home_dashboard_returns_cached_data_quickly():
 
 
 def test_background_refresh_does_not_duplicate_jobs():
-    ro._home_refresh_running = False
-    ro._active_home_job_id = None
-    ro._refresh_started_at = None
+    ro.portfolio_refresh._home_refresh_running = False
+    ro.portfolio_refresh._active_home_job_id = None
+    ro.portfolio_refresh._refresh_started_at = None
     gate = threading.Event()
 
     def _slow_refresh(*args, **kwargs):
         gate.wait(timeout=2)
         return {"status": "ok", "steps": {}}
 
-    with patch.object(ro, "_execute_home_refresh", side_effect=_slow_refresh):
+    with patch.object(ro.portfolio_refresh, "_execute_home_refresh", side_effect=_slow_refresh):
         first = ro.start_home_refresh_async(force=False)
         second = ro.start_home_refresh_async(force=False)
     assert first is not None
     assert second is None
     gate.set()
-    ro._home_refresh_running = False
-    ro._active_home_job_id = None
-    ro._refresh_started_at = None
+    ro.portfolio_refresh._home_refresh_running = False
+    ro.portfolio_refresh._active_home_job_id = None
+    ro.portfolio_refresh._refresh_started_at = None
 
 
 def test_manual_force_refresh_bypasses_ttl():
-    with patch.object(ro, "_price_ttl_ok", return_value=True):
+    with patch.object(ro.portfolio_refresh, "_price_ttl_ok", return_value=True):
         with patch("services.refresh_orchestrator.get_current_holdings", return_value=[{"symbol": "AMC"}]):
             with patch("services.refresh_orchestrator.PriceService") as ps_cls:
                 ps_cls.return_value.get_history.return_value = MagicMock(empty=False)
@@ -139,7 +139,7 @@ def test_manual_force_refresh_bypasses_ttl():
 def test_no_medium_bucket_refresh():
     with patch.object(dfs, "assess_freshness") as assess:
         assess.return_value = DataFreshnessStatus(key="penny_scan", is_stale=True)
-        with patch("services.refresh_orchestrator.scan_manager") as sm:
+        with patch("services.refresh_orchestrator.scan_service") as sm:
             sm.create_job.return_value = MagicMock(job_id="j1", results=[])
             with patch("services.refresh_orchestrator.mark_freshness_updated"):
                 ro.refresh_penny_scan_if_needed(force=True)
@@ -207,7 +207,7 @@ def test_compounder_stale_does_not_make_home_stale():
 
 def test_penny_scan_refresh_is_non_blocking():
     with patch.object(dfs, "assess_freshness", return_value=DataFreshnessStatus(key="penny_scan", is_stale=True)):
-        with patch("services.refresh_orchestrator.scan_manager") as sm:
+        with patch("services.refresh_orchestrator.scan_service") as sm:
             sm.create_job.return_value = MagicMock(job_id="j1", results=[])
             with patch("services.refresh_orchestrator.threading.Thread") as thread_cls:
                 thread_cls.return_value.start = MagicMock()

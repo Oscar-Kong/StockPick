@@ -7,13 +7,10 @@ import pandas as pd
 
 from scoring.fundamental import revenue_eps_consistency_score, roic_margin_stability_score
 from scoring.technical import (
-    adx_score,
     bollinger_lower_touch_score,
-    breakout_score,
     golden_cross_score,
     macd_rsi_confluence_score,
     momentum_score,
-    relative_strength_vs_spy,
     trend_score,
     volume_spike_score,
 )
@@ -25,9 +22,6 @@ ENTRY_VARIANT_LABELS: dict[tuple[str, str], str] = {
     ("penny", "default"): "Momentum + volume (default)",
     ("penny", "macd_rsi"): "MACD + RSI confluence",
     ("penny", "bollinger_revert"): "Bollinger lower-band bounce",
-    ("medium", "default"): "Trend / breakout + RS vs SPY",
-    ("medium", "adx_trend"): "ADX-confirmed trend + RS",
-    ("medium", "dual_ma"): "Dual MA (50/200) + breakout",
     ("compounder", "default"): "Uptrend (SMA50 proxy)",
     ("compounder", "quality_momentum"): "Quality gate + trend",
     ("compounder", "golden_cross"): "Golden cross + trend",
@@ -52,25 +46,6 @@ def _penny_macd_rsi(window: pd.DataFrame, _spy: pd.DataFrame, _idx: int) -> bool
 
 def _penny_bollinger(window: pd.DataFrame, _spy: pd.DataFrame, _idx: int) -> bool:
     return bollinger_lower_touch_score(window) >= 70 and volume_spike_score(window) >= 55
-
-
-def _medium_default(window: pd.DataFrame, spy_window: pd.DataFrame, _idx: int) -> bool:
-    t = trend_score(window)
-    b = breakout_score(window)
-    rs = relative_strength_vs_spy(window, spy_window, days=20)
-    return (t >= 60 or b >= 70) and rs >= 55
-
-
-def _medium_adx(window: pd.DataFrame, spy_window: pd.DataFrame, _idx: int) -> bool:
-    return (
-        adx_score(window) >= 60
-        and trend_score(window) >= 55
-        and relative_strength_vs_spy(window, spy_window, days=20) >= 50
-    )
-
-
-def _medium_dual_ma(window: pd.DataFrame, spy_window: pd.DataFrame, _idx: int) -> bool:
-    return golden_cross_score(window) >= 55 and relative_strength_vs_spy(window, spy_window, days=20) >= 52
 
 
 def _compounder_default(window: pd.DataFrame, _spy: pd.DataFrame, _idx: int) -> bool:
@@ -102,9 +77,6 @@ _REGISTRY: dict[tuple[str, str], EntryFn] = {
     ("penny", "default"): _penny_default,
     ("penny", "macd_rsi"): _penny_macd_rsi,
     ("penny", "bollinger_revert"): _penny_bollinger,
-    ("medium", "default"): _medium_default,
-    ("medium", "adx_trend"): _medium_adx,
-    ("medium", "dual_ma"): _medium_dual_ma,
     ("compounder", "default"): _compounder_default,
     ("compounder", "golden_cross"): _compounder_golden_cross,
 }
@@ -118,6 +90,9 @@ def get_entry_fn(
     fundamentals: dict | None = None,
 ) -> tuple[EntryFn, str]:
     """Resolve entry function; compounder quality_momentum needs fundamentals closure."""
+    from core.sleeve import normalize_sleeve
+
+    bucket = normalize_sleeve(bucket)
     vid = (variant or "default").strip().lower()
     if bucket == "compounder" and vid == "quality_momentum":
 

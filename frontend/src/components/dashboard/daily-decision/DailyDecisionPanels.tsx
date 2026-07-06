@@ -6,18 +6,39 @@ import { useTranslation } from "@/lib/i18n";
 import { AppCard, SectionCard } from "@/components/ui/AppCard";
 import { GhostButton, PrimaryButton } from "@/components/ui/buttons";
 
-export function EmptyPortfolioState({ onImportClick }: { onImportClick: () => void }) {
+export function EmptyPortfolioState({
+  onImportClick,
+  robinhoodAuthenticated,
+  onSyncRobinhood,
+}: {
+  onImportClick?: () => void;
+  robinhoodAuthenticated?: boolean;
+  onSyncRobinhood?: () => void;
+}) {
   const { t } = useTranslation();
+  const useRobinhood = Boolean(robinhoodAuthenticated && onSyncRobinhood);
   return (
     <AppCard variant="ghost" className="px-6 py-14 text-center md:px-10">
-      <h2 className="text-xl font-semibold tracking-tight text-zinc-50">{t.home.dailyEmptyTitle}</h2>
-      <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-secondary">{t.home.dailyEmptyDescription}</p>
+      <h2 className="text-xl font-semibold tracking-tight text-zinc-50">
+        {useRobinhood ? t.home.dailyEmptyRobinhoodTitle : t.home.dailyEmptyTitle}
+      </h2>
+      <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-secondary">
+        {useRobinhood ? t.home.dailyEmptyRobinhoodDescription : t.home.dailyEmptyDescription}
+      </p>
       <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-        <PrimaryButton onClick={onImportClick} className="rounded-xl">
-          {t.home.dailyImportCsv}
-        </PrimaryButton>
+        {useRobinhood ? (
+          <PrimaryButton onClick={onSyncRobinhood} className="rounded-xl">
+            {t.portfolio.robinhoodLiveSyncShort}
+          </PrimaryButton>
+        ) : (
+          onImportClick && (
+            <PrimaryButton onClick={onImportClick} className="rounded-xl">
+              {t.home.dailyImportCsv}
+            </PrimaryButton>
+          )
+        )}
       </div>
-      <p className="mt-5 text-sm text-secondary">{t.home.dailyCsvWhereHint}</p>
+      {!useRobinhood && <p className="mt-5 text-sm text-secondary">{t.home.dailyCsvWhereHint}</p>}
     </AppCard>
   );
 }
@@ -220,7 +241,7 @@ export function PennyOpportunitiesPanel({ items }: { items: PennyOpportunityItem
         {items.map((p) => (
           <li key={p.symbol} className="rounded-xl border border-white/5 px-3 py-3">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <Link href={`/workspace?symbol=${p.symbol}`} className="font-semibold text-primary hover:underline">
+              <Link href={`/workspace?symbol=${p.symbol}`} className="text-symbol hover:underline">
                 {p.symbol}
               </Link>
               <span className="finance-value text-xs text-tertiary">

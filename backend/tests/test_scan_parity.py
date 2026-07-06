@@ -38,7 +38,7 @@ def test_top_factor_contributions_sorted_by_abs():
 
 
 def test_build_stage_b_parity_record_per_bucket():
-    for bucket in (Bucket.penny, Bucket.medium, Bucket.compounder):
+    for bucket in (Bucket.penny, Bucket.compounder):
         record = build_stage_b_parity_record(
             symbol=f"TST{bucket.value[:2].upper()}",
             sleeve=bucket.value,
@@ -59,7 +59,7 @@ def test_aggregate_scan_parity_summary_metrics():
     records = [
         StageBParityRecord(
             symbol="A",
-            sleeve="medium",
+            sleeve="penny",
             legacy_score=81.0,
             engine_score=70.0,
             parity_delta=11.0,
@@ -70,7 +70,7 @@ def test_aggregate_scan_parity_summary_metrics():
         ),
         StageBParityRecord(
             symbol="B",
-            sleeve="medium",
+            sleeve="penny",
             legacy_score=60.0,
             engine_score=60.0,
             parity_delta=0.0,
@@ -81,7 +81,7 @@ def test_aggregate_scan_parity_summary_metrics():
         ),
         StageBParityRecord(
             symbol="C",
-            sleeve="medium",
+            sleeve="penny",
             legacy_score=55.0,
             engine_score=40.0,
             parity_delta=15.0,

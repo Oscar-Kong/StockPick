@@ -49,7 +49,6 @@ logger = logging.getLogger(__name__)
 
 _SCREENERS = {
     "penny": PennyScreener,
-    "medium": PennyScreener,
     "compounder": CompounderScreener,
 }
 

@@ -8,7 +8,7 @@ from models.schemas import (
     HomeRefreshResponse,
     HomeRefreshStatusResponse,
 )
-from services.home_dashboard_service import build_daily_dashboard
+from services.portfolio_cockpit_service import get_today_view
 from services.refresh_orchestrator import (
     get_active_home_job_id,
     get_refresh_job,
@@ -53,7 +53,7 @@ def _attach_auto_refresh(dashboard: DailyDashboardResponse) -> DailyDashboardRes
 
 @router.get("/daily-dashboard", response_model=DailyDashboardResponse)
 def daily_dashboard(skip_auto_refresh: bool = Query(False, description="Poll without starting another background refresh")):
-    dashboard = build_daily_dashboard(include_freshness=True)
+    dashboard = get_today_view(include_freshness=True)
     if skip_auto_refresh:
         return dashboard
     return _attach_auto_refresh(dashboard)

@@ -12,7 +12,7 @@ def test_rule_based_pick_summary():
 
     out = generate_scan_pick_summary(
         symbol="AAPL",
-        bucket="medium",
+        bucket="penny",
         score=72.5,
         summary="Apple Inc — consumer electronics.",
         signals=[{"name": "rs_vs_spy", "value": 80, "contribution": 12}],

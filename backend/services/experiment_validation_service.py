@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Any
 
-from config import DEMO_MODE, SCORE_ENGINE_V2_ENABLED
+from config import DEMO_MODE, FACTOR_DISCOVERY_ENABLED, SCORE_ENGINE_V2_ENABLED
 from models.schemas_research import ExperimentValidateRequest, ExperimentValidationCheck, ExperimentValidationResponse
 from services.experiment_presets_service import merge_parameters, preset_allows_major_evidence, TEMPLATE_META
 from services.experiment_universe_service import resolve_universe
@@ -48,6 +48,18 @@ def _default_hypotheses(experiment_type: str) -> tuple[str, str, str, str]:
             "Positive excess return with controlled drawdown and turnover.",
             "Drawdown or costs erase gross spread.",
         ),
+        "scan_evaluation": (
+            "Historical scan algorithms capture high-forward-return names in Stage A recall.",
+            "Stage A recall is no better than alphabetical baseline.",
+            "Recall@K and rank IC exceed baseline with stable rebalance counts.",
+            "Recall flat vs baseline or insufficient rebalance dates.",
+        ),
+        "factor_discovery": (
+            "Proposed factor shows positive rank IC in discovery and validation windows.",
+            "Factor IC is indistinguishable from noise.",
+            "Sealed-test rank IC positive with adequate sample.",
+            "Sealed-test fails or discovery overfits validation.",
+        ),
     }
     return defaults.get(
         experiment_type,
@@ -77,6 +89,19 @@ def validate_experiment(body: ExperimentValidateRequest) -> ExperimentValidation
                 detail="Some persistence and symbol limits apply.",
             )
         )
+
+    if exp_type == "factor_discovery":
+        dependencies["factor_discovery"] = bool(FACTOR_DISCOVERY_ENABLED)
+        if not bool(FACTOR_DISCOVERY_ENABLED):
+            checks.append(
+                ExperimentValidationCheck(
+                    key="factor_discovery_enabled",
+                    label="Factor discovery",
+                    status="error",
+                    detail="FACTOR_DISCOVERY_ENABLED is false — launch is disabled in this release.",
+                )
+            )
+        limitations.append("Factor discovery engine is not implemented in this release.")
 
     if exp_type == "prediction_calibration" and not bool(SCORE_ENGINE_V2_ENABLED):
         dependencies["score_engine_v2"] = False
@@ -129,7 +154,12 @@ def validate_experiment(body: ExperimentValidateRequest) -> ExperimentValidation
                 )
             )
 
-    if symbol_count < min_symbols and exp_type not in ("prediction_calibration", "factor_validation"):
+    if symbol_count < min_symbols and exp_type not in (
+        "prediction_calibration",
+        "factor_validation",
+        "scan_evaluation",
+        "factor_discovery",
+    ):
         checks.append(
             ExperimentValidationCheck(
                 key="symbol_count",
@@ -173,9 +203,27 @@ def validate_experiment(body: ExperimentValidateRequest) -> ExperimentValidation
                 )
             )
 
-    if exp_type in ("walk_forward", "factor_validation"):
+    if exp_type in ("walk_forward", "factor_validation", "scan_evaluation"):
         start = merged.get("start_date")
         end = merged.get("end_date")
+        if exp_type == "scan_evaluation":
+            if body.sleeve:
+                merged["sleeve"] = body.sleeve
+                merged["bucket"] = body.sleeve
+            from services.scan_evaluation_experiment_runner import validate_scan_evaluation_params
+
+            for err in validate_scan_evaluation_params(merged):
+                checks.append(
+                    ExperimentValidationCheck(
+                        key="scan_eval_params",
+                        label="Scan evaluation parameters",
+                        status="error",
+                        detail=err,
+                    )
+                )
+            limitations.append(
+                "Evaluation experiments do not automatically modify the production scan configuration."
+            )
         if not start or not end:
             today = date.today()
             merged.setdefault("end_date", today.isoformat())

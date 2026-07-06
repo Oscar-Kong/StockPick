@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Any
 
-from config import DEMO_MODE, SCORE_ENGINE_V2_ENABLED
+from config import DEMO_MODE, FACTOR_DISCOVERY_ENABLED, SCORE_ENGINE_V2_ENABLED
 from models.schemas_research import ExperimentLaunchResponse, ExperimentValidateRequest
 from services.experiment_job_service import (
     complete_stage,
@@ -50,6 +50,21 @@ def launch_experiment(experiment_id: str) -> ExperimentLaunchResponse:
             message="A job is already running for this experiment.",
         )
 
+    if exp.experiment_type == "factor_discovery" and not bool(FACTOR_DISCOVERY_ENABLED):
+        job = create_job(experiment_id, experiment_type=exp.experiment_type)
+        fail_job(
+            job.job_id,
+            "validating",
+            "Factor discovery is not enabled (FACTOR_DISCOVERY_ENABLED=false).",
+            preserve_last_success=False,
+        )
+        return ExperimentLaunchResponse(
+            job_id=job.job_id,
+            experiment_id=experiment_id,
+            status="failed",
+            message="Factor discovery is not enabled in this release.",
+        )
+
     validation = validate_experiment(
         ExperimentValidateRequest(
             experiment_type=exp.experiment_type,
@@ -66,7 +81,7 @@ def launch_experiment(experiment_id: str) -> ExperimentLaunchResponse:
     if not validation.can_run:
         raise ValueError("experiment validation failed — cannot run")
 
-    job = create_job(experiment_id)
+    job = create_job(experiment_id, experiment_type=exp.experiment_type)
     _EXECUTOR.submit(_run_job, job.job_id, experiment_id)
     return ExperimentLaunchResponse(
         job_id=job.job_id,
@@ -117,18 +132,22 @@ def _run_job(job_id: str, experiment_id: str) -> None:
         mark_stage(job_id, "loading_prices", "running")
         complete_stage(job_id, "loading_prices", "Price panel deferred to engine")
 
-        mark_stage(job_id, "calculating_features", "running")
-        complete_stage(job_id, "calculating_features", "Features calculated by engine")
+        if exp.experiment_type == "scan_evaluation":
+            run_id = _run_scan_evaluation(exp, symbols, merged, job_id)
+            complete_stage(job_id, "evaluating_reliability", "Reliability evaluated")
+        else:
+            mark_stage(job_id, "calculating_features", "running")
+            complete_stage(job_id, "calculating_features", "Features calculated by engine")
 
-        mark_stage(job_id, "running_analysis", "running")
-        run_id = _dispatch_experiment(exp, symbols, merged, job_id)
-        complete_stage(job_id, "running_analysis", f"Analysis complete: {run_id}")
+            mark_stage(job_id, "running_analysis", "running")
+            run_id = _dispatch_experiment(exp, symbols, merged, job_id)
+            complete_stage(job_id, "running_analysis", f"Analysis complete: {run_id}")
 
-        mark_stage(job_id, "calculating_outcomes", "running")
-        complete_stage(job_id, "calculating_outcomes", "Outcomes calculated")
+            mark_stage(job_id, "calculating_outcomes", "running")
+            complete_stage(job_id, "calculating_outcomes", "Outcomes calculated")
 
-        mark_stage(job_id, "evaluating_reliability", "running")
-        complete_stage(job_id, "evaluating_reliability", "Reliability evaluated")
+            mark_stage(job_id, "evaluating_reliability", "running")
+            complete_stage(job_id, "evaluating_reliability", "Reliability evaluated")
 
         mark_stage(job_id, "persisting_result", "running")
         if run_id:
@@ -176,7 +195,106 @@ def _dispatch_experiment(
         return _run_similar_signal(exp, symbols, merged)
     if exp_type == "portfolio_policy":
         return _run_portfolio_policy(exp, symbols, merged)
+    if exp_type == "scan_evaluation":
+        raise ValueError("scan_evaluation must use _run_scan_evaluation from _run_job")
+    if exp_type == "factor_discovery":
+        return _run_factor_discovery(exp, merged, job_id)
     raise ValueError(f"unsupported experiment type: {exp_type}")
+
+
+_SCAN_RUNNER_STAGE_MAP: dict[str, str] = {
+    "preparing_universe": "preparing_universe",
+    "replaying_scans": "replaying_scans",
+    "comparing_algorithms": "replaying_scans",
+    "loading_historical_data": "loading_prices",
+    "calculating_forward_outcomes": "calculating_forward_outcomes",
+}
+
+
+def _run_scan_evaluation(exp: Any, symbols: list[str], merged: dict[str, Any], job_id: str) -> str:
+    from services.scan_evaluation_experiment_runner import ScanEvaluationExperimentRunner
+
+    bucket = str(merged.get("bucket") or exp.sleeve or "penny")
+    merged = {**merged, "bucket": bucket, "sleeve": bucket}
+
+    def on_stage(stage: str, status: str, message: str) -> None:
+        mapped = _SCAN_RUNNER_STAGE_MAP.get(stage, stage)
+        if status == "running":
+            mark_stage(job_id, mapped, "running", message)
+        elif status == "completed":
+            complete_stage(job_id, mapped, message)
+
+    mark_stage(job_id, "preparing_universe", "running", "Preparing evaluation universe")
+    payload = ScanEvaluationExperimentRunner().run(bucket=bucket, merged=merged, on_stage=on_stage)
+    complete_stage(job_id, "preparing_universe", "Universe prepared")
+
+    mark_stage(job_id, "generating_charts", "running", "Building chart artifacts")
+    complete_stage(job_id, "generating_charts", "Charts generated")
+
+    run_id = str(payload["run_id"])
+    now = _utcnow()
+    from data.db_engine import get_engine
+    from engines.quant_models import BacktestRun
+    from sqlalchemy.orm import Session
+
+    engine = get_engine()
+    with Session(engine) as session:
+        existing = session.get(BacktestRun, run_id)
+        if not existing:
+            row = BacktestRun(
+                run_id=run_id,
+                run_type="scan_evaluation",
+                config_json=json.dumps(
+                    {
+                        "experiment_id": exp.id,
+                        "parameters": merged,
+                        "sleeve": bucket,
+                        "symbols_resolved": len(symbols),
+                    }
+                ),
+                metrics_json=json.dumps(payload),
+                started_at=now,
+                finished_at=now,
+            )
+            session.add(row)
+            session.commit()
+
+    notify_run_persisted(run_id, store="backtest_runs")
+    return run_id
+
+
+def _run_factor_discovery(exp: Any, merged: dict[str, Any], job_id: str) -> str:
+    from models.schemas_factor_discovery import DiscoveryPeriodSplit
+    from engines.factor.discovery.validation_models import FactorValidationConfig
+    from services.factor_discovery.experiment_runner import FactorDiscoveryExperimentRunner, FactorDiscoveryRunRequest
+
+    period = DiscoveryPeriodSplit.model_validate(merged["period_split"])
+    vconfig = FactorValidationConfig.model_validate(merged.get("validation_config") or {})
+    runner = FactorDiscoveryExperimentRunner()
+
+    def on_stage(stage: str, status: str, message: str) -> None:
+        if status == "running":
+            mark_stage(job_id, stage, "running", message or stage)
+        elif status == "completed":
+            complete_stage(job_id, stage, message or stage)
+
+    result = runner.run(
+        FactorDiscoveryRunRequest(
+            experiment_id=exp.id,
+            job_id=job_id,
+            factor_id=str(merged["factor_id"]),
+            factor_version=str(merged["factor_version"]),
+            research_family_id=str(merged["research_family_id"]),
+            period_split=period,
+            validation_config=vconfig,
+            created_by=str(merged.get("created_by") or "system"),
+            idempotency_key=merged.get("idempotency_key"),
+            declared_family_size=merged.get("declared_family_size"),
+            validation_config_family_id=str(merged.get("validation_config_family_id") or "default_v1"),
+        ),
+        on_stage=on_stage,
+    )
+    return str(result["run_id"])
 
 
 def _run_walk_forward(exp: Any, symbols: list[str], merged: dict[str, Any]) -> str:

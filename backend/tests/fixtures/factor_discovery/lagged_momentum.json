@@ -1,0 +1,18 @@
+{
+  "kind": "CROSS_SECTIONAL",
+  "op": "PERCENTILE_RANK",
+  "child": {
+    "kind": "ROLLING",
+    "op": "PCT_CHANGE",
+    "window": 126,
+    "child": {
+      "kind": "ROLLING",
+      "op": "LAG",
+      "window": 1,
+      "child": {
+        "kind": "FIELD",
+        "field_id": "adjusted_close"
+      }
+    }
+  }
+}

@@ -221,7 +221,7 @@ function LibraryContent() {
                             <td className="py-2">
                               <Link
                                 href={`/workspace?symbol=${x.symbol}`}
-                                className="text-primary underline text-xs"
+                                className="text-buy underline text-xs"
                               >
                                 {t.library.openInWorkspace}
                               </Link>
@@ -257,7 +257,7 @@ function LibraryContent() {
                     <td className="py-2">{s.bucket}</td>
                     <td className="py-2 tabular-nums">{s.score?.toFixed(1) ?? "—"}</td>
                     <td className="py-2">
-                      <Link href={`/workspace?symbol=${s.symbol}`} className="text-primary underline text-xs">
+                      <Link href={`/workspace?symbol=${s.symbol}`} className="text-buy underline text-xs">
                         {t.library.openInWorkspace}
                       </Link>
                     </td>

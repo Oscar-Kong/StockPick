@@ -12,7 +12,7 @@
   --color-surface: #111317;
   --color-surface-raised: #16191e;
   --color-surface-hover: #1a1e24;
-  --color-surface-selected: #172033;
+  --color-surface-selected: #1f160c;
 
   --color-foreground: #f4f6f8;
   --color-foreground-secondary: #c7cdd6;
@@ -23,15 +23,26 @@
   --color-border-strong: #353c47;
   --color-divider: #20242b;
 
-  --color-primary: #3b82f6;
-  --color-primary-hover: #60a5fa;
-  --color-primary-active: #2563eb;
-  --color-primary-subtle: rgba(59, 130, 246, 0.14);
+  /* McLaren papaya orange — navigation, tabs, links, selection */
+  --color-primary: #ff8700;
+  --color-primary-hover: #ffa040;
+  --color-primary-active: #e67500;
+  --color-primary-subtle: rgba(255, 135, 0, 0.14);
   --color-on-primary: #ffffff;
 
   --color-buy: #22c55e;
   --color-buy-hover: #4ade80;
+  --color-buy-active: #16a34a;
   --color-buy-subtle: rgba(34, 197, 94, 0.14);
+  --color-on-buy: #ffffff;
+
+  /* Matte emerald workflow CTAs — matches portfolio value strip */
+  --color-action: #6ee7a8;
+  --color-action-hover: #84eeb6;
+  --color-action-active: #58d892;
+  --color-action-surface: color-mix(in oklab, #50c878 9%, var(--color-surface));
+  --color-action-surface-hover: color-mix(in oklab, #50c878 13%, var(--color-surface));
+  --color-action-border: color-mix(in oklab, #50c878 28%, var(--color-border));
 
   --color-hold: #f59e0b;
   --color-hold-hover: #fbbf24;
@@ -44,7 +55,7 @@
   --color-info: #38bdf8;
   --color-info-subtle: rgba(56, 189, 248, 0.14);
 
-  --color-ring: #60a5fa;
+  --color-ring: #ff9500;
   --color-overlay: rgba(0, 0, 0, 0.72);
 
   /* —— Legacy aliases (Phase 6 removal) —— */
@@ -83,7 +94,7 @@
   --color-surface: #ffffff;
   --color-surface-raised: #ffffff;
   --color-surface-hover: #f6f8fa;
-  --color-surface-selected: #eff6ff;
+  --color-surface-selected: #fff4e8;
 
   --color-foreground: #111318;
   --color-foreground-secondary: #3d4652;
@@ -94,15 +105,24 @@
   --color-border-strong: #c9d0d8;
   --color-divider: #e7eaee;
 
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
-  --color-primary-active: #1e40af;
-  --color-primary-subtle: rgba(37, 99, 235, 0.1);
+  --color-primary: #ea7000;
+  --color-primary-hover: #ff8700;
+  --color-primary-active: #c95800;
+  --color-primary-subtle: rgba(234, 112, 0, 0.12);
   --color-on-primary: #ffffff;
 
   --color-buy: #15803d;
-  --color-buy-hover: #166534;
+  --color-buy-hover: #16a34a;
+  --color-buy-active: #14532d;
   --color-buy-subtle: rgba(21, 128, 61, 0.1);
+  --color-on-buy: #ffffff;
+
+  --color-action: #16a34a;
+  --color-action-hover: #15803d;
+  --color-action-active: #14532d;
+  --color-action-surface: color-mix(in oklab, #22c55e 8%, var(--color-surface));
+  --color-action-surface-hover: color-mix(in oklab, #22c55e 12%, var(--color-surface));
+  --color-action-border: color-mix(in oklab, #22c55e 26%, var(--color-border));
 
   --color-hold: #b45309;
   --color-hold-hover: #92400e;
@@ -115,7 +135,7 @@
   --color-info: #0369a1;
   --color-info-subtle: rgba(3, 105, 161, 0.1);
 
-  --color-ring: #2563eb;
+  --color-ring: #ea7000;
   --color-overlay: rgba(15, 23, 42, 0.55);
 
   --background: var(--color-background);
@@ -178,6 +198,7 @@ body {
 
 /* Shared keyboard focus ring — :focus-visible only (no pointer outlines) */
 .btn-primary:focus-visible,
+.btn-action:focus-visible,
 .btn-secondary:focus-visible,
 .btn-ghost:focus-visible,
 .app-tab:focus-visible,
@@ -229,6 +250,21 @@ body {
 }
 
 .text-buy {
+  color: var(--color-buy);
+}
+
+/* Stock symbols and deep-linked ticker names */
+.text-symbol {
+  color: var(--color-buy);
+  font-weight: 600;
+}
+
+a.text-symbol:hover,
+button.text-symbol:hover {
+  color: var(--color-buy-hover);
+}
+
+.text-stat {
   color: var(--color-buy);
 }
 
@@ -448,6 +484,43 @@ body::before {
   cursor: not-allowed;
 }
 
+/* Matte emerald workflow CTAs — Run scan, Run daily decision */
+.btn-action {
+  background: var(--color-action-surface);
+  color: var(--color-action);
+  border: 1px solid var(--color-action-border);
+  border-radius: 624rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  box-shadow: none;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.btn-action:hover:not(:disabled) {
+  background: var(--color-action-surface-hover);
+  color: var(--color-action-hover);
+  border-color: color-mix(in oklab, var(--color-action) 32%, var(--color-border));
+}
+
+.btn-action:active:not(:disabled) {
+  background: color-mix(in oklab, var(--color-action) 8%, var(--color-surface));
+  color: var(--color-action-active);
+  border-color: color-mix(in oklab, var(--color-action-active) 28%, var(--color-border));
+}
+
+.btn-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-action:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--color-action) 45%, transparent);
+  outline-offset: 2px;
+}
+
 .btn-secondary {
   background: color-mix(in oklab, var(--surface-elevated) 95%, transparent);
   color: var(--foreground);
@@ -501,6 +574,12 @@ body::before {
   color: color-mix(in oklab, var(--foreground) 38%, transparent);
 }
 
+.input-field--dense {
+  padding: 0.375rem 0.5rem;
+  font-size: 0.8125rem;
+  border-radius: 0.5rem;
+}
+
 .chip {
   background: color-mix(in oklab, var(--surface-muted) 88%, black 12%);
   border: 1px solid var(--surface-border);
@@ -517,12 +596,56 @@ body::before {
 }
 
 .analysis-toolbar {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 1rem;
   padding: 1rem 1.25rem;
   border-bottom: 1px solid var(--surface-border);
-  background: color-mix(in oklab, var(--surface-muted) 55%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--color-surface-raised) 88%, transparent) 0%,
+      color-mix(in oklab, var(--color-surface) 92%, transparent) 100%
+    );
+  overflow: hidden;
+}
+
+.analysis-toolbar::before,
+.analysis-toolbar::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  border-radius: 50%;
+}
+
+.analysis-toolbar::before {
+  top: -55%;
+  left: -8%;
+  width: 42%;
+  height: 140%;
+  background: radial-gradient(
+    ellipse,
+    color-mix(in oklab, var(--color-primary) 14%, transparent) 0%,
+    transparent 72%
+  );
+}
+
+.analysis-toolbar::after {
+  top: -35%;
+  right: -6%;
+  width: 36%;
+  height: 120%;
+  background: radial-gradient(
+    ellipse,
+    color-mix(in oklab, var(--color-buy) 8%, transparent) 0%,
+    transparent 68%
+  );
+}
+
+.analysis-toolbar > * {
+  position: relative;
+  z-index: 1;
 }
 
 .analysis-toolbar__head {
@@ -929,7 +1052,12 @@ body::before {
   flex-direction: column;
   overflow: hidden;
   border-right: 1px solid var(--surface-border);
-  background: color-mix(in oklab, var(--surface-muted) 80%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--color-surface-raised) 92%, transparent) 0%,
+      color-mix(in oklab, var(--color-surface) 88%, transparent) 100%
+    );
 }
 
 @media (min-width: 1280px) {
@@ -982,14 +1110,25 @@ body::before {
   border-right: 1px solid var(--surface-border);
 }
 
-.watchlist-rail-scroll {
+.watchlist-rail-scroll,
+.watchlist-rail__scroll {
+  min-height: 0;
+  flex: 1 1 0;
+  overflow-y: auto;
   overscroll-behavior: contain;
 }
 
 .analysis-rail {
   min-height: 0;
   overflow-y: auto;
-  background: color-mix(in oklab, var(--background) 70%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--color-background) 82%, transparent) 0%,
+      color-mix(in oklab, var(--color-surface) 70%, transparent) 100%
+    );
+  border-left: 1px solid color-mix(in oklab, var(--color-primary) 8%, var(--surface-border));
+  box-shadow: inset 1px 0 0 color-mix(in oklab, white 3%, transparent);
 }
 
 .analysis-chart-box {
@@ -1003,11 +1142,13 @@ body::before {
   flex-direction: column;
   gap: 0.375rem;
   min-width: 0;
+  border-bottom: 1px solid var(--surface-border);
+  padding-bottom: 0.125rem;
 }
 
 .analysis-tab-nav-scroll {
   display: flex;
-  gap: 0.75rem;
+  gap: 0.875rem;
   overflow-x: auto;
   padding-bottom: 0.125rem;
   scrollbar-width: thin;
@@ -1017,50 +1158,97 @@ body::before {
 .analysis-tab-group {
   display: flex;
   flex-shrink: 0;
-  align-items: center;
-  gap: 0.375rem;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.analysis-tab-group-sep {
+  width: 1px;
+  height: 1.5rem;
+  margin: 0 0.125rem 0.375rem;
+  background: color-mix(in oklab, var(--foreground) 12%, transparent);
 }
 
 .analysis-tab-group-label {
+  flex-shrink: 0;
   font-size: 0.625rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: color-mix(in oklab, var(--foreground) 38%, transparent);
-  padding-right: 0.25rem;
+  color: color-mix(in oklab, var(--foreground) 42%, transparent);
+  padding: 0 0.125rem 0.5rem;
 }
 
 .analysis-tab-group-items {
   display: flex;
-  gap: 0.25rem;
-  padding: 0.125rem;
-  border-radius: 0.625rem;
-  border: 1px solid var(--surface-border);
-  background: color-mix(in oklab, var(--background) 88%, transparent);
+  gap: 0.125rem;
+}
+
+.analysis-tab-group-items--underline {
+  gap: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 
 .analysis-tab-pill {
+  position: relative;
   flex-shrink: 0;
   scroll-snap-align: start;
-  border-radius: 0.5rem;
-  padding: 0.375rem 0.625rem;
-  font-size: 0.75rem;
+  min-height: 2.375rem;
+  padding: 0.375rem 0.75rem 0.625rem;
+  font-size: 0.8125rem;
   font-weight: 500;
   color: var(--text-secondary);
-  transition: color 0.12s ease, background 0.12s ease;
+  transition:
+    color 0.18s ease,
+    background 0.18s ease;
   white-space: nowrap;
+}
+
+.analysis-tab-pill--underline {
+  border-radius: 0;
+  background: transparent;
+}
+
+.analysis-tab-pill__label {
+  position: relative;
+  z-index: 1;
+}
+
+.analysis-tab-pill__indicator {
+  position: absolute;
+  left: 0.625rem;
+  right: 0.625rem;
+  bottom: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--color-primary) 70%, transparent),
+    var(--color-primary),
+    color-mix(in oklab, var(--color-primary) 70%, transparent)
+  );
+  box-shadow: 0 0 12px color-mix(in oklab, var(--color-primary) 45%, transparent);
 }
 
 .analysis-tab-pill:hover {
   color: var(--foreground);
-  background: color-mix(in oklab, var(--foreground) 6%, transparent);
+}
+
+.analysis-tab-pill--underline:hover {
+  background: color-mix(in oklab, var(--foreground) 4%, transparent);
 }
 
 .analysis-tab-pill--active {
-  background: color-mix(in oklab, var(--color-primary) 18%, transparent);
-  color: var(--color-primary);
+  color: var(--foreground);
   font-weight: 600;
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-primary) 45%, transparent);
+}
+
+.analysis-tab-pill--underline.analysis-tab-pill--active {
+  background: transparent;
+  box-shadow: none;
 }
 
 .analysis-tab-hint {
@@ -1072,25 +1260,41 @@ body::before {
 .analysis-symbol-nav {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  border-radius: 0.625rem;
-  border: 1px solid var(--surface-border);
-  background: color-mix(in oklab, var(--background) 90%, transparent);
+  gap: 0.125rem;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in oklab, var(--color-primary) 28%, var(--surface-border));
+  background: color-mix(in oklab, var(--color-surface) 82%, transparent);
+  backdrop-filter: blur(10px);
   padding: 0.125rem;
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, white 5%, transparent),
+    0 2px 12px rgb(0 0 0 / 0.18);
 }
 
 .analysis-symbol-nav-btn {
-  min-width: 1.75rem;
-  border-radius: 0.45rem;
-  padding: 0.25rem 0.375rem;
-  font-size: 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  min-height: 2rem;
+  border-radius: 0.5rem;
+  padding: 0.25rem;
   color: var(--text-secondary);
-  transition: background 0.12s ease, color 0.12s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.analysis-symbol-nav-icon {
+  width: 1rem;
+  height: 1rem;
 }
 
 .analysis-symbol-nav-btn:hover:not(:disabled) {
-  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+  background: color-mix(in oklab, var(--color-primary) 14%, transparent);
   color: var(--color-primary);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-primary) 22%, transparent);
 }
 
 .analysis-symbol-nav-btn:disabled {
@@ -1099,29 +1303,64 @@ body::before {
 }
 
 .analysis-symbol-nav-current {
-  min-width: 3.25rem;
-  padding: 0 0.375rem;
+  min-width: 3.5rem;
+  padding: 0 0.5rem;
   text-align: center;
-  font-size: 0.9375rem;
-  font-weight: 650;
-  letter-spacing: 0.01em;
-  color: var(--foreground);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-buy);
+  text-shadow: 0 0 18px color-mix(in oklab, var(--color-buy) 35%, transparent);
 }
 
 .analysis-overview-grid {
   display: grid;
-  gap: 1rem;
+  gap: 0.625rem;
+  align-items: start;
 }
 
 @media (min-width: 1024px) {
   .analysis-overview-grid {
-    grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr);
-    align-items: start;
+    grid-template-columns: minmax(0, 1.65fr) minmax(15rem, 1fr);
   }
 }
 
+.analysis-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
 .analysis-overview-chart {
-  min-height: 280px;
+  min-height: 0;
+}
+
+.analysis-glass-panel--chart {
+  padding: 0.625rem 0.75rem 0.75rem;
+}
+
+.analysis-overview-side {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0.75rem 0.875rem;
+}
+
+.analysis-side-divider {
+  height: 1px;
+  margin: 0.625rem 0;
+  background: color-mix(in oklab, var(--color-border) 88%, transparent);
+}
+
+.analysis-section--flush {
+  padding: 0;
+  margin: 0;
+}
+
+.analysis-sidebar__hint {
+  font-size: 0.6875rem;
+  line-height: 1.45;
+  color: color-mix(in oklab, var(--foreground) 48%, transparent);
 }
 
 .analysis-insights-toggle {
@@ -1187,10 +1426,12 @@ body::before {
 }
 
 .analysis-sidebar-section {
-  border: 1px solid var(--surface-border);
+  border: 1px solid color-mix(in oklab, var(--color-border) 85%, var(--color-primary) 10%);
   border-radius: 0.65rem;
-  background: color-mix(in oklab, var(--background) 88%, transparent);
+  background: color-mix(in oklab, var(--color-surface) 75%, transparent);
+  backdrop-filter: blur(8px);
   overflow: hidden;
+  box-shadow: inset 0 1px 0 color-mix(in oklab, white 4%, transparent);
 }
 
 .analysis-sidebar-section-summary {
@@ -1454,7 +1695,7 @@ body::before {
 }
 
 .decision-mix-label-buy {
-  color: var(--color-primary);
+  color: var(--color-buy);
   font-weight: 600;
 }
 
@@ -1700,8 +1941,312 @@ body::before {
 }
 
 .watchlist-item--active {
-  background: color-mix(in oklab, var(--color-primary) 10%, transparent) !important;
-  box-shadow: inset 3px 0 0 var(--color-primary);
+  background: color-mix(in oklab, var(--color-buy) 10%, transparent) !important;
+  box-shadow: inset 3px 0 0 var(--color-buy);
+}
+
+/* —— Watchlist rail (workspace) —— */
+.watchlist-rail {
+  display: flex;
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.watchlist-rail__header {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--surface-border);
+  background: color-mix(in oklab, var(--color-surface) 88%, transparent);
+}
+
+.watchlist-rail__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.watchlist-rail__title {
+  font-size: 0.8125rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: var(--foreground);
+}
+
+.watchlist-rail__count {
+  min-width: 1.375rem;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text-secondary);
+  background: color-mix(in oklab, var(--foreground) 6%, transparent);
+}
+
+.watchlist-rail__actions {
+  display: flex;
+  gap: 0.375rem;
+}
+
+.watchlist-rail__add-btn {
+  flex: 1;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.watchlist-rail__refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--surface-border);
+  color: var(--text-secondary);
+  background: color-mix(in oklab, var(--color-background) 80%, transparent);
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.watchlist-rail__refresh-btn:hover:not(:disabled) {
+  color: var(--color-primary);
+  border-color: color-mix(in oklab, var(--color-primary) 35%, var(--surface-border));
+  background: color-mix(in oklab, var(--color-primary) 8%, transparent);
+}
+
+.watchlist-rail__refresh-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.watchlist-rail__icon {
+  width: 0.9375rem;
+  height: 0.9375rem;
+}
+
+.watchlist-rail__search {
+  padding: 0.4375rem 0.625rem;
+  font-size: 0.75rem;
+}
+
+.watchlist-rail__msg {
+  font-size: 0.6875rem;
+  color: var(--text-tertiary);
+}
+
+.watchlist-rail__import {
+  max-height: 12rem;
+  flex-shrink: 0;
+  overflow-y: auto;
+  border-bottom: 1px solid var(--surface-border);
+  padding: 0.75rem;
+}
+
+.watchlist-rail__empty {
+  padding: 1.25rem 0.75rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+}
+
+.watchlist-rail__list {
+  list-style: none;
+}
+
+.watchlist-rail__item {
+  border-bottom: 1px solid color-mix(in oklab, var(--color-border) 65%, transparent);
+}
+
+.watchlist-rail__row {
+  width: 100%;
+  padding: 0.625rem 0.75rem 0.375rem;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.watchlist-rail__row:hover {
+  background: color-mix(in oklab, var(--foreground) 4%, transparent);
+}
+
+.watchlist-rail__row--active {
+  background: color-mix(in oklab, var(--color-buy) 9%, transparent);
+  box-shadow: inset 3px 0 0 var(--color-buy);
+}
+
+.watchlist-rail__row-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.625rem;
+}
+
+.watchlist-rail__symbol-block {
+  min-width: 0;
+  flex: 1;
+}
+
+.watchlist-rail__symbol-line {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.watchlist-rail__symbol {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--foreground);
+}
+
+.watchlist-rail__alert-badge {
+  border-radius: 999px;
+  padding: 0 0.375rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: var(--color-hold);
+  background: var(--color-hold-subtle);
+}
+
+.watchlist-rail__stale-dot {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--foreground) 28%, transparent);
+}
+
+.watchlist-rail__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem 0.5rem;
+  margin-top: 0.1875rem;
+  font-size: 0.6875rem;
+  color: var(--text-tertiary);
+}
+
+.watchlist-rail__bucket {
+  text-transform: capitalize;
+  color: var(--color-buy);
+}
+
+.watchlist-rail__price,
+.watchlist-rail__rs {
+  font-variant-numeric: tabular-nums;
+}
+
+.watchlist-rail__score-block {
+  flex-shrink: 0;
+  width: 2.5rem;
+  text-align: right;
+}
+
+.watchlist-rail__score {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.watchlist-rail__score-bar {
+  height: 0.1875rem;
+  margin-top: 0.3125rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--foreground) 8%, transparent);
+}
+
+.watchlist-rail__score-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--color-buy) 70%, transparent),
+    var(--color-buy)
+  );
+}
+
+.watchlist-rail__summary {
+  margin-top: 0.3125rem;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  font-size: 0.6875rem;
+  line-height: 1.35;
+  color: color-mix(in oklab, var(--foreground) 42%, transparent);
+}
+
+.watchlist-rail__row-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0 0.75rem 0.5rem;
+  font-size: 0.6875rem;
+}
+
+.watchlist-rail__link {
+  color: var(--text-tertiary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.watchlist-rail__link:hover {
+  color: var(--foreground-secondary);
+}
+
+.watchlist-rail__remove {
+  color: color-mix(in oklab, var(--foreground) 38%, transparent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.watchlist-rail__remove:hover {
+  color: var(--color-sell);
+}
+
+.watchlist-rail__skeleton-row {
+  padding: 0.75rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--color-border) 65%, transparent);
+}
+
+.watchlist-rail__skeleton-line {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.375rem;
+  background: color-mix(in oklab, var(--color-surface-raised) 75%, transparent);
+}
+
+.watchlist-rail__skeleton-line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in oklab, white 7%, transparent), transparent);
+  animation: analysis-shimmer 1.6s ease-in-out infinite;
+}
+
+.watchlist-rail__skeleton-line--symbol {
+  width: 4rem;
+  height: 0.75rem;
+}
+
+.watchlist-rail__skeleton-line--meta {
+  width: 6.5rem;
+  height: 0.5625rem;
+  margin-top: 0.375rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .watchlist-rail__skeleton-line::after {
+    animation: none;
+  }
 }
 
 /* —— Command palette —— */
@@ -1816,6 +2361,147 @@ body::before {
   padding: 0.5rem 1rem 0.75rem;
   font-size: 0.6875rem;
   color: color-mix(in oklab, var(--foreground) 42%, transparent);
+  border-top: 1px solid var(--surface-border);
+}
+
+.settings-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.625rem;
+  font-size: 0.8125rem;
+  color: color-mix(in oklab, var(--foreground) 70%, transparent);
+  background: color-mix(in oklab, var(--surface-muted) 70%, transparent);
+  border: 1px solid var(--surface-border);
+  border-radius: 0.625rem;
+  transition: border-color 0.12s ease, color 0.12s ease;
+  cursor: pointer;
+}
+
+.settings-nav-btn:hover {
+  color: var(--foreground);
+  border-color: color-mix(in oklab, var(--color-primary) 35%, var(--surface-border));
+}
+
+.settings-nav-btn__icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.settings-nav-btn__label {
+  display: none;
+  font-weight: 500;
+}
+
+@media (min-width: 768px) {
+  .settings-nav-btn__label {
+    display: inline;
+  }
+}
+
+@media (max-width: 767px) {
+  .settings-nav-btn {
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+    justify-content: center;
+    padding: 0.5rem;
+  }
+}
+
+.settings-menu-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.375rem);
+  z-index: 50;
+  width: min(17rem, calc(100vw - 1rem));
+  overflow: hidden;
+  border-radius: 0.75rem;
+  border: 1px solid var(--surface-border);
+  background: color-mix(in oklab, var(--surface) 98%, black 2%);
+  box-shadow: var(--shadow-md, 0 6px 18px rgba(0, 0, 0, 0.22));
+  padding: 0.375rem 0;
+}
+
+.settings-menu-dropdown__hero {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  color: var(--foreground);
+  text-decoration: none;
+  transition: background 0.12s ease;
+}
+
+.settings-menu-dropdown__hero:hover {
+  background: color-mix(in oklab, var(--surface-muted) 80%, transparent);
+}
+
+.settings-menu-dropdown__hero-title {
+  font-weight: 600;
+}
+
+.settings-menu-dropdown__hero-desc {
+  font-size: 0.75rem;
+  color: color-mix(in oklab, var(--foreground) 55%, transparent);
+  line-height: 1.35;
+}
+
+.settings-menu-dropdown__heading {
+  padding: 0.5rem 0.875rem 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--foreground) 50%, transparent);
+}
+
+.settings-menu-dropdown__lang-row {
+  display: flex;
+  gap: 0.375rem;
+  padding: 0 0.625rem 0.625rem;
+}
+
+.settings-menu-dropdown__lang-btn {
+  flex: 1;
+  border-radius: 0.5rem;
+  padding: 0.4375rem 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  background: transparent;
+  color: color-mix(in oklab, var(--foreground) 65%, transparent);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.settings-menu-dropdown__lang-btn:hover {
+  background: color-mix(in oklab, var(--surface-muted) 85%, transparent);
+  color: var(--foreground);
+}
+
+.settings-menu-dropdown__lang-btn--active {
+  background: color-mix(in oklab, var(--color-primary) 16%, transparent);
+  border-color: color-mix(in oklab, var(--color-primary) 35%, transparent);
+  color: var(--color-primary);
+}
+
+.settings-menu-dropdown__link {
+  display: block;
+  padding: 0.5625rem 0.875rem;
+  font-size: 0.8125rem;
+  color: var(--foreground);
+  text-decoration: none;
+  transition: background 0.12s ease;
+}
+
+.settings-menu-dropdown__link:hover {
+  background: color-mix(in oklab, var(--surface-muted) 80%, transparent);
+}
+
+.settings-menu-dropdown__divider {
+  margin: 0.25rem 0;
   border-top: 1px solid var(--surface-border);
 }
 
@@ -2192,7 +2878,7 @@ body::before {
 }
 
 .summary-strip__value--positive {
-  color: var(--color-primary);
+  color: var(--color-buy);
 }
 
 .summary-strip__value--negative {
@@ -2392,6 +3078,21 @@ body::before {
 .dense-table td.col-num {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+.dense-table th.col-text,
+.dense-table td.col-text {
+  text-align: left;
+}
+
+.dense-table th.col-center,
+.dense-table td.col-center {
+  text-align: center;
+}
+
+.dense-table td.col-center .ledger-side-pill-wrap {
+  display: inline-flex;
+  justify-content: center;
 }
 
 .dense-table-toolbar {
@@ -3246,37 +3947,190 @@ body::before {
   box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-primary) 40%, transparent);
 }
 
-.analysis-hero {
+/* ── Analysis compact layout ─────────────────────────────────────────── */
+
+.analysis-glass-panel {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in oklab, var(--color-border) 88%, var(--color-primary) 12%);
+  background: color-mix(in oklab, var(--color-surface) 78%, transparent);
+  backdrop-filter: blur(12px);
+  padding: 0.875rem 1rem;
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, white 5%, transparent),
+    0 8px 28px rgb(0 0 0 / 0.22);
+}
+
+.analysis-glass-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--color-primary) 5%, transparent) 0%,
+    transparent 42%,
+    color-mix(in oklab, var(--color-buy) 3%, transparent) 100%
+  );
+}
+
+.analysis-glass-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+.pq-glass-panel__body {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  min-width: 0;
+}
+
+.quant-lab-overview-kpis {
+  display: grid;
+  gap: 0.4375rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 1024px) {
+  .quant-lab-overview-kpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.analysis-hero .quant-lab-overview-kpis .metric-tile--card,
+.analysis-hero .quant-lab-overview-kpis .stat-tile {
+  border-color: color-mix(in oklab, var(--color-border) 80%, var(--color-primary) 10%);
+  background: color-mix(in oklab, var(--color-background) 55%, transparent);
+}
+
+.analysis-glass-panel--compact {
+  padding: 0.75rem;
+}
+
+.analysis-hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  padding: 1rem 1.125rem;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in oklab, var(--color-border) 82%, var(--color-primary) 18%);
+  background: color-mix(in oklab, var(--color-surface) 72%, transparent);
+  backdrop-filter: blur(14px);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, white 6%, transparent),
+    0 10px 32px rgb(0 0 0 / 0.24);
+  overflow: hidden;
+}
+
+.analysis-hero__ambient {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse 55% 80% at 8% 0%,
+      color-mix(in oklab, var(--color-primary) 10%, transparent),
+      transparent 68%
+    ),
+    radial-gradient(
+      ellipse 45% 70% at 92% 100%,
+      color-mix(in oklab, var(--color-buy) 7%, transparent),
+      transparent 72%
+    );
+}
+
+.analysis-hero__head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+
+.analysis-hero__price-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.analysis-hero__price-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--foreground) 48%, transparent);
 }
 
 .analysis-hero__price-row {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: baseline;
   gap: 0.5rem 0.75rem;
 }
 
 .analysis-hero__price {
-  font-size: 1.375rem;
-  font-weight: 650;
-  letter-spacing: -0.02em;
-  line-height: 1.15;
+  font-size: clamp(1.5rem, 2.4vw, 1.875rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
   color: var(--foreground);
+  text-shadow: 0 0 24px color-mix(in oklab, var(--foreground) 12%, transparent);
 }
 
-.analysis-hero__change {
-  font-size: 0.875rem;
-  font-weight: 500;
+.analysis-hero__change-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1875rem 0.5625rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 650;
   line-height: 1.2;
+  border: 1px solid transparent;
+}
+
+.analysis-hero__change-pill--up {
+  color: var(--color-buy);
+  background: var(--color-buy-subtle);
+  border-color: color-mix(in oklab, var(--color-buy) 32%, transparent);
+  box-shadow: 0 0 16px color-mix(in oklab, var(--color-buy) 18%, transparent);
+}
+
+.analysis-hero__change-pill--down {
+  color: var(--color-sell);
+  background: var(--color-sell-subtle);
+  border-color: color-mix(in oklab, var(--color-sell) 32%, transparent);
+  box-shadow: 0 0 16px color-mix(in oklab, var(--color-sell) 16%, transparent);
 }
 
 .analysis-hero__stats {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(6.75rem, 1fr));
-  gap: 0.375rem;
+  gap: 0.4375rem;
+}
+
+.analysis-hero__stats .stat-tile {
+  border-color: color-mix(in oklab, var(--color-border) 80%, var(--color-primary) 10%);
+  background: color-mix(in oklab, var(--color-background) 55%, transparent);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.analysis-hero__stats .stat-tile:hover {
+  border-color: color-mix(in oklab, var(--color-primary) 28%, var(--color-border));
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.16);
+  transform: translateY(-1px);
 }
 
 .analysis-hero__chip {
@@ -3286,45 +4140,132 @@ body::before {
 }
 
 .analysis-hero__stat--fresh .stat-tile__hint {
-  color: var(--color-primary);
+  color: var(--color-buy);
 }
 
 .analysis-hero__stat--warn .stat-tile__hint {
   color: var(--warn);
 }
 
-.analysis-section {
-  padding: 0.75rem 0;
-  border-bottom: 1px solid var(--border-subtle);
+.analysis-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
 }
 
-.analysis-section:last-child {
-  border-bottom: none;
+.analysis-loading__bar,
+.analysis-loading__tile,
+.analysis-loading__chart {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.625rem;
+  background: color-mix(in oklab, var(--color-surface-raised) 70%, transparent);
 }
 
-.analysis-section__title {
-  margin-bottom: 0.5rem;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--foreground);
+.analysis-loading__bar::after,
+.analysis-loading__tile::after,
+.analysis-loading__chart::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, white 8%, transparent),
+    transparent
+  );
+  animation: analysis-shimmer 1.6s ease-in-out infinite;
 }
 
-.analysis-overview-grid {
-  display: grid;
+.analysis-loading__bar {
+  height: 0.875rem;
+}
+
+.analysis-loading__bar--wide {
+  width: 55%;
+}
+
+.analysis-loading__bar--price {
+  width: 8rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+}
+
+.analysis-loading__bar--pill {
+  width: 4rem;
+  height: 1.375rem;
+  border-radius: 999px;
+}
+
+.analysis-loading__hero {
+  display: flex;
+  align-items: center;
   gap: 0.75rem;
 }
 
-@media (min-width: 1024px) {
-  .analysis-overview-grid {
-    grid-template-columns: minmax(0, 1.85fr) minmax(16rem, 1fr);
-    align-items: start;
+.analysis-loading__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(6.75rem, 1fr));
+  gap: 0.4375rem;
+}
+
+.analysis-loading__tile {
+  height: 3.25rem;
+  border: 1px solid var(--border-subtle);
+}
+
+.analysis-loading__tile--rail {
+  height: 2.75rem;
+}
+
+.analysis-loading__chart {
+  height: 16rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.75rem;
+}
+
+@keyframes analysis-shimmer {
+  100% {
+    transform: translateX(100%);
   }
 }
 
-.analysis-overview-side {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
+@media (prefers-reduced-motion: reduce) {
+  .analysis-toolbar::before,
+  .analysis-toolbar::after {
+    display: none;
+  }
+
+  .analysis-loading__bar::after,
+  .analysis-loading__tile::after,
+  .analysis-loading__chart::after {
+    animation: none;
+  }
+
+  .analysis-hero__stats .stat-tile:hover {
+    transform: none;
+  }
+}
+
+.analysis-section {
+  padding: 0;
+  border-bottom: none;
+}
+
+.analysis-glass-panel.analysis-section {
+  margin-bottom: 0.625rem;
+}
+
+.analysis-glass-panel.analysis-section:last-child {
+  margin-bottom: 0;
+}
+
+.analysis-section__title {
+  margin-bottom: 0.375rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--foreground);
 }
 
 .price-chart__header {
@@ -3578,11 +4519,11 @@ body::before {
 }
 
 .portfolio-holdings__symbol-link:hover .font-semibold {
-  color: var(--color-primary);
+  color: var(--color-buy);
 }
 
 .portfolio-holdings__row:hover td {
-  background: color-mix(in oklab, var(--color-primary) 5%, transparent);
+  background: color-mix(in oklab, var(--color-buy) 5%, transparent);
 }
 
 .portfolio-holdings__bucket {
@@ -3606,7 +4547,7 @@ body::before {
 .portfolio-holdings__analyze {
   font-size: 0.6875rem;
   font-weight: 600;
-  color: var(--color-primary);
+  color: var(--color-buy);
   text-decoration: none;
 }
 
@@ -3773,6 +4714,89 @@ body::before {
   margin-bottom: 0.75rem;
 }
 
+/* ── Portfolio modern makeover (Today tab + shell; chart graph untouched) ── */
+.portfolio-workspace--modern {
+  position: relative;
+  isolation: isolate;
+}
+
+.portfolio-workspace--modern::before {
+  content: "";
+  position: absolute;
+  inset: -2rem -1rem auto;
+  height: 22rem;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(ellipse 55% 45% at 12% 0%, color-mix(in oklab, var(--color-primary) 14%, transparent), transparent 70%),
+    radial-gradient(ellipse 45% 40% at 88% 8%, color-mix(in oklab, var(--color-buy) 8%, transparent), transparent 72%);
+  opacity: 0.85;
+}
+
+.portfolio-workspace--modern::after {
+  content: "";
+  position: absolute;
+  inset: auto -2rem -4rem;
+  height: 16rem;
+  pointer-events: none;
+  z-index: -1;
+  background: radial-gradient(ellipse 50% 60% at 50% 100%, color-mix(in oklab, var(--color-primary) 6%, transparent), transparent 75%);
+}
+
+.portfolio-workspace--modern .portfolio-workspace__tab-row {
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+  padding: 0.25rem;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in oklab, var(--foreground) 10%, transparent);
+  background: color-mix(in oklab, var(--surface-raised) 55%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow:
+    0 1px 0 color-mix(in oklab, var(--foreground) 6%, transparent) inset,
+    0 8px 24px -12px color-mix(in oklab, var(--background) 80%, transparent);
+}
+
+.portfolio-workspace--modern .portfolio-workspace__tab-row .app-tab {
+  border-radius: 9999px;
+  padding: 0.4375rem 1rem;
+  transition:
+    color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.portfolio-workspace--modern .portfolio-workspace__tab-row .app-tab:hover {
+  background: color-mix(in oklab, var(--foreground) 8%, transparent);
+}
+
+.portfolio-workspace--modern .portfolio-workspace__tab-row .app-tab--active {
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--color-primary) 28%, var(--surface-raised)) 0%,
+    color-mix(in oklab, var(--color-primary) 14%, var(--surface-raised)) 100%
+  );
+  color: var(--foreground);
+  font-weight: 600;
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--color-primary) 40%, transparent),
+    0 4px 16px -4px color-mix(in oklab, var(--color-primary) 35%, transparent),
+    inset 0 1px 0 color-mix(in oklab, var(--foreground) 12%, transparent);
+}
+
+.portfolio-workspace--modern .portfolio-workspace__source {
+  border-radius: 9999px;
+  border: 1px solid color-mix(in oklab, var(--color-primary) 22%, transparent);
+  background: color-mix(in oklab, var(--color-primary) 8%, var(--surface-elevated));
+  padding: 0.1875rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+  box-shadow: 0 0 12px -4px color-mix(in oklab, var(--color-primary) 25%, transparent);
+}
+
 .portfolio-workspace__meta-row {
   margin-top: -0.25rem;
   margin-bottom: 0.75rem;
@@ -3825,6 +4849,747 @@ body::before {
   background: color-mix(in oklab, var(--surface-elevated) 60%, transparent);
 }
 
+/* Today tab — action queue + penny ops + risk left, holdings primary right */
+.portfolio-today__workspace {
+  display: grid;
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .portfolio-today__workspace {
+    grid-template-columns: minmax(17rem, 22rem) minmax(0, 1fr);
+    gap: 1rem 1.25rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .portfolio-today__workspace {
+    grid-template-columns: minmax(18rem, 24rem) minmax(0, 1fr);
+  }
+}
+
+.portfolio-today__sidebar,
+.portfolio-today__main {
+  min-width: 0;
+}
+
+/* Mobile: holdings first (primary), then action queue */
+.portfolio-today__main {
+  order: 1;
+}
+
+.portfolio-today__sidebar {
+  order: 2;
+}
+
+/* Glass sidebar + main panels on Today tab */
+.portfolio-today--modern .portfolio-today__sidebar--glass > .surface,
+.portfolio-today--modern .portfolio-today__sidebar--glass > section {
+  border-radius: 0.875rem;
+  border: 1px solid color-mix(in oklab, var(--foreground) 9%, transparent);
+  background: linear-gradient(
+    155deg,
+    color-mix(in oklab, var(--surface-raised) 78%, transparent) 0%,
+    color-mix(in oklab, var(--surface-muted) 55%, transparent) 100%
+  );
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow:
+    0 1px 0 color-mix(in oklab, var(--foreground) 7%, transparent) inset,
+    0 12px 32px -16px color-mix(in oklab, var(--background) 90%, transparent);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.portfolio-today--modern .portfolio-today__sidebar--glass > .surface:hover,
+.portfolio-today--modern .portfolio-today__sidebar--glass > section:hover {
+  border-color: color-mix(in oklab, var(--color-primary) 22%, transparent);
+  box-shadow:
+    0 1px 0 color-mix(in oklab, var(--foreground) 8%, transparent) inset,
+    0 16px 40px -14px color-mix(in oklab, var(--color-primary) 18%, transparent);
+}
+
+.portfolio-today--modern .portfolio-holdings-card {
+  border-radius: 0.875rem;
+  border: 1px solid color-mix(in oklab, var(--foreground) 10%, transparent);
+  background: linear-gradient(
+    160deg,
+    color-mix(in oklab, var(--surface-raised) 82%, transparent) 0%,
+    color-mix(in oklab, var(--background) 92%, transparent) 100%
+  );
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow:
+    0 1px 0 color-mix(in oklab, var(--foreground) 8%, transparent) inset,
+    0 20px 48px -24px color-mix(in oklab, var(--background) 85%, transparent);
+  overflow: hidden;
+}
+
+.portfolio-today--modern .portfolio-holdings-card .data-panel-header {
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--foreground) 6%, transparent);
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--color-primary) 6%, transparent),
+    transparent 55%
+  );
+}
+
+.portfolio-today--modern .portfolio-holdings-card tbody tr {
+  transition: background 0.15s ease;
+}
+
+.portfolio-today--modern .portfolio-holdings-card tbody tr:hover td {
+  background: color-mix(in oklab, var(--color-primary) 5%, transparent);
+}
+
+.portfolio-today--modern .portfolio-plan .surface,
+.portfolio-today--modern .portfolio-plan > section,
+.portfolio-workspace--modern .portfolio-plan .surface {
+  border-radius: 0.875rem;
+  border: 1px solid color-mix(in oklab, var(--foreground) 9%, transparent);
+  background: linear-gradient(
+    155deg,
+    color-mix(in oklab, var(--surface-raised) 78%, transparent) 0%,
+    color-mix(in oklab, var(--surface-muted) 55%, transparent) 100%
+  );
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow:
+    0 1px 0 color-mix(in oklab, var(--foreground) 7%, transparent) inset,
+    0 12px 32px -16px color-mix(in oklab, var(--background) 90%, transparent);
+}
+
+.portfolio-glass-inset {
+  border-radius: 0.75rem;
+  border: 1px dashed color-mix(in oklab, var(--foreground) 12%, transparent);
+  background: color-mix(in oklab, var(--surface-muted) 40%, transparent);
+}
+
+.portfolio-action-item {
+  position: relative;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in oklab, var(--foreground) 8%, transparent);
+  background: linear-gradient(
+    145deg,
+    color-mix(in oklab, var(--surface-raised) 70%, transparent) 0%,
+    color-mix(in oklab, var(--surface-muted) 45%, transparent) 100%
+  );
+  padding: 0.875rem 1rem;
+  overflow: hidden;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.portfolio-action-item::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  border-radius: 3px 0 0 3px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-primary) 70%, transparent),
+    color-mix(in oklab, var(--color-buy) 50%, transparent)
+  );
+  opacity: 0.55;
+  transition: opacity 0.2s ease;
+}
+
+.portfolio-action-item:hover {
+  border-color: color-mix(in oklab, var(--color-buy) 28%, transparent);
+  background: linear-gradient(
+    145deg,
+    color-mix(in oklab, var(--surface-raised) 85%, transparent) 0%,
+    color-mix(in oklab, var(--color-buy) 6%, var(--surface-muted)) 100%
+  );
+  box-shadow: 0 8px 24px -12px color-mix(in oklab, var(--color-buy) 22%, transparent);
+  transform: translateY(-1px);
+}
+
+.portfolio-action-item:hover::before {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portfolio-action-item:hover {
+    transform: none;
+  }
+
+  .portfolio-workspace--modern .portfolio-workspace__tab-row .app-tab,
+  .portfolio-action-item,
+  .portfolio-today--modern .portfolio-today__sidebar--glass > .surface,
+  .portfolio-today--modern .portfolio-today__sidebar--glass > section {
+    transition: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .portfolio-today__sidebar {
+    order: 1;
+  }
+
+  .portfolio-today__main {
+    order: 2;
+  }
+}
+
+/* Activity — Robinhood trading history table */
+.trading-history__empty {
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-subtle);
+  padding: 2rem 1rem;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.trading-history__filters select {
+  min-width: 6.5rem;
+}
+
+.trading-history-table.dense-table-wrap {
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-subtle);
+}
+
+.trading-history-table .dense-table {
+  table-layout: fixed;
+}
+
+.trading-history-table .trading-history-table__col-date {
+  width: 28%;
+}
+
+.trading-history-table .trading-history-table__col-symbol {
+  width: 14%;
+}
+
+.trading-history-table .trading-history-table__col-side {
+  width: 12%;
+}
+
+.trading-history-table .trading-history-table__col-qty {
+  width: 14%;
+}
+
+.trading-history-table .trading-history-table__col-price {
+  width: 16%;
+}
+
+.trading-history-table .trading-history-table__col-amount {
+  width: 16%;
+}
+
+.trading-history-table th.col-num,
+.trading-history-table td.col-num {
+  padding-left: 0.5rem;
+  padding-right: 0.75rem;
+}
+
+.trading-history-table td.col-center {
+  padding-left: 0.375rem;
+  padding-right: 0.375rem;
+}
+
+@media (max-width: 639px) {
+  .trading-history-table .dense-table {
+    min-width: 36rem;
+  }
+}
+
+/* Today — portfolio performance hero (value + chart + P/L KPIs) */
+.portfolio-performance-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.portfolio-performance-hero__chart-shell {
+  border-radius: 0.75rem;
+  border: 1px solid var(--border-subtle);
+  background: linear-gradient(
+    165deg,
+    color-mix(in oklab, var(--surface-raised) 92%, var(--color-primary) 8%) 0%,
+    color-mix(in oklab, var(--background) 96%, transparent) 55%,
+    color-mix(in oklab, var(--background) 98%, transparent) 100%
+  );
+  padding: 0.875rem 1rem 0.5rem;
+  overflow: hidden;
+}
+
+.portfolio-performance-hero__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.portfolio-performance-hero__label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.portfolio-performance-hero__value {
+  margin-top: 0.125rem;
+  font-size: clamp(1.75rem, 4vw, 2.25rem);
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--foreground);
+}
+
+.portfolio-performance-hero__period {
+  margin-top: 0.25rem;
+}
+
+.portfolio-performance-hero__ranges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.125rem;
+  border-radius: 9999px;
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in oklab, var(--background) 70%, transparent);
+}
+
+.portfolio-performance-hero__range-btn {
+  min-width: 2.25rem;
+  padding: 0.3125rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.portfolio-performance-hero__range-btn:hover {
+  color: var(--foreground);
+  background: color-mix(in oklab, var(--foreground) 6%, transparent);
+}
+
+.portfolio-performance-hero__range-btn.is-active {
+  color: var(--foreground);
+  background: color-mix(in oklab, var(--color-primary) 18%, var(--surface-raised));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-primary) 35%, transparent);
+}
+
+.portfolio-performance-hero__chart {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  height: min(14rem, 42vw);
+  min-height: 10rem;
+}
+
+.portfolio-performance-hero__kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+@media (max-width: 639px) {
+  .portfolio-performance-hero__kpis {
+    grid-template-columns: 1fr;
+  }
+}
+
+.portfolio-performance-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.75rem 0.875rem;
+  border-radius: 0.625rem;
+  border: 1px solid color-mix(in oklab, var(--foreground) 9%, transparent);
+  background: linear-gradient(
+    145deg,
+    color-mix(in oklab, var(--surface-raised) 72%, transparent) 0%,
+    color-mix(in oklab, var(--surface-muted) 48%, transparent) 100%
+  );
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow:
+    0 1px 0 color-mix(in oklab, var(--foreground) 6%, transparent) inset,
+    0 8px 20px -12px color-mix(in oklab, var(--background) 80%, transparent);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.portfolio-performance-kpi:hover {
+  border-color: color-mix(in oklab, var(--color-primary) 20%, transparent);
+  box-shadow:
+    0 1px 0 color-mix(in oklab, var(--foreground) 8%, transparent) inset,
+    0 12px 28px -10px color-mix(in oklab, var(--color-primary) 16%, transparent);
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portfolio-performance-kpi:hover {
+    transform: none;
+  }
+
+  .portfolio-performance-kpi {
+    transition: none;
+  }
+}
+
+.portfolio-performance-kpi__label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.portfolio-performance-kpi__value {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.portfolio-performance-kpi__hint {
+  font-size: 0.75rem;
+}
+
+/* Daily trading plan — compact band aligned with portfolio summary strip */
+.daily-trading-plan .data-panel-header {
+  margin-bottom: 0.75rem;
+}
+
+.daily-trading-plan__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.daily-trading-plan__metrics {
+  margin: 0;
+}
+
+.daily-trading-plan__exposure {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.daily-trading-plan__exposure-track {
+  height: 0.375rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--surface-muted) 80%, transparent);
+}
+
+.daily-trading-plan__exposure-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+
+.daily-trading-plan__exposure-fill--low {
+  background: var(--color-buy);
+}
+
+.daily-trading-plan__exposure-fill--mid {
+  background: var(--color-hold);
+}
+
+.daily-trading-plan__exposure-fill--high {
+  background: var(--color-sell);
+}
+
+.daily-trading-plan__exposure-caption {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.daily-trading-plan__summary {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--foreground);
+}
+
+.daily-trading-plan__alert {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.daily-trading-plan__alert--warn {
+  border: 1px solid color-mix(in oklab, var(--color-hold) 35%, transparent);
+  background: var(--color-hold-subtle);
+  color: var(--color-hold);
+}
+
+.daily-trading-plan__alert--info {
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in oklab, var(--surface-muted) 70%, transparent);
+  color: var(--text-secondary);
+}
+
+.daily-trading-plan__section-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.daily-trading-plan__rules-fail-count {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--color-sell);
+}
+
+.daily-trading-plan__focus-table.dense-table thead th,
+.daily-trading-plan__focus-table.dense-table tbody td {
+  padding-top: 0.375rem;
+  padding-bottom: 0.375rem;
+}
+
+.daily-trading-plan__status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.375rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.daily-trading-plan__status--pass {
+  color: var(--color-buy);
+  background: var(--color-buy-subtle);
+}
+
+.daily-trading-plan__status--fail {
+  color: var(--color-sell);
+  background: var(--color-sell-subtle);
+}
+
+.daily-trading-plan__status--pending {
+  color: var(--color-hold);
+  background: var(--color-hold-subtle);
+}
+
+.daily-trading-plan__rules {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.daily-trading-plan__rule {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.375rem 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in oklab, var(--background) 45%, transparent);
+}
+
+.daily-trading-plan__rule--pass {
+  border-color: color-mix(in oklab, var(--color-buy) 25%, transparent);
+}
+
+.daily-trading-plan__rule--fail {
+  border-color: color-mix(in oklab, var(--color-sell) 30%, transparent);
+  background: var(--color-sell-subtle);
+}
+
+.daily-trading-plan__rule--pending {
+  border-color: color-mix(in oklab, var(--color-hold) 25%, transparent);
+}
+
+.daily-trading-plan__rule-status {
+  flex-shrink: 0;
+  min-width: 2.75rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.daily-trading-plan__rule--pass .daily-trading-plan__rule-status {
+  color: var(--color-buy);
+}
+
+.daily-trading-plan__rule--fail .daily-trading-plan__rule-status {
+  color: var(--color-sell);
+}
+
+.daily-trading-plan__rule--pending .daily-trading-plan__rule-status {
+  color: var(--color-hold);
+}
+
+.daily-trading-plan__rule-label {
+  color: var(--text-secondary);
+}
+
+.daily-trading-plan__rule--fail .daily-trading-plan__rule-label {
+  color: var(--foreground);
+}
+
+.daily-trading-plan__details {
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.625rem;
+  background: color-mix(in oklab, var(--surface-muted) 40%, transparent);
+}
+
+.daily-trading-plan__details-summary {
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--foreground);
+  cursor: pointer;
+  list-style: none;
+}
+
+.daily-trading-plan__details-summary::-webkit-details-marker {
+  display: none;
+}
+
+.daily-trading-plan__details-summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 0.5rem;
+  color: var(--text-tertiary);
+  transition: transform 0.15s ease;
+}
+
+.daily-trading-plan__details[open] .daily-trading-plan__details-summary::before {
+  transform: rotate(90deg);
+}
+
+.daily-trading-plan__setup-grid {
+  display: grid;
+  gap: 0.625rem 1rem;
+  margin: 0;
+  padding: 0 0.75rem 0.75rem;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+@media (min-width: 640px) {
+  .daily-trading-plan__setup-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .daily-trading-plan__setup-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.daily-trading-plan__setup-grid dt {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.daily-trading-plan__setup-grid dd {
+  margin: 0.125rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: var(--foreground);
+}
+
+.daily-trading-plan__evidence {
+  margin: 0;
+  padding: 0 0.75rem 0.75rem 2rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.daily-trading-plan__review {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding: 0 0.75rem 0.75rem;
+}
+
+.daily-trading-plan__review-followed {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.daily-trading-plan__review-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.daily-trading-plan__review-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.daily-trading-plan__review-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.daily-trading-plan__review-textarea {
+  min-height: 4.5rem;
+  resize: vertical;
+}
+
+.daily-trading-plan__review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.daily-trading-plan__disclaimer {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+}
+
 .portfolio-research-basket {
   padding: 0.875rem 1rem;
 }
@@ -3842,6 +5607,51 @@ body::before {
   flex-wrap: wrap;
 }
 
+.portfolio-workspace--modern .portfolio-research__tabs,
+.portfolio-workspace--modern .portfolio-research-basket__header + .app-tab-bar {
+  padding: 0.25rem;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in oklab, var(--foreground) 10%, transparent);
+  background: color-mix(in oklab, var(--surface-raised) 55%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow:
+    0 1px 0 color-mix(in oklab, var(--foreground) 6%, transparent) inset,
+    0 8px 24px -12px color-mix(in oklab, var(--background) 80%, transparent);
+}
+
+.portfolio-workspace--modern .portfolio-research__tabs .app-tab,
+.portfolio-workspace--modern .portfolio-research-basket__header + .app-tab-bar .app-tab {
+  border-radius: 9999px;
+}
+
+.portfolio-workspace--modern .portfolio-research__tabs .app-tab--active,
+.portfolio-workspace--modern .portfolio-research-basket__header + .app-tab-bar .app-tab--active {
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--color-primary) 28%, var(--surface-raised)) 0%,
+    color-mix(in oklab, var(--color-primary) 14%, var(--surface-raised)) 100%
+  );
+  color: var(--foreground);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--color-primary) 40%, transparent),
+    0 4px 16px -4px color-mix(in oklab, var(--color-primary) 35%, transparent);
+}
+
+.portfolio-workspace--modern .surface.surface--raised,
+.portfolio-workspace--modern .surface.surface--data,
+.portfolio-workspace--modern .data-panel {
+  border-color: color-mix(in oklab, var(--foreground) 9%, transparent);
+  background: linear-gradient(
+    155deg,
+    color-mix(in oklab, var(--surface-raised) 76%, transparent) 0%,
+    color-mix(in oklab, var(--surface-muted) 52%, transparent) 100%
+  );
+  box-shadow:
+    0 1px 0 color-mix(in oklab, var(--foreground) 6%, transparent) inset,
+    0 10px 28px -14px color-mix(in oklab, var(--background) 85%, transparent);
+}
+
 /* KaTeX — match dark UI in Quant Lab model library */
 .katex {
   color: var(--foreground);
@@ -3852,26 +5662,28 @@ body::before {
   margin: 0.5rem 0;
 }
 
-/* Portfolio ledger — glass / React Bits–inspired activity UI */
+/* Portfolio Activity — ledger (aligned with data-panel / dense-table) */
+.ledger-inset {
+  border-radius: 0.75rem;
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in oklab, var(--surface-muted) 55%, transparent);
+}
+
 .ledger-form-field__label {
   display: block;
   margin-bottom: 0.375rem;
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
 }
 
 .ledger-form-field__hint {
   display: block;
   margin-top: 0.25rem;
-  font-size: 0.6875rem;
-  color: color-mix(in oklab, var(--text-secondary) 80%, transparent);
-}
-
-.ledger-input:focus-visible {
-  outline: none;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
 }
 
 .ledger-side-toggle {
@@ -3879,18 +5691,18 @@ body::before {
   grid-template-columns: 1fr 1fr;
   gap: 0.25rem;
   padding: 0.25rem;
-  border-radius: 0.875rem;
-  border: 1px solid color-mix(in oklab, var(--foreground) 8%, transparent);
-  background: color-mix(in oklab, var(--surface) 60%, transparent);
+  border-radius: 0.625rem;
+  border: 1px solid var(--surface-border);
+  background: color-mix(in oklab, var(--background) 88%, transparent);
 }
 
 .ledger-side-toggle__btn {
-  border-radius: 0.625rem;
-  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  padding: 0.4375rem 0.75rem;
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--text-secondary);
-  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .ledger-side-toggle__btn:hover:not(.ledger-side-toggle__btn--buy-active):not(.ledger-side-toggle__btn--sell-active) {
@@ -3899,113 +5711,39 @@ body::before {
 }
 
 .ledger-side-toggle__btn--buy-active {
-  color: rgb(167 243 208);
-  background: color-mix(in oklab, rgb(16 185 129) 18%, transparent);
-  box-shadow: 0 0 20px -6px rgba(16, 185, 129, 0.45);
+  color: var(--color-buy);
+  background: color-mix(in oklab, var(--color-buy) 14%, transparent);
+  border: 1px solid color-mix(in oklab, var(--color-buy) 30%, transparent);
 }
 
 .ledger-side-toggle__btn--sell-active {
-  color: rgb(252 165 165);
-  background: color-mix(in oklab, rgb(239 68 68) 16%, transparent);
-  box-shadow: 0 0 20px -6px rgba(239, 68, 68, 0.35);
+  color: var(--negative);
+  background: color-mix(in oklab, var(--negative) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--negative) 28%, transparent);
 }
 
 .ledger-holdings-strip__title {
   margin-bottom: 0.625rem;
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
 }
 
 .ledger-holding-chip {
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
-  padding: 0.375rem 0.625rem;
-  border-radius: 9999px;
-  border: 1px solid color-mix(in oklab, var(--foreground) 8%, transparent);
-  background: color-mix(in oklab, var(--surface-elevated) 85%, transparent);
-  font-size: 0.75rem;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.ledger-holding-chip:hover {
-  border-color: color-mix(in oklab, rgb(16 185 129) 25%, transparent);
-  box-shadow: 0 0 16px -8px rgba(16, 185, 129, 0.35);
-}
-
-.ledger-table-shell {
-  background: color-mix(in oklab, var(--surface) 40%, transparent);
-}
-
-.ledger-table-shell table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.8125rem;
-  text-align: left;
-}
-
-.ledger-table-shell thead {
-  background: color-mix(in oklab, var(--surface-elevated) 92%, transparent);
-  backdrop-filter: blur(8px);
-}
-
-.ledger-table-shell th {
-  padding: 0.625rem 0.75rem;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.ledger-table-shell tbody tr {
-  border-top: 1px solid color-mix(in oklab, var(--foreground) 6%, transparent);
-  transition: background 0.15s ease;
-}
-
-.ledger-table-shell tbody tr:hover {
-  background: color-mix(in oklab, var(--foreground) 3%, transparent);
-}
-
-.ledger-table-shell tbody tr.ledger-row--locked {
-  background: color-mix(in oklab, rgb(16 185 129) 4%, transparent);
-}
-
-.ledger-table-shell td {
-  padding: 0.5rem 0.75rem;
-  vertical-align: middle;
+.dense-table tbody tr.ledger-row--locked {
+  background: color-mix(in oklab, var(--color-buy) 4%, transparent);
 }
 
 .ledger-cell-readonly {
   font-variant-numeric: tabular-nums;
   color: var(--foreground);
-}
-
-.ledger-add-form__header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-
-.ledger-add-form__title {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: var(--foreground);
-}
-
-.ledger-add-form__subtitle {
-  margin-top: 0.25rem;
-  font-size: 0.8125rem;
-  line-height: 1.45;
-  color: var(--text-secondary);
 }
 
 .ledger-add-form__grid {
@@ -4038,26 +5776,30 @@ body::before {
   gap: 0.5rem;
   margin-top: 1rem;
   padding-top: 1rem;
-  border-top: 1px solid color-mix(in oklab, var(--foreground) 6%, transparent);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.ledger-empty {
+  border-radius: 0.75rem;
+  border: 1px dashed var(--border-subtle);
+  background: color-mix(in oklab, var(--surface-muted) 40%, transparent);
+  padding: 2rem 1rem;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
 }
 
 .ledger-notice {
   border-radius: 0.75rem;
-  border: 1px solid color-mix(in oklab, rgb(245 158 11) 25%, transparent);
-  background: color-mix(in oklab, rgb(245 158 11) 8%, transparent);
+  border: 1px solid color-mix(in oklab, var(--negative) 28%, transparent);
+  background: color-mix(in oklab, var(--negative) 8%, transparent);
   padding: 0.625rem 0.875rem;
   font-size: 0.8125rem;
-  color: rgb(253 230 138);
+  color: color-mix(in oklab, var(--negative) 75%, var(--foreground));
 }
 
 .ledger-notice--error {
-  border-color: color-mix(in oklab, rgb(245 158 11) 35%, transparent);
-}
-
-.ledger-hint {
-  font-size: 0.75rem;
-  line-height: 1.45;
-  color: var(--text-secondary);
+  border-color: color-mix(in oklab, var(--negative) 35%, transparent);
 }
 
 .ledger-csv-compare {
@@ -4071,28 +5813,12 @@ body::before {
   }
 }
 
-.ledger-csv-compare__panel {
-  border-radius: 1rem;
-  border: 1px solid color-mix(in oklab, var(--foreground) 8%, transparent);
-  padding: 0.875rem 1rem;
-  background: color-mix(in oklab, var(--surface) 50%, transparent);
-}
-
-.ledger-csv-compare__panel--projected {
-  border-color: color-mix(in oklab, rgb(16 185 129) 25%, transparent);
-  background: color-mix(in oklab, rgb(16 185 129) 6%, transparent);
-}
-
 .ledger-csv-compare__title {
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: var(--text-secondary);
-}
-
-.ledger-csv-compare__panel--projected .ledger-csv-compare__title {
-  color: rgb(110 231 183);
+  color: var(--text-tertiary);
 }
 
 .ledger-csv-meta {
@@ -4103,9 +5829,6 @@ body::before {
 }
 
 .ledger-csv-meta__pill {
-  border-radius: 9999px;
-  border: 1px solid color-mix(in oklab, var(--foreground) 10%, transparent);
-  background: color-mix(in oklab, var(--surface) 70%, transparent);
   padding: 0.125rem 0.5rem;
   font-size: 0.6875rem;
   font-variant-numeric: tabular-nums;
@@ -4262,6 +5985,12 @@ body::before {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+.chart-shell__mount {
+  position: relative;
+  width: 100%;
+  min-width: 0;
 }
 
 .chart-shell__date {

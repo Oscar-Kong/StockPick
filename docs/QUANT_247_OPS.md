@@ -26,7 +26,7 @@ Your 24/7 job is to **refresh the DB on a schedule**, then **score from cache**.
 | Tier | What | API cost | Frequency |
 |------|------|----------|-------------|
 | **A — Watchlist** | 5–20 symbols you care about | Low | 2–4× per trading day |
-| **B — Active sleeve scan** | One bucket (e.g. medium) | Medium | 1–2× per trading day |
+| **B — Active sleeve scan** | One bucket (penny or compounder) | Medium | 1–2× per trading day |
 | **C — Universe / quant jobs** | Full universe quotes, IC panel, fundamentals | High | 1× after close |
 
 **Live recommendations** should come from **Tier A + last Tier B scan**, not from running Tier B every 15 minutes.
@@ -101,7 +101,7 @@ cd backend && .venv/bin/python scripts/run_job_worker.py
 | **7:00 AM** | Refresh watchlist only | `POST /watchlist/refresh` |
 | **9:35 AM** | Post-open watchlist tick | `POST /watchlist/refresh` |
 | **12:00 PM** | Optional mid-day watchlist | `POST /watchlist/refresh` |
-| **3:45 PM** | Pre-close scan (one sleeve) | `POST /scan/medium` (or penny) |
+| **3:45 PM** | Pre-close scan (one sleeve) | `POST /scan/penny` or `POST /scan/compounder` |
 | **4:15 PM** | Daily DB pipeline | Scheduler `daily_pipeline` (quotes + fundamentals cap) |
 | **4:45 PM** | Quant jobs | Scheduler `quant_daily_jobs` (regime, IC, outcomes) |
 | **Weekends** | Nothing | Scheduler skips non-sessions (`SCHEDULER_MARKET_CALENDAR=XNYS`) |
@@ -116,8 +116,8 @@ crontab -e
 # Watchlist refresh — 7:00 and 9:35 ET (adjust for your TZ)
 0 7 * * 1-5  curl -s -X POST http://127.0.0.1:18731/watchlist/refresh
 35 9 * * 1-5 curl -s -X POST http://127.0.0.1:18731/watchlist/refresh
-# One medium scan pre-close
-45 15 * * 1-5 curl -s -X POST http://127.0.0.1:18731/scan/medium -H 'Content-Type: application/json' -d '{}'
+# One pre-close scan (penny or compounder)
+45 15 * * 1-5 curl -s -X POST http://127.0.0.1:18731/scan/penny -H 'Content-Type: application/json' -d '{}'
 ```
 
 Use `launchd` on Mac if the machine sleeps — cron will miss fires.
@@ -126,12 +126,12 @@ Use `launchd` on Mac if the machine sleeps — cron will miss fires.
 
 ## 6. Pick **one** active sleeve
 
-Running penny + medium + compounder scans 4× daily ≈ 3× API load.
+Running penny + compounder scans 4× daily ≈ 2× API load.
 
 For a 24/7 algo mindset:
 
 - **Day trading / momentum** → penny only, watchlist ≤ 15.
-- **Swing** → medium only (default for most users).
+- **Swing / multi-week** → penny (short-horizon model) or compounder for quality holds.
 - **Long-term** → compounder scan **once daily**; watchlist refresh weekly is enough.
 
 Align with [USER_GUIDE.md](USER_GUIDE.md) §2.
@@ -167,7 +167,7 @@ Intraday:
   Read cached latest scan (Screen UI) — do NOT re-scan unless schedule says so
 
 Decision:
-  For top 3 symbols → GET /api/v2/score/{sym}?sleeve=medium
+  For top 3 symbols → GET /api/v2/score/{sym}?sleeve=penny
   Optional → open Research once (no refresh=true spam)
 
 Journal:

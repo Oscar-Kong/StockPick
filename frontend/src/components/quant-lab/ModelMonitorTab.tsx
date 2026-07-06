@@ -13,7 +13,6 @@ import { buildQuantLabHref } from "@/lib/quantLabNavigation";
 import { useTranslation, useTRef } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { BucketSelect } from "./QuantLabTabShell";
 import { DataQualityTab } from "./DataQualityTab";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
@@ -30,10 +29,10 @@ type MonitorSection =
 
 interface ModelMonitorTabProps {
   sleeve: Bucket;
-  onSleeveChange: (sleeve: Bucket) => void;
+  onSleeveChange?: (sleeve: Bucket) => void;
 }
 
-export function ModelMonitorTab({ sleeve, onSleeveChange }: ModelMonitorTabProps) {
+export function ModelMonitorTab({ sleeve }: ModelMonitorTabProps) {
   const { t } = useTranslation();
   const tRef = useTRef();
   const router = useRouter();
@@ -111,7 +110,6 @@ export function ModelMonitorTab({ sleeve, onSleeveChange }: ModelMonitorTabProps
     <div className="space-y-3 text-sm">
       <p className="text-zinc-400">{t.quantLab.monitorHint}</p>
       <div className="flex flex-wrap items-end gap-2">
-        <BucketSelect label={t.common.bucket} value={sleeve} onChange={(v) => onSleeveChange(v as Bucket)} />
         <button type="button" className="rounded border border-zinc-700 px-2 py-1 text-xs" onClick={() => void load()}>
           {t.common.refresh}
         </button>

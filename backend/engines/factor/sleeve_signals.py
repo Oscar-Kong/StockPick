@@ -12,19 +12,12 @@ from scoring.technical import smooth_growth_score, smooth_growth_score_with_hori
 from data.fred_client import FredClient
 from scoring.sentiment import combined_sentiment_score
 from scoring.technical import (
-    breakout_score,
-    macd_score,
     momentum_score,
-    relative_strength_vs_spy,
     rsi_score,
-    trend_score,
     volatility_fit_score,
     volume_spike_score,
 )
-from scoring.sector_strength import sector_relative_strength
-from scoring.ml_signal import ml_medium_horizon_score
 from screeners.base import CandidateContext, WeightedSignal
-from screeners.penny import PennyScreener
 from services.openbb_integration import append_governance_signal
 from services.qlib_integration import get_symbol_alpha_score
 
@@ -39,30 +32,6 @@ def build_penny_signals(ctx: CandidateContext) -> list[WeightedSignal]:
         WeightedSignal("Social buzz", sentiment_data["score"], 0.20, "StockTwits sentiment"),
         WeightedSignal("Volatility fit", volatility_fit_score(df), 0.15, "ATR-based tradeability"),
     ]
-
-
-def build_medium_signals(ctx: CandidateContext) -> list[WeightedSignal]:
-    df = ctx.history
-    spy = ctx.spy_history
-    if spy is None or getattr(spy, "empty", True):
-        spy = PennyScreener()._spy()
-    sentiment_data = combined_sentiment_score(ctx.symbol, include_news=True)
-    rs = relative_strength_vs_spy(df, spy, days=20)
-    technical = (macd_score(df) + breakout_score(df) + trend_score(df)) / 3
-    ml_proxy = ml_medium_horizon_score(df, spy)
-    qlib_signal, qlib_source = get_symbol_alpha_score(Bucket.medium, ctx.symbol, ml_proxy)
-    sector = ctx.info.get("sector")
-    sector_strength = sector_relative_strength(
-        df, sector, spy, PennyScreener().ps.market, days=20
-    )
-    signals = [
-        WeightedSignal("20d momentum vs SPY", rs, 0.22, "Relative strength vs benchmark"),
-        WeightedSignal("Technical setup", technical, 0.23, "MACD, trend, breakout"),
-        WeightedSignal("Sector RS vs SPY", sector_strength, 0.18, f"Stock vs {sector or 'sector'} ETF"),
-        WeightedSignal("Qlib alpha (20d)", qlib_signal, 0.18, f"Model signal source: {qlib_source}"),
-        WeightedSignal("Sentiment", sentiment_data["score"], 0.19, "Finnhub/StockTwits news"),
-    ]
-    return append_governance_signal(signals, ctx.symbol, allow_fetch=OPENBB_ON_SCAN)
 
 
 def build_compounder_signals(ctx: CandidateContext) -> list[WeightedSignal]:
@@ -91,7 +60,6 @@ def build_compounder_signals(ctx: CandidateContext) -> list[WeightedSignal]:
 
 _BUILDERS = {
     "penny": build_penny_signals,
-    "medium": build_medium_signals,
     "compounder": build_compounder_signals,
 }
 
@@ -100,13 +68,11 @@ def build_sleeve_signals(ctx: CandidateContext, sleeve: str) -> list[WeightedSig
     if SLEEVE_FACTORS_V3_ENABLED:
         from engines.factor.sleeve_signals_v3 import (
             build_compounder_signals_v3,
-            build_medium_signals_v3,
             build_penny_signals_v3,
         )
 
         v3_builders = {
             "penny": build_penny_signals_v3,
-            "medium": build_medium_signals_v3,
             "compounder": build_compounder_signals_v3,
         }
         builder = v3_builders.get(sleeve)

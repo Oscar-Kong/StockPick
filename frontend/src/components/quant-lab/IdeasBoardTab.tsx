@@ -14,7 +14,6 @@ import { buildExperimentStudioHref } from "@/lib/experimentStudio";
 import { useTranslation, useTRef } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BucketSelect } from "./QuantLabTabShell";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 
@@ -22,10 +21,10 @@ const OPEN_STATUSES: ResearchIdeaStatus[] = ["new", "saved", "ready_to_test", "r
 
 interface IdeasBoardTabProps {
   sleeve: Bucket;
-  onSleeveChange: (sleeve: Bucket) => void;
+  onSleeveChange?: (sleeve: Bucket) => void;
 }
 
-export function IdeasBoardTab({ sleeve, onSleeveChange }: IdeasBoardTabProps) {
+export function IdeasBoardTab({ sleeve }: IdeasBoardTabProps) {
   const { t } = useTranslation();
   const tRef = useTRef();
   const router = useRouter();
@@ -183,7 +182,6 @@ export function IdeasBoardTab({ sleeve, onSleeveChange }: IdeasBoardTabProps) {
   return (
     <div className="space-y-3 text-sm">
       <div className="flex flex-wrap items-end gap-2">
-        <BucketSelect label={t.common.bucket} value={sleeve} onChange={(v) => onSleeveChange(v as Bucket)} />
         <label className="text-xs text-zinc-500">
           {t.quantLab.ideasSearch}
           <input

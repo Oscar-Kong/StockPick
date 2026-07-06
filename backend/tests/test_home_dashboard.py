@@ -43,6 +43,11 @@ def test_build_daily_dashboard_does_not_crash():
     assert result.portfolio_value >= 0
     assert result.disclaimer == ""
     assert result.freshness is None
+    assert result.daily_trading_plan is not None
+    assert result.daily_trading_plan.plan_id.startswith("dtp_")
+    assert result.daily_trading_plan.decision in {
+        "buy", "manage", "reduce", "exit", "watch", "stay_in_cash",
+    }
 
 
 def test_portfolio_total_is_buying_power_plus_invested():

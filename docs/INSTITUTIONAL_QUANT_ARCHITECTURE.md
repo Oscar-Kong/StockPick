@@ -1,6 +1,6 @@
 # Institutional Quant Model Architecture (v2)
 
-Target-state design for the Stock Picker platform: **penny (3–10d)**, **medium (4–8w)**, **compounder (multi-year)** sleeves, with a path from the **current codebase** to institutional robustness.
+Target-state design for the Stock Picker platform: **penny (3–10d)** and **compounder (multi-year)** sleeves, with a path from the **current codebase** to institutional robustness. Legacy API input `medium` normalizes to `penny`.
 
 **Companion artifacts**
 
@@ -116,7 +116,7 @@ backend/
   jobs/               # nightly_ic, rebalance_weights, factor_panel
 ```
 
-**Migration rule:** keep `screeners/penny|medium|compounder.py` API-compatible; internally call `ScoringEngine.score(symbol, sleeve)`.
+**Migration rule:** keep `screeners/penny|compounder.py` API-compatible; internally call `ScoringEngine.score(symbol, sleeve)`.
 
 ---
 
@@ -186,7 +186,7 @@ GET /api/v2/score/{symbol}
 
 - Factors \(i = 1..N\), sleeve \(s\), date \(t\)
 - \(f_{i,t}\): cross-sectionally normalized factor score (0–100) at \(t\)
-- \(r_{t+h}\): forward return over horizon \(h\) (sleeve-specific: penny \(h=5d\), medium \(h=20d\), compounder \(h=252d\))
+- \(r_{t+h}\): forward return over horizon \(h\) (sleeve-specific: penny \(h=5d\), compounder \(h=252d\))
 
 ### 4.2 Information Coefficient (rolling)
 
@@ -253,7 +253,7 @@ Let \(w_{i,t}^{base}\) from §4.5. Apply sleeve-specific overlay matrix \(A_{s,r
 w_{i,t}^{final} = \frac{A_{s,r(t),i} \cdot w_{i,t}^{base}}{\sum_j A_{s,r(t),j} \cdot w_{j,t}^{base}}
 \]
 
-**Example overlays (medium sleeve)** — multiply base weight:
+**Example overlays (compounder sleeve)** — multiply base weight:
 
 | Factor | Bull | Bear | Sideways | High vol | Low vol |
 |--------|------|------|----------|----------|---------|
@@ -484,7 +484,7 @@ m_{risk} = 1 - 0.006 \cdot RiskScore
 - \(R\): risk score 0–100
 - \(E\): current portfolio gross exposure (0–1)
 - \(N\): active positions count
-- Sleeve max weight cap \(W_{sleeve}^{max}\) (penny 3%, medium 8%, compounder 15%)
+- Sleeve max weight cap \(W_{sleeve}^{max}\) (penny 3%, compounder 15%)
 
 ### 9.2 Base weight (conviction)
 
@@ -673,7 +673,7 @@ build_report_v2(symbol, sleeve):
 ### Phase 3 — Sleeve factor expansion (4–6 weeks)
 
 - [x] Penny: float, limit-up proxy, sentiment pos/neg (`scoring/penny_factors.py`, `catalog_v3`)
-- [x] Medium: OBV, CMF, earnings revision proxy (`scoring/flow.py`, `scoring/medium_factors.py`)
+- [x] Compounder: OBV, CMF, earnings revision proxy (`scoring/flow.py`)
 - [x] Compounder: percentile PE/PB/PS, FCF, adjusted EPS (`scoring/compounder_v3.py`)
 - [x] Hard filters table-driven per sleeve (`engines/filters/hard_filters.py`, `HARD_FILTERS_V3_ENABLED`)
 

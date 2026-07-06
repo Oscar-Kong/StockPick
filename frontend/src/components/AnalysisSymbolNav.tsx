@@ -12,6 +12,27 @@ interface AnalysisSymbolNavProps {
   className?: string;
 }
 
+function ChevronIcon({ direction }: { direction: "left" | "right" }) {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 16 16"
+      className="analysis-symbol-nav-icon"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {direction === "left" ? (
+        <path d="M10 3L5 8l5 5" />
+      ) : (
+        <path d="M6 3l5 5-5 5" />
+      )}
+    </svg>
+  );
+}
+
 export function AnalysisSymbolNav({
   symbol,
   prevSymbol,
@@ -62,7 +83,7 @@ export function AnalysisSymbolNav({
         aria-label={prevSymbol ? fmt(t.analysis.prevSymbol, { symbol: prevSymbol }) : t.analysis.noPrevSymbol}
         title={prevSymbol ? fmt(t.analysis.prevSymbol, { symbol: prevSymbol }) : undefined}
       >
-        ←
+        <ChevronIcon direction="left" />
       </button>
       <span className="analysis-symbol-nav-current">{symbol}</span>
       <button
@@ -73,7 +94,7 @@ export function AnalysisSymbolNav({
         aria-label={nextSymbol ? fmt(t.analysis.nextSymbol, { symbol: nextSymbol }) : t.analysis.noNextSymbol}
         title={nextSymbol ? fmt(t.analysis.nextSymbol, { symbol: nextSymbol }) : undefined}
       >
-        →
+        <ChevronIcon direction="right" />
       </button>
     </div>
   );

@@ -15,11 +15,22 @@ Research and validation console. Shows **latest persisted evidence** before aski
 
 Quant Lab shows **latest evidence** on load, then lets you run heavy research on demand. It does not directly re-rank today's scan.
 
+## UI layout (2026 makeover)
+
+- **Header:** page title, sleeve selector (when the section uses a sleeve), **Guide** drawer button, and research-only badge.
+- **Sticky section nav:** workflow tabs (Overview → Model Monitor); Legacy in **More** menu below 900px.
+- **Section workspace:** single `DataPanel` per section; no forced min-height padding.
+- **Guide drawer:** Evidence, Scan relationship, and Action boundary panels (formerly stacked above content).
+- **Overview:** four `MetricTile` KPIs + two-column findings grid.
+- **Experiments:** configure/review use a desktop split pane (form + run summary aside).
+
+See `design-system/pages/quant-lab.md` for the full spec.
+
 See also: [Product flow in UI](../frontend/src/components/product/ProductFlowDiagram.tsx) — rendered on `/quant-lab`.
 
 ## Evidence overview (page load)
 
-On open, Quant Lab loads read-only summaries via `GET /api/v2/quant-lab/evidence?sleeve=medium`:
+On open, Quant Lab loads read-only summaries via `GET /api/v2/quant-lab/evidence?sleeve=penny`:
 
 | Card | Source | Persisted? |
 |------|--------|------------|
@@ -55,7 +66,6 @@ Env: `QUANT_LAB_RESEARCH_API_ENABLED`, `RESEARCH_MAX_ORDINARY_MODIFIER` (default
 |---------|-------|----------------|
 | Overview | `section=overview` (default) | `GET /api/v2/research/overview?sleeve=` only |
 | Ideas | `section=ideas` | `GET /api/v2/research/ideas` |
-| Models | `section=models` | Static model library (GBM, HMM, Markowitz, cointegration, GARCH) — no API |
 | Model Monitor | `section=model-monitor` | `GET /api/v2/research/model-monitor` — factor/prediction/data health, jobs, audit, evidence review |
 | Legacy tools | `section=legacy&tab=` | Factor performance, walk-forward, predictions, pairs |
 
@@ -63,19 +73,7 @@ Overview includes deterministic **research brief** findings, recommended ideas, 
 
 Ideas board supports manual create, generate-from-brief, edit/notes/priority, archive, duplicate, and **Configure experiment** (creates experiment record + opens Experiment Studio).
 
-## Model library (`section=models`)
-
-Read-only reference for five core quant models with KaTeX-rendered equations and **In this project** mapping:
-
-| Model | Status | Where used in this repo |
-|-------|--------|-------------------------|
-| Geometric Brownian Motion | Reference | Conceptual baseline; walk-forward and optimizer use empirical returns |
-| Hidden Markov Model | Partial | Target for regime labels; today rule-based SPY vol in `scoring/regime.py` |
-| Markowitz Mean–Variance | Live | `portfolio_optimizer.py` / PyPortfolioOpt — Portfolio → Research |
-| Cointegration & stat arb | Live | `engines/pairs/` — Legacy Pairs tab & Experiment Studio |
-| GARCH | Partial | ATR-based vol regime proxy; full GARCH fit not wired yet |
-
-Route: `/quant-lab?section=models`. No backend API — static catalog in `frontend/src/lib/quantLabModels.ts`.
+> **Retired:** `section=models` (static equation library) redirects to `section=model-monitor`. Use Portfolio → Research for Markowitz optimization and Legacy → Pairs for cointegration research.
 
 ## Experiment Studio (Phase 4)
 
@@ -126,7 +124,6 @@ frontend/src/components/quant-lab/
   IdeasBoardTab.tsx         → ideas CRUD + generate
   ExperimentStudio.tsx      → unified experiment wizard
   ResultsTab.tsx            → paginated runs + detail + compare
-  ModelsTab.tsx             → model library (equations + project mapping)
   ModelMonitorTab.tsx       → health, jobs, audit, evidence review
   LegacyQuantLabTabs.tsx    → factor, WF, predictions, pairs
   QuantLabTabShell.tsx      → shared UI helpers
@@ -163,6 +160,66 @@ Run IC panel (populates Factor Performance):
 ```bash
 curl -X POST http://127.0.0.1:18731/api/v2/jobs/ic-panel
 ```
+
+## Factor discovery (Phase 6B LLM layer complete)
+
+Phase 0–6B backend persistence, gated experiment integration, and schema-constrained LLM research layer are **complete**. Both runtime flags remain **disabled by default** (`FACTOR_DISCOVERY_ENABLED=false`, `FACTOR_DISCOVERY_LLM_ENABLED=false`).
+
+- Contracts: `backend/models/schemas_factor_discovery.py`
+- DSL & compiler: `backend/engines/factor/discovery/`
+- Execution engine: `compute_factor_panel()` — see [execution engine](./quant-lab/factor-discovery-execution-engine.md)
+- Validation engine: `validate_factor_execution()` — see [validation engine](./quant-lab/factor-discovery-validation-engine.md)
+- Phase 5 persistence: [registry & ledger](./quant-lab/factor-discovery-registry-and-ledger.md) · [sealed-test policy](./quant-lab/factor-discovery-sealed-test-policy.md) · [experiment runner](./quant-lab/factor-discovery-experiment-runner.md)
+- Phase 6A hardening: [data provider](./quant-lab/factor-discovery-data-provider.md) · [concurrency & idempotency](./quant-lab/factor-discovery-concurrency-and-idempotency.md) · [operations](./quant-lab/factor-discovery-operations.md)
+- Phase 6B LLM: [LLM architecture](./quant-lab/factor-discovery-llm-architecture.md) · [prompts](./quant-lab/factor-discovery-llm-prompts.md) · [security](./quant-lab/factor-discovery-llm-security.md) · [human review policy](./quant-lab/factor-discovery-human-review-policy.md)
+- Env: `FACTOR_DISCOVERY_ENABLED`, `FACTOR_DISCOVERY_LLM_ENABLED`, `FACTOR_DISCOVERY_LLM_PROVIDER` (all default off/disabled)
+- Docs: [audit](./quant-lab/factor-discovery-audit.md) · [architecture](./quant-lab/factor-discovery-architecture.md) · [DSL](./quant-lab/factor-discovery-dsl.md) · [data inventory](./quant-lab/factor-discovery-data-inventory.md) · [risk register](./quant-lab/factor-discovery-risk-register.md) · [implementation plan](./quant-lab/factor-discovery-implementation-plan.md)
+
+> A persisted validation pass is research evidence only. It does not authorize paper trading, production Scan use, or production lifecycle promotion.
+
+## Factor Discovery mining loop (Phase 7) & workspace (Phase 8B / 9A)
+
+Backend bounded workflow: hypothesis generation → human review → formula translation → closed experiment → critique with validation-exposure limits. Disabled by default (`FACTOR_DISCOVERY_LOOP_ENABLED=false`).
+
+**Quant Lab UI:** `/quant-lab?section=factor-discovery` — supervised session dashboard, new research flow, **server-backed review queue**, **candidate review cards**, **validation evidence panel**, **factor registry**, readiness. See [factor-discovery-workspace.md](./quant-lab/factor-discovery-workspace.md).
+
+**Phase 9A** completes research review and evidence presentation. It does **not** validate factors for investment use, reveal sealed-test performance, promote lifecycle status, or connect factors to production Scan. Real-data staging validation is **Phase 9B**.
+
+**Phase 9B** adds real-data staging validation: preflight audits, immutable snapshot reproducibility, and staging audit artifacts. See [factor-discovery-staging-validation.md](./quant-lab/factor-discovery-staging-validation.md).
+
+**Phase 9B.2** runs an extended staging matrix across Penny and Compounder sleeves with regime slices, negative controls, and a promotion-readiness gate (`READY_FOR_PROMOTION_REVIEW` / `NOT_READY_FOR_PROMOTION_REVIEW`). See [FACTOR_MINING_EXTENDED_STAGING.md](./FACTOR_MINING_EXTENDED_STAGING.md).
+
+**Phase 10** adds controlled promotion governance: lifecycle states from `experimental` through `approved_for_manual_integration`, versioned promotion gates, immutable evidence bundles, shadow scoring (research-only), and the **Promotion Review** tab in Factor Discovery. Does **not** activate live scan scoring. See [FACTOR_PROMOTION_GOVERNANCE.md](./FACTOR_PROMOTION_GOVERNANCE.md) and [FACTOR_SHADOW_SCORING.md](./FACTOR_SHADOW_SCORING.md).
+
+**Phase 11** (final) adds the acceptance runner, isolation audit, traceability matrix, and release documentation. Status: **`PHASE_11_COMPLETE`**. See [FACTOR_RESEARCH_FINAL_ACCEPTANCE.md](./FACTOR_RESEARCH_FINAL_ACCEPTANCE.md), [PHASE_0_TO_11_TRACEABILITY.md](./PHASE_0_TO_11_TRACEABILITY.md), [RESEARCH_RELIABILITY.md](./RESEARCH_RELIABILITY.md).
+
+```bash
+python backend/scripts/run_factor_research_acceptance.py --mode fixture   # CI
+python backend/scripts/run_factor_research_acceptance.py --mode real      # local DB
+```
+
+- Architecture: [quant-lab/factor-discovery-mining-loop.md](./quant-lab/factor-discovery-mining-loop.md)
+- Review UI: [factor-discovery-candidate-review-ui.md](./quant-lab/factor-discovery-candidate-review-ui.md) · [promising review](./quant-lab/factor-discovery-promising-review-ui.md) · [artifact integrity UI](./quant-lab/factor-discovery-artifact-integrity-ui.md) · [factor registry](./quant-lab/factor-discovery-factor-registry.md)
+- API: `GET/POST /api/v2/research/factor-discovery/...` (503 when disabled)
+- Does **not** affect live Scan rankings or open sealed tests
+
+## Scan Selection Evaluation (Experiment Studio)
+
+`experiment_type: scan_evaluation` is wired through Experiment Studio (UI: `ScanEvaluationConfigFields` on configure, `ScanEvaluationResultPanel` on result + Results detail):
+
+| Step | Module |
+|------|--------|
+| Template | `experiment_presets_service.TEMPLATE_META` + Experiment Studio choose step |
+| Configure | `ScanEvaluationConfigFields.tsx` (algorithms, horizons, friction) |
+| Validate | `experiment_validation_service` + `validate_scan_evaluation_params` |
+| Launch | `experiment_launch_service._run_scan_evaluation` |
+| Runner | `scan_evaluation_experiment_runner.ScanEvaluationExperimentRunner` |
+| Persist | `backtest_runs` (`run_type=scan_evaluation`) |
+| Index | `research_run_service.adapter_scan_evaluation` |
+| Results UI | `ScanEvaluationResultPanel.tsx` (comparison table + caveats) |
+| Charts | `scan_evaluation_charts.charts_from_artifact` via `research_run_detail_service.build_charts` |
+
+Preset: `scan_eval_smoke`. Does **not** modify production scan rankings.
 
 ## Related
 

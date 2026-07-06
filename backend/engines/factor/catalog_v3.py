@@ -14,16 +14,6 @@ FACTOR_CATALOG_V3: dict[str, list[FactorSpec]] = {
         FactorSpec(_fid("penny", "intraday_vol"), "Intraday volatility", 0.08, "secondary", signal_name="Intraday volatility"),
         FactorSpec(_fid("penny", "float_size"), "Float size", 0.04, "secondary", signal_name="Float size"),
     ],
-    "medium": [
-        FactorSpec(_fid("medium", "rs_vs_spy"), "20d momentum vs SPY", 0.18, "critical", signal_name="20d momentum vs SPY"),
-        FactorSpec(_fid("medium", "trend_quality"), "Trend quality", 0.16, "critical", signal_name="Trend quality"),
-        FactorSpec(_fid("medium", "obv_slope"), "OBV slope", 0.12, "important", signal_name="OBV slope"),
-        FactorSpec(_fid("medium", "capital_flow"), "Capital flow (CMF)", 0.12, "important", signal_name="Capital flow (CMF)"),
-        FactorSpec(_fid("medium", "institutional_buy"), "Institutional flow proxy", 0.10, "important", signal_name="Institutional flow proxy"),
-        FactorSpec(_fid("medium", "chip_concentration"), "Holder concentration", 0.08, "secondary", signal_name="Holder concentration"),
-        FactorSpec(_fid("medium", "sector_rs"), "Sector RS vs SPY", 0.14, "important", signal_name="Sector RS vs SPY"),
-        FactorSpec(_fid("medium", "earnings_revision"), "Earnings revision", 0.10, "important", signal_name="Earnings revision"),
-    ],
     "compounder": [
         FactorSpec(_fid("compounder", "rev_growth"), "Revenue growth", 0.15, "critical", signal_name="Revenue growth"),
         FactorSpec(_fid("compounder", "eps_growth"), "EPS growth (adjusted)", 0.13, "critical", signal_name="EPS growth (adjusted)"),

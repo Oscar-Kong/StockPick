@@ -451,6 +451,9 @@ def _list_recent_queue_jobs(limit: int = 10) -> list[dict[str, Any]]:
 
 
 def get_quant_lab_evidence(sleeve: str = DEFAULT_BUCKET) -> QuantLabEvidenceResponse:
+    from core.sleeve import normalize_sleeve
+
+    sleeve = normalize_sleeve(sleeve)
     return QuantLabEvidenceResponse(
         sleeve=sleeve,
         generated_at=_utcnow().isoformat(),

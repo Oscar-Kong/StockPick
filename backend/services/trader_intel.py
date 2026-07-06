@@ -36,7 +36,7 @@ def _profiles() -> list[dict]:
             ],
             "integration_recipe": {
                 "style": "concentrated_value_catalyst",
-                "bucket_bias": ["medium", "compounder"],
+                "bucket_bias": ["penny", "compounder"],
                 "scan_tilt": {
                     "max_results": 12,
                     "min_volume": 500000,
@@ -95,7 +95,7 @@ def _profiles() -> list[dict]:
             ],
             "integration_recipe": {
                 "style": "thematic_chokepoint",
-                "bucket_bias": ["medium", "compounder"],
+                "bucket_bias": ["penny", "compounder"],
                 "scan_tilt": {
                     "max_results": 20,
                     "prefer_sector_focus": ["Semiconductors", "AI Infrastructure", "Power"],
@@ -149,7 +149,7 @@ def _profiles() -> list[dict]:
             ],
             "integration_recipe": {
                 "style": "institutional_13f_overlay",
-                "bucket_bias": ["compounder", "medium"],
+                "bucket_bias": ["compounder", "penny"],
                 "scan_tilt": {
                     "max_results": 25,
                     "prefer_market_cap": "mid_to_large",
@@ -208,7 +208,7 @@ def _profiles() -> list[dict]:
             ],
             "integration_recipe": {
                 "style": "momentum_breakout",
-                "bucket_bias": ["penny", "medium"],
+                "bucket_bias": ["penny", "compounder"],
                 "scan_tilt": {
                     "max_results": 20,
                     "min_volume": 1000000,
@@ -259,11 +259,13 @@ def build_trader_preset(slug: str, bucket: str) -> dict | None:
     if not profile:
         return None
     style = profile["integration_recipe"]["style"]
-    b = bucket.lower()
-    if b not in ("penny", "medium", "compounder"):
+    from core.sleeve import normalize_sleeve
+
+    b = normalize_sleeve(bucket.lower())
+    if b not in ("penny", "compounder"):
         return None
 
-    default_horizon = {"penny": "1y", "medium": "3y", "compounder": "5y"}[b]
+    default_horizon = {"penny": "1y", "compounder": "5y"}[b]
     preset = {
         "slug": slug,
         "bucket": b,
@@ -290,7 +292,7 @@ def build_trader_preset(slug: str, bucket: str) -> dict | None:
     elif style == "institutional_13f_overlay":
         preset["scan_options"]["min_volume"] = 1_500_000
         preset["backtest_overrides"] = {"hold_days": 63, "stop_pct": 0.15, "target_pct": 0.25}
-        preset["horizon"] = "5y" if b == "compounder" else "3y"
+        preset["horizon"] = "5y" if b == "compounder" else "1y"
         preset["notes"] = ["13F overlay: delayed signal; longer hold windows are more realistic."]
 
     return preset

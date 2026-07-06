@@ -1,7 +1,7 @@
 """Brokerage CSV import and portfolio holdings."""
 from __future__ import annotations
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 
 from models.schemas import (
     BrokerageCsvImportResponse,
@@ -28,6 +28,7 @@ from services.portfolio_snapshot_service import (
     get_current_portfolio,
     import_robinhood_csv_and_decide,
     list_import_history,
+    robinhood_mcp_status,
     set_buying_power,
     validate_robinhood_csv,
 )
@@ -209,6 +210,42 @@ async def validate_robinhood_csv_route(file: UploadFile = File(...)):
         return report
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Validation failed: {exc}") from exc
+
+
+@router.get("/robinhood-mcp/status")
+def robinhood_mcp_status_route():
+    """Whether Robinhood MCP OAuth is configured for live portfolio sync."""
+    return robinhood_mcp_status()
+
+
+@router.post("/sync/robinhood-mcp")
+def sync_robinhood_mcp_route(
+    run_decision: bool = Query(False, description="Run daily decision after sync (slower)"),
+):
+    """Start background Robinhood MCP sync (positions + order history)."""
+    require_non_demo_mode()
+    from integrations.robinhood.mcp_client import RobinhoodMcpClient
+    from services.robinhood_mcp_sync_service import start_robinhood_mcp_sync
+
+    client = RobinhoodMcpClient()
+    if not client.is_configured():
+        raise HTTPException(
+            status_code=401,
+            detail="Robinhood MCP not authenticated. Run: ./scripts/robinhood-mcp-login.sh",
+        )
+    job_id = start_robinhood_mcp_sync(run_decision=run_decision)
+    return {"job_id": job_id, "status": "running", "message": "Robinhood sync started"}
+
+
+@router.get("/sync/robinhood-mcp/{job_id}")
+def sync_robinhood_mcp_job_route(job_id: str):
+    """Poll Robinhood MCP sync job status."""
+    from services.robinhood_mcp_sync_service import get_robinhood_mcp_sync_job
+
+    job = get_robinhood_mcp_sync_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Sync job not found")
+    return job
 
 
 router_portfolio = APIRouter(prefix="/portfolio", tags=["portfolio-holdings"])

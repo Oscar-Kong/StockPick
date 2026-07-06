@@ -2,7 +2,7 @@
 
 > **Route:** `/` (default tab: Today)  
 > **Component:** `PortfolioToday` via `PortfolioWorkspace`  
-> **Audit:** `docs/UI_AUDIT.md` §12.1 (Portfolio/Home), §15 Phase 4, §16 guardrails  
+> **Audit:** `docs/UI_AUDIT_REVISED.md` §12.1 (Portfolio/Home), §15 Phase 4, §16 guardrails  
 > **Implementation phase:** Phase 4 (page redesign) — after Phase 0 baseline, Phase 1 a11y/nav, Phase 2 tokens, Phase 3 shared components  
 > **Parent:** `design-system/MASTER.md`  
 > **ui-ux-pro-max pattern:** Real-Time Operations Dashboard — dark, data-dense, status colors (green/amber/red), scannable metrics
@@ -23,7 +23,7 @@
 | Scattered summary metrics | Browser validation required | Confirm at 390/768/1024/1440 before Band 2 redesign (§12.1) |
 | Sidebar split (35/65) | Browser validation required | Do not ship grid change until holdings table remains primary in browser (§12.1) |
 
-**Naming (audit §4.3):** Audit treats Portfolio/Home as one route family. This file covers the **Today / daily cockpit** tab only; Research and Activity are in `portfolio.md`.
+**Naming (audit §4.3):** Audit treats Portfolio/Home as one route family. This file covers the **Today / daily cockpit** tab only; **Daily Plan**, Activity, and Research are separate Portfolio tabs (tab order: Today · Plan · Activity · Research).
 
 ---
 
@@ -31,7 +31,7 @@
 
 The Home page is the **operational cockpit**: answer “What should I do with my portfolio today?” without extra clicks. It is not a marketing landing page.
 
-**Preserve:** Buy/Hold/Sell percentages, confidence, decision queue, holdings table, risk alerts, penny opportunities, Run Now / Refresh, data freshness banners, demo-data indicators, all API contracts.
+**Preserve:** Buy/Hold/Sell percentages, confidence, decision queue, **Daily Trading Plan** (dedicated **Daily Plan** tab — policy-gated short-term plan), holdings table, risk alerts, penny opportunities, Run Now / Refresh, data freshness banners, demo-data indicators, all API contracts.
 
 ---
 
@@ -44,17 +44,20 @@ Transform Home from “header + stacked panels” into a **three-band command la
 │ Band 1 — Cockpit header (compact, single row on desktop)│
 │  Title · Status pill · Freshness · Primary actions      │
 ├─────────────────────────────────────────────────────────┤
-│ Band 2 — Summary strip (bullet-chart style KPIs)        │
-│  Value · Day P/L · Cash · Decision mix · Risk flag      │
+│ Band 2 — Performance hero (Robinhood-style)             │
+│  Total value · range % · 1D/1W/1M/6M/1Y area chart      │
+│  KPI row: Today P/L · Unrealized P/L · Realized P/L     │
 ├─────────────────────────────────────────────────────────┤
-│ Band 3 — Split workspace                              │
+│ Band 3 — Split workspace (Today tab)                    │
 │  ┌──────────────────────┬──────────────────────────┐  │
 │  │ Action queue (left)   │ Holdings table (primary) │  │
-│  │ Risk alerts           │ Expandable row details   │  │
-│  │ Penny ops (optional)  │                          │  │
+│  │ Penny ops (optional)  │ Expandable row details   │  │
+│  │ Risk alerts           │                          │  │
 │  └──────────────────────┴──────────────────────────┘  │
 └─────────────────────────────────────────────────────────┘
 ```
+
+**Performance hero (`PortfolioPerformancePanel`):** Full-width glass card with gradient area chart; range pills as segmented control (role=tablist); KPI strip uses semantic green/red for P/L only. Data from `GET /portfolio/performance`; **YTD-only** — unrealized = open-position cost basis; realized = `{year}` closed trades; chart replays `{year}` ledger from first trade date (MCP deposits calibrated from live buying power). Refreshes after Robinhood MCP sync via `performanceRefreshKey`.
 
 ui-ux-pro-max guidance: use **bullet charts / visible numeric KPIs** beside any visual indicators — never color-only status (chart domain: Performance vs Target, AAA accessibility).
 
@@ -65,7 +68,7 @@ ui-ux-pro-max guidance: use **bullet charts / visible numeric KPIs** beside any 
 | Area | Current | Makeover | Priority |
 |------|---------|----------|----------|
 | Hero | `DailyDecisionHero` separate from today toolbar — duplicated meta | Single compact cockpit bar; merge hero into Band 1 | Major |
-| Summary | `PortfolioSummaryStrip` below hero | Elevate to Band 2; use unified `MetricTile` (consolidate StatTile + SummaryStrip) | Moderate |
+| Summary | `PortfolioSummaryStrip` below hero | **Shipped:** `PortfolioPerformancePanel` — value + chart + P/L KPIs (Band 2) | Moderate |
 | Tabs | Portfolio tabs in `PageHeader` actions | Move workspace tabs **below** page title (match Scan pattern); Home = default tab | Moderate |
 | Holdings | `ActiveHoldingsDecisionTable` full width | Primary column 65%; action queue + alerts in 35% sidebar on `lg+` | Major |
 | Empty state | `EmptyPortfolioState` centered | Action-oriented card: Import CSV CTA + link to Activity + sample screenshot hint | Moderate |
@@ -157,7 +160,7 @@ ui-ux-pro-max guidance: use **bullet charts / visible numeric KPIs** beside any 
 - [ ] Merge hero + toolbar into single cockpit bar
 - [ ] Move Portfolio tabs below page title (coordinate with `portfolio.md`)
 - [ ] Bullet-style summary strip with labeled KPIs (wrap existing SummaryStrip)
-- [ ] Sidebar layout for queue/alerts on desktop — **only if** holdings table stays primary
+- [x] Sidebar layout for queue/alerts on desktop — **only if** holdings table stays primary (penny ops under action queue)
 - [ ] Mobile column reduction + row drawer (not full card conversion)
 - [ ] Phase 2 token cleanup per component — classify each green use (§5.2)
 - [ ] Inventory all actions/metrics before/after (audit Phase 0 step 8)

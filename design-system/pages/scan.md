@@ -30,6 +30,8 @@ Scan is a **live operations screen**: run bucket scans, monitor progress, review
 
 **Preserve:** Bucket tabs (penny, medium, compounder), scan polling, score breakdown, recommendation columns, stale/fresh badges, result counts, command bar actions, saved scans link.
 
+**Glass panels (2026-07-04):** `ScanScoringNote` uses shared `GlassPanel` hero variant (same ambient glow as Analyze `analysis-hero`).
+
 ---
 
 ## Makeover vision

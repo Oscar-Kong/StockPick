@@ -66,13 +66,30 @@ Open: `http://127.0.0.1:18730`
 | Scan      | `/scan` → run one bucket                        |
 | Workspace | Add ticker to watchlist → open Research         |
 | Analyze   | Quant tab shows signal bars; Refresh works      |
-| Portfolio | `/` — Today (decisions), Research (optimize/backtest/exposure/allocation), Activity (CSV review, transaction ledger) |
+| Portfolio | `/` — Today (holdings & action queue), Daily Plan (`?tab=plan`), Research (optimize/backtest/exposure/allocation), Activity (CSV review, transaction ledger) |
 | Library   | Save a scan or report, visible under `/library` |
 | Ledger    | Portfolio → Activity → Transaction ledger (`/?tab=activity`; legacy `/?journal=1` redirects here) |
 
 Investor guide for Analyze: [ANALYZE_PANEL.md](ANALYZE_PANEL.md)
 
 Round 2 quant (recommendation loop, valuation, jobs): [MANUAL_INTEGRATION.md](MANUAL_INTEGRATION.md)
+
+---
+
+## 2.5 Robinhood MCP — live portfolio sync
+
+For **live** holdings without CSV exports (daily trading):
+
+```bash
+./scripts/robinhood-mcp-login.sh    # once — OAuth
+./scripts/sync-robinhood-mcp.sh     # pull positions into StockPick
+```
+
+Or `POST /api/brokerage/sync/robinhood-mcp` while the backend is running.
+
+Cursor chat (optional): `.cursor/mcp.json` + **Settings → Tools & MCP → Connect** if MCP shows errored until OAuth completes.
+
+Full guide: [ROBINHOOD_MCP.md](ROBINHOOD_MCP.md).
 
 ---
 
@@ -109,7 +126,7 @@ Important for local dev:
 | ------------------- | --------------------------------- |
 | `SCHEDULER_ENABLED` | `false` — less background load    |
 | `SCAN_EMAIL_ENABLED` | `false` — morning scan email off locally |
-| `SCAN_EMAIL_TO` | recipient(s), comma-separated when enabling email |
+| `SCAN_EMAIL_TO` | fallback recipient(s) when Settings mailing list is empty; comma-separated |
 | `SMTP_USER` / `SMTP_PASSWORD` | Gmail + App Password when using SMTP |
 | `OPENBB_ON_SCAN`    | `false` — faster bulk scans       |
 | `OPENBB_ENABLED`    | `true` only when OpenBB installed |
@@ -120,6 +137,8 @@ Primary data roles default to **finnhub** for quotes and **FMP** for fundamental
 **FMP 403 / blocked history:** if FMP returns HTTP 403 (common on free-tier keys), the backend trips a process-wide circuit breaker and falls back to **yfinance** for OHLC during scans and analyze. Install `yfinance` (`pip install yfinance`) — it is listed in `backend/requirements.txt`. Logs will show `FMP access denied (403) — disabling FMP for this process`. Restart the backend to retry FMP after fixing the key or tier.
 
 **Analyze OHLC freshness:** `PriceService.get_history()` now checks the **last bar date**, not only row count. Stale SQLite history triggers a provider fetch, merge, and persist. `GET /analyze/{symbol}?refresh=true` bypasses the analysis cache **and** forces a price-history refresh. The response includes `price_history_last_date`, `price_history_is_stale`, `price_history_refreshed_at`, and `price_history_bar_count`.
+
+**Portfolio live marks:** During regular and extended market hours, `PriceService.get_latest_price()` and **Refresh data** (`POST /home/refresh`) use Finnhub/AkShare live quotes (not only the last stored daily close). `refresh_prices_for_holdings` persists today's session bar from the live quote when available. Outside market hours, holdings still use the latest completed daily bar.
 
 **Scan default in UI:** bucket scans now default to `mode=fast` (15 deep-scored candidates). Use deep mode from the API (`POST /scan/{bucket}` with `"mode":"deep"`) when you want the full Stage B cap (`SCAN_STAGE_B_TOP_N`, default 50).
 
@@ -240,7 +259,7 @@ The scan results table shows **only `ranking_score`** when `confidence_score` an
 
 | Env | Default | Role |
 |-----|---------|------|
-| `SCAN_RANK_ALPHA_WEIGHT_PENNY` | `0.65` | Alpha weight (penny bucket; medium/compounder have `_MEDIUM` / `_COMPOUNDER` variants) |
+| `SCAN_RANK_ALPHA_WEIGHT_PENNY` | `0.65` | Alpha weight (penny bucket; compounder has `_COMPOUNDER` variant) |
 | `SCAN_RANK_CONFIDENCE_WEIGHT_PENNY` | `0.20` | Confidence weight |
 | `SCAN_RANK_TRADABILITY_WEIGHT_PENNY` | `0.15` | Tradability weight |
 | `SCAN_MAX_PER_SECTOR` | `3` | Max final results from one sector |
@@ -261,6 +280,8 @@ cd backend && python scripts/run_scan_evaluation.py \
 
 See [SCAN_EVALUATION.md](SCAN_EVALUATION.md) for MacBook quick start, algorithm version labels, and output files.
 
+`data/scan_eval/` and generated `data/factor_discovery/{snapshots,acceptance,extended_staging,staging_input/batches}/` are **gitignored** — regenerate locally; do not commit evaluation or factor-discovery run artifacts.
+
 ### Auto-refresh slot reservation
 
 `services.refresh_orchestrator.try_begin_auto_refresh()` is the only correct
@@ -276,7 +297,7 @@ still uses `start_home_refresh_async` and bypasses the cooldown when `force=true
 
 See [PROJECT_INVENTORY.md](PROJECT_INVENTORY.md) for UI gaps.
 
-1. **Offline alpha** → `POST /ml/alpha/ingest` → scan medium/compounder
+1. **Offline alpha** → `POST /ml/alpha/ingest` → scan penny/compounder
 2. **Portfolio optimize** → `POST /portfolio/optimize` with symbol list
 3. **Portfolio policy backtest** → `POST /portfolio/policy-backtest` (`institutional: false` for fast sim; `true` or `POST /api/v2/backtest/portfolio` for costs/slippage)
 4. **Portfolio factor exposure** → `POST /portfolio/factor-exposure`
@@ -361,12 +382,37 @@ curl -s -X POST "http://127.0.0.1:18731/api/v2/research/gate/evaluate?run_id=YOU
 
 `RESEARCH_MAX_ORDINARY_MODIFIER=0` (default) keeps supporting/contradicting evidence **display-only** — no score mutation.
 
+### Factor promotion governance (Phase 10)
 
-Seed deterministic evidence (IC, walk-forward, predictions, pairs, jobs):
+Advisory review only. **Does not change live scan rankings or factor weights.**
+
+```bash
+# Enable in .env (both default false)
+FACTOR_PROMOTION_GOVERNANCE_ENABLED=true
+FACTOR_SHADOW_SCORING_ENABLED=true
+
+# Readiness
+curl -s "http://127.0.0.1:18731/api/v2/research/factor-discovery/promotion/readiness" | jq .
+
+# List promotion candidates
+curl -s "http://127.0.0.1:18731/api/v2/research/factor-discovery/promotion-candidates" | jq .
+```
+
+Prerequisite: Phase 9B.2 extended staging at `READY_FOR_PROMOTION_REVIEW`. See [FACTOR_PROMOTION_GOVERNANCE.md](FACTOR_PROMOTION_GOVERNANCE.md).
+
+### Phase 11 final acceptance
+
+```bash
+python backend/scripts/run_factor_research_acceptance.py --mode fixture
+python backend/scripts/run_factor_research_acceptance.py --mode real
+```
+
+See [FACTOR_RESEARCH_FINAL_ACCEPTANCE.md](FACTOR_RESEARCH_FINAL_ACCEPTANCE.md).
+
 
 ```bash
 cd backend
-python scripts/seed_quant_lab_demo.py --sleeve medium
+python scripts/seed_quant_lab_demo.py --sleeve penny
 DATABASE_URL=sqlite:///$(pwd)/../storage/dev/quant_lab_demo.db \
   python -m uvicorn main:app --port 18731
 ```
@@ -426,7 +472,39 @@ SCAN_EMAIL_FROM=StockPick <you@gmail.com>
 SCAN_EMAIL_TO=you@gmail.com
 ```
 
-`SCAN_EMAIL_FROM` must match `SMTP_USER`, or a **Send mail as** alias configured in Gmail settings. Northeastern/other addresses work as **recipients** (`SCAN_EMAIL_TO`) but not as the SMTP sender unless added as a Gmail alias.
+**163 / QQ SMTP (China-friendly):** enable POP3/SMTP or IMAP/SMTP in mailbox settings and use the **authorization code** (授权码), not your login password. 163 typically requires **port 465** (implicit SSL); Gmail uses **587** (STARTTLS).
+
+```env
+SMTP_HOST=smtp.163.com
+SMTP_PORT=465
+SMTP_USER=you@163.com
+SMTP_PASSWORD=your-163-authorization-code
+SCAN_EMAIL_FROM=StockPick <you@163.com>
+```
+
+QQ: `smtp.qq.com`, port `465`, same authorization-code flow.
+
+**Gmail fallback (optional):** when primary SMTP fails (timeout, network), StockPick retries via fallback credentials. Useful to keep Gmail configured while using 163 as primary in China.
+
+```env
+# Primary: 163
+SMTP_HOST=smtp.163.com
+SMTP_PORT=465
+SMTP_USER=you@163.com
+SMTP_PASSWORD=your-163-authorization-code
+SCAN_EMAIL_FROM=StockPick <you@163.com>
+
+# Fallback: Gmail
+SMTP_FALLBACK_HOST=smtp.gmail.com
+SMTP_FALLBACK_PORT=587
+SMTP_FALLBACK_USER=you@gmail.com
+SMTP_FALLBACK_PASSWORD=your-gmail-app-password
+SCAN_EMAIL_FROM_FALLBACK=StockPick <you@gmail.com>
+```
+
+`SCAN_EMAIL_FROM` must match primary `SMTP_USER`. Fallback uses `SCAN_EMAIL_FROM_FALLBACK` (or derives from `SMTP_FALLBACK_USER`). Northeastern/other addresses work as **recipients** (`SCAN_EMAIL_TO`) but not as the SMTP sender unless added as a Gmail alias.
+
+**Mailing list (Settings UI):** add recipients under Settings → Ops → **Mailing list**. Addresses are stored in `backend/data_store/mailing_list.json`. When the list has active subscribers, it is the source of truth for delivery (`.env` `SCAN_EMAIL_TO` is ignored). When the list is empty, `SCAN_EMAIL_TO` is used as a fallback. Use **Import from .env** to copy existing `SCAN_EMAIL_TO` values into the managed list. No third-party newsletter platform is required — StockPick sends directly via SMTP.
 
 **Manual / test:**
 
@@ -463,7 +541,11 @@ Key flags on Render:
 
 Health check: `GET /health` (no external API calls). Render health path: `/health`.
 
-Vercel: `NEXT_PUBLIC_API_URL=<Render URL>`.
+Vercel: `NEXT_PUBLIC_API_URL=<Render URL>` **at build time** (inlined into the client bundle).
+
+Local production (`npm run build && npm start`): if `NEXT_PUBLIC_API_URL` is unset at build, the client uses **relative** API paths and `frontend/next.config.ts` rewrites proxy them to `http://127.0.0.1:18731` (override with `BACKEND_URL` when starting Next).
+
+Quant Lab E2E (`frontend/npm run test:e2e -- e2e/quant-lab.spec.ts`): `scripts/quant-lab-e2e-up.sh` rebuilds with `BACKEND_URL` (rewrite proxy target) and **without** `NEXT_PUBLIC_API_URL` so the browser stays same-origin.
 
 ---
 

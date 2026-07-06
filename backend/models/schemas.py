@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field
 
 class Bucket(str, Enum):
     penny = "penny"
-    medium = "medium"
     compounder = "compounder"
 
 
@@ -290,7 +289,7 @@ class TradeCreateRequest(BaseModel):
     symbol: str
     sleeve: str | None = Field(
         default=None,
-        description="penny | medium | compounder; inferred from tags/watchlist if omitted",
+        description="penny | compounder; inferred from tags/watchlist if omitted",
     )
     side: str = "long"
     entry_time: datetime
@@ -581,7 +580,7 @@ class PortfolioPolicyBacktestRequest(BaseModel):
     max_weight: float = Field(default=0.35, gt=0, le=1)
     cash_buffer: float = Field(default=0.0, ge=0, lt=1)
     institutional: bool = False
-    sleeve: str | None = Field(default="penny", pattern="^(penny|medium|compounder)$")
+    sleeve: str | None = Field(default="penny", pattern="^(penny|compounder)$")
     fee_bps: float | None = Field(default=None, ge=0, le=100)
     slip_bps: float | None = Field(default=None, ge=0, le=100)
     use_universe_pit: bool = True
@@ -804,6 +803,9 @@ class MorningScanEmailStatusResponse(BaseModel):
     config_errors: list[str] = []
     provider: str = "smtp"
     recipient_masked: str = "—"
+    recipients: list[str] = []
+    recipient_count: int = 0
+    recipient_source: str = "none"
     schedule_label: str = "9:20 AM ET"
     cron: str = "20 9 * * 1-5"
     timezone: str = "America/New_York"
@@ -833,6 +835,7 @@ class MorningScanEmailSendResponse(BaseModel):
     subject: str | None = None
     html_preview: str | None = None
     text_preview: str | None = None
+    recipients: list[str] = []
 
 
 class ExplainRequest(BaseModel):
@@ -919,6 +922,41 @@ class ApiSettingsPatchRequest(BaseModel):
 
 class ApiSettingsResetRequest(BaseModel):
     keys: list[str] | None = None
+
+
+class MailingListSubscriberItem(BaseModel):
+    id: str
+    email: str
+    label: str = ""
+    enabled: bool = True
+    created_at: str = ""
+    updated_at: str = ""
+
+
+class MailingListResponse(BaseModel):
+    subscribers: list[MailingListSubscriberItem] = []
+    active_count: int = 0
+    recipient_source: str = "none"
+    recipient_count: int = 0
+    read_only: bool = False
+
+
+class MailingListAddRequest(BaseModel):
+    email: str
+    label: str = ""
+
+
+class MailingListPatchRequest(BaseModel):
+    enabled: bool | None = None
+    label: str | None = None
+
+
+class MailingListImportEnvResponse(BaseModel):
+    imported: int
+    subscribers: list[MailingListSubscriberItem] = []
+    active_count: int = 0
+    recipient_source: str = "settings"
+    recipient_count: int = 0
 
 
 class AnalyzeAlert(BaseModel):
@@ -1097,6 +1135,100 @@ class PennyOpportunityItem(BaseModel):
     summary: str = ""
 
 
+class DailyTradingPlanFocusItem(BaseModel):
+    symbol: str
+    rank: int
+    status: str  # qualified | watch | rejected
+    reasons: list[str] = []
+    rejection_reasons: list[str] = []
+
+
+class DailyTradingPlanCandidate(BaseModel):
+    symbol: str
+    action: str  # buy | watch | manage | reduce | exit
+    entry_not_before: str = "10:00 America/New_York"
+    entry_condition: str = ""
+    reference_entry_price: float = 0.0
+    maximum_position_value: float = 0.0
+    maximum_portfolio_weight_pct: float = 0.0
+    stop_price: float = 0.0
+    stop_loss_pct: float = 5.0
+    first_target_price: float = 0.0
+    first_target_gain_pct: float = 10.0
+    first_target_sell_fraction_pct: float = 50.0
+    remaining_position_plan: str = ""
+    trend_state: str = ""
+    sector_leadership: dict[str, Any] = {}
+    volume_classification: str = ""
+    news_classification: str = ""
+    risk_reward_ratio: float = 0.0
+    data_confidence: float = 0.0
+    supporting_evidence: list[str] = []
+    risk_flags: list[str] = []
+
+
+class DailyTradingPlanRuleCheck(BaseModel):
+    rule_id: str
+    label: str
+    status: str  # pass | fail | unavailable
+    evidence: str = ""
+
+
+class DailyTradingPlanHolidayRisk(BaseModel):
+    is_pre_holiday_session: bool = False
+    recommend_reduce_exposure: bool = False
+    reason: str | None = None
+
+
+class DailyTradingPlanResponse(BaseModel):
+    plan_id: str
+    as_of: str
+    market_session: str = "closed_hours"
+    decision: str  # buy | manage | reduce | exit | watch | stay_in_cash
+    confidence: float = 0.0
+    summary: str = ""
+    current_short_term_exposure_pct: float = 0.0
+    maximum_short_term_exposure_pct: float = 50.0
+    available_risk_capacity_pct: float = 0.0
+    active_short_term_positions: int = 0
+    focus_list: list[DailyTradingPlanFocusItem] = []
+    primary_candidate: DailyTradingPlanCandidate | None = None
+    cash_reason: str | None = None
+    rule_checklist: list[DailyTradingPlanRuleCheck] = []
+    rejected_candidates: list[dict[str, Any]] = []
+    holiday_risk: DailyTradingPlanHolidayRisk = Field(default_factory=DailyTradingPlanHolidayRisk)
+    review_prompts: list[str] = []
+    data_freshness: dict[str, Any] = {}
+    disclaimer: str = "Research and decision support only. No order has been placed."
+
+
+class DailyTradingPlanReviewRequest(BaseModel):
+    trading_date: str
+    plan_id: str
+    planned_decision: str
+    primary_candidate: str | None = None
+    plan_followed: bool | None = None
+    actual_action: str | None = None
+    overridden_rules: list[str] = []
+    user_notes: str = ""
+    end_of_day_outcome: str | None = None
+
+
+class DailyTradingPlanReviewResponse(BaseModel):
+    id: int
+    trading_date: str
+    plan_id: str
+    planned_decision: str
+    primary_candidate: str | None = None
+    plan_followed: bool | None = None
+    actual_action: str | None = None
+    overridden_rules: list[str] = []
+    user_notes: str = ""
+    end_of_day_outcome: str | None = None
+    created_at: str
+    updated_at: str
+
+
 class DataFreshnessStatus(BaseModel):
     key: str
     last_updated_at: str | None = None
@@ -1162,6 +1294,9 @@ class DailyDashboardResponse(BaseModel):
     ledger_rows_count: int | None = None
     ledger_cash_estimate: float | None = None
     cash_source: str | None = None  # buying_power | ledger | unset
+    daily_trading_plan: DailyTradingPlanResponse | None = None
+    robinhood_mcp_enabled: bool = True
+    robinhood_mcp_authenticated: bool = False
 
 
 class BrokerageCsvImportResponse(BaseModel):
@@ -1314,6 +1449,29 @@ class PortfolioSummaryResponse(BaseModel):
     stale: bool = False
     warnings: list[str] = []
     freshness: dict[str, Any] | None = None
+    disclaimer: str = ""
+
+
+class PortfolioPerformancePoint(BaseModel):
+    date: str
+    value: float
+
+
+class PortfolioPerformanceResponse(BaseModel):
+    total_value: float = 0.0
+    invested_value: float = 0.0
+    cash: float = 0.0
+    as_of: str | None = None
+    today_pl: float = 0.0
+    today_pl_pct: float | None = None
+    unrealized_pl: float = 0.0
+    unrealized_pl_pct: float | None = None
+    realized_pl: float = 0.0
+    realized_pl_equity: float | None = None
+    realized_pl_events: float | None = None
+    realized_pl_source: str | None = None
+    curves: dict[str, list[PortfolioPerformancePoint]] = Field(default_factory=dict)
+    period_change_pct: dict[str, float | None] = Field(default_factory=dict)
     disclaimer: str = ""
 
 

@@ -22,7 +22,7 @@ def test_v2_score_shape():
         return
     mock_score = {
         "symbol": "AAPL",
-        "sleeve": "medium",
+        "sleeve": "penny",
         "score": 72.5,
         "market_regime": "neutral",
         "risk_level": "medium",
@@ -45,7 +45,7 @@ def test_v2_score_shape():
         "factor_model_version": "test",
     }
     with patch("api.routes_v2.build_v2_score", return_value=mock_score):
-        r = client.get("/api/v2/score/AAPL?sleeve=medium")
+        r = client.get("/api/v2/score/AAPL?sleeve=penny")
     if r.status_code == 503:
         return
     assert r.status_code == 200, r.text

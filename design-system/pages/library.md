@@ -2,7 +2,7 @@
 
 > **Route:** `/library?tab=` (`scans` · `reports` · `snapshots`)  
 > **Component:** `LibraryPage.tsx`  
-> **Audit:** `docs/UI_AUDIT.md` §12.5, §11.1, §15 Phase 4 (#6 Library), §16  
+> **Audit:** `docs/UI_AUDIT_REVISED.md` §12.5, §11.1, §15 Phase 4 (#6 Library), §16  
 > **Implementation phase:** Phase 4 — **fix reliability in Phase 1 before visual work**  
 > **Parent:** `design-system/MASTER.md`  
 > **ui-ux-pro-max pattern:** List-detail library — neutral surfaces, clear empty/error differentiation

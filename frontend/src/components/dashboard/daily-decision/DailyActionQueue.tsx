@@ -6,25 +6,43 @@ import { SectionCard } from "@/components/ui/AppCard";
 import { DecisionBadge } from "./DecisionBadge";
 import { DecisionMixBar } from "./DecisionMixBar";
 
-export function DailyActionQueue({ items }: { items: PortfolioDecisionItem[] }) {
+export function DailyActionQueue({
+  items,
+  density = "default",
+}: {
+  items: PortfolioDecisionItem[];
+  /** Single-column stack for portfolio sidebar layout */
+  density?: "default" | "sidebar";
+}) {
   const { t } = useTranslation();
   const queue = buildActionQueue(items);
 
   return (
-    <SectionCard title={t.home.dailyActionQueueTitle} subtitle={t.home.dailyActionQueueSubtitle} variant="elevated">
+    <SectionCard
+      title={t.home.dailyActionQueueTitle}
+      subtitle={t.home.dailyActionQueueSubtitle}
+      variant="elevated"
+      className="portfolio-action-queue"
+    >
       {queue.length === 0 ? (
-        <p className="rounded-xl border border-white/8 bg-zinc-900/40 px-4 py-5 text-sm text-secondary">
+        <p className="portfolio-glass-inset px-4 py-5 text-sm text-secondary">
           {t.home.dailyActionQueueEmpty}
         </p>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <ul
+          className={
+            density === "sidebar"
+              ? "flex flex-col gap-3"
+              : "grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
+          }
+        >
           {queue.map((item) => (
             <li
               key={item.symbol}
-              className="rounded-xl border border-white/8 bg-zinc-900/35 px-4 py-3.5 transition-colors hover:border-buy/20 hover:bg-zinc-900/55"
+              className="portfolio-action-item"
             >
               <div className="flex items-start justify-between gap-2">
-                <Link href={`/workspace?symbol=${item.symbol}`} className="text-base font-semibold text-primary hover:underline">
+                <Link href={`/workspace?symbol=${item.symbol}`} className="text-base text-symbol hover:underline">
                   {item.symbol}
                 </Link>
                 <DecisionBadge decision={item.decision} />

@@ -17,7 +17,12 @@ from models.schemas import Bucket
 from services.email import get_email_provider
 from services.morning_scan_email_templates import BucketEmailSection, build_morning_scan_email
 from services.scan_email_comparison import compare_scan_results
-from services.scan_email_config import ScanEmailSettings, load_scan_email_settings, mask_recipients
+from services.scan_email_config import (
+    ScanEmailSettings,
+    format_recipient_list,
+    load_scan_email_settings,
+    mask_recipients,
+)
 from services.scan_manager import scan_manager
 from sqlalchemy.orm import Session, sessionmaker
 from utils.datetime_util import utc_now
@@ -26,6 +31,13 @@ logger = logging.getLogger(__name__)
 
 NOTIFICATION_TYPE = "morning_scan_email"
 DELIVERY_KIND_PRIMARY = "primary"
+
+
+def _recipient_source() -> str:
+    from services.mailing_list_store import resolve_scan_email_recipients
+
+    _recipients, source = resolve_scan_email_recipients()
+    return source
 
 
 @dataclass
@@ -39,6 +51,7 @@ class MorningScanEmailResult:
     text_preview: str | None = None
     deferred: bool = False
     retry_scheduled: bool = False
+    recipients: tuple[str, ...] = ()
 
 
 def _session_factory() -> sessionmaker[Session]:
@@ -366,11 +379,12 @@ async def run_morning_scan_email(
         if dry_run:
             return MorningScanEmailResult(
                 status="dry_run",
-                message="Email built successfully (dry run)",
+                message=f"Email built successfully (dry run) — would send to {format_recipient_list(settings.recipients)}",
                 dry_run=True,
                 subject=content.subject,
                 html_preview=content.html[:2000],
                 text_preview=content.text[:2000],
+                recipients=settings.recipients,
             )
 
         from config import DEMO_MODE
@@ -456,9 +470,10 @@ async def run_morning_scan_email(
             )
             return MorningScanEmailResult(
                 status="sent",
-                message="Email sent",
+                message=f"Email sent to {format_recipient_list(settings.recipients)}",
                 delivery_id=delivery.id,
                 subject=content.subject,
+                recipients=settings.recipients,
             )
 
         delivery.status = "failed"
@@ -506,6 +521,7 @@ def run_morning_scan_email_sync(**kwargs: Any) -> dict[str, Any]:
         "subject": result.subject,
         "html_preview": result.html_preview,
         "text_preview": result.text_preview,
+        "recipients": list(result.recipients),
     }
 
 
@@ -545,6 +561,9 @@ def get_morning_scan_email_status() -> dict[str, Any]:
         "config_errors": list(settings.config_errors),
         "provider": settings.provider,
         "recipient_masked": mask_recipients(settings.recipients),
+        "recipients": list(settings.recipients),
+        "recipient_count": len(settings.recipients),
+        "recipient_source": _recipient_source(),
         "schedule_label": "9:20 AM ET",
         "cron": settings.cron,
         "timezone": settings.timezone,

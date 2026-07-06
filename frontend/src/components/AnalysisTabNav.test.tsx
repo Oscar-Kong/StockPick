@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { en } from "@/lib/i18n/messages/en";
-import { AnalysisTabNav, type AnalysisTabConfig } from "./AnalysisTabNav";
+import { AnalysisTabNav, analysisPanelId, type AnalysisTabConfig } from "./AnalysisTabNav";
 
 vi.mock("@/lib/i18n", () => ({
   useTranslation: () => ({ t: en, locale: "en" }),
@@ -10,22 +10,25 @@ vi.mock("@/lib/i18n", () => ({
 }));
 
 const tabs: AnalysisTabConfig[] = [
-  { id: "overview", label: "Overview", shortLabel: "Ovw", hint: "Overview hint" },
-  { id: "score", label: "Score", shortLabel: "Score", hint: "Score hint" },
-  { id: "report", label: "AI Report", shortLabel: "Rpt", hint: "Report hint" },
+  { id: "overview", label: "Overview", shortLabel: "Ovw", hint: "Overview hint", group: "core" },
+  { id: "score", label: "Score", shortLabel: "Score", hint: "Score hint", group: "core" },
+  { id: "report", label: "AI Report", shortLabel: "Rpt", hint: "Report hint", group: "workspace" },
 ];
 
 describe("AnalysisTabNav", () => {
   afterEach(() => cleanup());
 
-  it("renders one continuous tab bar without group labels or hint row", () => {
+  it("renders grouped underline tabs with aria-controls linkage", () => {
     const onChange = vi.fn();
     render(
       <AnalysisTabNav tabs={tabs} active="overview" onChange={onChange} ariaLabel="Views" />
     );
-    expect(screen.queryByText(en.analysis.tabGroupCore)).not.toBeInTheDocument();
+    expect(screen.getByText(en.analysis.tabGroupCore)).toBeInTheDocument();
+    expect(screen.getByText(en.analysis.tabGroupWorkspace)).toBeInTheDocument();
     expect(screen.queryByText("Overview hint")).not.toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+    const overviewTab = screen.getByRole("tab", { name: "Overview" });
+    expect(overviewTab).toHaveAttribute("aria-selected", "true");
+    expect(overviewTab).toHaveAttribute("aria-controls", analysisPanelId("overview"));
     fireEvent.click(screen.getByRole("tab", { name: "Score" }));
     expect(onChange).toHaveBeenCalledWith("score");
   });

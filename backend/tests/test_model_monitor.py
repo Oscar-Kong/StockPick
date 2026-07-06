@@ -45,8 +45,8 @@ def test_model_monitor_sections(research_db):
     summary = adapter_walk_forward("wf_test_001")
     assert summary
     upsert_run_index(summary)
-    mon = get_model_monitor("medium")
-    assert mon.sleeve == "medium"
+    mon = get_model_monitor("penny")
+    assert mon.sleeve == "penny"
     assert isinstance(mon.factor_health, list)
     assert mon.prediction_health.resolved_count >= 0
     assert mon.model_configuration.strategy_version
@@ -83,7 +83,7 @@ def test_evidence_review_list_and_action(research_db):
     assert s
     s.evidence_impact = "supporting"
     upsert_run_index(s)
-    findings = list_review_findings(sleeve="medium")
+    findings = list_review_findings(sleeve="penny")
     assert findings.total >= 1
     fid = findings.findings[0].finding_id
     result = apply_review_action(
@@ -105,7 +105,7 @@ def test_major_gate_pass_and_fail(research_db):
             "aggregate_horizons": {"20": {"mean_rank_ic": 0.08}},
             "sample_size": 50,
         },
-        parameters={"sleeve": "medium", "end_date": "2024-01-01"},
+        parameters={"sleeve": "penny", "end_date": "2024-01-01"},
     )
     assert pass_gate.impact_level in ("major_positive", "major_negative", "informational")
 
@@ -137,7 +137,7 @@ def test_default_no_impact_on_score(research_db, monkeypatch):
     monkeypatch.setattr(config, "RESEARCH_MAX_ORDINARY_MODIFIER", 0.0)
     ev = evaluate_evidence_impact(proposed_impact="supporting")
     assert apply_ordinary_modifier_to_score(75.0, ev) == 75.0
-    consumption = apply_research_evidence_to_score(75.0, symbol="AAPL", sleeve="medium", audit=False)
+    consumption = apply_research_evidence_to_score(75.0, symbol="AAPL", sleeve="penny", audit=False)
     assert consumption.adjusted_score == 75.0
 
 
@@ -165,9 +165,9 @@ def test_audit_record_on_score_consumption(research_db):
 def test_api_model_monitor_and_review(client, research_db):
     seed_walk_forward_run()
     upsert_run_index(adapter_walk_forward("wf_test_001"))
-    r = client.get("/api/v2/research/model-monitor?sleeve=medium")
+    r = client.get("/api/v2/research/model-monitor?sleeve=penny")
     assert r.status_code == 200
-    rev = client.get("/api/v2/research/evidence-review?sleeve=medium")
+    rev = client.get("/api/v2/research/evidence-review?sleeve=penny")
     assert rev.status_code == 200
 
 
@@ -177,7 +177,7 @@ def test_production_weight_unchanged_by_experiment(research_db, monkeypatch):
 
     seed_walk_forward_run()
     upsert_run_index(adapter_walk_forward("wf_test_001"))
-    before = dict(WeightStore.load("medium"))
+    before = dict(WeightStore.load("penny"))
     upsert_run_index(adapter_walk_forward("wf_test_001"))
-    after = dict(WeightStore.load("medium"))
+    after = dict(WeightStore.load("penny"))
     assert before == after

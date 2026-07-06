@@ -1,0 +1,26 @@
+{
+  "kind": "NEUTRALIZE",
+  "key": "SECTOR",
+  "child": {
+    "kind": "CROSS_SECTIONAL",
+    "op": "RANK",
+    "child": {
+      "kind": "BINARY",
+      "op": "DIVIDE",
+      "zero_policy": "null",
+      "left": {
+        "kind": "ROLLING",
+        "op": "LAG",
+        "window": 45,
+        "child": {
+          "kind": "FIELD",
+          "field_id": "free_cash_flow"
+        }
+      },
+      "right": {
+        "kind": "FIELD",
+        "field_id": "market_cap"
+      }
+    }
+  }
+}

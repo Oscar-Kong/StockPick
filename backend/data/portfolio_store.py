@@ -115,6 +115,25 @@ class PortfolioDecisionSnapshot(PortfolioBase):
     created_at = Column(DateTime, nullable=False, index=True)
 
 
+class DailyTradingPlanReview(PortfolioBase):
+    __tablename__ = "daily_trading_plan_reviews"
+    __table_args__ = (UniqueConstraint("account_id", "trading_date", name="uq_dtp_review_date"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    account_id = Column(Integer, nullable=False, index=True)
+    trading_date = Column(String, nullable=False, index=True)
+    plan_id = Column(String, nullable=False, default="")
+    planned_decision = Column(String, nullable=False, default="")
+    primary_candidate = Column(String, nullable=True)
+    plan_followed = Column(Boolean, nullable=True)
+    actual_action = Column(String, nullable=True)
+    overridden_rules_json = Column(Text, nullable=False, default="[]")
+    user_notes = Column(Text, nullable=False, default="")
+    end_of_day_outcome = Column(String, nullable=True)
+    created_at = Column(DateTime, nullable=False)
+    updated_at = Column(DateTime, nullable=False)
+
+
 DEFAULT_ACCOUNT_ID = 1
 
 
@@ -1077,5 +1096,104 @@ def get_account_cash(account_id: int = DEFAULT_ACCOUNT_ID) -> float:
     try:
         acct = session.get(BrokerageAccount, account_id)
         return float(acct.cash_balance) if acct else 0.0
+    finally:
+        session.close()
+
+
+def _review_dict(row: DailyTradingPlanReview) -> dict:
+    return {
+        "id": row.id,
+        "trading_date": row.trading_date,
+        "plan_id": row.plan_id,
+        "planned_decision": row.planned_decision,
+        "primary_candidate": row.primary_candidate,
+        "plan_followed": row.plan_followed,
+        "actual_action": row.actual_action,
+        "overridden_rules": json.loads(row.overridden_rules_json or "[]"),
+        "user_notes": row.user_notes or "",
+        "end_of_day_outcome": row.end_of_day_outcome,
+        "created_at": utc_iso_z(row.created_at),
+        "updated_at": utc_iso_z(row.updated_at),
+    }
+
+
+def upsert_daily_trading_plan_review(
+    *,
+    account_id: int = DEFAULT_ACCOUNT_ID,
+    trading_date: str,
+    plan_id: str,
+    planned_decision: str,
+    primary_candidate: str | None = None,
+    plan_followed: bool | None = None,
+    actual_action: str | None = None,
+    overridden_rules: list[str] | None = None,
+    user_notes: str = "",
+    end_of_day_outcome: str | None = None,
+) -> dict:
+    session = SessionLocal()
+    try:
+        now = _utcnow()
+        row = (
+            session.query(DailyTradingPlanReview)
+            .filter(
+                DailyTradingPlanReview.account_id == account_id,
+                DailyTradingPlanReview.trading_date == trading_date,
+            )
+            .first()
+        )
+        rules_json = json.dumps(overridden_rules or [])
+        if row:
+            row.plan_id = plan_id
+            row.planned_decision = planned_decision
+            row.primary_candidate = primary_candidate
+            if plan_followed is not None:
+                row.plan_followed = plan_followed
+            if actual_action is not None:
+                row.actual_action = actual_action
+            if overridden_rules is not None:
+                row.overridden_rules_json = rules_json
+            if user_notes:
+                row.user_notes = user_notes
+            if end_of_day_outcome is not None:
+                row.end_of_day_outcome = end_of_day_outcome
+            row.updated_at = now
+        else:
+            row = DailyTradingPlanReview(
+                account_id=account_id,
+                trading_date=trading_date,
+                plan_id=plan_id,
+                planned_decision=planned_decision,
+                primary_candidate=primary_candidate,
+                plan_followed=plan_followed,
+                actual_action=actual_action,
+                overridden_rules_json=rules_json,
+                user_notes=user_notes,
+                end_of_day_outcome=end_of_day_outcome,
+                created_at=now,
+                updated_at=now,
+            )
+            session.add(row)
+        session.commit()
+        session.refresh(row)
+        return _review_dict(row)
+    finally:
+        session.close()
+
+
+def get_daily_trading_plan_review(
+    trading_date: str,
+    account_id: int = DEFAULT_ACCOUNT_ID,
+) -> dict | None:
+    session = SessionLocal()
+    try:
+        row = (
+            session.query(DailyTradingPlanReview)
+            .filter(
+                DailyTradingPlanReview.account_id == account_id,
+                DailyTradingPlanReview.trading_date == trading_date,
+            )
+            .first()
+        )
+        return _review_dict(row) if row else None
     finally:
         session.close()

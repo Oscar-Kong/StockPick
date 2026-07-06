@@ -66,7 +66,7 @@ def _mock_scoring_result(*, final: float = 68.0) -> SimpleNamespace:
         )
     ]
     return SimpleNamespace(
-        sleeve="medium",
+        sleeve="penny",
         signals=signals,
         factors=factors,
         raw_score=68.0,
@@ -103,11 +103,11 @@ def scoring_patches():
 def test_legacy_mode_never_calls_scoring_engine(scoring_patches):
     enrich, engine_score = scoring_patches
     ctx = _mock_ctx("LEG")
-    screener = _mock_screener(Bucket.medium)
+    screener = _mock_screener(Bucket.penny)
     outcome = score_stage_b_candidate(
         ctx=ctx,
         screener=screener,
-        bucket=Bucket.medium,
+        bucket=Bucket.penny,
         symbol=ctx.symbol,
         quality_score=80.0,
         strategy_version="test-v1",
@@ -127,11 +127,11 @@ def test_legacy_mode_never_calls_scoring_engine(scoring_patches):
 def test_engine_mode_never_calls_legacy_scorer(scoring_patches):
     enrich, engine_score = scoring_patches
     ctx = _mock_ctx("ENG")
-    screener = _mock_screener(Bucket.medium)
+    screener = _mock_screener(Bucket.penny)
     outcome = score_stage_b_candidate(
         ctx=ctx,
         screener=screener,
-        bucket=Bucket.medium,
+        bucket=Bucket.penny,
         symbol=ctx.symbol,
         quality_score=80.0,
         strategy_version="test-v2",
@@ -241,11 +241,11 @@ def test_production_ranking_uses_primary_scorer(scoring_patches):
 def test_enrichment_not_duplicated_per_candidate(scoring_patches):
     enrich, _ = scoring_patches
     ctx = _mock_ctx("ENR")
-    screener = _mock_screener(Bucket.medium)
+    screener = _mock_screener(Bucket.penny)
     score_stage_b_candidate(
         ctx=ctx,
         screener=screener,
-        bucket=Bucket.medium,
+        bucket=Bucket.penny,
         symbol=ctx.symbol,
         quality_score=80.0,
         strategy_version="test-v2",
@@ -263,7 +263,7 @@ def test_enrichment_not_duplicated_per_candidate(scoring_patches):
         score_stage_b_candidate(
             ctx=ctx,
             screener=screener,
-            bucket=Bucket.medium,
+            bucket=Bucket.penny,
             symbol=ctx.symbol,
             quality_score=80.0,
             strategy_version="test-v2",

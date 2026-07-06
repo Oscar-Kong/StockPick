@@ -15,8 +15,8 @@ from utils.datetime_util import utc_iso_z
 
 logger = logging.getLogger(__name__)
 
-_HORIZON_DAYS = {"penny": 14, "medium": 20, "compounder": 365}
-_TARGET_PCT = {"penny": 15.0, "medium": 10.0, "compounder": 25.0}
+_HORIZON_DAYS = {"penny": 14, "compounder": 365}
+_TARGET_PCT = {"penny": 15.0, "compounder": 25.0}
 
 
 def _utcnow() -> datetime:
@@ -24,8 +24,10 @@ def _utcnow() -> datetime:
 
 
 def infer_sleeve(symbol: str, setup_tags: list[str] | None = None) -> str:
+    from core.sleeve import normalize_sleeve
+
     tags = {t.lower() for t in (setup_tags or [])}
-    for sleeve in ("penny", "medium", "compounder"):
+    for sleeve in ("penny", "compounder"):
         if sleeve in tags:
             return sleeve
     try:
@@ -35,12 +37,12 @@ def infer_sleeve(symbol: str, setup_tags: list[str] | None = None) -> str:
         sym = symbol.upper()
         for row in wl:
             if str(row.get("symbol", "")).upper() == sym:
-                bucket = str(row.get("bucket") or row.get("sleeve") or "").lower()
+                bucket = normalize_sleeve(str(row.get("bucket") or row.get("sleeve") or ""))
                 if bucket in _HORIZON_DAYS:
                     return bucket
     except Exception:
         pass
-    return "medium"
+    return "penny"
 
 
 def expected_return_from_score(score: float, sleeve: str) -> float:

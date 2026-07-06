@@ -40,7 +40,9 @@ class DecomposedScanScore:
 
 
 def _ranking_weights(bucket: Bucket) -> dict[str, float]:
-    key = bucket.value
+    from core.sleeve import normalize_sleeve
+
+    key = normalize_sleeve(bucket.value)
     weights = dict(SCAN_RANKING_WEIGHTS.get(key) or SCAN_RANKING_WEIGHTS["penny"])
     total = sum(weights.values()) or 1.0
     return {k: v / total for k, v in weights.items()}

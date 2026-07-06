@@ -8,6 +8,7 @@ from data.historical_store import HistoricalStore
 from data.quandl_client import QuandlClient
 from data.reconciler import DataReconciler
 from data.strategy_registry import StrategyRegistry
+from core.sleeve import normalize_sleeve
 from models.schemas import (
     DataQualityResponse,
     JobLogEntry,
@@ -68,7 +69,8 @@ def get_data_quality(symbol: str):
 
 @router.get("/strategy/{bucket}", response_model=StrategyVersionResponse)
 def get_strategy_version(bucket: str):
-    if bucket not in ("penny", "medium", "compounder"):
+    bucket = normalize_sleeve(bucket)
+    if bucket not in ("penny", "compounder"):
         raise HTTPException(status_code=400, detail="Invalid bucket")
     cfg = StrategyRegistry().get_active(bucket)
     return StrategyVersionResponse(

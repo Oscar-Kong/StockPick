@@ -5,6 +5,29 @@ import logging
 
 from data.db_engine import get_engine
 from engines.factor.catalog import active_factor_catalog
+from engines.factor_discovery_models import (
+    FactorDefinitionRecord,
+    FactorDiscoveryAttempt,
+    FactorDiscoveryRun,
+    FactorHypothesisRecord,
+    FactorLlmCandidate,
+    FactorLlmInteraction,
+    FactorLlmReviewEvent,
+    FactorMiningEvaluation,
+    FactorMiningEvent,
+    FactorMiningExposure,
+    FactorMiningLineage,
+    FactorMiningRevisionProposal,
+    FactorMiningSession,
+    FactorPromotionCandidate,
+    FactorPromotionStatusEvent,
+    FactorResearchDataSnapshot,
+    FactorResearchFamily,
+    FactorSealedTestReceipt,
+    FactorShadowEvaluationRun,
+    FactorStatusEvent,
+    FactorValidationArtifactRecord,
+)
 from engines.quant_models import (
     BacktestEquityPoint,
     BacktestRun,
@@ -86,6 +109,79 @@ def _migrate_quant_columns() -> None:
                     "ON research_runs (evidence_impact, archived)"
                 )
             )
+        _migrate_factor_discovery_columns(conn, insp, tables)
+
+
+def _migrate_factor_discovery_columns(conn, insp, tables: list[str]) -> None:
+    from sqlalchemy import text
+
+    if "factor_discovery_runs" in tables:
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_factor_discovery_runs_experiment "
+                "ON factor_discovery_runs (experiment_id)"
+            )
+        )
+        cols = {c["name"] for c in insp.get_columns("factor_discovery_runs")}
+        if "launch_payload_hash" not in cols:
+            conn.execute(text("ALTER TABLE factor_discovery_runs ADD COLUMN launch_payload_hash VARCHAR(80)"))
+        if "recommended_status" not in cols:
+            conn.execute(text("ALTER TABLE factor_discovery_runs ADD COLUMN recommended_status VARCHAR(32)"))
+    if "factor_definition_records" in tables:
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_factor_definition_formula_hash "
+                "ON factor_definition_records (formula_hash)"
+            )
+        )
+        cols = {c["name"] for c in insp.get_columns("factor_definition_records")}
+        if "lifecycle_version" not in cols:
+            conn.execute(text("ALTER TABLE factor_definition_records ADD COLUMN lifecycle_version INTEGER DEFAULT 0"))
+        if "recommended_status" not in cols:
+            conn.execute(text("ALTER TABLE factor_definition_records ADD COLUMN recommended_status VARCHAR(32)"))
+    if "factor_research_data_snapshots" in tables:
+        cols = {c["name"] for c in insp.get_columns("factor_research_data_snapshots")}
+        if "snapshot_identity_hash" not in cols:
+            conn.execute(text("ALTER TABLE factor_research_data_snapshots ADD COLUMN snapshot_identity_hash VARCHAR(80)"))
+        if "provider_data_version" not in cols:
+            conn.execute(text("ALTER TABLE factor_research_data_snapshots ADD COLUMN provider_data_version VARCHAR(80)"))
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_factor_snapshots_identity "
+                "ON factor_research_data_snapshots (snapshot_identity_hash)"
+            )
+        )
+    if "factor_validation_artifact_records" in tables:
+        cols = {c["name"] for c in insp.get_columns("factor_validation_artifact_records")}
+        if "prior_artifact_id" not in cols:
+            conn.execute(text("ALTER TABLE factor_validation_artifact_records ADD COLUMN prior_artifact_id VARCHAR(64)"))
+        if "revalidation_of_artifact_id" not in cols:
+            conn.execute(
+                text("ALTER TABLE factor_validation_artifact_records ADD COLUMN revalidation_of_artifact_id VARCHAR(64)")
+            )
+    if "factor_sealed_test_receipts" in tables:
+        cols = {c["name"] for c in insp.get_columns("factor_sealed_test_receipts")}
+        if "recovery_authorization" not in cols:
+            conn.execute(text("ALTER TABLE factor_sealed_test_receipts ADD COLUMN recovery_authorization VARCHAR(128)"))
+    if "factor_mining_sessions" in tables:
+        cols = {c["name"] for c in insp.get_columns("factor_mining_sessions")}
+        for col, ddl in (
+            ("pause_reason", "TEXT"),
+            ("lease_owner_id", "VARCHAR(128)"),
+            ("lease_token", "VARCHAR(80)"),
+            ("lease_acquired_at", "DATETIME"),
+            ("lease_expires_at", "DATETIME"),
+            ("lease_version", "INTEGER DEFAULT 0"),
+            ("last_heartbeat_at", "DATETIME"),
+        ):
+            if col not in cols:
+                conn.execute(text(f"ALTER TABLE factor_mining_sessions ADD COLUMN {col} {ddl}"))
+    if "factor_mining_exposures" in tables:
+        cols = {c["name"] for c in insp.get_columns("factor_mining_exposures")}
+        if "reservation_status" not in cols:
+            conn.execute(text("ALTER TABLE factor_mining_exposures ADD COLUMN reservation_status VARCHAR(32) DEFAULT 'FINALIZED'"))
+        if "prompt_template_id" not in cols:
+            conn.execute(text("ALTER TABLE factor_mining_exposures ADD COLUMN prompt_template_id VARCHAR(64)"))
 
 
 def _seed_factor_definitions() -> None:

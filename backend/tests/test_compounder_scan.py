@@ -19,7 +19,7 @@ from models.schemas import Bucket
 from scoring.fundamental import revenue_eps_consistency_score
 from scoring.technical import smooth_growth_score_with_horizon
 from services.scan_history_config import stage_a_period, stage_b_period
-from services.scan_manager import _resolve_stage_b_context
+from services.scan_pipeline import _resolve_stage_b_context
 from services.scan_data_flow import ScanDataFlowMetrics
 from screeners.compounder import CompounderScreener
 

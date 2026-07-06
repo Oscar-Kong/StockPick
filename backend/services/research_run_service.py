@@ -424,6 +424,70 @@ def adapter_portfolio_policy(run_id: str) -> ResearchRunSummary | None:
         return _apply_gate(summary, {**metrics, **config})
 
 
+def adapter_scan_evaluation(run_id: str, row: BacktestRun | None = None) -> ResearchRunSummary | None:
+    engine = get_engine()
+    with Session(engine) as session:
+        row = row or session.get(BacktestRun, run_id)
+        if not row or row.run_type != "scan_evaluation":
+            return None
+        config = json.loads(row.config_json or "{}")
+        metrics = json.loads(row.metrics_json or "{}")
+        ql = metrics.get("quant_lab") or {}
+        params = config.get("parameters") or config
+        sleeve = params.get("bucket") or params.get("sleeve") or config.get("sleeve")
+        primary: list[ResearchRunMetric] = []
+        rebalance_count = ql.get("rebalance_count")
+        if rebalance_count is not None:
+            primary.append(ResearchRunMetric(label="Rebalance dates", value=rebalance_count))
+        if ql.get("mode") == "comparison":
+            table = ql.get("comparison_table") or []
+            if table:
+                best = table[0]
+                primary.append(
+                    ResearchRunMetric(
+                        label="Best recall@10",
+                        value=best.get("recall_at_10", "—"),
+                    )
+                )
+        else:
+            if ql.get("recall_at_10") is not None:
+                primary.append(ResearchRunMetric(label="Recall@10", value=ql["recall_at_10"]))
+            if ql.get("recall_at_20") is not None:
+                primary.append(ResearchRunMetric(label="Recall@20", value=ql["recall_at_20"]))
+        warnings = list(metrics.get("caveats") or [])
+        if "Evaluation experiments do not automatically modify" not in " ".join(warnings):
+            warnings.insert(
+                0,
+                "Evaluation experiments do not automatically modify the production scan configuration.",
+            )
+        summary = ResearchRunSummary(
+            run_id=row.run_id,
+            run_type="scan_evaluation",
+            name=f"Scan evaluation ({sleeve or 'bucket'})",
+            status="completed",
+            sleeve=sleeve,
+            universe=[],
+            parameters=params,
+            strategy_version=params.get("strategy_version") or STRATEGY_VERSION,
+            factor_model_version=params.get("scoring_version") or FACTOR_MODEL_VERSION,
+            data_cutoff=params.get("end_date"),
+            sample_size=int(rebalance_count) if rebalance_count is not None else None,
+            primary_metrics=primary,
+            warnings=warnings,
+            blockers=[],
+            started_at=row.started_at,
+            completed_at=row.finished_at,
+            result_reference=ResultReference(
+                store="backtest_runs",
+                run_id=row.run_id,
+                detail_path=None,
+            ),
+            evidence_impact=default_impact_for_run_type("scan_evaluation"),
+        )
+        detail = {**metrics, **config, "quant_lab": ql}
+        return _apply_gate(summary, detail)
+
+
 def adapter_similar_signal(run_id: str) -> ResearchRunSummary | None:
     engine = get_engine()
     with Session(engine) as session:
@@ -507,6 +571,8 @@ def index_run_from_store(run_id: str, store: str | None = None) -> ResearchRunSu
             if row:
                 if row.run_type == "walk_forward_research":
                     summary = adapter_walk_forward(run_id, row)
+                elif row.run_type == "scan_evaluation":
+                    summary = adapter_scan_evaluation(run_id, row)
                 elif row.run_type in ("institutional_policy", "portfolio_policy"):
                     summary = adapter_portfolio_policy(run_id)
                 elif row.run_type == "similar_signal":
@@ -515,7 +581,10 @@ def index_run_from_store(run_id: str, store: str | None = None) -> ResearchRunSu
         summary = adapter_pairs(run_id)
     if summary is None and (store == "job_queue" or store is None):
         summary = adapter_quant_job(run_id)
-    if summary is None and store and store.startswith("ic_panel:"):
+    if summary is None and (store == "factor_discovery_runs" or store is None):
+        from services.factor_discovery.research_run_adapter import adapter_factor_discovery
+
+        summary = adapter_factor_discovery(run_id)
         parts = run_id.split(":")
         if len(parts) >= 3:
             summary = adapter_factor_ic_panel(parts[1], parts[2])
@@ -550,6 +619,19 @@ def backfill_run_index(*, limit: int = 200) -> int:
         )
         for row in pair_rows:
             s = adapter_pairs(row.run_id, row)
+            if s:
+                upsert_run_index(s)
+                count += 1
+
+        scan_rows = (
+            session.query(BacktestRun)
+            .filter(BacktestRun.run_type == "scan_evaluation")
+            .order_by(BacktestRun.finished_at.desc())
+            .limit(limit)
+            .all()
+        )
+        for row in scan_rows:
+            s = adapter_scan_evaluation(row.run_id, row)
             if s:
                 upsert_run_index(s)
                 count += 1

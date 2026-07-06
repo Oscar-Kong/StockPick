@@ -4,9 +4,6 @@ import type { Messages } from "@/lib/i18n/messages/en";
 /** User-facing scan tabs (active product buckets). */
 export const ACTIVE_BUCKET_ORDER: Bucket[] = ["penny", "compounder"];
 
-/** Legacy bucket — readable in saved data, not offered for new scans. */
-export const DEPRECATED_BUCKETS: Bucket[] = ["medium"];
-
 /** @deprecated Use ACTIVE_BUCKET_ORDER for scan UI. */
 export const BUCKET_ORDER: Bucket[] = ACTIVE_BUCKET_ORDER;
 
@@ -26,11 +23,6 @@ export function getBucketMeta(t: Messages): Record<
       title: t.buckets.penny.title,
       description: t.buckets.penny.description,
     },
-    medium: {
-      label: t.buckets.medium.label,
-      title: t.buckets.medium.title,
-      description: t.buckets.medium.description,
-    },
     compounder: {
       label: t.buckets.compounder.label,
       title: t.buckets.compounder.title,
@@ -39,18 +31,19 @@ export function getBucketMeta(t: Messages): Record<
   };
 }
 
-/** Parse URL/query bucket; defaults to penny. Deprecated medium maps to penny for scans. */
+/** Parse URL/query bucket; defaults to penny. Legacy `medium` maps to penny. */
 export function parseBucket(value: string | null | undefined): Bucket {
   if (value === "penny" || value === "compounder") return value;
   if (value === "medium") return "penny";
   return DEFAULT_BUCKET;
 }
 
-/** Bucket fit display: active buckets + legacy medium if present in data. */
-export function bucketFitDisplayOrder(scores: Partial<Record<Bucket, unknown>>): Bucket[] {
-  const order: Bucket[] = [...ACTIVE_BUCKET_ORDER];
-  if (scores.medium != null && !order.includes("medium")) {
-    order.splice(1, 0, "medium");
-  }
-  return order;
+/** Normalize watchlist/API bucket strings for active sleeves only. */
+export function normalizeBucket(value: string | null | undefined): Bucket {
+  return parseBucket(value);
+}
+
+/** Bucket fit display order for analysis sidebar. */
+export function bucketFitDisplayOrder(_scores: Partial<Record<Bucket, unknown>>): Bucket[] {
+  return [...ACTIVE_BUCKET_ORDER];
 }

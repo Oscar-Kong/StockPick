@@ -64,7 +64,7 @@ def test_strong_buy_gated_by_data_confidence():
     dc = DataConfidence(score=65, issues=["stale fundamentals"])
     rec = build_recommendation(
         symbol="TEST",
-        sleeve="medium",
+        sleeve="penny",
         final_score=85,
         factors=[{"factor_id": "medium_rs_vs_spy", "norm_score": 85, "contribution": 15}],
         risk_score=30,

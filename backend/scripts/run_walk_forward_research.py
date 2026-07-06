@@ -15,7 +15,7 @@ from data.cache import init_db
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Walk-forward research pipeline")
-    parser.add_argument("--sleeve", required=True, help="penny | medium | compounder")
+    parser.add_argument("--sleeve", required=True, help="penny | compounder")
     parser.add_argument("--start-date", required=True, help="YYYY-MM-DD")
     parser.add_argument("--end-date", required=True, help="YYYY-MM-DD")
     parser.add_argument(

@@ -2,6 +2,7 @@
 
 import type { ResearchReliabilityScore, ResearchReliabilityStatus } from "@/lib/researchReliability";
 import { translateReliabilityList } from "@/lib/researchReliability";
+import { GlassPanel } from "@/components/ui/GlassPanel";
 import { useTranslation } from "@/lib/i18n";
 
 const STATUS_STYLES: Record<ResearchReliabilityStatus, string> = {
@@ -38,8 +39,9 @@ export function ResearchReliabilityCard({ score, maxReasons = 3 }: ResearchRelia
   const nextAction = translateReliabilityList([score.suggested_next_action], "actions", t)[0];
 
   return (
-    <section
-      className="rounded-lg border border-zinc-800 bg-zinc-950/50 p-3 space-y-2"
+    <GlassPanel
+      variant="default"
+      className="space-y-2"
       data-testid="research-reliability-card"
       aria-label={t.reliability.cardTitle}
     >
@@ -96,10 +98,10 @@ export function ResearchReliabilityCard({ score, maxReasons = 3 }: ResearchRelia
         </div>
       )}
 
-      <p className="text-xs text-zinc-500">
-        <span className="font-medium text-zinc-400">{t.reliability.nextActionLabel}: </span>
+      <p className="text-xs text-secondary">
+        <span className="font-medium text-tertiary">{t.reliability.nextActionLabel}: </span>
         {nextAction}
       </p>
-    </section>
+    </GlassPanel>
   );
 }

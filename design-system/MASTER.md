@@ -70,7 +70,9 @@ These colors are reserved for financial meaning:
 * Amber: Hold, caution, or incomplete confidence
 * Red: negative movement, Sell, warning, or destructive action
 
-Blue is used for normal interactions, navigation, selected states, and informational emphasis.
+McLaren papaya orange is used for normal interactions, navigation, selected states, and informational emphasis.
+
+**PickerQuant brand palette (2026):** McLaren papaya orange (`--color-primary`) for UI chrome; Robinhood-style green (`--color-buy`, `.btn-action`) for Run scan, Run daily decision, Buy signals, and positive movement.
 
 ### 4. Preserve functionality
 

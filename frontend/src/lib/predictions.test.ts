@@ -12,7 +12,7 @@ import type { FeedbackSummaryResponse, PredictionSnapshotItem } from "./types";
 const snapshot = (overrides: Partial<PredictionSnapshotItem> = {}): PredictionSnapshotItem => ({
   id: 1,
   symbol: "AAPL",
-  sleeve: "medium",
+  sleeve: "penny",
   source: "v2_score",
   created_at: new Date().toISOString(),
   outcome: null,

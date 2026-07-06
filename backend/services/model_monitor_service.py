@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
-from buckets import DEFAULT_BUCKET, ALL_BUCKETS
+from buckets import DEFAULT_BUCKET, ACTIVE_BUCKETS
 from config import (
     DYNAMIC_WEIGHTS_ENABLED,
     PREDICTION_SNAPSHOTS_ENABLED,
@@ -266,7 +266,7 @@ def get_model_configuration() -> ModelConfigurationSummary:
         pass
 
     weights_by_sleeve: dict[str, dict[str, float]] = {}
-    for sleeve_name in ALL_BUCKETS:
+    for sleeve_name in ACTIVE_BUCKETS:
         try:
             weights_by_sleeve[sleeve_name] = WeightStore.load(sleeve_name, regime=regime)
         except Exception:
@@ -289,7 +289,9 @@ def get_model_configuration() -> ModelConfigurationSummary:
 
 
 def get_model_monitor(sleeve: str | None = None) -> ModelMonitorResponse:
-    sleeve = sleeve or DEFAULT_BUCKET
+    from core.sleeve import normalize_sleeve
+
+    sleeve = normalize_sleeve(sleeve or DEFAULT_BUCKET)
     return ModelMonitorResponse(
         sleeve=sleeve,
         factor_health=get_factor_health(sleeve),

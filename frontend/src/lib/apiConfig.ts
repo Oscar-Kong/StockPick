@@ -1,5 +1,5 @@
 /** Central API base URL for browser and server code. */
-const LOCAL_FALLBACK = "http://127.0.0.1:18731";
+export const LOCAL_FALLBACK = "http://127.0.0.1:18731";
 
 export function getApiBaseUrl(): string {
   const raw =
@@ -10,6 +10,7 @@ export function getApiBaseUrl(): string {
     return raw.replace(/\/$/, "");
   }
   if (process.env.NODE_ENV === "production") {
+    // Relative paths — proxied to the backend via next.config rewrites (local prod / misconfigured builds).
     return "";
   }
   return LOCAL_FALLBACK;

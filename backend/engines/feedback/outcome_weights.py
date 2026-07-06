@@ -52,7 +52,7 @@ def run_outcome_weight_feedback(*, sleeve: str | None = None) -> dict:
 
     regime = WeightStore.current_regime()
     updates: list[dict] = []
-    for sl in ("penny", "medium", "compounder"):
+    for sl in ("penny", "compounder"):
         if sleeve and sl != sleeve:
             continue
         weights = WeightStore.load(sl, regime)

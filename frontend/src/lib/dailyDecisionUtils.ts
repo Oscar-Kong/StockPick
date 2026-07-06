@@ -45,7 +45,7 @@ export function getDecisionPriority(decision: string): number {
 }
 
 export function filterActiveDecisionItems(items: PortfolioDecisionItem[]): PortfolioDecisionItem[] {
-  return items.filter((i) => i.bucket !== "medium");
+  return items;
 }
 
 /** Ensure every open holding appears in the decision table (fallback when decision run is stale). */
@@ -58,7 +58,7 @@ export function mergeHoldingsWithDecisionItems(
   const extras: PortfolioDecisionItem[] = [];
 
   for (const h of holdings) {
-    if (h.bucket === "medium" || bySym.has(h.symbol)) continue;
+    if (bySym.has(h.symbol)) continue;
     const mv = h.shares * h.avg_cost;
     extras.push({
       symbol: h.symbol,
@@ -118,7 +118,10 @@ export function getCockpitStatus(data: DailyDashboardResponse): CockpitStatus {
   } else if (data.holdings.length > 0) {
     return "stale";
   }
-  const realSource = data.data_source === "csv" || data.data_source === "snaptrade";
+  const realSource =
+    data.data_source === "csv" ||
+    data.data_source === "snaptrade" ||
+    data.data_source === "robinhood_mcp";
   if (realSource && data.decision?.items?.length) return "ready";
   if (data.holdings.length && !data.decision?.items?.length) return "stale";
   return "ready";

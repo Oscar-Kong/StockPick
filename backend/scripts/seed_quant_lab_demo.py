@@ -16,7 +16,7 @@ DEFAULT_DB = BACKEND.parent / "storage" / "dev" / "quant_lab_demo.db"
 def main() -> int:
     parser = argparse.ArgumentParser(description="Seed Quant Lab demo database")
     parser.add_argument("--db", type=Path, default=DEFAULT_DB, help="SQLite database path")
-    parser.add_argument("--sleeve", default="medium", choices=["penny", "medium", "compounder"])
+    parser.add_argument("--sleeve", default="penny", choices=["penny", "compounder"])
     args = parser.parse_args()
 
     args.db.parent.mkdir(parents=True, exist_ok=True)

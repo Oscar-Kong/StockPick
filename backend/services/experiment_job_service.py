@@ -10,7 +10,7 @@ from models.schemas_research import ExperimentJobResponse, ExperimentStageRecord
 from services.research_json import json_dumps, json_loads
 from sqlalchemy.orm import Session
 
-STAGE_ORDER = [
+DEFAULT_STAGE_ORDER: tuple[str, ...] = (
     "validating",
     "resolving_universe",
     "loading_prices",
@@ -20,7 +20,50 @@ STAGE_ORDER = [
     "evaluating_reliability",
     "persisting_result",
     "complete",
-]
+)
+
+SCAN_EVALUATION_STAGE_ORDER: tuple[str, ...] = (
+    "validating",
+    "resolving_universe",
+    "loading_prices",
+    "preparing_universe",
+    "replaying_scans",
+    "calculating_forward_outcomes",
+    "generating_charts",
+    "evaluating_reliability",
+    "persisting_result",
+    "complete",
+)
+
+_EXPERIMENT_STAGE_ORDERS: dict[str, tuple[str, ...]] = {
+    "scan_evaluation": SCAN_EVALUATION_STAGE_ORDER,
+    "factor_discovery": (
+        "validating",
+        "loading_factor_definition",
+        "compiling_factor",
+        "resolving_data_snapshot",
+        "validating_pit_universe",
+        "executing_factor",
+        "generating_outcomes",
+        "resolving_periods",
+        "validating_discovery",
+        "validating_holdout",
+        "running_walk_forward",
+        "evaluating_acceptance",
+        "persisting_artifact",
+        "indexing_result",
+        "persisting_result",
+        "complete",
+    ),
+}
+
+# Backward-compatible alias for internal callers.
+STAGE_ORDER = list(DEFAULT_STAGE_ORDER)
+
+
+def stage_order_for_experiment(experiment_type: str) -> tuple[str, ...]:
+    """Return immutable stage order for an experiment type."""
+    return _EXPERIMENT_STAGE_ORDERS.get(experiment_type, DEFAULT_STAGE_ORDER)
 
 
 def _utcnow() -> datetime:
@@ -56,12 +99,13 @@ def _to_response(row: ResearchExperimentJob) -> ExperimentJobResponse:
     )
 
 
-def create_job(experiment_id: str) -> ExperimentJobResponse:
+def create_job(experiment_id: str, *, experiment_type: str | None = None) -> ExperimentJobResponse:
     job_id = f"expjob_{uuid.uuid4().hex[:12]}"
     now = _utcnow()
+    order = stage_order_for_experiment(experiment_type or "")
     stages = [
         ExperimentStageRecord(stage=s, status="pending")  # type: ignore[arg-type]
-        for s in STAGE_ORDER
+        for s in order
     ]
     engine = get_engine()
     with Session(engine) as session:

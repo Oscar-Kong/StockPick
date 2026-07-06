@@ -93,7 +93,7 @@ def test_rebalance_dates_invalid_range():
 def test_universe_for_date_pit(mock_universe, mock_pit):
     mock_universe.return_value = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN"]
     mock_pit.return_value = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN"]
-    symbols, source = universe_for_date("medium", date(2024, 6, 1), max_symbols=10)
+    symbols, source = universe_for_date("penny", date(2024, 6, 1), max_symbols=10)
     assert source == "pit"
     assert symbols == ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN"]
 
@@ -103,7 +103,7 @@ def test_universe_for_date_pit(mock_universe, mock_pit):
 def test_universe_for_date_fallback(mock_universe, mock_pit):
     mock_universe.return_value = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN"]
     mock_pit.return_value = []
-    symbols, source = universe_for_date("medium", date(2024, 6, 1), max_symbols=3)
+    symbols, source = universe_for_date("penny", date(2024, 6, 1), max_symbols=3)
     assert source == "fallback"
     assert len(symbols) == 3
 
@@ -165,7 +165,7 @@ def test_run_walk_forward_research_synthetic(
         side_effect=lambda hist, start, horizon: float(symbols.index(hist.attrs["symbol"]) + 1),
     ):
         cfg = WalkForwardConfig(
-            sleeve="medium",
+            sleeve="penny",
             start_date="2024-01-01",
             end_date="2024-06-30",
             rebalance_frequency="monthly",
@@ -201,7 +201,7 @@ def test_run_walk_forward_tail_insufficient_forward(mock_dates, mock_persist_run
         patch("services.walk_forward_research_service._forward_return_pct", return_value=None),
     ):
         cfg = WalkForwardConfig(
-            sleeve="medium",
+            sleeve="penny",
             start_date="2024-12-01",
             end_date="2024-12-31",
             forward_horizons=[20],

@@ -12,7 +12,7 @@ from engines.scoring.data_quality import dq_multiplier
 
 def test_factor_catalog_covers_sleeves():
     catalog = active_factor_catalog()
-    assert set(catalog) == {"penny", "medium", "compounder"}
+    assert set(catalog) == {"penny", "compounder"}
     for sleeve, specs in catalog.items():
         w = sum(s.weight for s in specs)
         assert 0.99 <= w <= 1.01, f"{sleeve} weights sum to {w}"

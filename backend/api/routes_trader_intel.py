@@ -8,7 +8,6 @@ from data.price_service import PriceService
 from data.reconciler import DataReconciler
 from data.strategy_registry import StrategyRegistry
 from ml.backtest_compounder import run_compounder_backtest
-from ml.backtest_medium import run_medium_backtest
 from ml.backtest_penny import run_penny_backtest
 from models.schemas import (
     Bucket,
@@ -90,7 +89,7 @@ def quick_compare(slug: str, bucket: Bucket):
     if not symbol:
         raise HTTPException(status_code=404, detail="No symbol found in latest saved scan")
 
-    horizon = preset.get("horizon") or ("1y" if bucket == Bucket.penny else "5y" if bucket == Bucket.compounder else "3y")
+    horizon = preset.get("horizon") or ("1y" if bucket == Bucket.penny else "5y")
     ps = PriceService()
     stock_df = ps.get_history(symbol, period=horizon if horizon != "2y" else "2y")
     spy_df = ps.get_spy_history(period=horizon if horizon != "2y" else "2y")
@@ -102,16 +101,6 @@ def quick_compare(slug: str, bucket: Bucket):
     if bucket == Bucket.penny:
         base = run_penny_backtest(stock_df, spy_df, horizon=horizon)
         tuned = run_penny_backtest(
-            stock_df,
-            spy_df,
-            horizon=horizon,
-            hold_days_override=trader_overrides.get("hold_days"),
-            stop_pct_override=trader_overrides.get("stop_pct"),
-            target_pct_override=trader_overrides.get("target_pct"),
-        )
-    elif bucket == Bucket.medium:
-        base = run_medium_backtest(stock_df, spy_df, horizon=horizon)
-        tuned = run_medium_backtest(
             stock_df,
             spy_df,
             horizon=horizon,

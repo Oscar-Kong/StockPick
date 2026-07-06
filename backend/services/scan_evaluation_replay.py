@@ -64,7 +64,9 @@ def _parse_date(value: str) -> date:
 
 
 def _resolve_bucket(value: str) -> Bucket:
-    return Bucket(value.lower())
+    from core.sleeve import normalize_bucket
+
+    return normalize_bucket(value)
 
 
 def _resolve_scoring_mode(algorithm_version: str) -> str:

@@ -24,6 +24,8 @@ VALID_EXPERIMENT_TYPES: frozenset[str] = frozenset(
         "pairs_discovery",
         "similar_signal",
         "portfolio_policy",
+        "scan_evaluation",
+        "factor_discovery",
     }
 )
 

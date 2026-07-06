@@ -1,0 +1,18 @@
+{
+  "kind": "ROLLING",
+  "op": "ROLLING_STD",
+  "window": 20,
+  "child": {
+    "kind": "ROLLING",
+    "op": "PCT_CHANGE",
+    "window": 5,
+    "child": {
+      "kind": "UNARY",
+      "op": "ABS",
+      "child": {
+        "kind": "FIELD",
+        "field_id": "close"
+      }
+    }
+  }
+}

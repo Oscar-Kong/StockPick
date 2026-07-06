@@ -28,14 +28,6 @@ def scan_penny(options: ScanOptions | None = None):
     return ScanJobResponse(job_id=job.job_id, bucket=Bucket.penny, status=job.status)
 
 
-@router.post("/medium", response_model=ScanJobResponse)
-def scan_medium(options: ScanOptions | None = None):
-    raise HTTPException(
-        status_code=410,
-        detail="Medium bucket is deprecated. Use POST /scan/penny or POST /scan/compounder.",
-    )
-
-
 @router.post("/compounder", response_model=ScanJobResponse)
 def scan_compounder(options: ScanOptions | None = None):
     options = enforce_scan_options(options)

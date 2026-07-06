@@ -190,7 +190,7 @@ describe("Quant Lab tabs", () => {
       mocked.runWalkForwardResearch.mockResolvedValue({
         run_id: "abc",
         status: "completed",
-        sleeve: "medium",
+        sleeve: "penny",
         start_date: "2024-01-01",
         end_date: "2026-01-01",
         rebalance_frequency: "monthly",
@@ -219,7 +219,7 @@ describe("Quant Lab tabs", () => {
       mocked.runWalkForwardResearch.mockResolvedValue({
         run_id: "abc",
         status: "completed",
-        sleeve: "medium",
+        sleeve: "penny",
         start_date: "2024-01-01",
         end_date: "2026-01-01",
         rebalance_frequency: "monthly",
@@ -238,7 +238,7 @@ describe("Quant Lab tabs", () => {
       mocked.runWalkForwardResearch.mockResolvedValue({
         run_id: "abc",
         status: "completed",
-        sleeve: "medium",
+        sleeve: "penny",
         start_date: "2024-01-01",
         end_date: "2026-01-01",
         rebalance_frequency: "monthly",
@@ -410,7 +410,7 @@ describe("Quant Lab tabs", () => {
         factor_model_version: "quant-v2",
       });
       mocked.getV2SleeveWeights.mockResolvedValue({
-        sleeve: "medium",
+        sleeve: "penny",
         regime: "neutral",
         dynamic_enabled: false,
         weights: {},

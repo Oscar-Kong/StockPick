@@ -1,29 +1,32 @@
 "use client";
 
 import {
-  compareResearchRunsDetail,
   createResearchRunFollowUpIdea,
   duplicateResearchRunExperiment,
   exportResearchRun,
   getResearchRunDetail,
-  listResearchRuns,
   patchResearchRunArchive,
   patchResearchRunNotes,
-} from "@/lib/api";
+} from "@/lib/api/research/runs";
 import { parseApiError } from "@/lib/apiError";
-import type { Bucket, ResearchRunDetailResponse, ResearchRunListItem } from "@/lib/types";
+import type { Bucket, ResearchRunListItem } from "@/lib/types";
 import { buildQuantLabHref } from "@/lib/quantLabNavigation";
-import { useTranslation, useTRef } from "@/lib/i18n";
+import { useTranslation } from "@/lib/i18n";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { BucketSelect } from "./QuantLabTabShell";
+import { useEffect, useMemo, useState } from "react";
+import {
+  useResearchRunCompare,
+  useResearchRunDetail,
+  useResearchRunList,
+} from "@/hooks/useResearchRuns";
 import { ResultChart } from "./ResultChart";
+import { ScanEvaluationResultPanel } from "./ScanEvaluationResultPanel";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 
 interface ResultsTabProps {
   sleeve: Bucket;
-  onSleeveChange: (sleeve: Bucket) => void;
+  onSleeveChange?: (sleeve: Bucket) => void;
 }
 
 const PAGE_SIZE = 20;
@@ -48,84 +51,70 @@ function MetricTip({ explanation }: { explanation: { label: string; measures: st
   );
 }
 
-export function ResultsTab({ sleeve, onSleeveChange }: ResultsTabProps) {
+export function ResultsTab({ sleeve }: ResultsTabProps) {
   const { t } = useTranslation();
-  const tRef = useTRef();
   const router = useRouter();
   const searchParams = useSearchParams();
   const runId = searchParams.get("run_id");
   const compareIds = searchParams.get("compare");
 
-  const [runs, setRuns] = useState<ResearchRunListItem[]>([]);
-  const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [runType, setRunType] = useState("");
   const [verdict, setVerdict] = useState("");
   const [impact, setImpact] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [detail, setDetail] = useState<ResearchRunDetailResponse | null>(null);
-  const [compare, setCompare] = useState<Awaited<ReturnType<typeof compareResearchRunsDetail>> | null>(null);
   const [notesDraft, setNotesDraft] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
 
-  const loadIndex = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await listResearchRuns({
-        sleeve,
-        search: search.trim() || undefined,
-        run_type: runType || undefined,
-        verdict: verdict || undefined,
-        evidence_impact: impact || undefined,
-        status: statusFilter || undefined,
-        offset,
-        limit: PAGE_SIZE,
-      });
-      setRuns(res.runs);
-      setTotal(res.total);
-    } catch (e) {
-      setRuns([]);
-      setError(parseApiError(e, tRef.current.quantLab.loadFailed));
-    } finally {
-      setLoading(false);
-    }
-  }, [sleeve, search, runType, verdict, impact, statusFilter, offset, tRef]);
+  const loadFailed = t.quantLab.loadFailed;
+  const indexEnabled = !runId && !compareIds;
+
+  const {
+    runs,
+    total,
+    loading: indexLoading,
+    error: indexError,
+    reload: loadIndex,
+    setError: setIndexError,
+  } = useResearchRunList(
+    {
+      sleeve,
+      search,
+      run_type: runType,
+      verdict,
+      evidence_impact: impact,
+      status: statusFilter,
+      offset,
+      limit: PAGE_SIZE,
+    },
+    { enabled: indexEnabled, loadFailed },
+  );
+
+  const {
+    detail,
+    loading: detailLoading,
+    error: detailError,
+    setDetail,
+  } = useResearchRunDetail(runId, loadFailed);
+
+  const {
+    compare,
+    loading: compareLoading,
+    error: compareError,
+  } = useResearchRunCompare(compareIds, loadFailed);
+
+  const loading = indexLoading || detailLoading || compareLoading;
+  const error = indexError ?? detailError ?? compareError;
+
+  const setError = (msg: string | null) => {
+    setIndexError(msg);
+  };
 
   useEffect(() => {
-    if (!runId && !compareIds) void loadIndex();
-  }, [loadIndex, runId, compareIds]);
-
-  useEffect(() => {
-    if (!runId) {
-      setDetail(null);
-      return;
-    }
-    setLoading(true);
-    getResearchRunDetail(runId)
-      .then((d) => {
-        setDetail(d);
-        setNotesDraft(d.summary.research_notes || "");
-      })
-      .catch((e) => setError(parseApiError(e, tRef.current.quantLab.loadFailed)))
-      .finally(() => setLoading(false));
-  }, [runId, tRef]);
-
-  useEffect(() => {
-    if (!compareIds) {
-      setCompare(null);
-      return;
-    }
-    setLoading(true);
-    compareResearchRunsDetail(compareIds.split(",").filter(Boolean))
-      .then(setCompare)
-      .catch((e) => setError(parseApiError(e, tRef.current.quantLab.loadFailed)))
-      .finally(() => setLoading(false));
-  }, [compareIds, tRef]);
+    if (detail) setNotesDraft(detail.summary.research_notes || "");
+  }, [detail]);
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / PAGE_SIZE)), [total]);
 
@@ -156,7 +145,7 @@ export function ResultsTab({ sleeve, onSleeveChange }: ResultsTabProps) {
       await fn();
       await loadIndex();
     } catch (e) {
-      setError(parseApiError(e, tRef.current.quantLab.runFailed));
+      setError(parseApiError(e, t.quantLab.runFailed));
     } finally {
       setBusy(null);
     }
@@ -214,11 +203,14 @@ export function ResultsTab({ sleeve, onSleeveChange }: ResultsTabProps) {
 
   if (runId && detail) {
     const interp = detail.interpretation;
+    const isScanEvaluation = detail.summary.run_type === "scan_evaluation";
     return (
       <div className="space-y-4 text-sm">
         <button type="button" className="text-sky-400 hover:underline" onClick={backToIndex}>
           {t.quantLab.resultsBack}
         </button>
+
+        {isScanEvaluation && <ScanEvaluationResultPanel detail={detail} variant="full" />}
 
         <header className="rounded-lg border border-zinc-800 bg-zinc-950/50 p-4 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -247,11 +239,13 @@ export function ResultsTab({ sleeve, onSleeveChange }: ResultsTabProps) {
           </p>
         </header>
 
-        <div className="grid gap-3 lg:grid-cols-2">
-          {detail.charts.map((c) => (
-            <ResultChart key={c.chart_id} chart={c} />
-          ))}
-        </div>
+        {!isScanEvaluation && (
+          <div className="grid gap-3 lg:grid-cols-2">
+            {detail.charts.map((c) => (
+              <ResultChart key={c.chart_id} chart={c} />
+            ))}
+          </div>
+        )}
 
         {detail.metric_explanations.length > 0 && (
           <div className="flex flex-wrap gap-2 text-xs">
@@ -351,7 +345,6 @@ export function ResultsTab({ sleeve, onSleeveChange }: ResultsTabProps) {
     <div className="space-y-3 text-sm">
       <p className="text-zinc-400">{t.quantLab.resultsIndexHint}</p>
       <div className="flex flex-wrap items-end gap-2">
-        <BucketSelect label={t.common.bucket} value={sleeve} onChange={(v) => onSleeveChange(v as Bucket)} />
         <input
           className="rounded border border-zinc-800 bg-zinc-950 px-2 py-1 text-xs"
           placeholder={t.quantLab.resultsSearch}

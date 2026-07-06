@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from config import FMP_API_KEY, FMP_ENABLED
-from scoring.medium_factors import earnings_revision_proxy
+from scoring.earnings_revision import earnings_revision_proxy
 from scoring.metrics import safe_float
 
 

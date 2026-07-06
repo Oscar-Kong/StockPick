@@ -9,8 +9,41 @@ import { ScoreSourceBadge } from "./ScoreSourceBadge";
 import { SimilarSignalBlock } from "./SimilarSignalBlock";
 import { ValuationBlock } from "./ValuationBlock";
 
-export function Round2Panel({ score }: { score: V2ScoreResponse }) {
+interface Round2PanelProps {
+  score: V2ScoreResponse;
+  /** Overview shows recommendation context only — score lives in the hero bar. */
+  variant?: "full" | "overview";
+}
+
+export function Round2Panel({ score, variant = "full" }: Round2PanelProps) {
   const { t } = useTranslation();
+
+  if (variant === "overview") {
+    return (
+      <div className="space-y-2.5">
+        {score.market_regime && (
+          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            {t.analysis.marketRegime}:{" "}
+            <span className="capitalize text-zinc-300">{score.market_regime}</span>
+          </p>
+        )}
+        {score.recommendation ? (
+          <RecommendationBlock data={score.recommendation} />
+        ) : (
+          <p className="text-sm text-secondary">{score.summary ?? t.analysis.summary}</p>
+        )}
+        {score.portfolio_impact && (
+          <p className="text-xs leading-relaxed text-zinc-500">
+            {fmt(t.quant.portfolioImpact, {
+              beta: score.portfolio_impact.portfolio_beta_impact ?? "—",
+              corr: score.portfolio_impact.correlation_with_portfolio ?? "—",
+              holdings: score.portfolio_impact.holdings_source ?? t.common.default,
+            })}
+          </p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">

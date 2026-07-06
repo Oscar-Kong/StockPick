@@ -87,7 +87,7 @@ def test_walk_forward_synthetic_pipeline(isolated_backend_env):
     ):
         summary = run_walk_forward_research(
             WalkForwardConfig(
-                sleeve="medium",
+                sleeve="penny",
                 start_date="2024-01-01",
                 end_date="2024-06-30",
                 forward_horizons=[5],
@@ -101,8 +101,8 @@ def test_walk_forward_synthetic_pipeline(isolated_backend_env):
 
 
 def test_evidence_reflects_seeded_ic(isolated_backend_env):
-    seed_factor_ic(sleeve="medium")
+    seed_factor_ic(sleeve="penny")
     seed_walk_forward_run()
-    evidence = get_quant_lab_evidence(sleeve="medium")
+    evidence = get_quant_lab_evidence(sleeve="penny")
     assert evidence.factor_ic.available is True
     assert evidence.walk_forward.available is True

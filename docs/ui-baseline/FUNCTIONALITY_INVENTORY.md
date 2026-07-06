@@ -189,9 +189,10 @@ Optional: source (column customization via `DenseTableToolbar`).
 | ideas | `IdeasBoardTab` |
 | experiments | `ExperimentStudio` |
 | results | `ResultsTab` |
-| models | `ModelsTab` |
 | model-monitor | `ModelMonitorTab` |
 | legacy | `LegacyQuantLabTabs` (`?tab=factor-performance\|walk-forward\|predictions\|pairs`) |
+
+> Retired: `section=models` redirects to `model-monitor`.
 
 ### Setup / execution
 

@@ -226,6 +226,9 @@ def _maintenance_actions() -> list[EvidenceMaintenanceAction]:
 
 
 def get_research_overview(sleeve: str = DEFAULT_BUCKET) -> ResearchOverviewResponse:
+    from core.sleeve import normalize_sleeve
+
+    sleeve = normalize_sleeve(sleeve)
     from config import FACTOR_MODEL_VERSION, STRATEGY_VERSION
     from services.version_pin import pinned_versions
 

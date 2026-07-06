@@ -204,13 +204,15 @@ class Cache:
 
 
 def get_watchlist() -> list[dict]:
+    from buckets import parse_bucket_query
+
     session = SessionLocal()
     try:
         rows = session.query(WatchlistEntry).order_by(WatchlistEntry.added_at.desc()).all()
         return [
             {
                 "symbol": r.symbol,
-                "bucket": r.bucket,
+                "bucket": parse_bucket_query(r.bucket),
                 "notes": r.notes or "",
                 "added_at": utc_iso_z(r.added_at),
                 "price": r.price,

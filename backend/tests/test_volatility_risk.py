@@ -97,7 +97,7 @@ def test_risk_engine_applies_vol_penalty_when_v2_enabled():
         with patch("engines.risk.engine.RISK_ENGINE_V2", True):
             assess = RiskEngine.assess(
                 "TEST",
-                "medium",
+                "penny",
                 final_score=75.0,
                 apply_deduction=True,
                 returns=r,
@@ -113,7 +113,7 @@ def test_risk_engine_skips_vol_when_v2_disabled():
         with patch("engines.risk.engine.RISK_ENGINE_V2", False):
             assess = RiskEngine.assess(
                 "TEST",
-                "medium",
+                "penny",
                 final_score=75.0,
                 apply_deduction=False,
                 returns=r,

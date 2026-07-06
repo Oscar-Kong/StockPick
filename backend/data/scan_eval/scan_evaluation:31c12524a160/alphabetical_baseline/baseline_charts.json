@@ -1,9 +1,0 @@
-{
-  "decile_forward_returns": [],
-  "mean_rank_ic_by_horizon": [
-    {
-      "horizon": "20",
-      "mean_rank_ic": null
-    }
-  ]
-}

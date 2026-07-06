@@ -13,8 +13,9 @@ import {
   refreshWatchlist,
   removeFromWatchlist,
 } from "@/lib/api";
-import type { AnalyzeWatchlistRow, WatchlistItem } from "@/lib/types";
+import { normalizeBucket } from "@/lib/buckets";
 import { fmt, useTranslation } from "@/lib/i18n";
+import type { AnalyzeWatchlistRow, WatchlistItem } from "@/lib/types";
 import { explainWorkspaceLoadError } from "@/lib/workspaceLoadError";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -72,7 +73,7 @@ function WorkspaceContent() {
       setSelected(upper);
       const row = matrixBySymbol.get(upper);
       setSelectedNotes(row?.notes ?? "");
-      setSelectedBucket(row?.bucket);
+      setSelectedBucket(normalizeBucket(row?.bucket));
       const params = new URLSearchParams(window.location.search);
       params.set("symbol", upper);
       params.delete("tab");
@@ -96,7 +97,7 @@ function WorkspaceContent() {
         const row = analyzeRes.rows.find((r) => r.symbol === selected);
         if (row) {
           setSelectedNotes(row.notes);
-          setSelectedBucket(row.bucket);
+          setSelectedBucket(normalizeBucket(row.bucket));
         }
       } else if (
         !autoPickedRef.current &&
@@ -107,7 +108,7 @@ function WorkspaceContent() {
         const first = analyzeRes.rows[0];
         setSelected(first.symbol);
         setSelectedNotes(first.notes);
-        setSelectedBucket(first.bucket);
+        setSelectedBucket(normalizeBucket(first.bucket));
       }
     } catch (err) {
       setMatrix([]);
@@ -128,7 +129,7 @@ function WorkspaceContent() {
       const row = matrixBySymbol.get(initialSymbol);
       if (row) {
         setSelectedNotes(row.notes);
-        setSelectedBucket(row.bucket);
+        setSelectedBucket(normalizeBucket(row.bucket));
       }
     }
   }, [initialSymbol, matrixBySymbol]);

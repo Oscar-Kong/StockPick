@@ -23,13 +23,14 @@ from services import refresh_orchestrator as ro
 
 
 def _reset_orchestrator_state() -> None:
-    """Clean module-level globals between tests (they are mutable singletons)."""
-    with ro._lock:
-        ro._home_refresh_running = False
-        ro._active_home_job_id = None
-        ro._refresh_started_at = None
-        ro._last_auto_refresh_at = None
-        ro._jobs.clear()
+    """Clean singleton state between tests."""
+    pr = ro.portfolio_refresh
+    with pr._lock:
+        pr._home_refresh_running = False
+        pr._active_home_job_id = None
+        pr._refresh_started_at = None
+        pr._last_auto_refresh_at = None
+        pr._jobs.clear()
 
 
 def test_try_begin_auto_refresh_returns_job_id_on_first_call():
@@ -41,7 +42,7 @@ def test_try_begin_auto_refresh_returns_job_id_on_first_call():
         started.set()
         return {"status": "ok", "steps": {}}
 
-    with patch.object(ro, "_execute_home_refresh", side_effect=_fake_execute):
+    with patch.object(ro.portfolio_refresh, "_execute_home_refresh", side_effect=_fake_execute):
         first = ro.try_begin_auto_refresh()
         # Let the worker thread finish so subsequent tests see a clean slot.
         started.wait(timeout=2.0)
@@ -58,7 +59,7 @@ def test_try_begin_auto_refresh_returns_none_when_already_running():
         release.wait(timeout=5.0)
         return {"status": "ok", "steps": {}}
 
-    with patch.object(ro, "_execute_home_refresh", side_effect=_slow_execute):
+    with patch.object(ro.portfolio_refresh, "_execute_home_refresh", side_effect=_slow_execute):
         first = ro.try_begin_auto_refresh()
         assert first is not None
         # Wait until the background worker actually starts so the running
@@ -77,7 +78,7 @@ def test_try_begin_auto_refresh_respects_cooldown():
     def _fast_execute(*, force: bool = False) -> dict:
         return {"status": "ok", "steps": {}}
 
-    with patch.object(ro, "_execute_home_refresh", side_effect=_fast_execute):
+    with patch.object(ro.portfolio_refresh, "_execute_home_refresh", side_effect=_fast_execute):
         first = ro.try_begin_auto_refresh()
         assert first is not None
         # Wait for the worker thread to fully clear `_home_refresh_running`.
@@ -112,7 +113,7 @@ def test_concurrent_callers_exactly_one_wins():
         with results_lock:
             results.append(jid)
 
-    with patch.object(ro, "_execute_home_refresh", side_effect=_slow_execute):
+    with patch.object(ro.portfolio_refresh, "_execute_home_refresh", side_effect=_slow_execute):
         threads = [threading.Thread(target=_worker) for _ in range(8)]
         for t in threads:
             t.start()

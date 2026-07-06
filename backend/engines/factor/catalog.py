@@ -28,21 +28,6 @@ FACTOR_CATALOG: dict[str, list[FactorSpec]] = {
         FactorSpec(_fid("penny", "social_buzz"), "Social buzz", 0.20, "important", signal_name="Social buzz"),
         FactorSpec(_fid("penny", "volatility_fit"), "Volatility fit", 0.15, "secondary", signal_name="Volatility fit"),
     ],
-    "medium": [
-        # Nominal weights when governance leg is active (base × 0.95 + 5% gov)
-        FactorSpec(_fid("medium", "rs_vs_spy"), "20d momentum vs SPY", 0.209, "critical", signal_name="20d momentum vs SPY"),
-        FactorSpec(_fid("medium", "technical_setup"), "Technical setup", 0.2185, "critical", signal_name="Technical setup"),
-        FactorSpec(_fid("medium", "sector_rs"), "Sector RS vs SPY", 0.171, "important", signal_name="Sector RS vs SPY"),
-        FactorSpec(_fid("medium", "qlib_alpha"), "Qlib alpha (20d)", 0.171, "important", signal_name="Qlib alpha (20d)"),
-        FactorSpec(_fid("medium", "sentiment"), "Sentiment", 0.1805, "important", signal_name="Sentiment"),
-        FactorSpec(
-            _fid("medium", "governance"),
-            "SEC / insider governance",
-            0.05,
-            "secondary",
-            signal_name="SEC / insider governance",
-        ),
-    ],
     "compounder": [
         FactorSpec(
             _fid("compounder", "rev_eps"),

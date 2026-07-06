@@ -31,10 +31,7 @@ def _utcnow() -> datetime:
 
 
 def _last_price(ps: PriceService, symbol: str) -> float | None:
-    df = ps.get_history(symbol, period="5d")
-    if df is None or df.empty:
-        return None
-    return float(df["close"].iloc[-1])
+    return ps.get_latest_price(symbol)
 
 
 def _momentum_score(symbol: str, ps: PriceService) -> float:
@@ -138,9 +135,6 @@ def run_portfolio_daily_decision(body: PortfolioDecisionRequest) -> PortfolioDec
     for h in body.holdings:
         sym = h.symbol.upper()
         sleeve = resolve_bucket(h.bucket.value if hasattr(h.bucket, "value") else str(h.bucket))
-        if sleeve == "medium":
-            sleeve = DEFAULT_BUCKET
-            notes.append(f"{sym}: medium bucket deprecated — using penny rules")
         latest = _last_price(ps, sym)
         price_for_mv = latest  # no avg_cost fallback for decisions
         mv = (price_for_mv * float(h.shares)) if price_for_mv else 0.0

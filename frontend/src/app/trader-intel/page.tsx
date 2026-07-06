@@ -35,7 +35,7 @@ export default function TraderIntelPage() {
         setCollectedAt(res.collected_at_utc);
         const bucketMap: Record<string, Bucket> = {};
         res.profiles.forEach((p) => {
-          const first = (p.integration_recipe.bucket_bias[0] as Bucket | undefined) ?? "medium";
+          const first = (p.integration_recipe.bucket_bias[0] as Bucket | undefined) ?? "penny";
           bucketMap[p.slug] = first;
         });
         setSelectedBucketBySlug(bucketMap);
@@ -86,7 +86,7 @@ export default function TraderIntelPage() {
               <label className="text-xs text-zinc-500">
                 {t.common.bucket}
                 <select
-                  value={selectedBucketBySlug[p.slug] ?? "medium"}
+                  value={selectedBucketBySlug[p.slug] ?? "penny"}
                   onChange={(e) =>
                     setSelectedBucketBySlug((prev) => ({
                       ...prev,
@@ -96,7 +96,6 @@ export default function TraderIntelPage() {
                   className="ml-2 rounded-lg border border-zinc-700 bg-zinc-950/80 px-2 py-1 text-xs text-zinc-200"
                 >
                   <option value="penny">{t.buckets.penny.label}</option>
-                  <option value="medium">{t.buckets.medium.label}</option>
                   <option value="compounder">{t.buckets.compounder.label}</option>
                 </select>
               </label>
@@ -104,7 +103,7 @@ export default function TraderIntelPage() {
                 type="button"
                 className="btn-ghost px-2 py-1 text-xs hover:bg-zinc-900"
                 onClick={async () => {
-                  const b = selectedBucketBySlug[p.slug] ?? "medium";
+                  const b = selectedBucketBySlug[p.slug] ?? "penny";
                   try {
                     const preset = await getTraderPreset(p.slug, b);
                     const params = new URLSearchParams();
@@ -125,7 +124,7 @@ export default function TraderIntelPage() {
                 type="button"
                 className="btn-primary px-2 py-1 text-xs"
                 onClick={async () => {
-                  const b = selectedBucketBySlug[p.slug] ?? "medium";
+                  const b = selectedBucketBySlug[p.slug] ?? "penny";
                   try {
                     const compare = await getTraderQuickCompare(p.slug, b);
                     setCompareBySlug((prev) => ({ ...prev, [p.slug]: compare }));

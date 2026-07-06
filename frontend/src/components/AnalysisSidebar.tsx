@@ -79,7 +79,7 @@ function BucketFitMini({
     return <p className="text-xs text-zinc-500">{t.analysis.scoringBuckets}</p>;
   }
   return (
-    <div className={`grid gap-1.5 ${scores.medium != null ? "grid-cols-3" : "grid-cols-2"}`}>
+    <div className="grid grid-cols-2 gap-1.5">
       {bucketFitDisplayOrder(scores).map((b) => {
         const s = scores[b];
         const active = b === assigned;
@@ -88,12 +88,10 @@ function BucketFitMini({
             key={b}
             className={clsx(
               "rounded-lg border px-2 py-1.5 text-center",
-              active ? "border-primary/40 bg-primary/10" : "border-zinc-800"
+              active ? "border-buy/40 bg-buy/10" : "border-zinc-800"
             )}
           >
-            <p className="text-xs capitalize text-zinc-500">
-              {b === "medium" ? `${b.slice(0, 4)}*` : b.slice(0, 4)}
-            </p>
+            <p className="text-xs capitalize text-zinc-500">{b.slice(0, 4)}</p>
             <p className="text-sm font-semibold tabular-nums text-zinc-100">
               {s?.score?.toFixed(0) ?? "—"}
             </p>
@@ -127,12 +125,6 @@ export function AnalysisSidebar({
   const scores = bucketFit?.scores ?? {};
   const primarySignals = display?.signals ?? data.signals;
   const scoreSource = display?.scoreSource ?? (v2Score ? "scoring_engine_v2" : "legacy_screener");
-  const scoreSourceLabel =
-    scoreSource === "scoring_engine_v2"
-      ? t.analysis.scoreSourceV2Short
-      : t.analysis.scoreSourceLegacyShort;
-  const scoreSourceTone =
-    scoreSource === "scoring_engine_v2" ? "text-emerald-300" : "text-secondary";
 
   const fundEntries: { label: string; value: string }[] = [];
   const labelsUsed = new Set<string>();
@@ -153,13 +145,8 @@ export function AnalysisSidebar({
   }
 
   return (
-    <div className="space-y-2 p-3">
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-800/80 bg-zinc-950/40 px-2.5 py-2">
-        <span className={clsx("text-[0.6875rem] font-semibold uppercase tracking-wide", scoreSourceTone)}>
-          {scoreSourceLabel}
-        </span>
-        <p className="text-[0.6875rem] leading-relaxed text-zinc-500">{t.analysis.sidebarInsightsHint}</p>
-      </div>
+    <div className="analysis-sidebar space-y-2 p-3">
+      <p className="analysis-sidebar__hint">{t.analysis.sidebarInsightsHint}</p>
 
       <SidebarSection title={t.analysis.technicals}>
         <div className="stat-tile-grid grid grid-cols-2 gap-1.5">
@@ -174,13 +161,7 @@ export function AnalysisSidebar({
       </SidebarSection>
 
       <SidebarSection title={t.analysis.qualityTiming}>
-        <div className="stat-tile-grid grid grid-cols-2 gap-1.5">
-          <StatCell
-            label={t.analysis.dataQuality}
-            value={
-              data.data_quality_score != null ? `${data.data_quality_score.toFixed(0)}%` : "—"
-            }
-          />
+        <div className="stat-tile-grid grid grid-cols-1 gap-1.5">
           <StatCell
             label={t.analysis.earnings}
             value={

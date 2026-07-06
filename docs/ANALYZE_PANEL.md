@@ -17,17 +17,16 @@ After you **scan** and add names to your **watchlist**, Analyze answers:
 
 ---
 
-## Three investment sleeves
+## Two investment sleeves
 
 | Sleeve | Typical hold | What you are hunting |
 |--------|--------------|----------------------|
 | **Penny** | ~3–10 days | Short momentum, volume, tradable volatility |
-| **Medium** | ~4–8 weeks | Swing: trend/breakout + RS vs market and sector |
 | **Compounder** | Years | Quality growth, margins, smooth long trend, macro fit |
 
-**Assigned sleeve** — the score and summary use one model (often medium unless the watchlist tags another).
+**Assigned sleeve** — the score and summary use one model (penny or compounder unless the watchlist tags another).
 
-**Bucket fit (three tiles)** — same stock scored under all three sleeves; use when the name sits between styles.
+**Bucket fit (two tiles)** — same stock scored under both sleeves; use when the name sits between styles.
 
 **Outside typical filters** — still shows a score, but the summary warns the name **fails** that sleeve’s normal universe rules.
 
@@ -40,7 +39,7 @@ After you **scan** and add names to your **watchlist**, Analyze answers:
 | **Price** | Reference last price for scoring |
 | **Sleeve** | Active holding-period model |
 | **Score (0–100)** | Composite attractiveness for that sleeve (not a return forecast) |
-| **Risk** | Sizing/diligence hint (penny often high; medium maps score to low/med/high) |
+| **Risk** | Sizing/diligence hint (penny often high; compounder maps score to low/med/high) |
 
 **Refresh** — re-score with today’s market and data.
 
@@ -52,17 +51,13 @@ After you **scan** and add names to your **watchlist**, Analyze answers:
 2. **Weighted blend** — each factor has an importance %; bars show **contribution**.
 3. **Regime adjustment** — SPY volatility and sector strength nudge the score.
 4. **Data trust** — disagreement across data vendors reduces the score.
-5. **Governance (when on)** — SEC/insider/offering flags for medium & compounder.
+5. **Governance (when on)** — SEC/insider/offering flags for compounder.
 
 The **headline score** can differ slightly from the sum of bars because steps 3–5 apply after the weighted average.
 
 ### Factor weights by sleeve (summary)
 
 **Penny:** 5d momentum, volume spike (normalized score), relative volume ratio (raw x baseline), RSI, social buzz, volatility fit. Scan drawer shows **Relative volume: 3.2x** separately from **Volume signal score: 92/100**.
-
-**Medium:** 20d RS vs SPY, technical setup, sector RS, quant alpha, sentiment, optional governance.
-
-**Medium risk labels:** score ≥75 → low; &lt;50 → high.
 
 **Compounder:** revenue/EPS consistency, ROIC/margins, 5Y smooth growth, moat proxies, macro, small quant alpha, optional governance.
 
@@ -163,7 +158,7 @@ See [ANALYZE_PANEL_STATS_GUIDE.md](ANALYZE_PANEL_STATS_GUIDE.md) for field-by-fi
 | Factor / signal | One scored input (momentum, sentiment, …) |
 | Contribution | Factor score × weight (bar chart) |
 | Relative strength | Performance vs SPY or sector ETF |
-| Bucket fit | Scores under penny, medium, compounder |
+| Bucket fit | Scores under penny and compounder |
 | Data quality | Trust in vendor-agreed fundamentals |
 | Hard filter | Minimum rules to be a “normal” candidate |
 

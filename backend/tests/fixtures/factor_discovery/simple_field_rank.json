@@ -1,0 +1,8 @@
+{
+  "kind": "CROSS_SECTIONAL",
+  "op": "RANK",
+  "child": {
+    "kind": "FIELD",
+    "field_id": "return_126d"
+  }
+}

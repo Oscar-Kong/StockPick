@@ -114,7 +114,7 @@ def test_experiment_persistence(research_db):
 def test_run_adapters_walk_forward_and_pairs(research_db):
     seed_walk_forward_run()
     seed_pairs_run()
-    seed_factor_ic(sleeve="medium", as_of=date.today())
+    seed_factor_ic(sleeve="penny", as_of=date.today())
 
     wf = adapter_walk_forward("wf_test_001")
     assert wf is not None
@@ -125,7 +125,7 @@ def test_run_adapters_walk_forward_and_pairs(research_db):
     assert pairs is not None
     assert pairs.run_type == "pairs"
 
-    ic = adapter_factor_ic_panel("medium", date.today().isoformat())
+    ic = adapter_factor_ic_panel("penny", date.today().isoformat())
     assert ic is not None
     assert ic.run_type == "factor_ic_panel"
 
@@ -218,10 +218,10 @@ def test_major_evidence_gate_walk_forward_strong(research_db):
         "aggregate_horizons": {"20": {"mean_rank_ic": 0.06}},
         "strategy_version": "v1",
         "factor_model_version": "v1",
-        "sleeve": "medium",
+        "sleeve": "penny",
         "sample_size": 120,
     }
-    params = {"sleeve": "medium", "start_date": "2023-01-01", "end_date": "2024-12-31"}
+    params = {"sleeve": "penny", "start_date": "2023-01-01", "end_date": "2024-12-31"}
     gate = evaluate_major_evidence_gate(
         run_type="walk_forward",
         summary=summary,
@@ -261,9 +261,9 @@ def test_change_proposal_persistence(research_db):
         ChangeProposalCreate(
             title="Retire negative IC factor",
             finding="Quality factor IC < 0 for 3 panels",
-            supporting_run_ids=["ic_panel:medium:2024-01-01"],
+            supporting_run_ids=["ic_panel:penny:2024-01-01"],
             proposed_change={"action": "retire_factor", "factor_id": "medium_quality"},
-            affected_sleeve="medium",
+            affected_sleeve="penny",
             affected_factors=["medium_quality"],
             status="draft",
         )

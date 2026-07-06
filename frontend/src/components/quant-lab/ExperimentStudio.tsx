@@ -12,36 +12,39 @@ import {
 import { parseApiError } from "@/lib/apiError";
 import {
   buildExperimentStudioHref,
+  defaultScanEvaluationParams,
   defaultWalkForwardDates,
   type ExperimentPresetId,
   type ExperimentStudioStep,
   type ExperimentType,
   type UniverseSource,
 } from "@/lib/experimentStudio";
+import { getResearchRunDetail } from "@/lib/api/research/runs";
 import { buildQuantLabHref } from "@/lib/quantLabNavigation";
 import type {
   ExperimentJobResponse,
   ExperimentPresetInfo,
   ExperimentTemplateInfo,
   ExperimentValidationResponse,
+  ResearchRunDetailResponse,
 } from "@/lib/types";
 import type { Bucket } from "@/lib/types";
 import { useTranslation, useTRef } from "@/lib/i18n";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BucketSelect } from "./QuantLabTabShell";
+import { ScanEvaluationConfigFields } from "./ScanEvaluationConfigFields";
+import { ScanEvaluationResultPanel } from "./ScanEvaluationResultPanel";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
-import { ResearchOnlyBadge } from "@/components/ui/ResearchOnlyBadge";
 
 interface ExperimentStudioProps {
   sleeve: Bucket;
-  onSleeveChange: (sleeve: Bucket) => void;
+  onSleeveChange?: (sleeve: Bucket) => void;
 }
 
 const STEP_ORDER: ExperimentStudioStep[] = ["choose", "configure", "review", "run", "status", "result"];
 
-export function ExperimentStudio({ sleeve, onSleeveChange }: ExperimentStudioProps) {
+export function ExperimentStudio({ sleeve }: ExperimentStudioProps) {
   const { t } = useTranslation();
   const tRef = useTRef();
   const router = useRouter();
@@ -58,6 +61,7 @@ export function ExperimentStudio({ sleeve, onSleeveChange }: ExperimentStudioPro
   const [error, setError] = useState<string | null>(null);
   const [validation, setValidation] = useState<ExperimentValidationResponse | null>(null);
   const [job, setJob] = useState<ExperimentJobResponse | null>(null);
+  const [resultDetail, setResultDetail] = useState<ResearchRunDetailResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const runLockRef = useRef(false);
 
@@ -155,13 +159,37 @@ export function ExperimentStudio({ sleeve, onSleeveChange }: ExperimentStudioPro
     };
   }, [jobId, step, navigate, template]);
 
+  useEffect(() => {
+    if (step !== "result" || template !== "scan_evaluation" || !job?.run_id) {
+      setResultDetail(null);
+      return;
+    }
+    let cancelled = false;
+    void getResearchRunDetail(job.run_id)
+      .then((detail) => {
+        if (!cancelled) setResultDetail(detail);
+      })
+      .catch(() => {
+        if (!cancelled) setResultDetail(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [step, template, job?.run_id]);
+
   const selectedTemplate = useMemo(
     () => templates.find((x) => x.experiment_type === template) ?? null,
     [templates, template]
   );
 
   const onChooseTemplate = (expType: ExperimentType) => {
-    setName(selectedTemplate?.title ?? expType.replace(/_/g, " "));
+    const tmplMeta = templates.find((x) => x.experiment_type === expType);
+    if (expType === "scan_evaluation") {
+      setPreset("scan_eval_smoke");
+      setParams(defaultScanEvaluationParams());
+      setUniverseSource("full_bucket");
+    }
+    setName(tmplMeta?.title ?? expType.replace(/_/g, " "));
     navigate({ step: "configure", template: expType });
   };
 
@@ -241,11 +269,6 @@ export function ExperimentStudio({ sleeve, onSleeveChange }: ExperimentStudioPro
 
   return (
     <div className="space-y-4 text-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <BucketSelect label={t.common.bucket} value={sleeve} onChange={(v) => onSleeveChange(v as Bucket)} />
-        <ResearchOnlyBadge tooltip={t.quantLab.researchOnlyWarning} />
-      </div>
-
       <nav className="flex flex-wrap gap-1 text-xs" aria-label={t.quantLab.studioStepsAria}>
         {STEP_ORDER.slice(0, 4).map((s, i) => (
           <span
@@ -281,7 +304,8 @@ export function ExperimentStudio({ sleeve, onSleeveChange }: ExperimentStudioPro
       )}
 
       {step === "configure" && template && (
-        <section className="surface-card space-y-3 p-4">
+        <div className="quant-lab-experiment-layout">
+          <section className="quant-lab-experiment-layout__main surface-card space-y-3 p-4">
           <h3 className="font-semibold text-zinc-100">{selectedTemplate?.title ?? template}</h3>
           <label className="block text-xs text-zinc-500">
             {t.quantLab.studioName}
@@ -407,6 +431,9 @@ export function ExperimentStudio({ sleeve, onSleeveChange }: ExperimentStudioPro
           {template === "pairs_discovery" && (
             <p className="text-xs text-amber-300/90">{t.quantLab.cointegrationTooltip}</p>
           )}
+          {template === "scan_evaluation" && (
+            <ScanEvaluationConfigFields params={params} preset={preset} onChange={setParams} />
+          )}
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
@@ -425,11 +452,24 @@ export function ExperimentStudio({ sleeve, onSleeveChange }: ExperimentStudioPro
               {t.quantLab.studioContinueReview}
             </button>
           </div>
-        </section>
+          </section>
+          <ExperimentStudioAside
+            step={step}
+            templateTitle={selectedTemplate?.title ?? template}
+            sleeve={sleeve}
+            preset={preset}
+            universeSource={universeSource}
+            symbolCount={validation?.symbol_count}
+            dataCutoff={validation?.data_cutoff ?? undefined}
+            canRun={validation?.can_run}
+            limitationCount={validation?.major_limitations.length ?? 0}
+          />
+        </div>
       )}
 
       {step === "review" && template && (
-        <section className="surface-card space-y-3 p-4">
+        <div className="quant-lab-experiment-layout">
+          <section className="quant-lab-experiment-layout__main surface-card space-y-3 p-4">
           <h3 className="font-semibold text-zinc-100">{t.quantLab.studioReviewTitle}</h3>
           {!validation ? (
             <LoadingSkeleton lines={4} />
@@ -479,7 +519,19 @@ export function ExperimentStudio({ sleeve, onSleeveChange }: ExperimentStudioPro
               {busy ? t.common.running : t.quantLab.studioRun}
             </button>
           </div>
-        </section>
+          </section>
+          <ExperimentStudioAside
+            step={step}
+            templateTitle={selectedTemplate?.title ?? template}
+            sleeve={sleeve}
+            preset={preset}
+            universeSource={universeSource}
+            symbolCount={validation?.symbol_count}
+            dataCutoff={validation?.data_cutoff ?? undefined}
+            canRun={validation?.can_run}
+            limitationCount={validation?.major_limitations.length ?? 0}
+          />
+        </div>
       )}
 
       {(step === "status" || step === "result") && (
@@ -524,6 +576,9 @@ export function ExperimentStudio({ sleeve, onSleeveChange }: ExperimentStudioPro
                 ))}
               </ul>
               {job.error_message && <p className="text-xs text-red-400">{job.error_message}</p>}
+              {step === "result" && template === "scan_evaluation" && resultDetail && (
+                <ScanEvaluationResultPanel detail={resultDetail} variant="compact" />
+              )}
             </>
           )}
           {step === "result" && job?.run_id && (
@@ -553,3 +608,79 @@ const UNIVERSE_SOURCE_OPTIONS: UniverseSource[] = [
   "full_bucket",
   "custom_symbols",
 ];
+
+function ExperimentStudioAside({
+  step,
+  templateTitle,
+  sleeve,
+  preset,
+  universeSource,
+  symbolCount,
+  dataCutoff,
+  canRun,
+  limitationCount,
+}: {
+  step: ExperimentStudioStep;
+  templateTitle: string;
+  sleeve: Bucket;
+  preset: ExperimentPresetId;
+  universeSource: UniverseSource;
+  symbolCount?: number;
+  dataCutoff?: string;
+  canRun?: boolean;
+  limitationCount: number;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <aside className="quant-lab-experiment-layout__aside surface-card space-y-3 p-4">
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{t.quantLab.studioAsideSummary}</h4>
+      <dl className="space-y-2 text-xs">
+        <div className="flex justify-between gap-2">
+          <dt className="text-zinc-500">{t.quantLab.studioAsideTemplate}</dt>
+          <dd className="text-right text-zinc-200">{templateTitle}</dd>
+        </div>
+        <div className="flex justify-between gap-2">
+          <dt className="text-zinc-500">{t.common.bucket}</dt>
+          <dd className="text-right capitalize text-zinc-200">{sleeve}</dd>
+        </div>
+        <div className="flex justify-between gap-2">
+          <dt className="text-zinc-500">{t.quantLab.studioPreset}</dt>
+          <dd className="text-right text-zinc-200">{preset}</dd>
+        </div>
+        <div className="flex justify-between gap-2">
+          <dt className="text-zinc-500">{t.quantLab.studioUniverse}</dt>
+          <dd className="text-right text-zinc-200">
+            {t.quantLab[`studioUniverse_${universeSource}` as keyof typeof t.quantLab] as string}
+          </dd>
+        </div>
+        {step === "review" && symbolCount != null && (
+          <div className="flex justify-between gap-2">
+            <dt className="text-zinc-500">{t.quantLab.studioSymbolCount}</dt>
+            <dd className="tabular-nums text-zinc-200">{symbolCount}</dd>
+          </div>
+        )}
+        {step === "review" && dataCutoff && (
+          <div className="flex justify-between gap-2">
+            <dt className="text-zinc-500">{t.quantLab.studioDataCutoff}</dt>
+            <dd className="tabular-nums text-zinc-200">{dataCutoff}</dd>
+          </div>
+        )}
+      </dl>
+      {step === "review" && (
+        <div className="border-t border-zinc-800 pt-3 text-xs">
+          <p className="text-zinc-500">{t.quantLab.studioAsideValidation}</p>
+          <p className={`mt-1 font-medium ${canRun ? "text-emerald-400" : "text-amber-300"}`}>
+            {canRun ? t.quantLab.studioAsideReady : t.quantLab.studioAsideBlocked}
+          </p>
+          {limitationCount > 0 && (
+            <p className="mt-1 text-amber-300">
+              {t.quantLab.studioAsideLimitations}: {limitationCount}
+            </p>
+          )}
+        </div>
+      )}
+      <p className="text-xs leading-relaxed text-zinc-600">{t.quantLab.validationCopy}</p>
+    </aside>
+  );
+}

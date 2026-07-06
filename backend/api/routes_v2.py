@@ -24,7 +24,7 @@ router = APIRouter(prefix="/api/v2", tags=["quant-v2"])
 @router.get("/score/{symbol}", response_model=V2ScoreResponse)
 def get_v2_score(
     symbol: str,
-    sleeve: Bucket | None = Query(None, description="penny | medium | compounder"),
+    sleeve: Bucket | None = Query(None, description="penny | compounder"),
     validate_parity: bool = Query(True, description="Compare to legacy analyze score"),
     x_strategy_version: str | None = Header(None, alias="X-Strategy-Version"),
     x_factor_model_version: str | None = Header(None, alias="X-Factor-Model-Version"),

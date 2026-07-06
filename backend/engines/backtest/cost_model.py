@@ -5,14 +5,16 @@ from config import BT_FEE_BPS_DEFAULT, BT_MIN_TICKET_USD, BT_SLIP_BPS_DEFAULT
 
 SLEEVE_COST_BPS: dict[str, dict[str, float]] = {
     "penny": {"fee": 8.0, "slip": 15.0},
-    "medium": {"fee": 5.0, "slip": 10.0},
     "compounder": {"fee": 4.0, "slip": 8.0},
 }
 
 
 def resolve_cost_bps(sleeve: str | None = None) -> tuple[float, float]:
-    if sleeve and sleeve in SLEEVE_COST_BPS:
-        cfg = SLEEVE_COST_BPS[sleeve]
+    from core.sleeve import normalize_sleeve
+
+    key = normalize_sleeve(sleeve) if sleeve else None
+    if key and key in SLEEVE_COST_BPS:
+        cfg = SLEEVE_COST_BPS[key]
         return float(cfg["fee"]), float(cfg["slip"])
     return BT_FEE_BPS_DEFAULT, BT_SLIP_BPS_DEFAULT
 

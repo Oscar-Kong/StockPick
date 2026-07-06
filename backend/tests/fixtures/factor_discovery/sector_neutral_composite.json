@@ -1,0 +1,29 @@
+{
+  "kind": "NEUTRALIZE",
+  "key": "SECTOR",
+  "child": {
+    "kind": "BINARY",
+    "op": "ADD",
+    "left": {
+      "kind": "CROSS_SECTIONAL",
+      "op": "ZSCORE",
+      "child": {
+        "kind": "FIELD",
+        "field_id": "relative_volume"
+      }
+    },
+    "right": {
+      "kind": "CROSS_SECTIONAL",
+      "op": "ZSCORE",
+      "child": {
+        "kind": "ROLLING",
+        "op": "ROLLING_MEAN",
+        "window": 20,
+        "child": {
+          "kind": "FIELD",
+          "field_id": "return_1d"
+        }
+      }
+    }
+  }
+}

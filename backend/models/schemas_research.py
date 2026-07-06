@@ -40,6 +40,8 @@ ExperimentType = Literal[
     "pairs_discovery",
     "similar_signal",
     "portfolio_policy",
+    "scan_evaluation",
+    "factor_discovery",
 ]
 
 ResearchRunType = Literal[
@@ -50,6 +52,7 @@ ResearchRunType = Literal[
     "similar_signal",
     "portfolio_policy",
     "quant_job",
+    "scan_evaluation",
 ]
 
 RunStatus = Literal["pending", "running", "completed", "failed", "cancelled"]
@@ -78,6 +81,7 @@ ExperimentPreset = Literal[
     "quick_check",
     "standard_research",
     "robust_validation",
+    "scan_eval_smoke",
     "exploratory",
     "robust",
     "custom",
@@ -101,6 +105,23 @@ ExperimentStage = Literal[
     "calculating_outcomes",
     "evaluating_reliability",
     "persisting_result",
+    "preparing_universe",
+    "replaying_scans",
+    "calculating_forward_outcomes",
+    "generating_charts",
+    "loading_factor_definition",
+    "compiling_factor",
+    "resolving_data_snapshot",
+    "validating_pit_universe",
+    "executing_factor",
+    "generating_outcomes",
+    "resolving_periods",
+    "validating_discovery",
+    "validating_holdout",
+    "running_walk_forward",
+    "evaluating_acceptance",
+    "persisting_artifact",
+    "indexing_result",
     "complete",
     "failed",
 ]

@@ -58,14 +58,6 @@ def _penny_losses(ctx: CandidateContext, _options: ScanOptions) -> tuple[bool, s
     return True, ""
 
 
-def _medium_liquidity(ctx: CandidateContext, options: ScanOptions) -> tuple[bool, str]:
-    from config import MEDIUM_MIN_DOLLAR_VOLUME_20D
-
-    dv = avg_dollar_volume_from_history(ctx.history)
-    if dv < MEDIUM_MIN_DOLLAR_VOLUME_20D:
-        return False, f"Dollar volume below medium sleeve minimum"
-    return True, ""
-
 
 def _compounder_adjusted_eps(ctx: CandidateContext, _options: ScanOptions) -> tuple[bool, str]:
     from scoring.compounder_v3 import adjusted_eps_score
@@ -88,7 +80,6 @@ HARD_FILTER_TABLE: list[HardFilterRule] = [
     HardFilterRule("delisting_risk", "penny", "exclude", "Sustained sub-$1 price", _penny_delisting),
     HardFilterRule("st_status", "penny", "exclude", "OTC / pink sheet", _penny_otc),
     HardFilterRule("persistent_losses", "penny", "exclude", "Negative EPS trajectory", _penny_losses),
-    HardFilterRule("liquidity", "medium", "exclude", "Medium dollar volume", _medium_liquidity),
     HardFilterRule("adjusted_eps", "compounder", "exclude", "EPS one-off filter", _compounder_adjusted_eps),
     HardFilterRule("fcf_leverage", "compounder", "exclude", "FCF vs debt", _compounder_fcf),
 ]

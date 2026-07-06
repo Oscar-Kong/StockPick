@@ -13,7 +13,7 @@ const VALUE_TONE: Record<MetricTileTone, string> = {
   negative: "text-negative",
   warning: "text-hold",
   muted: "text-tertiary",
-  primary: "text-primary",
+  primary: "text-buy",
 };
 
 const SUMMARY_TONE: Record<"default" | "positive" | "negative" | "warning" | "muted", string> = {

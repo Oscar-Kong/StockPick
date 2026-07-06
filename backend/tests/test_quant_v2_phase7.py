@@ -40,7 +40,7 @@ def test_audit_and_job_queue():
     importlib.reload(al)
     from engines.audit.logger import audit_log, list_audit_logs
 
-    audit_log("test_event", symbol="AAPL", sleeve="medium", payload={"x": 1})
+    audit_log("test_event", symbol="AAPL", sleeve="penny", payload={"x": 1})
     events = list_audit_logs(limit=5, event_type="test_event")
     assert len(events) == 1
     assert events[0]["strategy_version"]

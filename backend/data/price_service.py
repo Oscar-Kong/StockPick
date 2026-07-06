@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import date
 from typing import Any
 
 import pandas as pd
@@ -226,3 +227,70 @@ class PriceService:
             "currentPrice": price,
             "averageVolume": avg_vol,
         }
+
+    def _live_quote_price(self, symbol: str) -> tuple[float | None, dict[str, Any]]:
+        quote = self.market.get_quote(symbol.upper())
+        price = quote.get("currentPrice") or quote.get("price")
+        if price is None:
+            return None, quote
+        return float(price), quote
+
+    @staticmethod
+    def _session_date_et() -> date:
+        from services.data_freshness_service import NY_TZ
+
+        return utc_now().astimezone(NY_TZ).date()
+
+    def _upsert_live_quote_bar(self, symbol: str, quote: dict[str, Any], price: float) -> None:
+        """Persist today's session bar from a live quote so holdings refresh updates DB."""
+        sym = symbol.upper()
+        session_date = self._session_date_et()
+        row = {
+            "date": pd.Timestamp(session_date),
+            "open": float(quote.get("open") or price),
+            "high": float(quote.get("high") or price),
+            "low": float(quote.get("low") or price),
+            "close": float(price),
+            "volume": float(quote.get("volume") or 0),
+        }
+        local_rows = self.store.get_quotes(sym, limit=PERIOD_LIMIT.get("5d", 10))
+        local_df = _rows_to_dataframe(local_rows)
+        merged = merge_history_frames(local_df, pd.DataFrame([row]))
+        self._persist(sym, merged)
+
+    def get_latest_price(self, symbol: str, *, force_refresh: bool = False) -> float | None:
+        """Latest mark for portfolio — live quote during market hours, else last daily close."""
+        sym = symbol.upper()
+        from services.data_freshness_service import get_market_session_band
+
+        band = get_market_session_band()
+        use_live = force_refresh or band in ("regular", "extended")
+        if use_live:
+            price, _quote = self._live_quote_price(sym)
+            if price is not None and price > 0:
+                return price
+
+        df = self.get_history(sym, period="5d", force_refresh=force_refresh)
+        if df is None or df.empty:
+            return None
+        return float(df["close"].iloc[-1])
+
+    def refresh_latest_price(self, symbol: str, *, force: bool = False) -> float | None:
+        """Fetch live quote + daily history for a holding symbol."""
+        sym = symbol.upper()
+        price, quote = self._live_quote_price(sym)
+        if price is not None and price > 0:
+            try:
+                self._upsert_live_quote_bar(sym, quote, price)
+            except Exception as exc:
+                logger.warning("Failed to persist live quote bar for %s: %s", sym, exc)
+
+        self.get_history(sym, period="5d", force_refresh=force)
+
+        if price is not None and price > 0:
+            return price
+
+        df = self.get_history(sym, period="5d")
+        if df is None or df.empty:
+            return None
+        return float(df["close"].iloc[-1])

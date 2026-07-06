@@ -1,8 +1,8 @@
 # Quant Lab — Research & Experiments
 
 > **Route:** `/quant-lab` (+ section / legacy tab query params)  
-> **Components:** `QuantLabPage`, section tabs, `OverviewTab`, `ExperimentStudio`, `ResultsTab`, `ModelsTab`, etc.  
-> **Audit:** `docs/UI_AUDIT.md` §12.4, §15 Phase 4 (#5 Quant Lab), §16  
+> **Components:** `QuantLabPage`, section tabs, `OverviewTab`, `ExperimentStudio`, `ResultsTab`, `ModelMonitorTab`, etc.  
+> **Audit:** `docs/UI_AUDIT_REVISED.md` §12.4, §15 Phase 4 (#5 Quant Lab), §16  
 > **Implementation phase:** Phase 4 — chart/shell items partially in Phase 1 & 3  
 > **Parent:** `design-system/MASTER.md`  
 > **ui-ux-pro-max pattern:** Feature-rich research showcase — academic readable typography, progressive disclosure, block-based sections
@@ -31,13 +31,15 @@ Experiment setup → Validation config → Execution status → Results → Evid
 - Product explanation in info drawer (not removed)
 - Restore last-used section from URL (already partially supported)
 
+**Glass panels (2026-07-04):** Shared `GlassPanel` (`default` / `compact` / `hero`) wraps Overview KPIs, brief/findings, evidence last-run cards, reliability card, and product boundary panels — matches Analyze workspace frosted surfaces.
+
 ---
 
 ## Page purpose
 
 Quant Lab is the **institutional research layer**: experiment design, backtest results, factor models, model monitoring, and legacy quant tooling.
 
-**Preserve:** All seven primary sections + Legacy tab, evidence/scan relationship panels, research-only warnings, experiment configs, walk-forward, predictions, factor performance, model admin — all query-param deep links.
+**Preserve:** All primary workflow sections + Legacy tab, evidence/scan relationship panels (Guide drawer), research-only warnings, experiment configs, walk-forward, predictions, factor performance, model admin — all query-param deep links.
 
 ---
 
@@ -50,7 +52,7 @@ Page header + ResearchOnlyBadge (one row)
 ├── Primary section tabs (sticky below header)
 ├── [Collapsed by default] Evidence · Scan relationship (accordion)
 └── Section workspace (min-height fits content — no forced 12rem)
-    ├── Overview | Ideas | Experiments | Results | Models | Monitor | Legacy
+    ├── Overview | Ideas | Experiments | **Factor Discovery** | Results | Monitor | Legacy
     └── Legacy: secondary tab row inside panel only
 ```
 
@@ -63,7 +65,7 @@ ui-ux-pro-max: **Feature-Rich Showcase** — hero metrics above fold, features b
 | Area | Current | Makeover | Priority |
 |------|---------|----------|----------|
 | Collapsible panels | Expanded by default above tabs | **Collapsed default**; move product explanation to info drawer (§12.4) | Major |
-| Section tabs | 7 + Legacy in one bar | Primary 6 visible; Legacy in overflow “More” menu on `<900px` | Moderate |
+| Section tabs | 6 workflow + Legacy | Workflow row includes Monitor; Legacy in overflow “More” on `<900px` | Moderate |
 | `min-h-[12rem]` | Empty padding when loading | `min-h-0`; skeleton fills natural height | Minor |
 | Overview | Dense cards + tables | Top row: 4 `MetricTile` KPIs; below: two-column grid | Moderate |
 | Experiments | `ExperimentStudio` form-heavy | Left config (40%) / right preview results (60%) on desktop | Major |
@@ -88,8 +90,8 @@ ui-ux-pro-max: **Feature-Rich Showcase** — hero metrics above fold, features b
 - Export + copy actions in panel toolbar
 
 ### Models / Model Monitor
-- Wrap local `MetricCard` with shared `MetricTile` layer — do not delete until migrated (§6.2)
-- Use `QuantLabTabShell` pattern **everywhere** in Quant Lab
+- **Retired:** static Models equation library (`section=models` → Monitor redirect)
+- Model Monitor uses shared shell patterns; migrate local `MetricCard` to `MetricTile` when touched
 
 ### Legacy
 - Keep all tabs; reduce visual weight (smaller tab text, no primary green)
@@ -126,7 +128,6 @@ Replace all `text-xs text-zinc-500` loading lines with shell.
 
 ui-ux-pro-max suggested academic fonts (Crimson Pro, Atkinson Hyperlegible) — **override: keep Geist Sans/Mono** per Master §4 for product consistency. Apply “academic readable” via:
 - Slightly larger body (`14px`) in long-form result summaries only
-- `QuantEquation` / KaTeX blocks unchanged
 
 ---
 
@@ -158,9 +159,9 @@ ui-ux-pro-max suggested academic fonts (Crimson Pro, Atkinson Hyperlegible) — 
 - [ ] Async shell states including `running` / `partial`
 
 ### Phase 4 — Quant Lab
-- [ ] Browser-test sticky tabs + collapsed evidence + info drawer
-- [ ] Align section order to workflow hierarchy above
-- [ ] Experiment studio split pane (if validated)
-- [ ] Legacy overflow on narrow viewports — capability preserved
-- [ ] i18n for all empty/loading strings
+- [x] Browser-test sticky tabs + collapsed evidence + info drawer
+- [x] Align section order to workflow hierarchy above
+- [x] Experiment studio split pane (if validated)
+- [x] Legacy overflow on narrow viewports — capability preserved
+- [x] i18n for all empty/loading strings
 - [ ] No experiment API or scoring logic changes (§16)

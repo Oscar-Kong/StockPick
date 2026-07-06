@@ -7,18 +7,12 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 from datetime import datetime
 from typing import Literal
 
-from config import (
-    COMPOUNDER_MARKET_CAP_MIN,
-    MEDIUM_PRICE_MAX,
-    MEDIUM_PRICE_MIN,
-    PENNY_PRICE_MAX,
-)
+from config import COMPOUNDER_MARKET_CAP_MIN
 from data import cache as cache_module
 from data.candidate_builder import build_candidate
 from data.price_service import PriceService
 from models.schemas import Bucket, ScanOptions, StockResult
 from screeners.compounder import CompounderScreener
-from screeners.penny import PennyScreener
 from screeners.penny import PennyScreener
 from services.symbol_parser import parse_symbols
 
@@ -29,22 +23,13 @@ BucketChoice = Bucket | Literal["auto"]
 
 _SCREENERS = {
     Bucket.penny: PennyScreener,
-    Bucket.medium: PennyScreener,
     Bucket.compounder: CompounderScreener,
 }
 
 
 def detect_bucket(price: float, market_cap: float | None) -> Bucket:
-    if price > 0 and price <= PENNY_PRICE_MAX:
-        return Bucket.penny
-    if market_cap and market_cap >= COMPOUNDER_MARKET_CAP_MIN:
-        if price >= MEDIUM_PRICE_MAX or price == 0:
-            return Bucket.compounder
     if market_cap and market_cap >= COMPOUNDER_MARKET_CAP_MIN:
         return Bucket.compounder
-    # Former medium-range names default to penny (short-term product focus)
-    if price > PENNY_PRICE_MAX:
-        return Bucket.penny
     return Bucket.penny
 
 
@@ -178,7 +163,7 @@ def import_to_watchlist(
             outcomes.append(
                 {
                     "symbol": symbol.upper(),
-                    "bucket": bucket_choice if bucket_choice != "auto" else "medium",
+                    "bucket": bucket_choice if bucket_choice != "auto" else "penny",
                     "price": None,
                     "score": None,
                     "summary": error or "Unknown error",
@@ -240,7 +225,7 @@ def refresh_watchlist(
             )
             break
         symbol = item["symbol"]
-        bucket = item.get("bucket", "medium")
+        bucket = item.get("bucket", "penny")
         try:
             bucket_enum = Bucket(bucket)
         except ValueError:

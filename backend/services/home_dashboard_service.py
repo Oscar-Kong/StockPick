@@ -1,6 +1,8 @@
 """Build home daily decision dashboard payload."""
 from __future__ import annotations
 
+import logging
+
 from models.schemas import (
     Bucket,
     ClosedPositionItem,
@@ -13,12 +15,16 @@ from integrations.robinhood.portfolio_rebuilder import rebuild_portfolio
 from services.data_freshness_service import assess_all_freshness, assess_freshness
 from services.portfolio_snapshot_service import estimate_ledger_cash, get_current_portfolio
 from services.refresh_orchestrator import get_active_home_job_id, is_home_refresh_running
+from services.daily_trading_plan_service import build_daily_trading_plan
 from services.scan_manager import scan_manager
+
+logger = logging.getLogger(__name__)
 
 _SOURCE_LABELS = {
     "manual": "Manual holdings",
     "csv": "Robinhood CSV",
     "snaptrade": "Robinhood (SnapTrade)",
+    "robinhood_mcp": "Robinhood (live MCP)",
     "demo": "Demo / mock data",
 }
 
@@ -127,7 +133,7 @@ def build_daily_dashboard(*, include_freshness: bool = False) -> DailyDashboardR
     total_value = cash + reserved_cash + invested
 
     cash_pct = round(cash / total_value * 100, 2) if total_value > 0 else 0.0
-    allow_buys = source in ("csv", "snaptrade") and bool(holdings) and source != "demo"
+    allow_buys = source in ("csv", "snaptrade", "robinhood_mcp") and bool(holdings) and source != "demo"
 
     warnings = _portfolio_warnings(portfolio, decision)
     decision_stale_warning: str | None = None
@@ -162,6 +168,21 @@ def build_daily_dashboard(*, include_freshness: bool = False) -> DailyDashboardR
         ledger_rows_count = len(ledger_rows)
         ledger_cash_estimate = round(estimate_ledger_cash(), 2)
 
+    daily_plan = None
+    try:
+        daily_plan = build_daily_trading_plan(
+            portfolio_value=round(total_value, 2),
+            cash=cash,
+            holdings=holdings,
+            decision=decision,
+        )
+    except Exception:
+        logger.exception("Failed to build daily_trading_plan; dashboard will omit plan")
+
+    from services.portfolio_snapshot_service import robinhood_mcp_status
+
+    mcp_status = robinhood_mcp_status()
+
     return DailyDashboardResponse(
         portfolio_value=round(total_value, 2),
         cash=cash,
@@ -190,4 +211,7 @@ def build_daily_dashboard(*, include_freshness: bool = False) -> DailyDashboardR
         ledger_rows_count=ledger_rows_count,
         ledger_cash_estimate=ledger_cash_estimate,
         cash_source=cash_source,
+        daily_trading_plan=daily_plan,
+        robinhood_mcp_enabled=bool(mcp_status.get("enabled")),
+        robinhood_mcp_authenticated=bool(mcp_status.get("authenticated")),
     )

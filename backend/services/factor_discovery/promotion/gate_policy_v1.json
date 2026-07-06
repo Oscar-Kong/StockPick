@@ -1,0 +1,85 @@
+{
+  "policy_id": "factor_promotion_gates_v1",
+  "policy_version": "1.0.0",
+  "gates": {
+    "sufficient_observations": {
+      "display_name": "Sufficient observations",
+      "min_valid_validation_dates": 20,
+      "blocking": true
+    },
+    "sufficient_pit_date_coverage": {
+      "display_name": "Sufficient PIT date coverage",
+      "min_date_count": 20,
+      "blocking": true
+    },
+    "sufficient_symbol_coverage": {
+      "display_name": "Sufficient symbol coverage",
+      "min_symbol_count": 3,
+      "blocking": true
+    },
+    "positive_stable_oos_ic": {
+      "display_name": "Positive stable out-of-sample IC",
+      "min_mean_rank_ic": 0.01,
+      "blocking": false
+    },
+    "acceptable_ic_dispersion": {
+      "display_name": "Acceptable IC dispersion",
+      "max_rank_ic_std": 0.15,
+      "blocking": false
+    },
+    "acceptable_top_bottom_spread": {
+      "display_name": "Acceptable top-minus-bottom spread",
+      "min_spread": 0.0,
+      "blocking": false
+    },
+    "reasonable_monotonicity": {
+      "display_name": "Reasonable quantile monotonicity",
+      "min_monotonicity": 0.5,
+      "blocking": false
+    },
+    "no_leakage_flags": {
+      "display_name": "No leakage flags",
+      "blocking": true
+    },
+    "reproducibility_pass": {
+      "display_name": "Reproducibility pass",
+      "blocking": true
+    },
+    "negative_controls_ok": {
+      "display_name": "Negative controls behave as expected",
+      "blocking": true
+    },
+    "transaction_cost_survivability": {
+      "display_name": "Transaction-cost survivability",
+      "max_cost_drag_bps": 50.0,
+      "blocking": false
+    },
+    "turnover_limits": {
+      "display_name": "Turnover within limits",
+      "max_mean_turnover": 0.8,
+      "blocking": false
+    },
+    "liquidity_suitability": {
+      "display_name": "Liquidity suitability",
+      "blocking": false
+    },
+    "sector_concentration": {
+      "display_name": "Sector concentration acceptable",
+      "max_hhi": 0.5,
+      "blocking": false
+    },
+    "sleeve_consistency": {
+      "display_name": "Sleeve consistency",
+      "blocking": false
+    },
+    "recent_period_degradation": {
+      "display_name": "Recent-period degradation acceptable",
+      "max_ic_drop": 0.05,
+      "blocking": false
+    },
+    "baseline_comparison": {
+      "display_name": "Comparison against baseline",
+      "blocking": false
+    }
+  }
+}

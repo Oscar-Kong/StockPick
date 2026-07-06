@@ -1,0 +1,199 @@
+{
+  "acceptance": {
+    "blocking_findings": [
+      "no_daily_quotes",
+      "universe_pit_empty",
+      "data_provider_disabled"
+    ],
+    "limitations": [
+      "reproducibility_not_executed"
+    ],
+    "no_production_scan": true,
+    "no_sealed_access": true,
+    "policy_id": "factor_discovery_staging_readiness_v1",
+    "status": "NOT_READY"
+  },
+  "actor": "staging-cli",
+  "artifact_hash": "sha256:e95a4b77bc01064fd71c763c394042b4ef2b140e7b8901981638dd62e092845a",
+  "artifact_schema_version": "factor_discovery_staging_audit_v1",
+  "audit_policy_version": "2026-03-01",
+  "corporate_actions_audit": {
+    "blocking_codes": [],
+    "duplicate_dates": 0,
+    "largest_jumps": [],
+    "limitations": [
+      "Only adjusted close series available; split/dividend adjustment is provider-declared",
+      "Independent corporate-action verification requires raw+adjusted pairs"
+    ],
+    "mixed_adjustment_symbols": [],
+    "provider_declared_only": true
+  },
+  "created_at": "2026-07-03T12:51:08.307927",
+  "environment_identity": {
+    "config_hash": "sha256:967e890b2f7de4e5",
+    "data_provider_id": "disabled",
+    "database_identity_hash": "sha256:1f547d1c990a8037",
+    "environment_name": "test",
+    "git_commit": "8d9bfbabc66e",
+    "input_root": "/Users/ok/Desktop/Personal Project/SP/Stock picker \u7f8e\u80a1/backend/data/factor_discovery/staging_input",
+    "is_demo_mode": false,
+    "snapshot_root": "/Users/ok/Desktop/Personal Project/SP/Stock picker \u7f8e\u80a1/backend/data/factor_discovery/snapshots",
+    "staging_enabled": false
+  },
+  "preflight": {
+    "application_readiness": {
+      "data_provider": "disabled",
+      "database_backend": "sqlite",
+      "database_connectivity": true,
+      "factor_discovery_enabled": true,
+      "llm_ready": false,
+      "mining_loop_enabled": false,
+      "schema_ready": true,
+      "snapshot_storage_persistent": true,
+      "snapshot_storage_writable": true,
+      "supervised_ready": false
+    },
+    "blocking_reasons": [
+      "no_daily_quotes",
+      "universe_pit_empty",
+      "data_provider_disabled"
+    ],
+    "calendar_audit": {
+      "calendar_id": "us_equity_observed_union_v1",
+      "calendar_version": "2026-03-01",
+      "earliest_session": null,
+      "fallback_calendar_id": "observed_panel_union_v1",
+      "large_gap_count": 0,
+      "latest_session": null,
+      "limitations": [
+        "Observed union calendar used when exchange holiday table unavailable",
+        "Weekend sessions flagged as diagnostic only"
+      ],
+      "session_count": 0,
+      "session_hash": null,
+      "weekend_sessions": []
+    },
+    "environment": {
+      "config_hash": "sha256:967e890b2f7de4e5",
+      "data_provider_id": "disabled",
+      "database_identity_hash": "sha256:1f547d1c990a8037",
+      "environment_name": "test",
+      "git_commit": "8d9bfbabc66e",
+      "input_root": "/Users/ok/Desktop/Personal Project/SP/Stock picker \u7f8e\u80a1/backend/data/factor_discovery/staging_input",
+      "is_demo_mode": false,
+      "snapshot_root": "/Users/ok/Desktop/Personal Project/SP/Stock picker \u7f8e\u80a1/backend/data/factor_discovery/snapshots",
+      "staging_enabled": false
+    },
+    "price_readiness": {
+      "adjusted_rows": 0,
+      "audit_hash": "sha256:ae1b712c21b5593f",
+      "audit_limits": {
+        "maximum_flagged_examples_per_category": 20,
+        "maximum_sample_symbols": 50
+      },
+      "blocking_codes": [
+        "no_daily_quotes"
+      ],
+      "duplicate_rows": 0,
+      "earliest_date": null,
+      "future_dates": 0,
+      "invalid_symbols": 0,
+      "latest_date": null,
+      "mixed_adjustment_symbols": [],
+      "non_finite_prices": 0,
+      "nonpositive_prices": 0,
+      "policy_id": "historical_adjusted_prices_v1",
+      "raw_rows": 0,
+      "suspicious_jumps": [],
+      "symbols": 0,
+      "total_rows": 0,
+      "warnings": []
+    },
+    "provider_capabilities": {
+      "adjusted_prices_available": false,
+      "blocking_reasons": [
+        "no_daily_quotes",
+        "universe_pit_empty"
+      ],
+      "calendar_status": "observed_union_fallback",
+      "delisting_data_status": "limited_missing_horizon_end_prices",
+      "pit_universe_available": false,
+      "price_research_available": false,
+      "provider_data_version": "sha256:ea33150ed3220737",
+      "provider_id": "historical_store_v1",
+      "supported_date_range": null,
+      "supported_fields": [],
+      "symbol_identity_status": "verified"
+    },
+    "read_only": true,
+    "snapshot_readiness": {
+      "broken_snapshot_records": [],
+      "existing_snapshots": 0,
+      "hash_failures": 0,
+      "storage_available": true,
+      "supported_format": "factor_snapshot_csv_bundle_v1"
+    },
+    "universe_readiness": {
+      "audit_hash": "sha256:3beac14ac72aca34",
+      "blocking_codes": [
+        "universe_pit_empty"
+      ],
+      "constant_membership_ratio": 0.0,
+      "coverage_minimums": {
+        "max_missing_outcome_rate": 0.25,
+        "min_eligible_symbols_per_date": 3,
+        "min_score_coverage_ratio": 0.5,
+        "min_valid_validation_dates": 20,
+        "min_walk_forward_folds": 2
+      },
+      "current_list_only_pattern": false,
+      "duplicate_memberships": 0,
+      "earliest_date": null,
+      "empty_dates": [],
+      "entry_events": 0,
+      "exit_events": 0,
+      "latest_date": null,
+      "max_eligible_per_date": 0,
+      "median_eligible_per_date": 0.0,
+      "min_eligible_per_date": 0,
+      "policy_id": "universe_pit_membership_v1",
+      "quotes_without_membership": 0,
+      "survivorship_status": "unverified",
+      "symbols_without_quotes": [],
+      "total_membership_rows": 0,
+      "unique_dates": 0,
+      "unique_symbols": 0,
+      "warnings": []
+    },
+    "warnings": []
+  },
+  "survivorship_audit": {
+    "blocking_codes": [
+      "universe_pit_empty",
+      "insufficient_pit_date_coverage"
+    ],
+    "constant_membership_ratio": 0.0,
+    "current_list_backfill_detected": false,
+    "current_list_only_pattern": false,
+    "current_only_members": [],
+    "eligible_symbols_by_session_available": false,
+    "entry_events": 0,
+    "exit_events": 0,
+    "historical_only_members": [],
+    "limitations": [
+      "Delisting returns not imputed; missing terminal outcomes reported separately",
+      "Staging curated source is not index-official membership"
+    ],
+    "membership_counts_by_date": {
+      "max": 0,
+      "median": 0.0,
+      "min": 0
+    },
+    "pct_historical_still_current": 0.0,
+    "pct_verified_pit_provenance": 0.0,
+    "pit_evidence_status": "unverified",
+    "total_current_members": 0,
+    "total_unique_historical_members": 0,
+    "wording": "Survivorship risk remains because provenance is unverified"
+  }
+}

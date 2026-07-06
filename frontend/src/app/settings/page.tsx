@@ -6,6 +6,7 @@ import { ApiSettingsPanel } from "@/components/ApiSettingsPanel";
 import { QuantHealthCard } from "@/components/quant/QuantHealthCard";
 import { LanguageSettingsPanel } from "@/components/LanguageSettingsPanel";
 import { MorningScanEmailPanel } from "@/components/settings/MorningScanEmailPanel";
+import { MailingListPanel } from "@/components/settings/MailingListPanel";
 import { ThemeSettingsPanel } from "@/components/settings/ThemeSettingsPanel";
 import { GhostButton } from "@/components/ui/buttons";
 import { useTranslation } from "@/lib/i18n";
@@ -148,6 +149,9 @@ function SettingsContent() {
                 {t.settings.sectionOps}
               </h2>
               <MorningScanEmailPanel />
+              <div className="mt-4">
+                <MailingListPanel />
+              </div>
             </section>
           )}
         </div>
