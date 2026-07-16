@@ -24,12 +24,17 @@ Five canonical roles mapped to GitHub label strings. See [docs/agents/triage-lab
 
 Single-context layout: root `CONTEXT.md` + `docs/adr/`. Consumer rules and canonical doc pointers: [docs/agents/domain.md](docs/agents/domain.md).
 
+### Domain wiki (Obsidian)
+
+Synthesized product/architecture context lives in a separate Obsidian vault: `~/Documents/stockpick-brain` (start at `wiki/index.md`). Query it with the `second-brain-query` skill before surface-boundary or architecture decisions. Repo docs remain source of truth. Cursor rule: `.cursor/rules/stockpick-brain.mdc`.
+
 ### Skill routing
 
 | Intent | Skill |
 |--------|-------|
 | Unsure which skill fits | `ask-matt` |
 | Sharpen a feature before coding | `grill-with-docs` or `domain-modeling` |
+| Product / architecture context from wiki | `second-brain-query` (vault: `~/Documents/stockpick-brain`) |
 | Build or fix with tests | `tdd` |
 | Hard bug or regression | `diagnosing-bugs` |
 | Structural cleanup | `improve-codebase-architecture` + `codebase-design` |

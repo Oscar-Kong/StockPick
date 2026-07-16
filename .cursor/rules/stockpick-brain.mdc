@@ -1,0 +1,22 @@
+---
+description: Pointer to the Obsidian LLM wiki (stockpick-brain) for product/architecture context.
+alwaysApply: true
+---
+
+# stockpick-brain — domain wiki
+
+Obsidian LLM wiki (separate vault, not this repo):
+
+`~/Documents/stockpick-brain`
+
+- Catalog: `wiki/index.md`
+- Ops log: `wiki/log.md`
+- Canonical repo docs remain source of truth; the wiki is synthesized context
+
+## When to use it
+
+Before product-surface, architecture, ADR, Quant Lab vs Scan, or domain-language decisions — query the wiki instead of guessing from memory.
+
+Use the `second-brain-query` skill (vault path above). For ingest/lint of the wiki itself, open the vault or use `second-brain-ingest` / `second-brain-lint`.
+
+Do **not** treat wiki pages as executable specs; prefer `CONTEXT.md`, `docs/adr/`, and area docs listed in `docs/agents/domain.md` when they conflict.

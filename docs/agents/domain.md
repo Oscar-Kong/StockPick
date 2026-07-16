@@ -6,7 +6,8 @@ How engineering skills should consume this repo's domain documentation.
 
 1. **`CONTEXT.md`** at the repo root — ubiquitous language for product surfaces, screening, and research-integrity terms. Use these words in issues, test names, and refactor proposals.
 2. **`docs/adr/`** — architectural decisions. Read ADRs that touch the area you are about to change.
-3. **Area-specific canonical docs** (do not duplicate into CONTEXT.md):
+3. **Domain wiki (optional synthesis)** — Obsidian vault at `~/Documents/stockpick-brain` (`wiki/index.md`). Use the `second-brain-query` skill for cross-cutting product/architecture recall. **Repo docs win on conflict.** See `.cursor/rules/stockpick-brain.mdc`.
+4. **Area-specific canonical docs** (do not duplicate into CONTEXT.md):
 
 | Topic | Canonical doc |
 |-------|----------------|
