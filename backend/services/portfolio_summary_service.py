@@ -59,14 +59,15 @@ def _position_rows(
         shares = float(h.get("shares") or 0)
         avg_cost = float(h.get("avg_cost") or 0)
         item = decision_by_sym.get(sym)
-        price = float(item.price) if item and item.price_available else None
-        if price is None:
-            latest = ps.get_latest_price(sym)
-            if latest is not None:
-                price = latest
+        # Prefer a live mark so summary stays aligned after price refresh even
+        # when the last decision snapshot has not been re-run yet.
+        latest = ps.get_latest_price(sym)
+        price = latest if latest is not None else (
+            float(item.price) if item and item.price_available else None
+        )
         market_value = shares * price if price is not None else None
         if market_value is None and item:
-            market_value = float(item.market_value or 0) or None
+            market_value = shares * float(item.price) if item.price_available and item.price else None
         weight = float(item.current_weight) if item else (
             (market_value / total_value) if market_value and total_value > 0 else None
         )

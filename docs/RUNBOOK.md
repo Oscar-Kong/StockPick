@@ -70,6 +70,8 @@ Open: `http://127.0.0.1:18730`
 | Library   | Save a scan or report, visible under `/library` |
 | Ledger    | Portfolio → Activity → Transaction ledger (`/?tab=activity`; legacy `/?journal=1` redirects here) |
 
+**Watchlist / trade upload timeouts:** `WATCHLIST_IMPORT_PER_SYMBOL_TIMEOUT_SECONDS` (default `30`) bounds each symbol on `POST /watchlist/import`. Concurrent imports share a lock so market-data providers are not stampeded. `TRADE_UPLOAD_PREDICTION_TIMEOUT_SECONDS` (default `8`) and `TRADE_UPLOAD_DECISION_TIMEOUT_SECONDS` (default `20`) keep `POST /trades/upload` from hanging when scoring or the daily decision stalls — the journal row still persists.
+
 Investor guide for Analyze: [ANALYZE_PANEL.md](ANALYZE_PANEL.md)
 
 Round 2 quant (recommendation loop, valuation, jobs): [MANUAL_INTEGRATION.md](MANUAL_INTEGRATION.md)
@@ -81,11 +83,15 @@ Round 2 quant (recommendation loop, valuation, jobs): [MANUAL_INTEGRATION.md](MA
 For **live** holdings without CSV exports (daily trading):
 
 ```bash
-./scripts/robinhood-mcp-login.sh    # once — OAuth
+./scripts/robinhood-mcp-login.sh    # once — OAuth (re-run when sync says session expired)
+./scripts/sync-robinhood-mcp.sh --status --probe   # auth + live connectivity test
 ./scripts/sync-robinhood-mcp.sh     # pull positions into StockPick
 ```
 
-Or `POST /api/brokerage/sync/robinhood-mcp` while the backend is running.
+Or `POST /brokerage/sync/robinhood-mcp` while the backend is running.
+Diagnose without a full sync: `POST /brokerage/robinhood-mcp/test` (also Portfolio → Today → **Test connection**).
+
+If sync fails with **session expired** (or a vague `TaskGroup` error on older builds), tokens in `storage/robinhood_mcp/oauth.json` are stale — re-run the login script. StockPick stores absolute `expires_at` and refreshes access tokens when possible.
 
 Cursor chat (optional): `.cursor/mcp.json` + **Settings → Tools & MCP → Connect** if MCP shows errored until OAuth completes.
 
@@ -138,7 +144,9 @@ Primary data roles default to **finnhub** for quotes and **FMP** for fundamental
 
 **Analyze OHLC freshness:** `PriceService.get_history()` now checks the **last bar date**, not only row count. Stale SQLite history triggers a provider fetch, merge, and persist. `GET /analyze/{symbol}?refresh=true` bypasses the analysis cache **and** forces a price-history refresh. The response includes `price_history_last_date`, `price_history_is_stale`, `price_history_refreshed_at`, and `price_history_bar_count`.
 
-**Portfolio live marks:** During regular and extended market hours, `PriceService.get_latest_price()` and **Refresh data** (`POST /home/refresh`) use Finnhub/AkShare live quotes (not only the last stored daily close). `refresh_prices_for_holdings` persists today's session bar from the live quote when available. Outside market hours, holdings still use the latest completed daily bar.
+**Portfolio live marks:** During regular and extended market hours, `PriceService.get_latest_price()`, **Refresh data** (`POST /home/refresh`), **Sync Robinhood**, and **Run daily decision** use Finnhub/AkShare live quotes (not only the last stored daily close). `refresh_prices_for_holdings` persists today's session bar from the live quote when available. Outside market hours, holdings still use the latest completed daily bar.
+
+**Mark alignment:** Today’s holdings table and hero value read the last **daily decision snapshot**. Sync / Refresh re-price and re-run that decision so shares×mark match live holdings. The hero invested value is always `current_shares × mark` (never a frozen `market_value` from an older decision). If prices still disagree with the Robinhood app, check Finnhub/FMP keys and whether the session is outside regular/extended hours (StockPick then shows last daily close).
 
 **Scan default in UI:** bucket scans now default to `mode=fast` (15 deep-scored candidates). Use deep mode from the API (`POST /scan/{bucket}` with `"mode":"deep"`) when you want the full Stage B cap (`SCAN_STAGE_B_TOP_N`, default 50).
 
@@ -159,9 +167,9 @@ Ticker universes are built in three layers (`backend/data/universe.py`, `backend
 
 **In-process cache:** `get_universe()` uses an LRU keyed by listing revision — refreshing the listing master invalidates cached universes without restarting Python.
 
-**Adding a thematic seed:** append symbols to the appropriate `_PENNY_*` group in `universe.py`; they are validated against the listing master at runtime. Multi-theme membership is tracked in `SYMBOL_THEMES`.
+**Adding a thematic seed:** append symbols to the appropriate `_PENNY_*` group in `universe.py`; they are validated against the listing master at runtime. Multi-theme membership is tracked in `SYMBOL_THEMES`. Remove symbols that fail listing validation, and add permanently dead names to `STALE_OR_DELISTED`.
 
-Set `UNIVERSE_SCAN_BATCH_SIZE=0` in `.env` to scan the full list instead of the first N alphabetically.
+Set `UNIVERSE_SCAN_BATCH_SIZE=0` in `.env` to scan the full validated universe. Positive caps use a deterministic hash sample (`cap_universe_for_scan`) — not an alphabetical prefix — so larger seed lists do not amplify A–ticker bias. Default remains `100` to keep Stage A provider load bounded.
 
 **Bulk scan fast path:** universe scans set `services.scan_context.set_bulk_scan(True)` for the job thread. While active, Stage B skips per-symbol reconcile, StockTwits/Finnhub sentiment, and OpenBB governance fetches. Single-symbol **Workspace → Analyze** keeps full depth. Set `OPENBB_ON_SCAN=false` as well for fastest scans.
 
@@ -173,7 +181,7 @@ These were previously hard-coded inside `backend/services/scan_manager.py`. They
 
 | Variable                          | Default                          | Effect                                                                                 |
 | --------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------- |
-| `UNIVERSE_SCAN_BATCH_SIZE`        | `100`                            | Cap Stage A symbols (`0` = full curated universe; recommended after expanding penny list). |
+| `UNIVERSE_SCAN_BATCH_SIZE`        | `100`                            | Cap Stage A symbols via hash sample (`0` = full validated universe; heavy when penny seeds are large). |
 | `MAX_CANDIDATES_PER_BUCKET`       | `25`                             | Hard cap on rows returned per scan (UI `max_results` cannot exceed this).              |
 | `SCAN_STAGE_B_TOP_N`              | `50`                             | Max candidates deep-scored per scan (`mode=deep`).                                     |
 | `SCAN_STAGE_B_TOP_N_FAST`         | `15`                             | Candidate cap when `ScanOptions.mode="fast"` — used for low-latency exploratory scans. |
@@ -222,8 +230,14 @@ Penny **hard filters** reject on price bounds, minimum share/dollar volume, min 
 
 Every code path that needs a final score for a symbol should route through
 `services.scoring_facade.score_symbol_canonical(...)`. Scan Stage B, Watchlist,
-and Analyze all use it, so the same `CandidateContext` produces the same
-numeric score regardless of entry point.
+and Analyze (including `score_all_buckets` bucket-fit) all use it, so the same
+`CandidateContext` produces the same numeric score regardless of entry point.
+
+**Stage B factor legs** for both sleeves are owned by
+`engines.factor.sleeve_signals` (aligned with `FACTOR_CATALOG`). Legacy
+`PennyScreener.score` / `CompounderScreener.score` call that module instead of
+maintaining a second weight table. Liquidity/spread for penny remains in
+display metrics and setup classification — it is not a separate composite leg.
 
 **Stage B scoring modes** (`SCAN_SCORING_MODE`):
 
@@ -424,6 +438,8 @@ cd backend && pytest -q tests/test_quant_lab_contracts.py tests/test_quant_lab_i
 cd frontend && npm test -- --run src/components/quant-lab
 cd frontend && npx playwright install chromium && npm run test:e2e
 ```
+
+Pytest’s `isolated_backend_env` restores shipped Factor Discovery defaults (`FACTOR_DISCOVERY_*=false` / `disabled`) even when a developer `.env` enables supervised local research. That keeps “disabled by default” tests aligned with [factor-discovery-operations.md](quant-lab/factor-discovery-operations.md).
 
 See [QUANT_LAB_FUNCTIONAL_TEST_REPORT.md](QUANT_LAB_FUNCTIONAL_TEST_REPORT.md) and [QUANT_LAB_MANUAL_TEST_CHECKLIST.md](QUANT_LAB_MANUAL_TEST_CHECKLIST.md).
 

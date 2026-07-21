@@ -173,6 +173,7 @@ export {
   rebuildPortfolioLedger,
   setBuyingPower,
   getRobinhoodMcpStatus,
+  testRobinhoodMcpConnection,
   syncRobinhoodMcp,
 } from "./api/portfolio";
 

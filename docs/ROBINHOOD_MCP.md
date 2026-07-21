@@ -20,9 +20,9 @@ Robinhood docs: [Agentic Trading overview](https://robinhood.com/us/en/support/a
 
 StockPick **does not** call trade tools (`place_equity_order`, etc.) — portfolio read sync only.
 
-After sync, holdings feed the **daily decision queue** and Research tools automatically.
+After sync, StockPick **re-prices holdings** (Finnhub/AkShare live quotes in session) and — from the in-app **Sync Robinhood** button — **re-runs the daily decision** so Today marks, shares, and portfolio value stay aligned with Robinhood. The CLI script does the same by default (`./scripts/sync-robinhood-mcp.sh`); pass `--no-decision` to skip the decision step. The raw API defaults to `run_decision=false` but still refreshes prices.
 
-**In the app:** Portfolio → **Today** — **Sync Robinhood** in the header. **Activity** is a single trading-history list (year/month filters) that replaces CSV import and the editable ledger; it refreshes on each Robinhood sync. **Refresh data** also syncs Robinhood in the background when MCP is authenticated.
+**In the app:** Portfolio → **Today** — **Sync Robinhood** in the header. **Activity** is a single trading-history list (year/month filters) that replaces CSV import and the editable ledger; it refreshes on each Robinhood sync. **Refresh data** also syncs Robinhood in the background when MCP is authenticated, then refreshes prices and the daily decision.
 
 ---
 
@@ -64,8 +64,12 @@ Check status:
 
 ```bash
 ./scripts/sync-robinhood-mcp.sh --status
-curl http://127.0.0.1:18731/api/brokerage/robinhood-mcp/status
+./scripts/sync-robinhood-mcp.sh --status --probe   # live connectivity test
+curl http://127.0.0.1:18731/brokerage/robinhood-mcp/status
+curl -X POST http://127.0.0.1:18731/brokerage/robinhood-mcp/test
 ```
+
+In the app: Portfolio → Today shows the usual cockpit for cash-only MCP accounts (buying power + empty holdings). MCP status / Test connection is under **Troubleshoot connection** — only surface it when auth fails or you suspect a problem.
 
 ### 4. Automate (daily trader)
 
@@ -109,10 +113,14 @@ ROBINHOOD_MCP_REDIRECT_URI=http://127.0.0.1:8765/callback
 |-------|-----|
 | Cursor MCP "errored" | Settings → Tools & MCP → disconnect/reconnect; complete OAuth on desktop |
 | `401 authentication required` | Run `./scripts/robinhood-mcp-login.sh` |
+| `Robinhood MCP session expired` / opaque `TaskGroup` sync error | Access token expired and refresh failed — run `./scripts/robinhood-mcp-login.sh` again. StockPick blanks stale access tokens so refresh is attempted; if refresh returns 404, a full browser login is required. |
+| Sync says authenticated but fails immediately | Same as above — `oauth.json` can still exist while tokens are dead. Re-login refreshes `storage/robinhood_mcp/oauth.json` (and writes absolute `expires_at`). |
 | `502 MCP sync failed` | Check rollout eligibility; reconnect OAuth |
-| Positions empty | Set `ROBINHOOD_MCP_ACCOUNT_ID` if multiple accounts (default uses `is_default` account) |
-| Holdings differ from Robinhood app | Ensure source is `robinhood_mcp` — live positions win over ledger/CSV history |
-| Ledger tab stale | Expected — MCP sync updates **holdings**, not transaction ledger (CSV still optional for history) |
+| Positions empty after sync | Often real: Robinhood reports `equity_value=0` (cash-only). Confirm with `./scripts/sync-robinhood-mcp.sh --status --probe` or Portfolio → **Troubleshoot connection**. If you expect shares, set `ROBINHOOD_MCP_ACCOUNT_ID` to the account that holds them (default uses `is_default`). |
+| UI shows red “sync failed / taking longer” but status is Connected | Soft client timeout while the job was still running (or cash-only sync finished with 0 positions). Re-sync or refresh Today — empty equity is success, not failure. MCP diagnostics stay collapsed unless auth is broken. |
+| Phantom symbol (e.g. `ZZZZ`) on Today with 0 holdings | Leftover from a journal/API healthcheck trade that wrote a decision snapshot. Cash-only MCP sync now clears that snapshot; dashboard also drops decision rows not in open holdings. |
+| UI says "Import needed" but sync succeeded | Fixed for cash-only MCP: synced $0 equity is not treated as missing import. Re-sync or refresh Today. |
+| Activity / ledger after sync | MCP sync replaces trade history from filled orders each run; holdings always come from live positions |
 
 ---
 

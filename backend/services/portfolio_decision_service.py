@@ -281,6 +281,17 @@ def run_stored_portfolio_decision(*, trigger: str = "manual", persist: bool = Tr
     if not holdings:
         raise ValueError("No holdings on file — import Robinhood CSV or add positions first")
 
+    # Persist live quotes before scoring so Today marks match the decision run.
+    # Only on the manual button — orchestrated paths (refresh / robinhood_mcp /
+    # scheduled chain) already call refresh_prices_for_holdings first.
+    if trigger == "manual":
+        try:
+            from services.refresh_orchestrator import refresh_prices_for_holdings
+
+            refresh_prices_for_holdings(force=True)
+        except Exception as exc:
+            logger.warning("Pre-decision price refresh failed: %s", exc)
+
     body = PortfolioDecisionRequest(cash=cash, reserved_cash=reserved, holdings=holdings, persist=False)
     response = run_portfolio_daily_decision(body)
 

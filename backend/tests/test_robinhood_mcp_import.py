@@ -62,7 +62,11 @@ def test_mcp_import_uses_live_positions_not_ledger_rebuild():
                                             with patch("services.portfolio_snapshot_service.mark_sync", return_value={}):
                                                 with patch("data.freshness_store.mark_freshness_updated"):
                                                     with patch("data.freshness_store.clear_freshness_flag"):
-                                                        result = import_robinhood_mcp_and_decide(run_decision=False)
+                                                        with patch(
+                                                            "services.refresh_orchestrator.refresh_prices_for_holdings",
+                                                            return_value={"refreshed": 2},
+                                                        ) as refresh_prices:
+                                                            result = import_robinhood_mcp_and_decide(run_decision=False)
 
     assert applied_rebuild is not None
     symbols = [h.symbol for h in applied_rebuild.open_holdings]
@@ -71,6 +75,55 @@ def test_mcp_import_uses_live_positions_not_ledger_rebuild():
     assert result["robinhood_account_number"] == "555676394"
     clear_ledger.assert_called_once_with(1)
     upsert.assert_called_once()
+    refresh_prices.assert_called_once_with(force=True)
+
+
+def test_mcp_import_with_decision_refreshes_prices_then_decides():
+    live = [ReconstructedHolding(symbol="AMC", shares=66.0, avg_cost=2.01, bucket="penny")]
+    snapshot = MagicMock()
+    snapshot.holdings = live
+    snapshot.buying_power = 100.0
+    snapshot.portfolio_value = 200.0
+    snapshot.account_id = "1"
+    snapshot.order_rows = []
+
+    decision = MagicMock()
+    decision.model_dump = MagicMock(return_value={"items": []})
+
+    with patch("services.portfolio_snapshot_service.RobinhoodMcpClient") as client_cls:
+        client_cls.return_value.is_configured.return_value = True
+        with patch("services.portfolio_snapshot_service.asyncio.run", return_value=snapshot):
+            with patch("services.portfolio_snapshot_service.get_or_create_account", return_value={"id": 1}):
+                with patch("services.portfolio_snapshot_service.clear_trade_ledger", return_value=0):
+                    with patch("services.portfolio_snapshot_service._apply_ledger_to_portfolio") as apply:
+                        apply.return_value = {
+                            "holdings": [{"symbol": "AMC", "shares": 66.0}],
+                            "cash": 100.0,
+                            "holdings_count": 1,
+                            "closed_positions": [],
+                            "misc_events": [],
+                        }
+                        with patch("services.portfolio_snapshot_service.update_account_source", return_value={}):
+                            with patch("services.portfolio_snapshot_service.mark_sync", return_value={}):
+                                with patch("data.freshness_store.mark_freshness_updated"):
+                                    with patch("data.freshness_store.clear_freshness_flag"):
+                                        with patch(
+                                            "services.refresh_orchestrator.refresh_prices_for_holdings",
+                                            return_value={"refreshed": 1},
+                                        ) as refresh_prices:
+                                            with patch(
+                                                "services.portfolio_decision_service.run_stored_portfolio_decision",
+                                                return_value=decision,
+                                            ) as run_decision:
+                                                with patch(
+                                                    "services.portfolio_snapshot_service.model_to_dict",
+                                                    return_value={"items": []},
+                                                ):
+                                                    result = import_robinhood_mcp_and_decide(run_decision=True)
+
+    refresh_prices.assert_called_once_with(force=True)
+    run_decision.assert_called_once()
+    assert "decision" in result
 
 
 def test_robinhood_mcp_skips_ledger_reconcile():

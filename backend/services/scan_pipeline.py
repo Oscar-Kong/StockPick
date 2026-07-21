@@ -29,7 +29,7 @@ from data.history_normalize import validate_preloaded_history
 from data.historical_store import HistoricalStore
 from data.price_service import PriceService
 from data.strategy_registry import StrategyRegistry
-from data.universe import get_universe
+from data.universe import cap_universe_for_scan, get_universe, get_universe_revision
 from models.schemas import Bucket, RiskLevel, ScanOptions, ScanStatus, StockResult
 from screeners.base import BaseScreener, CandidateContext
 from services.scan_context import set_bulk_scan
@@ -300,7 +300,11 @@ def run_scan_pipeline(manager: "ScanService", job_id: str, options: ScanOptions 
         screener.ps = ps
     universe = get_universe(job.bucket.value)
     if UNIVERSE_SCAN_BATCH_SIZE > 0:
-        universe = universe[:UNIVERSE_SCAN_BATCH_SIZE]
+        universe = cap_universe_for_scan(
+            universe,
+            UNIVERSE_SCAN_BATCH_SIZE,
+            revision=get_universe_revision(),
+        )
     max_results = min(options.max_results, MAX_CANDIDATES_PER_BUCKET)
     stage_b_cap = _stage_b_cap(getattr(options, "mode", "deep"))
     candidates: list[StockResult] = []

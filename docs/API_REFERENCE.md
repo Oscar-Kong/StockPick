@@ -292,8 +292,9 @@ Base path: `/api/brokerage` (mutating routes require non-demo mode)
 | POST | `/preview/robinhood-csv` | Parse CSV; return editable preview rows + current/projected holdings (Form: `file`, optional `replace=true`) |
 | POST | `/import/robinhood-csv/approve` | Apply reviewed rows from preview (`CsvApproveRequest`: `filename`, `replace`, `rows[]` with `included`, editable fields) |
 | POST | `/import/robinhood-csv` | Legacy direct import (no review step) |
-| GET | `/robinhood-mcp/status` | Robinhood MCP OAuth configured? |
-| POST | `/sync/robinhood-mcp` | Start background Robinhood MCP sync → `{ job_id, status: "running" }` |
+| GET | `/robinhood-mcp/status` | OAuth configured? Returns `login_script`, `token_expired`, optional `?probe=true` live check |
+| POST | `/robinhood-mcp/test` | Live MCP connectivity probe (accounts/portfolio/positions; no ledger sync) |
+| POST | `/sync/robinhood-mcp` | Start background Robinhood MCP sync → `{ job_id, status: "running" }`. Always refreshes live marks after positions. Query `?run_decision=true` re-runs the daily decision **only when holdings_count > 0** (cash-only skips decision). UI Sync button uses `run_decision=true`. |
 | GET | `/sync/robinhood-mcp/{job_id}` | Poll sync job until `completed` or `failed` |
 | POST | `/buying-power` | Save explicit cash / IPO reserved amounts |
 

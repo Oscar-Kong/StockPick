@@ -45,7 +45,7 @@ Top navigation: **Portfolio · Scan · Workspace · Quant Lab · Library · Sett
 
 1. **Scan request** (`POST /scan/{bucket}`)
 2. **Stage A**: bulk OHLC pull, eligibility filter, cross-sectional preliminary ranking (momentum/volume/liquidity features), then advance top-N by `pre_score` to Stage B
-3. **Stage B**: deep scoring for narrowed symbols
+3. **Stage B**: deep scoring for narrowed symbols (factor legs from `engines.factor.sleeve_signals`; Scan ranking may further decompose into alpha/confidence/tradability)
 4. **Scoring**: technical/fundamental/sentiment/data-quality (+ optional OpenBB governance)
 5. **Persistence**:
    - latest scan cache
@@ -231,7 +231,7 @@ Ops: Settings → **Ops** (morning scan status + **Mailing list**), or `GET /ops
   - chart
   - backtest + sweep
   - report
-- Watchlist with refresh/import
+- Watchlist with refresh/import (`WATCHLIST_IMPORT_PER_SYMBOL_TIMEOUT_SECONDS` default 30s; concurrent imports serialize analyzes)
 - Strategy version and data quality visibility
 - Optional quant layer endpoints (portfolio, ML, allocation, LEAN)
 
@@ -269,6 +269,7 @@ Ops: Settings → **Ops** (morning scan status + **Mailing list**), or `GET /ops
 
 - `GET/POST/PATCH/DELETE /trades`, `/trades/manual`, `/trades/upload`, `/trades/stats/summary`
 - Manual journal entries with **quantity** also append to the portfolio ledger, rebuild holdings, and rerun the daily decision (same as a new CSV buy/sell row). Each saved trade shows an **On Home / Not on Home** badge; use **Sync to Home** to backfill. Screenshot uploads require quantity too.
+- Trade upload / manual sync bounds prediction scoring (`TRADE_UPLOAD_PREDICTION_TIMEOUT_SECONDS`, default 8s) and the post-sync daily decision (`TRADE_UPLOAD_DECISION_TIMEOUT_SECONDS`, default 20s) so a market-data stall cannot hang the HTTP request — the journal row still saves.
 - `GET /trades` includes `portfolio_sync_status` (`synced` | `pending` | `needs_quantity`) per row
 - `POST /trades/{id}/sync-portfolio` — push an existing journal trade to Home holdings
 - `GET /home/daily-dashboard?skip_auto_refresh=true` — poll without starting another background refresh (used while Home is updating)
@@ -327,7 +328,7 @@ For production-grade models, offline training pipelines still need to be operate
 | [Architecture](docs/ARCHITECTURE.md) | Developers — modules and extension points |
 | [API Reference](docs/API_REFERENCE.md) | Developers — HTTP endpoints |
 | [Runbook](docs/RUNBOOK.md) | Ops — start, flags, troubleshooting |
-| [Robinhood MCP sync](docs/ROBINHOOD_MCP.md) | Live portfolio pull — no CSV |
+| [Robinhood MCP sync](docs/ROBINHOOD_MCP.md) | Live portfolio pull — no CSV; `./scripts/robinhood-mcp-login.sh` to authorize; cash-only is a valid empty book; **Troubleshoot connection** for auth issues |
 | [Scan evaluation harness](docs/SCAN_EVALUATION.md) | Quant — offline Stage A/B replay & forward-return labels |
 | [Deployment (Vercel + Render demo)](docs/DEPLOYMENT.md) | Free public demo — env vars, CORS, limits |
 | [Postgres migration](docs/POSTGRES_MIGRATION.md) | After demo — Neon, auth, per-user data |

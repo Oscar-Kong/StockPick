@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { DailyDashboardResponse } from "@/lib/types";
-import { filterActiveDecisionItems, mergeHoldingsWithDecisionItems } from "@/lib/dailyDecisionUtils";
+import { filterActiveDecisionItems, formatCurrency, mergeHoldingsWithDecisionItems } from "@/lib/dailyDecisionUtils";
 import { useTranslation } from "@/lib/i18n";
 import { SectionCard } from "@/components/ui/AppCard";
 import { ActiveHoldingsDecisionTable } from "@/components/dashboard/daily-decision/ActiveHoldingsDecisionTable";
@@ -10,6 +10,7 @@ import { DailyActionQueue } from "@/components/dashboard/daily-decision/DailyAct
 import { EmptyPortfolioState, PennyOpportunitiesPanel } from "@/components/dashboard/daily-decision/DailyDecisionPanels";
 import { RiskAlertsPanel } from "@/components/dashboard/daily-decision/RiskAlertsPanel";
 import { PortfolioPerformancePanel } from "@/components/portfolio/PortfolioPerformancePanel";
+import { RobinhoodMcpStatusCard } from "@/components/portfolio/RobinhoodMcpStatusCard";
 import { useState } from "react";
 
 export interface PortfolioTodayProps {
@@ -30,6 +31,10 @@ export function PortfolioToday({
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState<string | null>(null);
   const hasHoldings = (data.holdings.length ?? 0) > 0;
+  const cashOnlySynced =
+    !hasHoldings &&
+    data.data_source === "robinhood_mcp" &&
+    Boolean(robinhoodAuthenticated ?? data.robinhood_mcp_authenticated);
   const items = mergeHoldingsWithDecisionItems(
     data.holdings ?? [],
     filterActiveDecisionItems(data.decision?.items ?? [])
@@ -37,12 +42,15 @@ export function PortfolioToday({
   const showPennyOps =
     !data.is_demo_data && hasHoldings && (data.top_penny_opportunities.length ?? 0) > 0;
 
-  if (!hasHoldings) {
+  // Not yet synced / CSV import needed — keep the focused empty state.
+  if (!hasHoldings && !cashOnlySynced) {
     return (
       <div className="space-y-4">
         <EmptyPortfolioState
           robinhoodAuthenticated={robinhoodAuthenticated}
           onSyncRobinhood={onSyncRobinhood}
+          cash={data.cash}
+          dataSource={data.data_source}
         />
         <p className="text-center text-sm text-secondary">
           {t.portfolio.activityHint}{" "}
@@ -56,7 +64,47 @@ export function PortfolioToday({
 
   return (
     <div className="portfolio-today portfolio-today--modern space-y-4">
-      <PortfolioPerformancePanel hasHoldings={hasHoldings} refreshKey={performanceRefreshKey} />
+      <PortfolioPerformancePanel
+        hasHoldings={hasHoldings}
+        cashOnly={cashOnlySynced}
+        cash={data.cash}
+        portfolioValue={data.portfolio_value}
+        refreshKey={performanceRefreshKey}
+      />
+
+      {cashOnlySynced && (
+        <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/40 px-4 py-3 text-sm text-secondary">
+          <p className="font-medium text-zinc-100">{t.home.dailyEmptyRobinhoodCashTitle}</p>
+          <p className="mt-1 leading-relaxed">
+            {t.home.dailyEmptyRobinhoodCashBrief}
+            {data.cash != null && (
+              <>
+                {" "}
+                <span className="finance-value text-zinc-200">
+                  {t.home.dailyEmptyRobinhoodCashAmount.replace("{cash}", formatCurrency(data.cash))}
+                </span>
+              </>
+            )}
+          </p>
+          <div className="mt-2 text-xs">
+            {t.portfolio.activityHint}{" "}
+            <button type="button" className="text-primary hover:underline" onClick={onOpenActivity}>
+              {t.portfolio.tabActivity}
+            </button>
+          </div>
+          <details className="mt-2 text-xs">
+            <summary className="cursor-pointer text-primary hover:underline">
+              {t.portfolio.robinhoodMcpTroubleshoot}
+            </summary>
+            <RobinhoodMcpStatusCard
+              authenticated={robinhoodAuthenticated}
+              cash={data.cash}
+              compact
+              forceShow
+            />
+          </details>
+        </div>
+      )}
 
       <div className="portfolio-today__workspace">
         <aside className="portfolio-today__sidebar portfolio-today__sidebar--glass space-y-4">
@@ -68,7 +116,9 @@ export function PortfolioToday({
         <div className="portfolio-today__main portfolio-today__main--glass space-y-4">
           <SectionCard
             title={t.home.dailyHoldingsTitle}
-            subtitle={t.home.dailyHoldingsSubtitle}
+            subtitle={
+              cashOnlySynced ? t.home.dailyEmptyRobinhoodCashTitle : t.home.dailyHoldingsSubtitle
+            }
             variant="elevated"
             className="portfolio-holdings-card"
             action={
@@ -77,11 +127,17 @@ export function PortfolioToday({
               </Link>
             }
           >
-            <ActiveHoldingsDecisionTable
-              items={items}
-              expanded={expanded}
-              onToggle={(sym) => setExpanded((cur) => (cur === sym ? null : sym))}
-            />
+            {hasHoldings ? (
+              <ActiveHoldingsDecisionTable
+                items={items}
+                expanded={expanded}
+                onToggle={(sym) => setExpanded((cur) => (cur === sym ? null : sym))}
+              />
+            ) : (
+              <p className="px-1 py-6 text-center text-sm text-secondary">
+                {t.home.dailyEmptyRobinhoodCashBrief}
+              </p>
+            )}
           </SectionCard>
         </div>
       </div>

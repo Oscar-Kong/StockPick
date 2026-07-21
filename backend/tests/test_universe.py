@@ -19,6 +19,7 @@ from data.universe import (
     SYMBOL_THEMES,
     TICKER_ALIASES,
     _get_universe_cached,
+    cap_universe_for_scan,
     get_universe,
     get_universe_revision,
     normalize_symbol,
@@ -227,3 +228,27 @@ def test_penny_discovery_seeds_exclude_sector_etfs_from_large_cap():
 def test_get_universe_revision_uses_listing_master():
     _seed_listing_snapshot(["AAPL"])
     assert get_universe_revision() == "test-rev-1"
+
+
+def test_cap_universe_for_scan_avoids_alphabetical_prefix_bias():
+    symbols = [f"S{i:03d}" for i in range(200)]
+    capped = cap_universe_for_scan(symbols, 50, revision="rev-a")
+    assert len(capped) == 50
+    assert capped == sorted(capped)
+    assert capped != sorted(symbols)[:50]
+    assert cap_universe_for_scan(symbols, 50, revision="rev-a") == capped
+    assert cap_universe_for_scan(symbols, 50, revision="rev-b") != capped
+
+
+def test_cap_universe_for_scan_passthrough_when_unlimited():
+    symbols = ["ZZZ", "AAA", "MMM"]
+    assert cap_universe_for_scan(symbols, 0) == symbols
+    assert cap_universe_for_scan(symbols, 10) == symbols
+
+
+def test_penny_seeds_exclude_known_stale_and_are_normalized():
+    for stale in ("WIRE", "BBBY", "BYND", "SAVA", "MARK", "CAN", "ML"):
+        assert stale in STALE_OR_DELISTED
+        assert stale not in PENNY_DISCOVERY_SEEDS
+    assert all(normalize_symbol(s) == s for s in PENNY_DISCOVERY_SEEDS)
+    assert not (set(PENNY_DISCOVERY_SEEDS) & STALE_OR_DELISTED)

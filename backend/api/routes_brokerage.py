@@ -213,9 +213,17 @@ async def validate_robinhood_csv_route(file: UploadFile = File(...)):
 
 
 @router.get("/robinhood-mcp/status")
-def robinhood_mcp_status_route():
-    """Whether Robinhood MCP OAuth is configured for live portfolio sync."""
-    return robinhood_mcp_status()
+def robinhood_mcp_status_route(
+    probe: bool = Query(False, description="Run a live MCP connectivity probe (accounts/portfolio/positions)"),
+):
+    """Robinhood MCP OAuth status; optional live connectivity probe."""
+    return robinhood_mcp_status(probe=probe)
+
+
+@router.post("/robinhood-mcp/test")
+def robinhood_mcp_test_route():
+    """Live connectivity test against Robinhood MCP (no full ledger sync)."""
+    return robinhood_mcp_status(probe=True)
 
 
 @router.post("/sync/robinhood-mcp")

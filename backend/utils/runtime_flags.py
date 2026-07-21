@@ -18,7 +18,7 @@ def _parse_bool(value: str | bool | None, default: bool = False) -> bool:
 
 
 class RuntimeBool:
-    """Bool-like flag that reads env default + JSON override at check time."""
+    """Bool-like flag that reads code default + env/JSON overrides at check time."""
 
     __slots__ = ("_registry", "key", "_default")
 
@@ -44,27 +44,45 @@ class RuntimeFlagRegistry:
         self._lock = threading.Lock()
         self._defaults: dict[str, bool] = {}
         self._overrides: dict[str, bool] = {}
+        self._env_overrides: dict[str, bool] = {}
         self._load()
 
-    def register(self, key: str, env_default: str) -> RuntimeBool:
-        default = _parse_bool(env_default, False)
+    def register(self, key: str, code_default: str) -> RuntimeBool:
+        """Register a flag. `code_default` is the shipped default (used after reset())."""
+        default = _parse_bool(code_default, False)
         self._defaults[key] = default
         return RuntimeBool(self, key, default)
+
+    def apply_env(self, key: str, value: bool) -> None:
+        """Apply a process-env overlay (not persisted). Cleared by reset()."""
+        if key not in self._defaults:
+            raise KeyError(f"Unknown runtime flag: {key}")
+        with self._lock:
+            if value == self._defaults[key]:
+                self._env_overrides.pop(key, None)
+            else:
+                self._env_overrides[key] = value
 
     def get(self, key: str, default: bool) -> bool:
         with self._lock:
             if key in self._overrides:
                 return self._overrides[key]
+            if key in self._env_overrides:
+                return self._env_overrides[key]
         return default
 
     def set(self, key: str, enabled: bool) -> None:
         if key not in self._defaults:
             raise KeyError(f"Unknown runtime flag: {key}")
         with self._lock:
-            if enabled == self._defaults[key]:
-                self._overrides.pop(key, None)
-            else:
+            code_default = self._defaults[key]
+            if enabled != code_default:
                 self._overrides[key] = enabled
+            elif key in self._env_overrides and self._env_overrides[key] != enabled:
+                # Persist Settings choice so it masks process env across restarts.
+                self._overrides[key] = enabled
+            else:
+                self._overrides.pop(key, None)
             self._save()
 
     def effective(self, key: str) -> bool:
@@ -82,8 +100,10 @@ class RuntimeFlagRegistry:
         with self._lock:
             if key is None:
                 self._overrides.clear()
+                self._env_overrides.clear()
             else:
                 self._overrides.pop(key, None)
+                self._env_overrides.pop(key, None)
             self._save()
 
     def default_for(self, key: str) -> bool:
@@ -91,7 +111,7 @@ class RuntimeFlagRegistry:
 
     def is_overridden(self, key: str) -> bool:
         with self._lock:
-            return key in self._overrides
+            return key in self._overrides or key in self._env_overrides
 
     def known_keys(self) -> frozenset[str]:
         return frozenset(self._defaults)

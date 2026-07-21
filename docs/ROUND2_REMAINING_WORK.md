@@ -19,6 +19,7 @@ Engineering backlog for quant integration, portfolio tooling, and production har
 | Item | Status | Notes |
 |------|--------|-------|
 | ScoringEngine parity mode | ✅ | `SCAN_SCORING_MODE` |
+| Single Stage B weight table | ✅ | `sleeve_signals` shared by engine + legacy screeners; Analyze via facade |
 | Scan evaluation harness | ✅ | [SCAN_EVALUATION.md](SCAN_EVALUATION.md) |
 | Factor discovery Phases 0–11 | ✅ | [FACTOR_RESEARCH_FINAL_ACCEPTANCE.md](FACTOR_RESEARCH_FINAL_ACCEPTANCE.md) |
 | Production discovered factors | ❌ | Separate flag from OpenAlpha |

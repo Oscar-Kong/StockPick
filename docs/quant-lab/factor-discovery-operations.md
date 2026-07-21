@@ -25,6 +25,8 @@ No secrets or full filesystem paths in responses.
 | `FACTOR_DISCOVERY_ENABLED` | `false` | Gates Quant Lab experiment launch |
 | `FACTOR_RESEARCH_DATA_PROVIDER` | `disabled` | See [factor-discovery-data-provider.md](./factor-discovery-data-provider.md) |
 
+Shipped defaults above are the Settings / `RuntimeBool` registry defaults. A local `.env` may enable flags for supervised development; that is a process-env overlay and does **not** rewrite the shipped default. `registry.reset()` (including pytest's `isolated_backend_env`) restores the shipped-off baseline. String knobs (`FACTOR_DISCOVERY_LLM_PROVIDER`, `FACTOR_DISCOVERY_LOOP_MODE`) are also forced to `disabled` in that fixture so "disabled by default" tests stay hermetic.
+
 ## Failed runs
 
 Failed Factor Discovery runs index into Research Results without a validation artifact. Summaries include stage, error code, and safe summary.

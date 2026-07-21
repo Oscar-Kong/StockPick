@@ -1,9 +1,11 @@
 """Trade journal routes with process-quality review."""
 from __future__ import annotations
 
+import logging
 import os
 import uuid
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from datetime import datetime
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
@@ -24,7 +26,13 @@ from services.trade_feedback_service import record_outcome_for_trade, record_pre
 from services.portfolio_snapshot_service import journal_trade_sync_status
 from utils.demo_guard import require_non_demo_mode
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/trades", tags=["trades"])
+
+_TRADE_SIDE_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="trade-side")
+
+_TRADE_SIDE_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="trade-side")
 
 _UPLOAD_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "storage", "trade_uploads")
@@ -127,14 +135,37 @@ def _build_review(
 
 def _on_trade_opened(row: dict, *, sleeve: str | None = None) -> tuple[bool, str | None]:
     try:
-        record_prediction_for_trade(
-            int(row["id"]),
-            symbol=row["symbol"],
-            side=row.get("side", "long"),
-            entry_price=float(row["entry_price"]),
-            setup_tags=row.get("setup_tags") or [],
-            sleeve=sleeve,
-        )
+        from config import TRADE_UPLOAD_PREDICTION_TIMEOUT_SECONDS
+
+        timeout = float(TRADE_UPLOAD_PREDICTION_TIMEOUT_SECONDS or 0)
+        if timeout > 0:
+            fut = _TRADE_SIDE_EXECUTOR.submit(
+                record_prediction_for_trade,
+                int(row["id"]),
+                symbol=row["symbol"],
+                side=row.get("side", "long"),
+                entry_price=float(row["entry_price"]),
+                setup_tags=row.get("setup_tags") or [],
+                sleeve=sleeve,
+            )
+            try:
+                fut.result(timeout=timeout)
+            except FuturesTimeout:
+                logger.warning(
+                    "Trade prediction timed out after %.1fs for trade %s (%s)",
+                    timeout,
+                    row.get("id"),
+                    row.get("symbol"),
+                )
+        else:
+            record_prediction_for_trade(
+                int(row["id"]),
+                symbol=row["symbol"],
+                side=row.get("side", "long"),
+                entry_price=float(row["entry_price"]),
+                setup_tags=row.get("setup_tags") or [],
+                sleeve=sleeve,
+            )
     except Exception:
         pass
     return _sync_trade_to_portfolio(row)

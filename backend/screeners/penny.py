@@ -27,10 +27,7 @@ from scoring.penny_liquidity import (
 from scoring.sentiment import combined_sentiment_score
 from scoring.technical import (
     momentum_score,
-    rsi_score,
     spread_proxy_score,
-    volatility_fit_score,
-    volume_spike_score,
 )
 from screeners.base import BaseScreener, CandidateContext, WeightedSignal
 from screeners.penny_setup import classify_penny_setup
@@ -98,8 +95,6 @@ class PennyScreener(BaseScreener):
         return True
 
     def score(self, ctx: CandidateContext) -> tuple[float, list[WeightedSignal], RiskLevel, str, dict]:
-        from config import SLEEVE_FACTORS_V3_ENABLED
-
         df = ctx.history
         reconcile_flags: list[str] = []
         warnings: list[str] = []
@@ -134,29 +129,13 @@ class PennyScreener(BaseScreener):
                 seen.add(w)
                 warnings.append(w)
 
-        if SLEEVE_FACTORS_V3_ENABLED:
-            from engines.factor.sleeve_signals import build_sleeve_signals
+        # Canonical Stage B legs/weights live in engines.factor.sleeve_signals
+        # (shared with ScoringEngine). Liquidity/spread stays in metrics + setup,
+        # not as a separate composite leg — matches FACTOR_CATALOG / engine path.
+        from engines.factor.sleeve_signals import build_sleeve_signals
 
-            signals = self.prepare_signals(ctx, build_sleeve_signals(ctx, "penny"))
-            sentiment_data = combined_sentiment_score(ctx.symbol, include_news=True)
-        else:
-            sentiment_data = combined_sentiment_score(ctx.symbol, include_news=True)
-            spread_val = spread_proxy_score(df)
-            vol_score = liquidity.relative_volume_score or volume_spike_score(df)
-            signals = [
-                WeightedSignal(
-                    "Volume spike",
-                    vol_score,
-                    0.28,
-                    "Normalized volume signal (0–100); raw ratio stored separately",
-                ),
-                WeightedSignal("5-day momentum", mom_5d, 0.24, "Recent price momentum"),
-                WeightedSignal("Social buzz", sentiment_data["score"], 0.18, "StockTwits + news sentiment"),
-                WeightedSignal("Volatility fit", volatility_fit_score(df), 0.12, "ATR-based tradeability"),
-                WeightedSignal("RSI fit", rsi_score(df), 0.10, "Not overbought"),
-                WeightedSignal("Liquidity/spread", spread_val, 0.08, "Bid-ask proxy from OHLC"),
-            ]
-            signals = self.prepare_signals(ctx, signals)
+        signals = self.prepare_signals(ctx, build_sleeve_signals(ctx, "penny"))
+        sentiment_data = combined_sentiment_score(ctx.symbol, include_news=True)
         raw_score = self.composite_score(signals)
         score, regime_meta = self.apply_regime(ctx, raw_score)
         score = self.apply_score_cap(score, ctx)

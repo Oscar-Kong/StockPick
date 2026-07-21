@@ -6,6 +6,7 @@ the scanner layer.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 from collections import defaultdict
 from functools import lru_cache
@@ -22,24 +23,70 @@ TICKER_ALIASES: dict[str, str] = {
 }
 
 STALE_OR_DELISTED: set[str] = {
-    "GOEV",
-    "NKLA",
-    "PTRA",
-    "FSR",
-    "RIDE",
+    "AREC",
     "ARVL",
-    "VORB",
-    "LLAP",
     "ASTR",
-    "LTHM",
-    "GRCL",
-    "MAXN",
-    "FFIE",
-    "DCFC",
-    "MULN",
-    "BLUE",
-    "NOVA",
+    "AVXL",
+    "AZIO",
+    "BBBY",
     "BLDE",
+    "BLNK",
+    "BLUE",
+    "BRR",
+    "BYND",
+    "CAN",
+    "DADA",
+    "DCFC",
+    "FFAI",
+    "FFIE",
+    "FSR",
+    "GFAI",
+    "GOEV",
+    "GOGL",
+    "GOSS",
+    "GRCL",
+    "GREE",
+    "HRTX",
+    "HYFM",
+    "IEP",
+    "ILLR",
+    "INVZ",
+    "INZY",
+    "ITOS",
+    "KALV",
+    "KNDI",
+    "LAZR",
+    "LBPH",
+    "LEV",
+    "LHAI",
+    "LLAP",
+    "LTHM",
+    "MARK",
+    "MAXN",
+    "MFIC",
+    "ML",
+    "MULN",
+    "NEP",
+    "NKLA",
+    "NM",
+    "NOVA",
+    "OCCI",
+    "OXLC",
+    "OXSQ",
+    "PSEC",
+    "PTRA",
+    "QD",
+    "RIDE",
+    "RR",
+    "SAVA",
+    "SCVL",
+    "SEM",
+    "SKLZ",
+    "SNAL",
+    "TCPC",
+    "VERV",
+    "VORB",
+    "WIRE",
 }
 
 SECTOR_ETFS: set[str] = {
@@ -89,112 +136,157 @@ SP500_SAMPLE = LARGE_CAP_SEEDS
 # --- Penny bucket discovery seeds (thematic; not guaranteed sub-$5) ---
 
 _PENNY_MEME_RETAIL = [
-    "SNDL", "AMC", "GME", "BB", "NOK", "CLOV", "SPCE", "HOOD", "SOFI", "BYND",
-    "TLRY", "CGC", "ACB", "CRON", "OGI", "GRWG", "HYFM", "IMPP", "NVAX", "WKHS",
+    "ACB", "AMC", "BB", "CGC", "CLOV", "CRON", "GME", "GRWG", "HOOD", "IMPP",
+    "NOK", "NVAX", "OGI", "SNDL", "SOFI", "SPCE", "TLRY", "WKHS",
 ]
-
 _PENNY_CRYPTO = [
-    "MARA", "RIOT", "HUT", "CLSK", "HIVE", "CAN", "BTBT", "ARBK", "WULF",
-    "CORZ", "IREN", "CIFR", "BTCS", "EXOD", "HGBL", "BKKT", "DGXX", "MSTR",
-    "GLXY", "BTDR", "APLD",
+    "ABTC", "APLD", "ARBK", "BKKT", "BTBT", "BTCS", "BTDR", "CIFR", "CLSK", "CORZ",
+    "DGXX", "EXOD", "GLXY", "HGBL", "HIVE", "HUT", "IREN", "MARA", "MSTR", "RIOT",
+    "WULF",
 ]
-
 _PENNY_EV_BATTERY = [
-    "NIO", "LCID", "RIVN", "CHPT", "BLNK", "EVGO", "QS", "MVST", "ENVX", "STEM",
-    "LAZR", "OUST", "PSNY", "HYLN", "XPEV", "LI", "VFS", "KNDI",
-    "FFAI", "LEV", "GGR", "CENN", "EVEX", "ZVIA", "AMPX",
-    "WBX", "NUVB", "SES", "SLDP",
+    "AMPX", "ATLX", "CENN", "CHPT", "ENVX", "EVEX", "EVGO", "GGR", "HYLN", "LCID",
+    "LI", "MVST", "NIO", "NUVB", "OUST", "PSNY", "QS", "RIVN", "SES", "SLDP",
+    "STEM", "VFS", "WBX", "XPEV", "ZVIA",
 ]
-
 _PENNY_HYDROGEN_CLEAN = [
-    "PLUG", "FCEL", "BE", "BLDP", "GPRE", "ARRY", "SHLS", "CSIQ", "JKS",
-    "DQ", "FLNC", "NEP", "PCT",
+    "ARRY", "BE", "BLDP", "CLNE", "CSIQ", "DQ", "FCEL", "FLNC", "GPRE", "JKS",
+    "MNTK", "PCT", "PLUG", "SHLS",
 ]
-
 _PENNY_BATTERY_MATERIALS = [
-    "LAC", "MP", "ALB", "EOSE", "BEEM", "FAC", "SEV", "TE",
+    "ABAT", "ALB", "BEEM", "EOSE", "FAC", "LAC", "MP", "SEV", "TE",
 ]
-
 _PENNY_EVTOL_AUTONOMY = [
-    "JOBY", "ACHR", "EH", "EVTL",
+    "ACHR", "AUR", "EH", "EVTL", "JOBY",
 ]
-
 _PENNY_QUANTUM_AI = [
-    "IONQ", "RGTI", "QBTS", "SOUN", "BBAI", "AI", "PATH", "GFAI", "VERI", "MARK",
-    "PRCT", "DUOT", "LTRX", "PERF", "AEYE", "AISP", "BNAI", "SSTI", "AMBA", "ONDS",
-    "QUBT", "ARQQ", "NBIS", "TEM", "SERV", "APLD",
+    "AEYE", "AI", "AISP", "AMBA", "APLD", "ARQQ", "BBAI", "BNAI", "DUOT", "IONQ",
+    "LTRX", "NBIS", "ONDS", "PATH", "PERF", "PRCT", "QBTS", "QUBT", "RGTI", "SERV",
+    "SOUN", "SSTI", "TEM", "VERI",
 ]
-
 _PENNY_BIOTECH = [
-    "DNA", "PACB", "CRSP", "EDIT", "NTLA", "BEAM", "VERV", "RXRX", "TWST", "SANA",
-    "FATE", "AUTL", "ARCT", "IOVA", "NKTR", "SAVA", "TGTX", "VSTM", "ALLO",
-    "BCYC", "ADPT", "KURA", "RCKT", "AGEN", "ALT", "ANAB", "ARVN", "ABUS", "ACAD",
-    "ADMA", "ALXO", "APGE", "ARDX", "ATAI", "AVXL", "BCRX", "BHVN",
-    "BMEA", "CAPR", "CCCC", "CGEM", "CLDX", "CMPS", "COGT", "CRBU", "CRNX",
-    "CRVS", "CTMX", "CTKB", "CYTK", "DNLI", "ERAS", "ESTA", "FULC",
-    "GERN", "GLUE", "GNLX", "GOSS", "HRTX", "IMVT", "IMUX", "INBX",
-    "INDV", "INZY", "IRON", "ITOS", "JANX", "KALV", "KYMR", "LBPH", "LEGN", "LRMR",
+    "ABEO", "ABOS", "ABSI", "ABUS", "ACAD", "ACH", "ACHV", "ACRS", "ACRV", "ADMA",
+    "ADPT", "AGEN", "AIRS", "AKBA", "ALDX", "ALEC", "ALLO", "ALT", "ALXO", "ANAB",
+    "ANIX", "ANNX", "ANVS", "APGE", "AQST", "ARCT", "ARDX", "ARMP", "ARTV", "ARVN",
+    "ATAI", "ATEC", "AURA", "AUTL", "AVR", "BBOT", "BCRX", "BCYC", "BDTX", "BEAM",
+    "BFLY", "BHVN", "BMEA", "BTMD", "CABA", "CADL", "CAPR", "CATX", "CCCC", "CGEM",
+    "CHRS", "CING", "CLDX", "CMPS", "CMPX", "CNTN", "COGT", "COYA", "CRBU", "CRMD",
+    "CRNX", "CRSP", "CRVO", "CRVS", "CTKB", "CTMX", "CVM", "CVRX", "CYTK", "DMAC",
+    "DNA", "DNLI", "DTIL", "EBS", "EDIT", "EIKN", "ELDN", "ELTX", "EMBC", "EOLS",
+    "EQ", "ERAS", "ESTA", "FATE", "FBIO", "FHTX", "FLNA", "FULC", "GALT", "GANX",
+    "GERN", "GLUE", "GNLX", "HURA", "HYPD", "IBIO", "IBRX", "IKT", "IMRX", "IMUX",
+    "IMVT", "INBX", "INDV", "INMB", "INO", "IOVA", "IPSC", "IRD", "IRON", "IRWD",
+    "JANX", "KURA", "KYMR", "KYTX", "LCTX", "LEGN", "LENZ", "LFMD", "LRMR", "LTRN",
+    "LXEO", "LXRX", "MDAI", "MDXG", "MGNX", "MNKD", "MRVI", "MXCT", "MYGN", "MYO",
+    "NAGE", "NKTR", "NKTX", "NMAD", "NMRA", "NNVC", "NRXP", "NTLA", "NUS", "NXTC",
+    "OABI", "OCGN", "OCUL", "OMER", "OPK", "ORGO", "OSUR", "OTLK", "OVID", "PACB",
+    "PALI", "PBYI", "PEPG", "PGEN", "PLRX", "PRLD", "PRME", "PROK", "PRTA", "PYXS",
+    "QCLS", "RCKT", "REPL", "RLMD", "RXRX", "RXST", "RZLT", "SABS", "SANA", "SENS",
+    "SGMT", "SIGA", "SLDB", "SNWV", "SPRO", "SPRY", "STIM", "STTK", "STXS", "SVRA",
+    "TALK", "TARA", "TGTX", "TOI", "TRDA", "TSHA", "TVRD", "TWST", "UNCY", "UPB",
+    "VIR", "VNDA", "VSTM", "VYGR", "WHWK", "XERS", "XFOR", "ZNTL",
 ]
-
 _PENNY_FINTECH = [
-    "AFRM", "UPST", "OPEN", "UWMC", "RKT", "LMND", "OPFI", "PAYO", "NRDS", "LU",
-    "DAVE", "FOUR", "GDOT", "NCNO", "TOST", "BILL", "XYZ", "PYPL", "BULL", "ML",
+    "AFRM", "AGNT", "AHRT", "BBDC", "BILL", "BRBS", "BTGO", "BULL", "BZAI", "CFFN",
+    "CION", "CMTG", "DAVE", "DFDV", "DOUG", "ECC", "FOUR", "FSCO", "GDOT", "GEMI",
+    "GSBD", "HRZN", "INV", "KRNY", "LDI", "LMND", "LPRO", "LU", "MBI", "NAVI",
+    "NCNO", "NMFC", "NRDS", "OPEN", "OPFI", "OPRT", "OSG", "OWL", "PAYO", "PFLT",
+    "PNBK", "PNNT", "PURR", "PYPL", "RDZN", "RILY", "RKT", "RPC", "RWAY", "TOST",
+    "UPST", "USDE", "UWMC", "WLTH", "XYZ", "ZSQR",
 ]
-
 _PENNY_SPACE_DEFENSE = [
-    "RKLB", "LUNR", "RDW", "MNTS", "SPIR", "BKSY", "PL", "ASTS", "SATL",
-    "SIDU", "SPCE", "KULR", "BBAI",
+    "ASTS", "BAER", "BBAI", "BKSY", "KULR", "LUNR", "MNTS", "PL", "RDW", "RKLB",
+    "SATL", "SIDU", "SPCE", "SPIR",
 ]
-
 _PENNY_DRONE_DEFENSE = [
-    "RCAT", "KTOS",
+    "KTOS", "RCAT",
 ]
-
 _PENNY_NUCLEAR = [
-    "UEC", "DNN", "URG", "UAMY", "UUUU", "LEU", "EU", "NXE", "UROY", "CCJ",
-    "SMR", "OKLO", "NNE", "LTBR", "ASPI",
+    "ASPI", "CCJ", "DNN", "EU", "LEU", "LTBR", "NNE", "NXE", "OKLO", "SMR",
+    "UAMY", "UEC", "URG", "UROY", "UUUU",
 ]
-
 _PENNY_MINING_METALS = [
-    "USAU", "GORO", "MUX", "EXK", "SLI", "HL", "AG", "CDE", "NG", "GSM",
-    "SVM", "ASM", "FSM", "EQX", "KGC", "SSRM", "WPM", "RGLD", "FNV",
+    "AG", "ASM", "CDE", "CLF", "DC", "EQX", "EXK", "FNV", "FSM", "GORO",
+    "GSM", "HL", "JELD", "KGC", "KRO", "MATV", "MUX", "NB", "NG", "NUCL",
+    "PZG", "RGLD", "RYAM", "SLI", "SSRM", "SVM", "USAU", "VGZ", "WPM",
 ]
-
 _PENNY_SHIPPING = [
-    "ZIM", "SBLK", "GOGL", "NM", "DAC", "GSL", "CMRE", "STNG", "TNK",
-    "ESEA", "SFL", "GNK", "HSHP", "TRMD", "PANL", "BORR",
+    "BORR", "CMRE", "DAC", "ESEA", "GNK", "GSL", "HSHP", "PANL", "SBLK", "SFL",
+    "STNG", "TNK", "TRMD", "ZIM",
 ]
-
 _PENNY_CHINA_EMERGING = [
-    "FUTU", "TIGR", "VNET", "IQ", "BILI", "TAL", "EDU", "GOTU", "GDS", "KC",
-    "TUYA", "ZH", "MOMO", "WB", "HUYA", "DOYU", "YMM", "BZ", "FINV",
-    "QD", "TME", "YALA", "LX", "DADA", "FENG", "NIU", "XNET",
+    "BILI", "BZ", "DOYU", "EDU", "FENG", "FINV", "FUTU", "GDS", "GOTU", "HUYA",
+    "IQ", "KC", "LX", "MOMO", "NIU", "TAL", "TIGR", "TME", "TUYA", "VNET",
+    "WB", "XNET", "YALA", "YMM", "ZH",
 ]
-
 _PENNY_SEMI_HARDWARE = [
-    "WOLF", "ALGM", "SKYT", "POET", "AAOI", "CRDO", "NVTS", "INDI", "LAES", "LIDR",
-    "INVZ", "AEHR", "AMKR", "FORM", "KN", "MXL", "PI", "RMBS", "SITM", "SLAB",
-    "VICR", "CAMT", "CEVA", "DIOD", "HIMX", "IMOS", "LSCC", "MCHP", "MTSI",
+    "AAOI", "AEHR", "ALGM", "AMKR", "CAMT", "CEVA", "CRDO", "DIOD", "FORM", "GCTS",
+    "HIMX", "IMOS", "INDI", "KN", "LAES", "LIDR", "LSCC", "MCHP", "MTSI", "MXL",
+    "NVTS", "PI", "POET", "RMBS", "SITM", "SKYT", "SLAB", "VICR", "WOLF",
 ]
-
 _PENNY_HEALTHCARE_SERVICES = [
-    "HIMS", "OSCR", "ALHC", "TDOC", "OMCL", "ACHC", "BFAM", "BTSG", "CNC",
-    "ENSG", "MOH", "PNTG", "PRGO", "SEM", "ADUS",
-    "AVAH", "CHE", "CON", "CYH", "DGX", "HCA", "LH", "OPCH",
+    "ACHC", "ADUS", "ALHC", "AVAH", "BFAM", "BTSG", "CHE", "CNC", "CON", "CYH",
+    "DGX", "ENSG", "HCA", "HIMS", "LH", "MOH", "OMCL", "OPCH", "OSCR", "PNTG",
+    "PRGO", "TDOC",
 ]
-
 _PENNY_CONSUMER_MEDIA = [
-    "FUBO", "SKLZ", "SIRI", "ROKU", "PINS", "SNAP", "RBLX", "U", "DKNG", "PENN",
-    "WYNN", "CZR", "MGM", "LVS", "CHWY", "ETSY", "W", "REAL", "CVNA", "CARG",
-    "BMBL", "MTCH", "ANGI", "EXPE", "TRIP", "LYFT", "DASH", "GRAB", "SE",
+    "ANGI", "BMBL", "CARG", "CHWY", "CVNA", "CZR", "DASH", "DKNG", "ETSY", "EXPE",
+    "FUBO", "GBTG", "GRAB", "IHRT", "LVS", "LYFT", "MGM", "MTCH", "NCMI", "PENN",
+    "PINS", "RBLX", "REAL", "ROKU", "SE", "SIRI", "SNAP", "SPWH", "TRIP", "U",
+    "W", "WYNN",
 ]
-
 _PENNY_INDUSTRIAL_MISC = [
-    "TRUP", "ASO", "DKS", "CAL", "BOOT", "SCVL", "ZUMZ",
-    "UA", "COLM", "GIII", "KTB", "TLYS", "THO", "WGO", "CWH", "MBUU", "HOG",
-    "TILE", "TTC", "TEX", "MTW", "GNRC", "TT", "IR", "DOV", "PNR", "FLS",
-    "GTES", "MLI", "WIRE", "ROAD", "MYRG", "PRIM", "STRL", "GVA", "TPC",
-    "BLDR", "ROCK", "SMID", "TGLS", "AWI", "GFF",
+    "AIRJ", "AIRO", "ALTO", "AMTX", "APPS", "ASO", "AWI", "BLDR", "BOOT", "BTX",
+    "BYRN", "CAL", "CBUS", "CDXS", "COLM", "CWH", "DFLI", "DKS", "DOV", "EMPD",
+    "FF", "FLS", "FWDI", "GEVO", "GFF", "GIII", "GNRC", "GTES", "GTN", "GVA",
+    "HOG", "HOVR", "IMSR", "IR", "JBI", "KTB", "LASE", "LODE", "LWLG", "MASS",
+    "MBUU", "MLI", "MTW", "MYRG", "NAUT", "NEOV", "NMAX", "NNBR", "NRGV", "NWL",
+    "PNR", "POWW", "PRIM", "PSKY", "QTRX", "ROAD", "ROCK", "SKYQ", "SMID", "SND",
+    "SSP", "STRL", "SWIM", "SXC", "TEX", "TGLS", "THO", "TILE", "TLYS", "TPC",
+    "TROX", "TRUP", "TT", "TTC", "TWI", "UA", "VYX", "WGO", "WRAP", "ZUMZ",
+]
+_PENNY_SOFTWARE_CLOUD = [
+    "ALOY", "AMPL", "ASAN", "ASTI", "ATOM", "BLND", "CAST", "CCC", "CERS", "CERT",
+    "CMRC", "CMTL", "COUR", "CRCT", "CRNC", "CRSR", "CXM", "DDD", "DJT", "DOMO",
+    "DXC", "ERII", "EVLV", "EXFY", "GDRX", "GDYN", "GLOO", "GSIT", "GTM", "HCAT",
+    "IDN", "IMMR", "KDK", "KLTR", "KOPN", "KVHI", "LAW", "LZ", "MOBX", "MRLN",
+    "NABL", "NIXX", "NXDR", "OPTX", "PAYS", "PDYN", "QMCO", "RBBN", "RUM", "RXT",
+    "SABR", "SBET", "SLNH", "SPT", "SST", "SSTK", "SSYS", "SVCO", "TASK", "TLS",
+    "TYGO", "UIS", "UPWK", "VTIX", "VUZI", "VWAV", "WEAV", "XPER", "XRX", "XTIA",
+    "YEXT", "ZIP",
+]
+_PENNY_TELECOM_CONNECTIVITY = [
+    "AIOT", "AMPG", "BWEN", "CXDO", "INSG", "KSCP", "LILA", "LILAK", "LUMN",
+]
+_PENNY_ENERGY_OIL_GAS = [
+    "ACDC", "AMPY", "ANNA", "BATL", "BSIN", "EAF", "EGY", "FIP", "GLND", "GRNT",
+    "HLX", "HPK", "KLXE", "NPWR", "NUAI", "PTEN", "REI", "RES", "SOC", "TTI",
+    "WTI",
+]
+_PENNY_REAL_ESTATE = [
+    "ABR", "ACRE", "ADAM", "AIV", "ARI", "BDN", "BHR", "BRSP", "DHC", "EARN",
+    "ELME", "ESRT", "FBRT", "FPI", "FRMI", "GNL", "GPMT", "ILPT", "INN", "IVR",
+    "KREF", "LAND", "MFA", "MPT", "ORC", "PDM", "RC", "RITM", "RWT", "SEVN",
+    "SITC", "SVC", "TRTX",
+]
+_PENNY_CONSUMER_RETAIL = [
+    "ACCO", "ACVA", "ADT", "AMCI", "ANGX", "ARHS", "ASLE", "ASPN", "BIRD", "BLMN",
+    "BRCB", "BZFD", "CCO", "CNDT", "COTY", "CPSH", "CRMT", "CURI", "CURV", "DBI",
+    "DCH", "DTI", "EVH", "FJET", "FNKO", "FOSL", "GOGO", "GT", "HDSN", "HLLY",
+    "HLMN", "HNST", "HODO", "HTZ", "INUV", "JBLU", "KLC", "KODK", "LESL", "MBC",
+    "MNTN", "NTRP", "OI", "OIS", "OPRX", "PACK", "PAL", "PLBY", "PRTH", "PTLO",
+    "PTON", "PUSA", "RGP", "RPAY", "SFIX", "SG", "SKYX", "SRTA", "STUB", "SVV",
+    "TBI", "TDAY", "TDUP", "THRY", "TIC", "TRON", "TSSI", "TTEC", "UAA", "ULCC",
+    "VENU", "VRRM", "WALD", "WEN", "WOOF", "WU", "XMAX", "XPOF",
+]
+_PENNY_CONSUMER_STAPLES = [
+    "ARKO", "BGS", "BRCC", "DNUT", "FLO", "GO", "SUJA", "UTZ", "WEST",
+]
+_PENNY_UTILITIES_POWER = [
+    "AQN", "CDZI", "GFUZ", "NEXT", "OPAL",
+]
+_PENNY_HEALTHCARE_MEDTECH = [
+    "LUCD", "MODD", "RCEL", "TMCI", "VANI",
 ]
 
 _THEME_GROUPS: dict[str, list[str]] = {
@@ -217,6 +309,14 @@ _THEME_GROUPS: dict[str, list[str]] = {
     "healthcare_services": _PENNY_HEALTHCARE_SERVICES,
     "consumer_media": _PENNY_CONSUMER_MEDIA,
     "industrial_misc": _PENNY_INDUSTRIAL_MISC,
+    "software_cloud": _PENNY_SOFTWARE_CLOUD,
+    "telecom_connectivity": _PENNY_TELECOM_CONNECTIVITY,
+    "energy_oil_gas": _PENNY_ENERGY_OIL_GAS,
+    "real_estate": _PENNY_REAL_ESTATE,
+    "consumer_retail": _PENNY_CONSUMER_RETAIL,
+    "consumer_staples": _PENNY_CONSUMER_STAPLES,
+    "utilities_power": _PENNY_UTILITIES_POWER,
+    "healthcare_medtech": _PENNY_HEALTHCARE_MEDTECH,
 }
 
 
@@ -234,7 +334,13 @@ def _build_theme_membership() -> tuple[dict[str, set[str]], dict[str, set[str]]]
 THEME_MEMBERSHIP, SYMBOL_THEMES = _build_theme_membership()
 
 PENNY_DISCOVERY_SEEDS = sorted(
-    {sym for group in _THEME_GROUPS.values() for sym in group}
+    {
+        sym
+        for group in _THEME_GROUPS.values()
+        for raw in group
+        for sym in (normalize_symbol(raw),)
+        if sym and sym not in STALE_OR_DELISTED and sym not in SECTOR_ETFS
+    }
 )
 
 # Backward-compatible alias — prefer PENNY_DISCOVERY_SEEDS in new code.
@@ -348,6 +454,28 @@ def _get_universe_cached(bucket: str, revision: str) -> tuple[str, ...]:
         bucket,
     )
     return tuple(_filter_curated_symbols(seeds))
+
+
+def cap_universe_for_scan(
+    symbols: list[str],
+    limit: int,
+    *,
+    revision: str = "",
+) -> list[str]:
+    """Return at most ``limit`` symbols without alphabetical-prefix bias.
+
+    When ``limit`` is <= 0 or >= len(symbols), return a copy of ``symbols``.
+    Selection is deterministic for a given (symbols, limit, revision) so scans
+    stay reproducible within a listing-master revision.
+    """
+    if limit <= 0 or limit >= len(symbols):
+        return list(symbols)
+
+    def _rank(sym: str) -> str:
+        return hashlib.sha256(f"{revision}:{sym}".encode()).hexdigest()
+
+    selected = sorted(symbols, key=_rank)[:limit]
+    return sorted(selected)
 
 
 def get_universe(bucket: str) -> list[str]:

@@ -33,12 +33,19 @@ from services.scan_scoring import ScanScoreOutcome, score_stage_b_candidate
 logger = logging.getLogger(__name__)
 
 
-def _strategy_version_for(bucket: Bucket) -> str:
+def _coerce_bucket(bucket: Bucket | str) -> Bucket:
+    if isinstance(bucket, Bucket):
+        return bucket
+    return Bucket(str(bucket).strip().lower())
+
+
+def _strategy_version_for(bucket: Bucket | str) -> str:
     """Best-effort lookup of the active strategy version for `bucket`."""
     try:
         from data.strategy_registry import StrategyRegistry
 
-        return StrategyRegistry().get_active(bucket.value).version_id
+        sleeve = bucket.value if isinstance(bucket, Bucket) else str(bucket)
+        return StrategyRegistry().get_active(sleeve).version_id
     except Exception as exc:  # pragma: no cover — defensive
         logger.warning("Falling back to default strategy version for %s: %s", bucket, exc)
         from config import STRATEGY_VERSION
@@ -50,7 +57,7 @@ def score_symbol_canonical(
     *,
     ctx: CandidateContext,
     screener: BaseScreener,
-    bucket: Bucket,
+    bucket: Bucket | str,
     symbol: str | None = None,
     quality_score: float | None = None,
     strategy_version: str | None = None,
@@ -62,13 +69,14 @@ def score_symbol_canonical(
     a `quality_filter` (Watchlist, Analyze) can omit it; we record an empty
     dict so downstream `metrics["quality_filter"]` is always present.
     """
+    bucket_enum = _coerce_bucket(bucket)
     sym = (symbol or ctx.symbol or "").upper()
-    sv = strategy_version or _strategy_version_for(bucket)
+    sv = strategy_version or _strategy_version_for(bucket_enum)
     qf = quality_filter if quality_filter is not None else {}
     return score_stage_b_candidate(
         ctx=ctx,
         screener=screener,
-        bucket=bucket,
+        bucket=bucket_enum,
         symbol=sym,
         quality_score=quality_score,
         strategy_version=sv,

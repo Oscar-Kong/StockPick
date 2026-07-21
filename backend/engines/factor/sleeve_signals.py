@@ -1,4 +1,8 @@
-"""Build factor signals per sleeve — mirrors screeners/*.py score() signal legs."""
+"""Build Stage B factor signals per sleeve.
+
+Canonical weight table for ScoringEngine and legacy screeners. Do not duplicate
+leg lists in screeners/*.py — call build_sleeve_signals() instead.
+"""
 from __future__ import annotations
 
 from config import OPENBB_ON_SCAN, SLEEVE_FACTORS_V3_ENABLED

@@ -26,29 +26,19 @@ export function ChartMount({
     let rafId = 0;
 
     const markReady = () => {
-      if (!cancelled) setReady(true);
+      if (!cancelled && hasChartDimensions(el)) setReady(true);
     };
 
-    if (hasChartDimensions(el)) {
-      markReady();
-      return;
-    }
-
+    // Always observe — parent layout can settle after first paint (flex/grid).
     const ro = new ResizeObserver(() => {
-      if (hasChartDimensions(el)) {
-        markReady();
-        ro.disconnect();
-      }
+      markReady();
+      if (hasChartDimensions(el)) ro.disconnect();
     });
     ro.observe(el);
+    markReady();
 
     rafId = requestAnimationFrame(() => {
-      rafId = requestAnimationFrame(() => {
-        if (hasChartDimensions(el)) {
-          markReady();
-          ro.disconnect();
-        }
-      });
+      rafId = requestAnimationFrame(markReady);
     });
 
     return () => {
@@ -59,7 +49,7 @@ export function ChartMount({
   }, []);
 
   return (
-    <div ref={ref} className={className}>
+    <div ref={ref} className={className} style={{ minWidth: 0, minHeight: 0 }}>
       {ready ? children : null}
     </div>
   );

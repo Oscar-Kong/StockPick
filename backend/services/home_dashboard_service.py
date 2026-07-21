@@ -53,13 +53,24 @@ def _top_penny_opportunities(*, cash: float, allow_new_buys: bool, limit: int = 
 
 def _risk_alerts(decision: PortfolioDecisionResponse | None, portfolio: dict) -> list[str]:
     alerts: list[str] = []
-    if not portfolio.get("holdings"):
-        alerts.append("No active holdings — import Robinhood CSV to reconstruct positions")
+    holdings = portfolio.get("holdings") or []
+    source = portfolio.get("data_source") or "manual"
+    if not holdings:
+        if source == "robinhood_mcp":
+            # Cash-only live sync is valid — do not nag about CSV import.
+            pass
+        else:
+            alerts.append("No active holdings — import Robinhood CSV to reconstruct positions")
     if portfolio.get("is_demo_data"):
         alerts.append("Demo/mock data source — not your real Robinhood portfolio")
     if not decision:
         return alerts
+    holding_syms = {str(h.get("symbol") or "").upper() for h in holdings}
     for item in decision.items:
+        if holding_syms and item.symbol.upper() not in holding_syms:
+            continue
+        if not holdings:
+            continue
         if item.price_available is False:
             alerts.append(f"{item.symbol}: missing latest price — decision is REVIEW")
         if bool(item.stop_loss_trigger):
@@ -79,15 +90,35 @@ def _risk_alerts(decision: PortfolioDecisionResponse | None, portfolio: dict) ->
 def _portfolio_warnings(portfolio: dict, decision: PortfolioDecisionResponse | None) -> list[str]:
     warnings: list[str] = []
     source = portfolio.get("data_source") or "manual"
+    holdings = portfolio.get("holdings") or []
     if source == "demo":
         warnings.append("⚠ Demo data — do not treat as real Robinhood holdings")
-    elif source == "manual" and not portfolio.get("holdings"):
+    elif source == "manual" and not holdings:
         warnings.append("Upload Robinhood CSV to reconstruct holdings from trade history")
-    if decision:
-        reviews = [i for i in decision.items if i.decision == "review"]
+    if decision and holdings:
+        holding_syms = {str(h.get("symbol") or "").upper() for h in holdings}
+        reviews = [
+            i for i in decision.items if i.decision == "review" and i.symbol.upper() in holding_syms
+        ]
         if reviews:
             warnings.append(f"{len(reviews)} positions need REVIEW due to missing or weak data")
     return warnings
+
+
+def _decision_for_open_holdings(
+    decision: PortfolioDecisionResponse | None,
+    holdings: list,
+) -> PortfolioDecisionResponse | None:
+    """Drop stale decision rows for symbols no longer held (e.g. journal healthcheck ZZZZ)."""
+    if decision is None:
+        return None
+    if not holdings:
+        return None
+    holding_syms = {str(h.get("symbol") or "").upper() for h in holdings}
+    filtered = [i for i in decision.items if i.symbol.upper() in holding_syms]
+    if len(filtered) == len(decision.items):
+        return decision
+    return decision.model_copy(update={"items": filtered})
 
 
 def build_daily_dashboard(*, include_freshness: bool = False) -> DailyDashboardResponse:
@@ -110,24 +141,28 @@ def build_daily_dashboard(*, include_freshness: bool = False) -> DailyDashboardR
     holdings = portfolio.get("holdings") or []
     closed_raw = portfolio.get("closed_positions") or []
     closed = [ClosedPositionItem(**c) if isinstance(c, dict) else c for c in closed_raw]
+    decision = _decision_for_open_holdings(decision, holdings)
 
     if decision:
         by_sym = {i.symbol: i for i in decision.items}
         invested = 0.0
         for h in holdings:
+            # Always mark with *current* shares. Decision.market_value freezes
+            # shares×price from the last run and drifts after RH sync / trades.
+            shares = float(h.get("shares", 0) or 0)
             item = by_sym.get(h["symbol"])
-            if item and item.price_available and (item.market_value or 0) > 0:
-                invested += float(item.market_value)
+            if item and item.price_available and (item.price or 0) > 0:
+                invested += shares * float(item.price)
             else:
-                invested += float(h.get("shares", 0)) * float(h.get("avg_cost", 0))
-        if not holdings and decision.invested_value is not None:
-            invested = float(decision.invested_value or 0)
+                invested += shares * float(h.get("avg_cost", 0) or 0)
+        if not holdings:
+            invested = 0.0
         elif not decision.items and decision.invested_value is not None and invested <= 0:
             invested = float(decision.invested_value)
     elif holdings:
         invested = sum(h.get("shares", 0) * h.get("avg_cost", 0) for h in holdings)
     else:
-        invested = max(0.0, float((snap or {}).get("total_value") or 0) - cash)
+        invested = 0.0
 
     # Robinhood: total = buying power + reserved (IPO) + invested holdings.
     total_value = cash + reserved_cash + invested
@@ -138,10 +173,12 @@ def build_daily_dashboard(*, include_freshness: bool = False) -> DailyDashboardR
     warnings = _portfolio_warnings(portfolio, decision)
     decision_stale_warning: str | None = None
     if include_freshness:
-        d_status = assess_freshness("daily_decision")
-        if d_status.is_stale or d_status.is_missing:
-            decision_stale_warning = "Decision is based on older data. Refresh before acting."
-            warnings = list(dict.fromkeys(warnings + [decision_stale_warning]))
+        # Cash-only: nothing to act on — do not nag about a stale decision snapshot.
+        if holdings:
+            d_status = assess_freshness("daily_decision")
+            if d_status.is_stale or d_status.is_missing:
+                decision_stale_warning = "Decision is based on older data. Refresh before acting."
+                warnings = list(dict.fromkeys(warnings + [decision_stale_warning]))
         if portfolio.get("is_demo_data"):
             demo_msg = "Demo data is displayed. Import Robinhood CSV before making decisions."
             warnings = list(dict.fromkeys([demo_msg] + warnings))

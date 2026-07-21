@@ -228,8 +228,12 @@ class PortfolioRefresh:
             return {"status": "failed", "error": str(exc)[:200]}
 
     def _price_ttl_ok(self) -> bool:
+        # Always consult the freshness store so a holdings sync that lands
+        # mid-TTL still forces a re-price for new / changed symbols.
+        status = assess_freshness("latest_prices")
+        if status.is_stale or status.is_missing:
+            return False
         if self._last_price_refresh_at is None:
-            status = assess_freshness("latest_prices")
             return not status.is_stale
         age = (_utcnow() - self._last_price_refresh_at).total_seconds()
         from services.data_freshness_service import price_stale_after_seconds
@@ -258,15 +262,16 @@ class PortfolioRefresh:
         else:
             steps["holdings"] = {"skipped": True}
 
+        holdings_ran = not steps.get("holdings", {}).get("skipped")
         p_status = assess_freshness("latest_prices")
-        if force or p_status.is_stale or p_status.is_missing:
-            steps["prices"] = self.refresh_prices_for_holdings(force=force)
+        # Re-price whenever holdings changed so new symbols are not skipped by TTL.
+        if force or p_status.is_stale or p_status.is_missing or holdings_ran:
+            steps["prices"] = self.refresh_prices_for_holdings(force=force or holdings_ran)
         else:
             steps["prices"] = {"skipped": True}
 
         d_status = assess_freshness("daily_decision")
         prices_ran = not steps.get("prices", {}).get("skipped")
-        holdings_ran = not steps.get("holdings", {}).get("skipped")
         if force or d_status.is_stale or d_status.is_missing or prices_ran or holdings_ran:
             steps["daily_decision"] = self.refresh_daily_decision_if_needed(
                 force=force or prices_ran or holdings_ran,
@@ -286,15 +291,15 @@ class PortfolioRefresh:
             else:
                 steps["holdings"] = {"skipped": True}
 
+            holdings_ran = not steps.get("holdings", {}).get("skipped")
             p_status = assess_freshness("latest_prices")
-            if force or p_status.is_stale or p_status.is_missing:
-                steps["prices"] = self.refresh_prices_for_holdings(force=force)
+            if force or p_status.is_stale or p_status.is_missing or holdings_ran:
+                steps["prices"] = self.refresh_prices_for_holdings(force=force or holdings_ran)
             else:
                 steps["prices"] = {"skipped": True}
 
             d_status = assess_freshness("daily_decision")
             prices_ran = not steps.get("prices", {}).get("skipped")
-            holdings_ran = not steps.get("holdings", {}).get("skipped")
             if force or d_status.is_stale or d_status.is_missing or prices_ran or holdings_ran:
                 steps["daily_decision"] = self.refresh_daily_decision_if_needed(
                     force=force or prices_ran or holdings_ran

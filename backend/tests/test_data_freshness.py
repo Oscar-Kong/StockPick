@@ -177,6 +177,28 @@ def test_assess_all_freshness_demo_overall():
     assert summary.overall_status == "demo"
 
 
+def test_mcp_cash_only_holdings_not_missing_import():
+    """Synced Robinhood MCP with $0 equity must not look like 'import needed'."""
+    with patch("services.data_freshness_service.get_current_holdings", return_value=[]):
+        with patch(
+            "services.data_freshness_service.get_or_create_account",
+            return_value={
+                "source": "robinhood_mcp",
+                "last_sync_at": _ts(0.01),
+                "cash_balance": 2105.82,
+            },
+        ):
+            with patch(
+                "services.data_freshness_service.get_latest_portfolio_snapshot",
+                return_value={"created_at": _ts(0.01)},
+            ):
+                with patch("services.data_freshness_service.get_freshness_meta", return_value=None):
+                    status = dfs.assess_portfolio_holdings()
+    assert status.is_missing is False
+    assert "csv" not in status.reason.lower()
+    assert status.source == "robinhood_mcp"
+
+
 def test_compounder_stale_does_not_make_home_stale():
     fresh = DataFreshnessStatus(key="portfolio_holdings", is_stale=False, last_updated_at=_ts(0.01))
     with patch.object(dfs, "assess_portfolio_holdings", return_value=fresh):

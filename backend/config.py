@@ -34,8 +34,22 @@ _runtime = get_registry(DATA_DIR)
 
 
 def _env_bool(name: str, default: str = "false"):
-    """Env-backed boolean that supports runtime JSON overrides."""
-    return _runtime.register(name, os.getenv(name, default))
+    """Env-backed boolean that supports runtime JSON overrides.
+
+    The registry default is always the shipped code `default` (so reset() and
+    Settings "env_default" match docs / .env.example). A present process env
+    value is applied as a non-persisted overlay — developer .env can enable
+    features locally without rewriting the shipped default used by tests.
+    """
+    from utils.runtime_flags import _parse_bool
+
+    flag = _runtime.register(name, default)
+    raw = os.getenv(name)
+    if raw is not None and str(raw).strip() != "":
+        desired = _parse_bool(raw, _parse_bool(default))
+        if desired != _parse_bool(default):
+            _runtime.apply_env(name, desired)
+    return flag
 
 
 # --- Environment ---
@@ -289,7 +303,7 @@ RECONCILE_PRICE_TOLERANCE = float(os.getenv("RECONCILE_PRICE_TOLERANCE", "0.01")
 RECONCILE_RATIO_TOLERANCE = float(os.getenv("RECONCILE_RATIO_TOLERANCE", "0.12"))
 
 # --- Strategy versioning ---
-STRATEGY_VERSION = os.getenv("STRATEGY_VERSION", "2026-05-eod-v1")
+STRATEGY_VERSION = os.getenv("STRATEGY_VERSION", "2026-07-sleeve-weights-v1")
 
 # --- Scheduler (America/New_York, post-close batch Mon–Fri) ---
 SCHEDULER_ENABLED = _env_bool("SCHEDULER_ENABLED", "true")
@@ -390,7 +404,14 @@ WATCHLIST_REFRESH_PER_SYMBOL_TIMEOUT_SECONDS = float(
 WATCHLIST_REPORT_MAX_ITEMS = int(os.getenv("WATCHLIST_REPORT_MAX_ITEMS", "10"))
 WATCHLIST_REPORT_BUDGET_SECONDS = float(os.getenv("WATCHLIST_REPORT_BUDGET_SECONDS", "45"))
 WATCHLIST_IMPORT_PER_SYMBOL_TIMEOUT_SECONDS = float(
-    os.getenv("WATCHLIST_IMPORT_PER_SYMBOL_TIMEOUT_SECONDS", "10")
+    os.getenv("WATCHLIST_IMPORT_PER_SYMBOL_TIMEOUT_SECONDS", "30")
+)
+# Bound trade-upload side effects so market-data stalls cannot hang the HTTP request.
+TRADE_UPLOAD_PREDICTION_TIMEOUT_SECONDS = float(
+    os.getenv("TRADE_UPLOAD_PREDICTION_TIMEOUT_SECONDS", "8")
+)
+TRADE_UPLOAD_DECISION_TIMEOUT_SECONDS = float(
+    os.getenv("TRADE_UPLOAD_DECISION_TIMEOUT_SECONDS", "20")
 )
 
 # --- Penny bucket ---

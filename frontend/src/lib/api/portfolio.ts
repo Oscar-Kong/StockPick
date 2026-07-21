@@ -161,10 +161,31 @@ export function rebuildPortfolioLedger(): Promise<{ holdings_count: number; hold
   return request("/brokerage/ledger/rebuild", { method: "POST" });
 }
 
+export type RobinhoodMcpProbeResult = {
+  ok: boolean;
+  latency_ms: number;
+  account_id?: string | null;
+  accounts_count?: number;
+  holdings_count?: number;
+  cash?: number | null;
+  equity_value?: number | null;
+  portfolio_value?: number | null;
+  error?: string | null;
+  needs_reauth?: boolean;
+  message?: string;
+};
+
 export type RobinhoodMcpStatusResponse = {
   enabled: boolean;
   authenticated: boolean;
   endpoint: string;
+  login_script?: string;
+  sync_script?: string;
+  docs_path?: string;
+  token_path?: string;
+  token_expires_at?: number | null;
+  token_expired?: boolean;
+  probe?: RobinhoodMcpProbeResult | null;
 };
 
 export type RobinhoodMcpSyncResponse = {
@@ -179,8 +200,13 @@ export type RobinhoodMcpSyncResponse = {
   message?: string;
 };
 
-export function getRobinhoodMcpStatus(): Promise<RobinhoodMcpStatusResponse> {
-  return request("/brokerage/robinhood-mcp/status");
+export function getRobinhoodMcpStatus(probe = false): Promise<RobinhoodMcpStatusResponse> {
+  const qs = probe ? "?probe=true" : "";
+  return request(`/brokerage/robinhood-mcp/status${qs}`, { timeoutMs: probe ? 45_000 : 15_000 });
+}
+
+export function testRobinhoodMcpConnection(): Promise<RobinhoodMcpStatusResponse> {
+  return request("/brokerage/robinhood-mcp/test", { method: "POST", timeoutMs: 45_000 });
 }
 
 export type RobinhoodMcpSyncJobResponse = {
@@ -194,10 +220,20 @@ export type RobinhoodMcpSyncJobResponse = {
 };
 
 const MCP_SYNC_POLL_MS = 2000;
+/** ~3 minutes — positions+orders sync; decision only runs when holdings > 0. */
 const MCP_SYNC_MAX_POLLS = 90;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Soft timeout: sync may still finish in the background; not a hard MCP failure. */
+export class RobinhoodMcpSyncTimeoutError extends Error {
+  readonly soft = true as const;
+  constructor(message: string) {
+    super(message);
+    this.name = "RobinhoodMcpSyncTimeoutError";
+  }
 }
 
 export function startRobinhoodMcpSync(runDecision = false): Promise<{ job_id: string; status: string }> {
@@ -209,6 +245,10 @@ export function getRobinhoodMcpSyncJob(jobId: string): Promise<RobinhoodMcpSyncJ
   return request(`/brokerage/sync/robinhood-mcp/${encodeURIComponent(jobId)}`, { timeoutMs: 15_000 });
 }
 
+function jobResultOrEmpty(job: RobinhoodMcpSyncJobResponse): RobinhoodMcpSyncResponse {
+  return job.result ?? { message: job.message || "Robinhood portfolio synced." };
+}
+
 export async function syncRobinhoodMcp(runDecision = false): Promise<RobinhoodMcpSyncResponse> {
   const start = await startRobinhoodMcpSync(runDecision);
   for (let i = 0; i < MCP_SYNC_MAX_POLLS; i += 1) {
@@ -216,14 +256,25 @@ export async function syncRobinhoodMcp(runDecision = false): Promise<RobinhoodMc
       await sleep(MCP_SYNC_POLL_MS);
     }
     const job = await getRobinhoodMcpSyncJob(start.job_id);
-    if (job.status === "completed" && job.result) {
-      return job.result;
+    // Completed with empty holdings is still success (cash-only) — do not require result fields.
+    if (job.status === "completed") {
+      return jobResultOrEmpty(job);
     }
     if (job.status === "failed") {
       throw new Error(job.error || "Robinhood sync failed");
     }
   }
-  throw new Error("Robinhood sync is taking longer than expected — check Activity ledger in a moment");
+  // Final check — sync often finishes just after the poll window.
+  const last = await getRobinhoodMcpSyncJob(start.job_id);
+  if (last.status === "completed") {
+    return jobResultOrEmpty(last);
+  }
+  if (last.status === "failed") {
+    throw new Error(last.error || "Robinhood sync failed");
+  }
+  throw new RobinhoodMcpSyncTimeoutError(
+    "Robinhood sync is still running in the background — refresh Today in a moment. This is not a connection failure.",
+  );
 }
 
 export async function setBuyingPower(

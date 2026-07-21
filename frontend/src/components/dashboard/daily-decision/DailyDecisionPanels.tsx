@@ -5,26 +5,50 @@ import { formatCurrency } from "@/lib/dailyDecisionUtils";
 import { useTranslation } from "@/lib/i18n";
 import { AppCard, SectionCard } from "@/components/ui/AppCard";
 import { GhostButton, PrimaryButton } from "@/components/ui/buttons";
+import { RobinhoodMcpStatusCard } from "@/components/portfolio/RobinhoodMcpStatusCard";
 
 export function EmptyPortfolioState({
   onImportClick,
   robinhoodAuthenticated,
   onSyncRobinhood,
+  cash,
+  dataSource,
+  showDiagnostics = false,
 }: {
   onImportClick?: () => void;
   robinhoodAuthenticated?: boolean;
   onSyncRobinhood?: () => void;
+  cash?: number;
+  dataSource?: string;
+  /** When true, always show MCP status card (troubleshoot expand). */
+  showDiagnostics?: boolean;
 }) {
   const { t } = useTranslation();
   const useRobinhood = Boolean(robinhoodAuthenticated && onSyncRobinhood);
+  const cashOnlySynced = useRobinhood && dataSource === "robinhood_mcp";
+  // Healthy cash-only sync is not an error — hide diagnostics unless asked.
+  const showMcpDiagnostics = useRobinhood && (showDiagnostics || !cashOnlySynced);
   return (
     <AppCard variant="ghost" className="px-6 py-14 text-center md:px-10">
       <h2 className="text-xl font-semibold tracking-tight text-zinc-50">
-        {useRobinhood ? t.home.dailyEmptyRobinhoodTitle : t.home.dailyEmptyTitle}
+        {cashOnlySynced
+          ? t.home.dailyEmptyRobinhoodCashTitle
+          : useRobinhood
+            ? t.home.dailyEmptyRobinhoodTitle
+            : t.home.dailyEmptyTitle}
       </h2>
       <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-secondary">
-        {useRobinhood ? t.home.dailyEmptyRobinhoodDescription : t.home.dailyEmptyDescription}
+        {cashOnlySynced
+          ? t.home.dailyEmptyRobinhoodCashDescription
+          : useRobinhood
+            ? t.home.dailyEmptyRobinhoodDescription
+            : t.home.dailyEmptyDescription}
       </p>
+      {cashOnlySynced && cash != null && (
+        <p className="mx-auto mt-3 finance-value text-sm text-zinc-200">
+          {t.home.dailyEmptyRobinhoodCashAmount.replace("{cash}", formatCurrency(cash))}
+        </p>
+      )}
       <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
         {useRobinhood ? (
           <PrimaryButton onClick={onSyncRobinhood} className="rounded-xl">
@@ -38,6 +62,9 @@ export function EmptyPortfolioState({
           )
         )}
       </div>
+      {showMcpDiagnostics && (
+        <RobinhoodMcpStatusCard authenticated={robinhoodAuthenticated} cash={cash} />
+      )}
       {!useRobinhood && <p className="mt-5 text-sm text-secondary">{t.home.dailyCsvWhereHint}</p>}
     </AppCard>
   );

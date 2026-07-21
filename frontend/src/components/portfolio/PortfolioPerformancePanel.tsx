@@ -37,9 +37,19 @@ function signedCurrency(value: number | null | undefined): string {
 type PortfolioPerformancePanelProps = {
   refreshKey?: number;
   hasHoldings?: boolean;
+  /** Cash-only MCP account — show buying-power hero instead of hiding. */
+  cashOnly?: boolean;
+  cash?: number;
+  portfolioValue?: number;
 };
 
-export function PortfolioPerformancePanel({ refreshKey = 0, hasHoldings = true }: PortfolioPerformancePanelProps) {
+export function PortfolioPerformancePanel({
+  refreshKey = 0,
+  hasHoldings = true,
+  cashOnly = false,
+  cash,
+  portfolioValue,
+}: PortfolioPerformancePanelProps) {
   const { t } = useTranslation();
   const [range, setRange] = useState<PerformanceRange>("1m");
   const [data, setData] = useState<PortfolioPerformanceResponse | null>(null);
@@ -47,7 +57,8 @@ export function PortfolioPerformancePanel({ refreshKey = 0, hasHoldings = true }
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!hasHoldings) {
+    // Cash-only still has an equity curve (ledger + buying power) — do not skip the chart.
+    if (!hasHoldings && !cashOnly) {
       setData(null);
       setLoading(false);
       return;
@@ -61,7 +72,7 @@ export function PortfolioPerformancePanel({ refreshKey = 0, hasHoldings = true }
     } finally {
       setLoading(false);
     }
-  }, [hasHoldings, t.portfolio.performanceLoadFailed]);
+  }, [cashOnly, hasHoldings, t.portfolio.performanceLoadFailed]);
 
   useEffect(() => {
     void load();
@@ -89,7 +100,10 @@ export function PortfolioPerformancePanel({ refreshKey = 0, hasHoldings = true }
     return t.portfolio.performanceRange1y;
   };
 
-  if (!hasHoldings) return null;
+  if (!hasHoldings && !cashOnly) return null;
+
+  const displayValue =
+    data?.total_value ?? (cashOnly ? (portfolioValue ?? cash ?? 0) : 0);
 
   return (
     <section className="portfolio-performance-hero" aria-labelledby="portfolio-performance-heading">
@@ -103,8 +117,11 @@ export function PortfolioPerformancePanel({ refreshKey = 0, hasHoldings = true }
               <p className="portfolio-performance-hero__value finance-value">—</p>
             ) : (
               <p className="portfolio-performance-hero__value finance-value">
-                {formatCurrency(data?.total_value ?? 0)}
+                {formatCurrency(displayValue)}
               </p>
+            )}
+            {cashOnly && !hasHoldings && (
+              <p className="mt-1 text-xs text-secondary">{t.portfolio.robinhoodLiveSyncCashOnly}</p>
             )}
             {periodPct != null && (
               <p
@@ -135,43 +152,46 @@ export function PortfolioPerformancePanel({ refreshKey = 0, hasHoldings = true }
         </div>
 
         <ChartMount className="portfolio-performance-hero__chart">
+          {/* Numeric height avoids Recharts ResponsiveContainer measuring width/height -1 on first paint. */}
           {chartData.length > 1 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={stroke} stopOpacity={0.35} />
-                    <stop offset="100%" stopColor={stroke} stopOpacity={0.02} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" vertical={false} />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fill: "var(--text-tertiary)", fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                  minTickGap={28}
-                />
-                <YAxis
-                  domain={["auto", "auto"]}
-                  tick={{ fill: "var(--text-tertiary)", fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={52}
-                  tickFormatter={(v: number) => `$${(v / 1000).toFixed(1)}k`}
-                />
-                <Tooltip content={<DarkChartTooltip />} cursor={darkTooltipCursor} />
-                <Area
-                  type="monotone"
-                  dataKey="value"
-                  stroke={stroke}
-                  strokeWidth={2}
-                  fill={`url(#${gradientId})`}
-                  dot={false}
-                  activeDot={{ r: 3, strokeWidth: 0 }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            <div className="h-full w-full min-h-[10rem]">
+              <ResponsiveContainer width="100%" height={224}>
+                <AreaChart data={chartData} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={stroke} stopOpacity={0.35} />
+                      <stop offset="100%" stopColor={stroke} stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fill: "var(--text-tertiary)", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                    minTickGap={28}
+                  />
+                  <YAxis
+                    domain={["auto", "auto"]}
+                    tick={{ fill: "var(--text-tertiary)", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={52}
+                    tickFormatter={(v: number) => `$${(v / 1000).toFixed(1)}k`}
+                  />
+                  <Tooltip content={<DarkChartTooltip />} cursor={darkTooltipCursor} />
+                  <Area
+                    type="monotone"
+                    dataKey="value"
+                    stroke={stroke}
+                    strokeWidth={2}
+                    fill={`url(#${gradientId})`}
+                    dot={false}
+                    activeDot={{ r: 3, strokeWidth: 0 }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           ) : (
             <p className="flex h-full items-center justify-center text-sm text-secondary">
               {loading ? t.common.loading : t.portfolio.performanceChartEmpty}

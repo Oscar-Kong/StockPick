@@ -224,13 +224,25 @@ def assess_portfolio_holdings() -> DataFreshnessStatus:
             last_ts = meta_ts
 
     if not holdings:
+        source = account.get("source", "manual")
+        # Live MCP sync can legitimately return cash-only (0 equity). That is not
+        # "import needed" — only treat as missing when we have never synced.
+        if source == "robinhood_mcp" and last_ts is not None:
+            return _status(
+                "portfolio_holdings",
+                last_updated_at=last_ts,
+                stale_after=DEFAULT_STALE_AFTER["portfolio_holdings"],
+                is_missing=False,
+                reason="Synced from Robinhood — no open equity positions",
+                source=source,
+            )
         return _status(
             "portfolio_holdings",
             last_updated_at=last_ts,
             stale_after=DEFAULT_STALE_AFTER["portfolio_holdings"],
             is_missing=True,
             reason="No holdings — import Robinhood CSV",
-            source=account.get("source", "manual"),
+            source=source,
         )
 
     if get_freshness_flag("portfolio_holdings", "holdings_dirty"):

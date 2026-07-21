@@ -93,6 +93,19 @@ def isolated_backend_env(monkeypatch, tmp_path, request):
     monkeypatch.setattr(config, "APP_ENV", "test", raising=False)
 
     _reset_runtime_state()
+    # Shipped Factor Discovery defaults (docs: all off). Developer .env can bake
+    # true into RuntimeBool registry defaults at import; reset() alone does not
+    # restore code defaults, so force the documented safe baseline for every test.
+    monkeypatch.setenv("FACTOR_DISCOVERY_ENABLED", "false")
+    monkeypatch.setenv("FACTOR_DISCOVERY_LLM_ENABLED", "false")
+    monkeypatch.setenv("FACTOR_DISCOVERY_LLM_PROVIDER", "disabled")
+    monkeypatch.setenv("FACTOR_DISCOVERY_LOOP_ENABLED", "false")
+    monkeypatch.setenv("FACTOR_DISCOVERY_LOOP_MODE", "disabled")
+    config.FACTOR_DISCOVERY_ENABLED.set(False)
+    config.FACTOR_DISCOVERY_LLM_ENABLED.set(False)
+    config.FACTOR_DISCOVERY_LOOP_ENABLED.set(False)
+    monkeypatch.setattr(config, "FACTOR_DISCOVERY_LLM_PROVIDER", "disabled", raising=False)
+    monkeypatch.setattr(config, "FACTOR_DISCOVERY_LOOP_MODE", "disabled", raising=False)
     _reload_db_modules()
 
     from data.cache import init_db

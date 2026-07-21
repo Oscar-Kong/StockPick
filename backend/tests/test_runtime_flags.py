@@ -31,6 +31,38 @@ def test_runtime_override_persists():
         assert "OPENBB_ENABLED" not in json.loads(path.read_text())
 
 
+def test_env_overlay_does_not_rewrite_shipped_default():
+    """Process env must not become registry default — reset restores shipped off."""
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "runtime_settings.json"
+        reg = RuntimeFlagRegistry(path)
+        flag = reg.register("FACTOR_DISCOVERY_LLM_ENABLED", "false")
+        reg.apply_env("FACTOR_DISCOVERY_LLM_ENABLED", True)
+        assert flag
+        assert reg.default_for("FACTOR_DISCOVERY_LLM_ENABLED") is False
+        assert reg.is_overridden("FACTOR_DISCOVERY_LLM_ENABLED") is True
+        if path.exists():
+            assert "FACTOR_DISCOVERY_LLM_ENABLED" not in json.loads(path.read_text())
+
+        reg.reset()
+        assert not flag
+        assert reg.default_for("FACTOR_DISCOVERY_LLM_ENABLED") is False
+
+
+def test_settings_disable_masks_env_overlay():
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "runtime_settings.json"
+        reg = RuntimeFlagRegistry(path)
+        flag = reg.register("FACTOR_DISCOVERY_LOOP_ENABLED", "false")
+        reg.apply_env("FACTOR_DISCOVERY_LOOP_ENABLED", True)
+        assert flag
+        flag.set(False)
+        assert not flag
+        assert json.loads(path.read_text())["FACTOR_DISCOVERY_LOOP_ENABLED"] is False
+
+
 if __name__ == "__main__":
     test_runtime_override_persists()
+    test_env_overlay_does_not_rewrite_shipped_default()
+    test_settings_disable_masks_env_overlay()
     print("runtime_flags tests passed")

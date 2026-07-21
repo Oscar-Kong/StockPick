@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from datetime import datetime
@@ -18,6 +19,9 @@ from services.symbol_parser import parse_symbols
 
 logger = logging.getLogger(__name__)
 _ANALYZE_EXECUTOR = ThreadPoolExecutor(max_workers=6, thread_name_prefix="watchlist-analyze")
+# Serialize import analyzes across concurrent HTTP requests so market-data
+# providers are not stampeded (timeouts / empty loads under parallel import).
+_IMPORT_ANALYZE_LOCK = threading.Lock()
 
 BucketChoice = Bucket | Literal["auto"]
 
@@ -50,7 +54,13 @@ def analyze_symbol(
         mcap = ctx.info.get("marketCap")
         bucket = detect_bucket(price, float(mcap) if mcap else None)
     else:
-        bucket = bucket_choice
+        if isinstance(bucket_choice, Bucket):
+            bucket = bucket_choice
+        else:
+            try:
+                bucket = Bucket(str(bucket_choice).strip().lower())
+            except ValueError:
+                return None, f"Invalid bucket: {bucket_choice}"
 
     screener = _SCREENERS[bucket]()
     if hasattr(screener, "ps"):
@@ -158,12 +168,20 @@ def import_to_watchlist(
 
     outcomes: list[dict] = []
     for symbol in symbols:
-        result, error = _analyze_with_timeout(symbol, bucket_choice, per_symbol_timeout_seconds)
+        with _IMPORT_ANALYZE_LOCK:
+            result, error = _analyze_with_timeout(
+                symbol, bucket_choice, per_symbol_timeout_seconds
+            )
         if error or result is None:
+            bucket_label = (
+                bucket_choice.value
+                if isinstance(bucket_choice, Bucket)
+                else (bucket_choice if bucket_choice != "auto" else "penny")
+            )
             outcomes.append(
                 {
                     "symbol": symbol.upper(),
-                    "bucket": bucket_choice if bucket_choice != "auto" else "penny",
+                    "bucket": bucket_label,
                     "price": None,
                     "score": None,
                     "summary": error or "Unknown error",

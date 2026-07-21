@@ -11,6 +11,15 @@ export function DataFreshnessBanner({ data }: { data: DailyDashboardResponse }) 
   const f = data.freshness;
   if (!f) return null;
 
+  // Cash-only MCP: no positions to decide — suppress stale/missing decision banners.
+  const mcpCashOnly =
+    data.data_source === "robinhood_mcp" &&
+    Boolean(data.robinhood_mcp_authenticated) &&
+    !(data.holdings?.length ?? 0);
+  if (mcpCashOnly && (f.overall_status === "stale" || f.overall_status === "missing")) {
+    return null;
+  }
+
   const status = f.overall_status;
   if (status === "fresh" || status === "demo") return null;
 

@@ -14,7 +14,6 @@ from data.candidate_builder import _load_cached_fundamentals
 from data.reconciler import DataReconciler
 from config import ANALYZE_RESULT_TTL
 from models.schemas import Bucket, ScanOptions
-from scoring.data_quality import adjust_score_for_data_quality
 from scoring.technical import (
     breakout_score,
     relative_strength_vs_spy,
@@ -80,7 +79,13 @@ def _quick_technicals(symbol: str, ps: PriceService, *, db_only: bool = False) -
 
 
 def score_all_buckets(symbol: str, ps: PriceService | None = None) -> dict[str, Any]:
-    """Score symbol under penny and compounder (for bucket-fit)."""
+    """Score symbol under penny and compounder (for bucket-fit).
+
+    Uses the canonical Stage B facade so Analyze matches Scan for the active
+    SCAN_SCORING_MODE (legacy / engine / parity_sample).
+    """
+    from services.scoring_facade import score_symbol_canonical
+
     ps = ps or PriceService()
     scores: dict[str, Any] = {}
     for bucket in (Bucket.penny, Bucket.compounder):
@@ -93,15 +98,24 @@ def score_all_buckets(symbol: str, ps: PriceService | None = None) -> dict[str, 
                 scores[bucket.value] = None
                 continue
             passed = screener.hard_filter(ctx, ScanOptions())
-            score, signals, risk, _, metrics = screener.score(ctx)
-            q = ctx.info.get("_reconcile_quality")
-            score = adjust_score_for_data_quality(score, q)
+            quality_score = ctx.info.get("_reconcile_quality")
+            if isinstance(quality_score, (int, float)):
+                q = float(quality_score)
+            else:
+                q = None
+            outcome = score_symbol_canonical(
+                ctx=ctx,
+                screener=screener,
+                bucket=bucket,
+                symbol=symbol,
+                quality_score=q,
+            )
             scores[bucket.value] = {
-                "score": round(score, 1),
+                "score": round(outcome.score, 1),
                 "passed_hard_filter": passed,
-                "risk_level": risk.value,
+                "risk_level": outcome.risk.value,
                 "top_signals": [
-                    {"name": s.name, "value": round(s.value, 1)} for s in signals[:4]
+                    {"name": s.name, "value": round(s.value, 1)} for s in outcome.signals[:4]
                 ],
             }
         except Exception as exc:

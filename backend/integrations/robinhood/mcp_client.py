@@ -31,6 +31,7 @@ ROBINHOOD_MCP_URL = os.getenv("ROBINHOOD_MCP_URL", "https://agent.robinhood.com/
 ROBINHOOD_MCP_REDIRECT_URI = os.getenv(
     "ROBINHOOD_MCP_REDIRECT_URI", "http://127.0.0.1:8765/callback"
 ).strip()
+_LOGIN_SCRIPT = "./scripts/robinhood-mcp-login.sh"
 READ_TOOLS = frozenset({
     "get_accounts",
     "get_portfolio",
@@ -225,6 +226,23 @@ def parse_portfolio_value(portfolio_payload: Any) -> float | None:
     return float(value) if value is not None else None
 
 
+def parse_equity_value(portfolio_payload: Any) -> float | None:
+    value = _walk_numbers(portfolio_payload, ("equity_value",))
+    return float(value) if value is not None else None
+
+
+def _count_accounts(accounts_payload: Any) -> int:
+    if isinstance(accounts_payload, dict):
+        nested = accounts_payload.get("data")
+        if isinstance(nested, dict) and isinstance(nested.get("accounts"), list):
+            return len(nested["accounts"])
+        if isinstance(accounts_payload.get("accounts"), list):
+            return len(accounts_payload["accounts"])
+    if isinstance(accounts_payload, list):
+        return len(accounts_payload)
+    return 0
+
+
 def _pick_account_id(accounts_payload: Any, preferred: str | None) -> str | None:
     if preferred:
         return preferred
@@ -252,6 +270,34 @@ def _pick_account_id(accounts_payload: Any, preferred: str | None) -> str | None
     return None
 
 
+_REAUTH_HINT = (
+    f"Robinhood MCP session expired. Re-authenticate with: {_LOGIN_SCRIPT}"
+)
+
+
+def _flatten_exc(exc: BaseException) -> BaseException:
+    """Unwrap ExceptionGroup to the first meaningful leaf error."""
+    cur: BaseException = exc
+    while isinstance(cur, BaseExceptionGroup) and cur.exceptions:
+        cur = cur.exceptions[0]
+    return cur
+
+
+def _auth_error(exc: BaseException) -> ValueError:
+    leaf = _flatten_exc(exc)
+    msg = str(leaf)
+    lowered = msg.lower()
+    if (
+        _REAUTH_HINT in msg
+        or "session expired" in lowered
+        or "redirect handler" in lowered
+        or "oauth" in type(leaf).__name__.lower()
+        or "token refresh failed" in lowered
+    ):
+        return ValueError(_REAUTH_HINT)
+    return ValueError(f"Robinhood MCP sync failed: {msg[:300]}")
+
+
 class RobinhoodMcpClient(BrokerageProvider):
     source = "robinhood_mcp"
 
@@ -263,6 +309,12 @@ class RobinhoodMcpClient(BrokerageProvider):
 
     @asynccontextmanager
     async def _session(self):
+        async def _redirect_handler(url: str) -> None:
+            raise ValueError(_REAUTH_HINT)
+
+        async def _callback_handler() -> tuple[str, str | None]:
+            raise ValueError(_REAUTH_HINT)
+
         oauth = OAuthClientProvider(
             server_url=ROBINHOOD_MCP_URL,
             client_metadata=OAuthClientMetadata(
@@ -273,11 +325,17 @@ class RobinhoodMcpClient(BrokerageProvider):
                 token_endpoint_auth_method="none",
             ),
             storage=self.storage,
+            # Sync path must never open a browser; force a clear re-auth error instead.
+            redirect_handler=_redirect_handler,
+            callback_handler=_callback_handler,
         )
-        async with streamablehttp_client(ROBINHOOD_MCP_URL, auth=oauth) as (read, write, _):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
-                yield session
+        try:
+            async with streamablehttp_client(ROBINHOOD_MCP_URL, auth=oauth) as (read, write, _):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    yield session
+        except BaseException as exc:
+            raise _auth_error(exc) from exc
 
     async def _call_read_tool(self, name: str, arguments: dict[str, Any] | None = None) -> Any:
         if name not in READ_TOOLS:
@@ -375,6 +433,101 @@ class RobinhoodMcpClient(BrokerageProvider):
             raw_portfolio=portfolio_raw,
             order_rows=order_rows,
         )
+
+    async def _probe_async(self) -> dict[str, Any]:
+        """Lightweight live check: accounts + portfolio + positions (no order history)."""
+        import time as _time
+
+        t0 = _time.monotonic()
+        preferred = os.getenv("ROBINHOOD_MCP_ACCOUNT_ID", "").strip() or None
+        async with self._session() as session:
+            accounts = await self._call_tool(session, "get_accounts", {})
+            account_id = _pick_account_id(accounts, preferred)
+            if not account_id:
+                raise ValueError("No Robinhood account_number found — set ROBINHOOD_MCP_ACCOUNT_ID")
+            account_args = {"account_number": account_id}
+            positions_raw = await self._call_tool(session, "get_equity_positions", account_args)
+            portfolio_raw = await self._call_tool(session, "get_portfolio", account_args)
+
+        holdings = parse_equity_positions(positions_raw)
+        cash = parse_buying_power(portfolio_raw)
+        portfolio_value = parse_portfolio_value(portfolio_raw)
+        equity_value = parse_equity_value(portfolio_raw)
+        latency_ms = int((_time.monotonic() - t0) * 1000)
+        if holdings:
+            message = f"Connected — {len(holdings)} equity position(s)"
+        else:
+            message = "Connected — account is cash-only (0 equity positions)"
+        return {
+            "ok": True,
+            "latency_ms": latency_ms,
+            "account_id": account_id,
+            "accounts_count": _count_accounts(accounts),
+            "holdings_count": len(holdings),
+            "cash": cash,
+            "equity_value": equity_value,
+            "portfolio_value": portfolio_value,
+            "error": None,
+            "needs_reauth": False,
+            "message": message,
+        }
+
+    def probe_connection(self) -> dict[str, Any]:
+        """Sync wrapper for UI/CLI connectivity test."""
+        import time as _time
+
+        if not _enabled():
+            return {
+                "ok": False,
+                "latency_ms": 0,
+                "account_id": None,
+                "accounts_count": 0,
+                "holdings_count": 0,
+                "cash": None,
+                "equity_value": None,
+                "portfolio_value": None,
+                "error": "Robinhood MCP disabled",
+                "needs_reauth": False,
+                "message": "Set ROBINHOOD_MCP_ENABLED=true to enable live sync",
+            }
+        if not self.is_configured():
+            return {
+                "ok": False,
+                "latency_ms": 0,
+                "account_id": None,
+                "accounts_count": 0,
+                "holdings_count": 0,
+                "cash": None,
+                "equity_value": None,
+                "portfolio_value": None,
+                "error": "Not authenticated",
+                "needs_reauth": True,
+                "message": f"Not authenticated — run {_LOGIN_SCRIPT}",
+            }
+        t0 = _time.monotonic()
+        try:
+            return asyncio.run(self._probe_async())
+        except Exception as exc:
+            latency_ms = int((_time.monotonic() - t0) * 1000)
+            err = _auth_error(exc)
+            needs_reauth = _REAUTH_HINT in str(err) or "session expired" in str(err).lower()
+            return {
+                "ok": False,
+                "latency_ms": latency_ms,
+                "account_id": None,
+                "accounts_count": 0,
+                "holdings_count": 0,
+                "cash": None,
+                "equity_value": None,
+                "portfolio_value": None,
+                "error": str(err)[:400],
+                "needs_reauth": needs_reauth,
+                "message": (
+                    f"Session expired — re-run {_LOGIN_SCRIPT}"
+                    if needs_reauth
+                    else f"MCP probe failed: {str(err)[:200]}"
+                ),
+            }
 
     def sync_holdings(self) -> BrokerageSyncResult:
         if not _enabled():

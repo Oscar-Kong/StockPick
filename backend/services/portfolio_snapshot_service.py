@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from datetime import datetime
 
 from data.portfolio_store import (
@@ -41,6 +43,9 @@ from models.schemas import Bucket, PortfolioHolding
 from utils.pydantic_util import model_to_dict
 
 logger = logging.getLogger(__name__)
+_MANUAL_TRADE_DECISION_EXECUTOR = ThreadPoolExecutor(
+    max_workers=2, thread_name_prefix="manual-trade-decision"
+)
 
 
 def _rebuild_from_store(account_id: int = DEFAULT_ACCOUNT_ID) -> PortfolioRebuildResult:
@@ -446,13 +451,31 @@ def apply_manual_trade_to_portfolio(
     clear_freshness_flag("closed_positions", "needs_refresh")
 
     try:
+        from config import TRADE_UPLOAD_DECISION_TIMEOUT_SECONDS
         from services.portfolio_decision_service import run_stored_portfolio_decision
 
-        decision = run_stored_portfolio_decision(trigger="manual_trade", persist=True)
-        portfolio_result["decision"] = model_to_dict(decision)
-        mark_freshness_updated("daily_decision", source="manual_trade")
-        mark_freshness_updated("risk_metrics", source="manual_trade")
-        mark_freshness_updated("data_quality", source="manual_trade")
+        timeout = float(TRADE_UPLOAD_DECISION_TIMEOUT_SECONDS or 0)
+        if timeout > 0:
+            fut = _MANUAL_TRADE_DECISION_EXECUTOR.submit(
+                run_stored_portfolio_decision,
+                trigger="manual_trade",
+                persist=True,
+            )
+            try:
+                decision = fut.result(timeout=timeout)
+            except FuturesTimeout:
+                portfolio_result["decision_error"] = (
+                    f"Daily decision timed out after {timeout:.0f}s"
+                )
+                decision = None
+        else:
+            decision = run_stored_portfolio_decision(trigger="manual_trade", persist=True)
+
+        if decision is not None:
+            portfolio_result["decision"] = model_to_dict(decision)
+            mark_freshness_updated("daily_decision", source="manual_trade")
+            mark_freshness_updated("risk_metrics", source="manual_trade")
+            mark_freshness_updated("data_quality", source="manual_trade")
     except Exception as exc:
         portfolio_result["decision_error"] = str(exc)[:200]
 
@@ -540,7 +563,19 @@ def import_robinhood_mcp_and_decide(*, run_decision: bool = False) -> dict:
         "account": acct,
     }
 
-    if run_decision and persisted["holdings_count"] >= 0:
+    # Pull live marks for the new holdings set so decision / hero values do not
+    # keep yesterday's closes after a position sync.
+    try:
+        from services.refresh_orchestrator import portfolio_refresh, refresh_prices_for_holdings
+
+        portfolio_refresh._last_price_refresh_at = None
+        result["prices"] = refresh_prices_for_holdings(force=True)
+    except Exception as exc:
+        result["prices_error"] = str(exc)[:200]
+
+    # Cash-only accounts have nothing to score — skip decision so sync stays fast
+    # and clear any stale snapshot (e.g. journal healthcheck symbols) so Today stays clean.
+    if run_decision and persisted["holdings_count"] > 0:
         try:
             from services.portfolio_decision_service import run_stored_portfolio_decision
 
@@ -549,17 +584,92 @@ def import_robinhood_mcp_and_decide(*, run_decision: bool = False) -> dict:
             mark_freshness_updated("daily_decision", source="robinhood_mcp")
         except Exception as exc:
             result["decision_error"] = str(exc)[:200]
+    elif run_decision and persisted["holdings_count"] == 0:
+        result["decision_skipped"] = "cash_only"
+        try:
+            from data.portfolio_store import DEFAULT_ACCOUNT_ID, save_decision_snapshot
+            from utils.datetime_util import utc_iso_z, utc_now
+
+            empty_payload = {
+                "as_of": utc_iso_z(utc_now()),
+                "cash": persisted.get("cash"),
+                "total_value": snapshot.portfolio_value,
+                "invested_value": 0.0,
+                "items": [],
+                "trigger": "robinhood_mcp_cash_only",
+            }
+            save_decision_snapshot(DEFAULT_ACCOUNT_ID, "robinhood_mcp_cash_only", empty_payload)
+            mark_freshness_updated("daily_decision", source="robinhood_mcp")
+            result["decision_cleared"] = True
+        except Exception as exc:
+            result["decision_clear_error"] = str(exc)[:200]
 
     return result
 
 
-def robinhood_mcp_status() -> dict:
+def robinhood_mcp_status(*, probe: bool = False) -> dict:
+    """OAuth + optional live connectivity probe for Robinhood MCP."""
+    from integrations.robinhood.mcp_token_store import token_path
+
     client = RobinhoodMcpClient()
-    return {
-        "enabled": bool(os.getenv("ROBINHOOD_MCP_ENABLED", "true").strip().lower() not in ("0", "false", "no", "off")),
-        "authenticated": client.is_configured(),
+    enabled = bool(os.getenv("ROBINHOOD_MCP_ENABLED", "true").strip().lower() not in ("0", "false", "no", "off"))
+    authenticated = client.is_configured()
+    expiry = _token_expiry_meta()
+    status: dict = {
+        "enabled": enabled,
+        "authenticated": authenticated,
         "endpoint": os.getenv("ROBINHOOD_MCP_URL", "https://agent.robinhood.com/mcp/trading"),
+        "login_script": "./scripts/robinhood-mcp-login.sh",
+        "sync_script": "./scripts/sync-robinhood-mcp.sh",
+        "docs_path": "docs/ROBINHOOD_MCP.md",
+        "token_path": str(token_path()),
+        "token_expires_at": expiry.get("token_expires_at"),
+        "token_expired": bool(expiry.get("token_expired")),
+        "probe": None,
     }
+    if not probe:
+        return status
+
+    if not authenticated:
+        status["probe"] = {
+            "ok": False,
+            "latency_ms": 0,
+            "account_id": None,
+            "accounts_count": 0,
+            "holdings_count": 0,
+            "cash": None,
+            "equity_value": None,
+            "portfolio_value": None,
+            "error": "Not authenticated",
+            "needs_reauth": True,
+            "message": "Not authenticated — run ./scripts/robinhood-mcp-login.sh",
+        }
+        return status
+
+    status["probe"] = client.probe_connection()
+    return status
+
+
+def _token_expiry_meta() -> dict:
+    """Read expires_at from local OAuth store without opening an MCP session."""
+    import time as _time
+
+    from integrations.robinhood.mcp_token_store import token_path
+
+    path = token_path()
+    if not path.is_file():
+        return {"token_expires_at": None, "token_expired": False}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"token_expires_at": None, "token_expired": False}
+    raw = data.get("expires_at")
+    try:
+        expires_at = float(raw) if raw is not None else None
+    except (TypeError, ValueError):
+        expires_at = None
+    expired = bool(expires_at is not None and _time.time() >= (expires_at - 120))
+    return {"token_expires_at": expires_at, "token_expired": expired}
 
 
 def sync_brokerage_if_configured() -> dict:

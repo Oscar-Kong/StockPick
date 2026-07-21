@@ -48,12 +48,13 @@ export function filterActiveDecisionItems(items: PortfolioDecisionItem[]): Portf
   return items;
 }
 
-/** Ensure every open holding appears in the decision table (fallback when decision run is stale). */
+/** Keep decision rows that match open holdings — drop orphans from stale snapshots (e.g. healthcheck ZZZZ). */
 export function mergeHoldingsWithDecisionItems(
   holdings: DailyDashboardResponse["holdings"],
   items: PortfolioDecisionItem[]
 ): PortfolioDecisionItem[] {
-  const active = filterActiveDecisionItems(items);
+  const holdingSyms = new Set(holdings.map((h) => h.symbol));
+  const active = filterActiveDecisionItems(items).filter((i) => holdingSyms.has(i.symbol));
   const bySym = new Map(active.map((i) => [i.symbol, i]));
   const extras: PortfolioDecisionItem[] = [];
 
@@ -84,7 +85,13 @@ export function mergeHoldingsWithDecisionItems(
     });
   }
 
-  return [...active, ...extras];
+  // Preserve holdings order: matched decision items first (by holdings), then extras.
+  const ordered: PortfolioDecisionItem[] = [];
+  for (const h of holdings) {
+    const item = bySym.get(h.symbol);
+    if (item) ordered.push(item);
+  }
+  return [...ordered, ...extras];
 }
 
 export function buildActionQueue(items: PortfolioDecisionItem[]): PortfolioDecisionItem[] {
@@ -104,11 +111,20 @@ export function getCockpitStatus(data: DailyDashboardResponse): CockpitStatus {
   const freshness = data.freshness?.overall_status;
   if (freshness === "demo" || data.is_demo_data) return "demo";
   if (freshness === "updating") return "updating";
+  // Cash-only Robinhood MCP after a successful sync is not "import needed"
+  // and should not look like a failed / stale decision cockpit.
+  const mcpSyncedCashOnly =
+    data.data_source === "robinhood_mcp" &&
+    Boolean(data.robinhood_mcp_authenticated) &&
+    !(data.holdings?.length ?? 0);
+  if (mcpSyncedCashOnly) return "ready";
   if (freshness === "missing") return "import_needed";
   if (freshness === "stale") return "stale";
   if (freshness === "fresh") return "fresh";
   if (data.is_demo_data) return "demo";
-  if (!data.holdings.length) return "import_needed";
+  if (!data.holdings.length) {
+    return "import_needed";
+  }
   const items = filterActiveDecisionItems(data.decision?.items ?? []);
   if (items.some((i) => getDecisionTone(i.decision) === "review")) return "needs_review";
   if (data.decision_stale_warning || data.freshness?.refresh_recommended) return "stale";
