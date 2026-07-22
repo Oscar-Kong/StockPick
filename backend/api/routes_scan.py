@@ -17,6 +17,7 @@ from models.schemas import (
 from services.scan_manager import scan_manager
 from services.scan_pick_summary import generate_scan_pick_summary
 from utils.demo_guard import enforce_scan_options
+from utils.pydantic_util import json_safe
 
 router = APIRouter(prefix="/scan", tags=["scan"])
 
@@ -59,7 +60,11 @@ def get_latest_scan(bucket: Bucket):
             ),
             last_attempt_error=last_attempt_error,
         )
-    results = [StockResult(**r) for r in data.get("results", [])]
+    results = [
+        StockResult(**json_safe(r))
+        for r in data.get("results", [])
+        if isinstance(r, dict)
+    ]
     completed = data.get("completed_at")
     cache_age = cache_module.get_latest_scan_cache_age_seconds(bucket.value)
     return LatestScanResponse(
@@ -100,15 +105,25 @@ def get_scan_status(job_id: str):
     job = scan_manager.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+
+    def _safe_results(rows: list) -> list:
+        out: list[StockResult] = []
+        for r in rows or []:
+            if isinstance(r, StockResult):
+                out.append(StockResult(**json_safe(r.model_dump())))
+            elif isinstance(r, dict):
+                out.append(StockResult(**json_safe(r)))
+        return out
+
     return ScanStatusResponse(
         job_id=job.job_id,
         bucket=job.bucket,
         status=job.status,
         progress=job.progress,
         message=job.message if job.status != "failed" else (job.error or job.message),
-        results=job.results,
+        results=_safe_results(job.results),
         completed_at=job.completed_at,
-        parity_summary=job.parity_summary,
+        parity_summary=json_safe(job.parity_summary) if job.parity_summary else None,
         scoring_engine_used=job.scoring_engine_used,
-        timings=dict(job.timings) if job.timings else None,
+        timings=json_safe(dict(job.timings)) if job.timings else None,
     )

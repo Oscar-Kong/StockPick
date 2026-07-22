@@ -142,6 +142,8 @@ Primary data roles default to **finnhub** for quotes and **FMP** for fundamental
 
 **FMP 403 / blocked history:** if FMP returns HTTP 403 (common on free-tier keys), the backend trips a process-wide circuit breaker and falls back to **yfinance** for OHLC during scans and analyze. Install `yfinance` (`pip install yfinance`) — it is listed in `backend/requirements.txt`. Logs will show `FMP access denied (403) — disabling FMP for this process`. Restart the backend to retry FMP after fixing the key or tier.
 
+**Yahoo Stage A ops:** bulk `yfinance.download` honors `SCAN_PRICE_DOWNLOAD_MAX_SECONDS` (per-chunk timeout ~20s, stop on rate-limit). After a bulk pass (partial or empty), MarketDataClient **skips** per-symbol Yahoo→AkShare fallback so a throttled provider cannot wedge the sync API worker for minutes. Prefer Finnhub/AV when configured; keep `UNIVERSE_SCAN_BATCH_SIZE` bounded (default `100`).
+
 **Analyze OHLC freshness:** `PriceService.get_history()` now checks the **last bar date**, not only row count. Stale SQLite history triggers a provider fetch, merge, and persist. `GET /analyze/{symbol}?refresh=true` bypasses the analysis cache **and** forces a price-history refresh. The response includes `price_history_last_date`, `price_history_is_stale`, `price_history_refreshed_at`, and `price_history_bar_count`.
 
 **Portfolio live marks:** During regular and extended market hours, `PriceService.get_latest_price()`, **Refresh data** (`POST /home/refresh`), **Sync Robinhood**, and **Run daily decision** use Finnhub/AkShare live quotes (not only the last stored daily close). `refresh_prices_for_holdings` persists today's session bar from the live quote when available. Outside market hours, holdings still use the latest completed daily bar.

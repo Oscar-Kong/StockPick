@@ -181,7 +181,8 @@ class Cache:
         session = self._get_session()
         try:
             entry = session.get(CacheEntry, key) or CacheEntry(key=key)
-            entry.value = json.dumps(value)
+            # NumPy scalars (bool_/float64) appear in scan metrics and break json.dumps.
+            entry.value = json.dumps(json_safe(value))
             entry.cached_at = _utcnow()
             entry.ttl_seconds = ttl_seconds
             session.merge(entry)
@@ -400,8 +401,8 @@ def save_scan_snapshot(
         entry = SavedScanEntry(
             name=(name or "").strip() or f"{bucket.title()} scan {now.strftime('%Y-%m-%d %H:%M')}",
             bucket=bucket,
-            options_json=json.dumps(options or {}),
-            results_json=json.dumps(results or []),
+            options_json=json.dumps(json_safe(options or {})),
+            results_json=json.dumps(json_safe(results or [])),
             result_count=len(results or []),
             strategy_version=strategy_version,
             completed_at=completed_at,

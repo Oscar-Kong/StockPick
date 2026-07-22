@@ -77,3 +77,75 @@ def test_download_batch_prefers_yfinance_bulk():
 
     assert set(result.keys()) == {"AAA", "BBB"}
     batch_mock.assert_called_once()
+    kwargs = batch_mock.call_args.kwargs
+    assert kwargs.get("max_runtime_seconds") is not None
+
+
+def test_download_batch_skips_per_symbol_after_yf_bulk_hit():
+    """After a partial yfinance bulk pass, do not burn minutes on per-symbol fallback."""
+    dates = pd.date_range("2025-01-01", periods=30, freq="B")
+    yf_df = pd.DataFrame(
+        {
+            "date": dates,
+            "open": [5.0] * 30,
+            "high": [5.5] * 30,
+            "low": [4.5] * 30,
+            "close": [5.2] * 30,
+            "volume": [500_000] * 30,
+        }
+    )
+    market = MarketDataClient(cache=MagicMock(get_price_cache=MagicMock(return_value=None)))
+    with (
+        patch(
+            "data.market_data_client.yf_client.download_batch",
+            return_value={"AAA": yf_df},
+        ),
+        patch.object(market, "get_history") as get_history,
+    ):
+        result = market.download_batch(
+            ["AAA", "BBB", "CCC"],
+            period="6mo",
+            max_runtime_seconds=30,
+        )
+    assert set(result.keys()) == {"AAA"}
+    get_history.assert_not_called()
+
+
+def test_download_batch_skips_per_symbol_when_yf_bulk_empty():
+    """Rate-limited / empty bulk must not fall into Yahoo→AkShare per-symbol hammering."""
+    market = MarketDataClient(cache=MagicMock(get_price_cache=MagicMock(return_value=None)))
+    with (
+        patch("data.market_data_client.yf_client.download_batch", return_value={}),
+        patch.object(market, "get_history") as get_history,
+    ):
+        result = market.download_batch(
+            ["AAA", "BBB"],
+            period="6mo",
+            max_runtime_seconds=30,
+            use_alpha_vantage_fallback=False,
+            alpha_vantage_probe_symbols=0,
+        )
+    assert result == {}
+    get_history.assert_not_called()
+
+
+def test_yfinance_batch_stops_on_rate_limit():
+    import time
+
+    import data.yfinance_client as yf_mod
+
+    calls = {"n": 0}
+
+    def fake_download(*args, **kwargs):
+        calls["n"] += 1
+        time.sleep(0.02)
+        raise RuntimeError("Too Many Requests. Rate limited. Try after a while.")
+
+    with patch.object(yf_mod, "_import_yfinance", return_value=MagicMock(download=fake_download)):
+        out = yf_mod.download_batch(
+            [f"S{i}" for i in range(80)],
+            period="6mo",
+            max_runtime_seconds=5,
+        )
+    assert out == {}
+    assert calls["n"] == 1

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 import pandas as pd
@@ -30,6 +31,11 @@ def _import_yfinance():
         return None
 
 
+def _is_rate_limit_error(exc: BaseException) -> bool:
+    text = str(exc).lower()
+    return "too many requests" in text or "rate limit" in text or "ratelimit" in text
+
+
 def get_history(symbol: str, period: str = "1y") -> pd.DataFrame:
     yf = _import_yfinance()
     if yf is None:
@@ -44,8 +50,17 @@ def get_history(symbol: str, period: str = "1y") -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def download_batch(symbols: list[str], period: str = "6mo") -> dict[str, pd.DataFrame]:
-    """Batch OHLC via yfinance.download — much faster than per-symbol API calls."""
+def download_batch(
+    symbols: list[str],
+    period: str = "6mo",
+    *,
+    max_runtime_seconds: float | None = None,
+) -> dict[str, pd.DataFrame]:
+    """Batch OHLC via yfinance.download — much faster than per-symbol API calls.
+
+    Honors ``max_runtime_seconds`` and stops early on rate-limit errors so Stage A
+    cannot hang indefinitely when Yahoo throttles.
+    """
     yf = _import_yfinance()
     if yf is None or not symbols:
         return {}
@@ -53,20 +68,52 @@ def download_batch(symbols: list[str], period: str = "6mo") -> dict[str, pd.Data
     yf_period = _PERIOD_TO_YF.get(period, period)
     result: dict[str, pd.DataFrame] = {}
     chunk_size = 40
+    started = time.monotonic()
     for i in range(0, len(unique), chunk_size):
+        if max_runtime_seconds and max_runtime_seconds > 0:
+            if (time.monotonic() - started) >= float(max_runtime_seconds):
+                logger.warning(
+                    "yfinance batch hit runtime cap (%.0fs) after %s/%s symbols",
+                    float(max_runtime_seconds),
+                    len(result),
+                    len(unique),
+                )
+                break
         chunk = unique[i : i + chunk_size]
         tickers = " ".join(chunk)
         try:
-            raw = yf.download(
-                tickers,
-                period=yf_period,
-                group_by="ticker",
-                auto_adjust=True,
-                threads=True,
-                progress=False,
-            )
+            # Hard-cap each Yahoo chunk so Stage A cannot wedge the sync API worker.
+            chunk_timeout = 20.0
+            if max_runtime_seconds and max_runtime_seconds > 0:
+                remaining = float(max_runtime_seconds) - (time.monotonic() - started)
+                chunk_timeout = min(chunk_timeout, max(3.0, remaining))
+            from concurrent.futures import ThreadPoolExecutor
+            from concurrent.futures import TimeoutError as FuturesTimeout
+
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                fut = pool.submit(
+                    yf.download,
+                    tickers,
+                    period=yf_period,
+                    group_by="ticker",
+                    auto_adjust=True,
+                    threads=True,
+                    progress=False,
+                )
+                try:
+                    raw = fut.result(timeout=chunk_timeout)
+                except FuturesTimeout:
+                    logger.warning(
+                        "yfinance batch chunk timed out after %.0fs (%s symbols)",
+                        chunk_timeout,
+                        len(chunk),
+                    )
+                    break
         except Exception as exc:
             logger.warning("yfinance batch download failed: %s", exc)
+            if _is_rate_limit_error(exc):
+                logger.warning("yfinance rate-limited — stopping remaining batch chunks")
+                break
             continue
         if raw is None or raw.empty:
             continue

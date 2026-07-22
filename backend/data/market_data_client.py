@@ -321,18 +321,41 @@ class MarketDataClient:
         # Fast path: bulk yfinance when FMP is blocked or not the primary price source.
         use_yf_bulk = PRIMARY_PRICE_SOURCE != "fmp" or FMPClient.is_disabled()
         if use_yf_bulk and missing:
-            yf_batch = yf_client.download_batch(missing, period=period)
+            remaining = max_runtime_seconds
+            if max_runtime_seconds > 0:
+                remaining = max(1, int(max_runtime_seconds - (time.time() - start)))
+            yf_batch = yf_client.download_batch(
+                missing,
+                period=period,
+                max_runtime_seconds=remaining if max_runtime_seconds > 0 else None,
+            )
             for sym, df in yf_batch.items():
                 if not df.empty:
                     result[sym] = df
             missing = [s for s in missing if s not in result]
-            if result:
-                logger.info(
-                    "Batch history: yfinance returned %s/%s symbols (%s)",
-                    len(result),
+            if use_yf_bulk:
+                if result:
+                    logger.info(
+                        "Batch history: yfinance returned %s/%s symbols (%s)",
+                        len(result),
+                        len(unique),
+                        period,
+                    )
+                    # Avoid per-symbol Yahoo/AkShare hammering after a bulk pass — that path
+                    # re-triggers rate limits and can wedge the sync API worker for minutes.
+                    if missing:
+                        logger.warning(
+                            "Batch history: skipping per-symbol fallback for %s symbols after yfinance bulk",
+                            len(missing),
+                        )
+                    return result
+                # Bulk returned nothing (rate-limit / DNS). Do not spend the remaining
+                # budget on per-symbol Yahoo→AkShare→AV — that path wedges Stage A.
+                logger.warning(
+                    "Batch history: yfinance bulk returned 0/%s symbols; skipping per-symbol fallback",
                     len(unique),
-                    period,
                 )
+                missing = []
 
         batch_size = max(1, chunk_size)
         for i in range(0, len(missing), batch_size):
