@@ -1,12 +1,18 @@
 """Analysis API — watchlist matrix, symbol deep-dive, compare."""
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 
-from config import ANALYZE_ROUTE_TIMEOUT_SECONDS, COMPARE_ROUTE_TIMEOUT_SECONDS, REPORT_ROUTE_TIMEOUT_SECONDS
+from config import (
+    ANALYZE_ROUTE_TIMEOUT_SECONDS,
+    COMPARE_ROUTE_TIMEOUT_SECONDS,
+    REPORT_ROUTE_TIMEOUT_SECONDS,
+)
 from buckets import parse_bucket_query
 from models.schemas import (
     AnalyzeCompareResponse,
+    AnalyzeCoreResponse,
+    AnalyzeSnapshotResponse,
     AnalyzeSymbolResponse,
     AnalyzeTimeSeriesDiagnosticsResponse,
     AnalyzeWatchlistResponse,
@@ -17,8 +23,10 @@ from services.analyze_service import (
     build_symbol_analysis,
     build_watchlist_matrix,
     get_cached_symbol_analysis,
+    get_cached_watchlist_matrix,
     score_all_buckets,
 )
+from services.analysis_context import build_analysis_snapshot, build_core_analysis
 from data import cache as cache_module
 from utils.demo_guard import enforce_compare_symbols
 
@@ -31,9 +39,30 @@ def _run_with_timeout(fn, *args, timeout_seconds: float, **kwargs):
     return future.result(timeout=max(1.0, timeout_seconds))
 
 
+def _apply_server_timing(response: Response, timings: dict | None) -> None:
+    if not timings:
+        return
+    parts = [f"{k};dur={float(v):.1f}" for k, v in timings.items()]
+    if parts:
+        response.headers["Server-Timing"] = ", ".join(parts)
+
+
 @router.get("/watchlist", response_model=AnalyzeWatchlistResponse)
-def analyze_watchlist():
-    rows = build_watchlist_matrix()
+def analyze_watchlist(
+    refresh: bool = Query(False, description="Bypass watchlist matrix cache"),
+):
+    try:
+        rows = _run_with_timeout(
+            build_watchlist_matrix,
+            timeout_seconds=ANALYZE_ROUTE_TIMEOUT_SECONDS,
+            force_refresh=refresh,
+        )
+    except FuturesTimeout as exc:
+        cached = get_cached_watchlist_matrix()
+        if cached is not None:
+            rows = cached
+        else:
+            raise HTTPException(status_code=504, detail="Watchlist matrix timed out") from exc
     alert_total = sum(r.get("alert_count", 0) for r in rows)
     return AnalyzeWatchlistResponse(rows=rows, alert_total=alert_total)
 
@@ -62,6 +91,68 @@ def analyze_symbol_bucket_fit(symbol: str):
         return _run_with_timeout(score_all_buckets, sym, timeout_seconds=ANALYZE_ROUTE_TIMEOUT_SECONDS)
     except FuturesTimeout as exc:
         raise HTTPException(status_code=504, detail="Bucket fit timed out") from exc
+
+
+@router.get("/{symbol}/snapshot", response_model=AnalyzeSnapshotResponse)
+def analyze_symbol_snapshot(
+    response: Response,
+    symbol: str,
+    bucket: str | None = Query(None, description="penny | compounder (legacy medium → penny)"),
+):
+    """Cached-first analysis paint — no full recompute."""
+    sym = symbol.upper()
+    if sym == "COMPARE":
+        raise HTTPException(status_code=404, detail="Invalid symbol")
+    selected_bucket = Bucket(parse_bucket_query(bucket))
+    data = build_analysis_snapshot(sym, selected_bucket.value)
+    _apply_server_timing(response, data.get("timings_ms"))
+    return AnalyzeSnapshotResponse(**data)
+
+
+@router.get("/{symbol}/core", response_model=AnalyzeCoreResponse)
+def analyze_symbol_core(
+    response: Response,
+    symbol: str,
+    bucket: str | None = Query(None, description="penny | compounder (legacy medium → penny)"),
+    refresh: bool = Query(False, description="Bypass in-memory core cache"),
+    include_bucket_fit: bool = Query(False, description="Also score both sleeves"),
+):
+    """Shared-context core analysis: base + v2 from one enrich pipeline."""
+    sym = symbol.upper()
+    if sym == "COMPARE":
+        raise HTTPException(status_code=404, detail="Invalid symbol")
+    selected_bucket = Bucket(parse_bucket_query(bucket))
+    try:
+        data = _run_with_timeout(
+            lambda: build_core_analysis(
+                sym,
+                selected_bucket.value,
+                force_refresh=refresh,
+                timeout_seconds=ANALYZE_ROUTE_TIMEOUT_SECONDS,
+                include_bucket_fit=include_bucket_fit,
+            ),
+            timeout_seconds=ANALYZE_ROUTE_TIMEOUT_SECONDS,
+        )
+    except FuturesTimeout as exc:
+        snap = build_analysis_snapshot(sym, selected_bucket.value)
+        if snap.get("base"):
+            _apply_server_timing(response, snap.get("timings_ms"))
+            return AnalyzeCoreResponse(
+                symbol=sym,
+                sleeve=selected_bucket.value,
+                base=snap.get("base"),
+                v2=snap.get("v2"),
+                trade_plan=snap.get("trade_plan"),
+                delta=snap.get("delta"),
+                freshness={**(snap.get("freshness") or {}), "status": "stale_timeout"},
+                timings_ms=snap.get("timings_ms") or {},
+            )
+        raise HTTPException(status_code=504, detail="Core analysis timed out") from exc
+
+    if data.get("error"):
+        raise HTTPException(status_code=404, detail=data["error"])
+    _apply_server_timing(response, data.get("timings_ms"))
+    return AnalyzeCoreResponse(**data)
 
 
 @router.get("/{symbol}/diagnostics", response_model=AnalyzeTimeSeriesDiagnosticsResponse)

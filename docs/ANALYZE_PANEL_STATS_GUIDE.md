@@ -1,10 +1,10 @@
 # Analyze Panel — Stats & Metrics Guide
 
-**Where:** Research (`/workspace`) → select a symbol → **Analyze** tab.
+**Where:** Research (`/workspace`) → select a symbol.
 
-This guide explains **every number, badge, and tab** in the Analyze panel: what it measures, how to read it, and what it does *not* mean.
+This guide explains **every number, badge, and section** in the Analyze panel: what it measures, how to read it, and what it does *not* mean.
 
-For workflow (“when to use which tab”), see [ANALYZE_PANEL.md](ANALYZE_PANEL.md). For Quant Lab validation (factor IC, walk-forward), see [QUANT_LAB.md](QUANT_LAB.md).
+For workflow (“when to use which section”), see [ANALYZE_PANEL.md](ANALYZE_PANEL.md). For Quant Lab validation (factor IC, walk-forward), see [QUANT_LAB.md](QUANT_LAB.md).
 
 ---
 
@@ -12,20 +12,22 @@ For workflow (“when to use which tab”), see [ANALYZE_PANEL.md](ANALYZE_PANEL
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  TOOLBAR: price · sleeve · score · source · risk · tabs     │
+│  TOOLBAR: price · sleeve · score · source · risk · sections │
 ├─────────────────────────────────────────────────────────────┤
-│  META: data quality badge · alerts                          │
+│  META: data quality badge · alerts · freshness              │
 ├──────────────────────────────┬──────────────────────────────┤
-│  MAIN TAB (left)             │  SIDEBAR (right, desktop)    │
-│  Overview / Score / Risk …   │  Technicals, bucket fit,     │
-│                              │  signals, fundamentals       │
+│  MAIN (left)                 │  SIDEBAR (right, desktop)    │
+│  Overview / Drivers / Risk / │  Technicals, bucket fit,     │
+│  Evidence / Research         │  signals, fundamentals       │
 └──────────────────────────────┴──────────────────────────────┘
 ```
 
 - **Toolbar** — headline identity: price, sleeve, score, risk, score engine badge.
-- **Meta row** — data trust and event warnings before you read details.
-- **Main tabs** — deep dives (factors, risk math, backtest, report).
-- **Sidebar** — same key stats on every tab (technicals, bucket fit, signal weights).
+- **Meta row** — data trust, event warnings, and cache freshness before you read details.
+- **Five sections** — Overview (decision brief), Drivers, Risk, Evidence, Research.
+- **Sidebar** — same key stats on every section (technicals, bucket fit, signal weights).
+
+**Loading:** snapshot (cached) paints first; `/analyze/{symbol}/core` refreshes base + v2 from one shared enrich. The watchlist rail never blocks symbol analysis.
 
 **Refresh** re-runs scoring with current market data. **Language switch** only translates labels; it does not re-score (see [USER_GUIDE.md](USER_GUIDE.md) §8).
 

@@ -10,10 +10,13 @@ How to read and use **Workspace → Research** (single-stock underwriting). This
 
 After you **scan** and add names to your **watchlist**, Analyze answers:
 
-- Which **holding-period model** fits (days vs weeks vs years)?
+- **What should I do?** (Buy / Watch / Avoid / Hold / Reduce) with confidence and horizon
 - How attractive is the setup on a **0–100 composite**?
+- What is the **trade plan** (stop, targets, size) and what would **invalidate** it?
 - Are **technicals, fundamentals, and data** strong enough to size a position?
-- What **event risks** (earnings, valuation, filings) should change timing?
+- What **evidence** (similar signals, diagnostics) supports the call?
+
+Workspace loads the watchlist rail independently of symbol analysis. Opening a ticker uses a **cached snapshot** first, then refreshes via `/analyze/{symbol}/core` (one shared enrich for base + v2).
 
 ---
 
@@ -21,14 +24,28 @@ After you **scan** and add names to your **watchlist**, Analyze answers:
 
 | Sleeve | Typical hold | What you are hunting |
 |--------|--------------|----------------------|
-| **Penny** | ~3–10 days | Short momentum, volume, tradable volatility |
+| **Penny** | ~3–10 days (often T+1–T+3) | Short momentum, volume, tradable volatility |
 | **Compounder** | Years | Quality growth, margins, smooth long trend, macro fit |
 
 **Assigned sleeve** — the score and summary use one model (penny or compounder unless the watchlist tags another).
 
-**Bucket fit (two tiles)** — same stock scored under both sleeves; use when the name sits between styles.
+**Bucket fit (two tiles)** — same stock scored under both sleeves; loaded lazily in the insights rail when dual-sleeve comparison is useful.
 
 **Outside typical filters** — still shows a score, but the summary warns the name **fails** that sleeve’s normal universe rules.
+
+---
+
+## Sections (five)
+
+| Section | Contents |
+|---------|----------|
+| **Overview** | Decision header, trade plan, chart, thesis/invalidation, top drivers, similar-signal strip, change vs last analysis |
+| **Drivers** | Full factor attribution, score breakdown, valuation, earnings setup |
+| **Risk** | Unified risk, sizing, portfolio impact |
+| **Evidence** | Similar signals, diagnostics, backtest |
+| **Research** | AI report, notes |
+
+Legacy nine-tab deep-links map into these five sections.
 
 ---
 
@@ -40,14 +57,15 @@ After you **scan** and add names to your **watchlist**, Analyze answers:
 | **Sleeve** | Active holding-period model |
 | **Score (0–100)** | Composite attractiveness for that sleeve (not a return forecast) |
 | **Risk** | Sizing/diligence hint (penny often high; compounder maps score to low/med/high) |
+| **Freshness** | Cached / refreshing / fresh (snapshot-first loading) |
 
-**Refresh** — re-score with today’s market and data.
+**Refresh** — re-score with today’s market and data (bypasses core cache).
 
 ---
 
 ## How the composite score is built
 
-1. **Factors (0–100 each)** — momentum, technicals, sentiment, fundamentals, etc. (see Quant tab).
+1. **Factors (0–100 each)** — momentum, technicals, sentiment, fundamentals, etc. (see Drivers).
 2. **Weighted blend** — each factor has an importance %; bars show **contribution**.
 3. **Regime adjustment** — SPY volatility and sector strength nudge the score.
 4. **Data trust** — disagreement across data vendors reduces the score.
@@ -103,19 +121,15 @@ The **headline score** can differ slightly from the sum of bars because steps 3�
 
 ## Views (when to use each)
 
-Current Analyze tabs (grouped **Core / Research / Workspace** in the toolbar; each tab shows a one-line hint):
+Current Analyze tabs (static flat underline row — Overview · Drivers · Risk · Evidence · Research; not scrollable; hover/title shows a one-line hint):
 
 | Tab | Use for |
 |-----|---------|
-| **Overview** | Price chart (left), v2 recommendation + position sizing (right) |
-| **Score breakdown** | Factor table + contribution bars — which inputs drove the score |
-| **Risk** | Volatility, liquidity, macro, event risk, risk index |
-| **Diagnostics** | Return distribution stats (momentum vs mean reversion vs noise) |
-| **Valuation** | DCF / peer fair value, margin of safety, sensitivity grid |
-| **Backtest** | Historical rule-based strategy test (not a forecast) |
-| **Similar signal** | Research-only historical analogs |
-| **Report** | LLM structured memo; save to Library |
-| **Notes** | Your watchlist notes |
+| **Overview** | Full-width chart; decision + trade plan beside position sizing; drivers / execution / delta full-width below (aligned card edges) |
+| **Drivers** | Factor table + contribution bars — which inputs drove the score |
+| **Risk** | Volatility, liquidity, macro, event risk, risk index, position sizing |
+| **Evidence** | Similar signals, diagnostics, backtest |
+| **Research** | LLM structured memo + notes; save to Library |
 
 **Navigation:** ← / → (or `[` / `]`) moves through the watchlist without leaving Analyze.
 

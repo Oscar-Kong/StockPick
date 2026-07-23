@@ -25,7 +25,14 @@ router = APIRouter(prefix="/api/v2", tags=["quant-v2"])
 def get_v2_score(
     symbol: str,
     sleeve: Bucket | None = Query(None, description="penny | compounder"),
-    validate_parity: bool = Query(True, description="Compare to legacy analyze score"),
+    validate_parity: bool = Query(
+        False,
+        description="Compare to legacy analyze score (off by default for interactive UI; enable for CI/shadow)",
+    ),
+    persist_snapshot: bool = Query(
+        False,
+        description="Persist prediction snapshot (off by default for page views; enable for evaluation jobs)",
+    ),
     x_strategy_version: str | None = Header(None, alias="X-Strategy-Version"),
     x_factor_model_version: str | None = Header(None, alias="X-Factor-Model-Version"),
 ):
@@ -38,7 +45,12 @@ def get_v2_score(
         factor_model_version=x_factor_model_version,
     )
     sleeve_val = sleeve.value if sleeve else DEFAULT_BUCKET
-    result = build_v2_score(symbol, sleeve_val, validate_parity=validate_parity)
+    result = build_v2_score(
+        symbol,
+        sleeve_val,
+        validate_parity=validate_parity,
+        persist_snapshot=persist_snapshot,
+    )
     if isinstance(result, dict) and result.get("error"):
         raise HTTPException(status_code=404, detail=result["error"])
     return result

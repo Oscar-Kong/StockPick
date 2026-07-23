@@ -56,13 +56,13 @@ export function RecommendationBlock({ data }: { data: RecommendationV2 }) {
             value: data.data_confidence.data_confidence.toFixed(0),
           })}
         </p>
-        {data.data_confidence.issues.slice(0, 3).map((issue) => (
-          <p key={issue} className="text-amber-200/80">
+        {data.data_confidence.issues.slice(0, 3).map((issue, idx) => (
+          <p key={`issue-${idx}-${issue}`} className="text-amber-200/80">
             • {issue}
           </p>
         ))}
-        {data.gates.map((g) => (
-          <p key={g} className="text-amber-300">
+        {data.gates.map((g, idx) => (
+          <p key={`gate-${idx}-${g}`} className="text-amber-300">
             {t.quant.gate} {g}
           </p>
         ))}

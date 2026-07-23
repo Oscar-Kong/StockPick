@@ -20,6 +20,8 @@ _PERIOD_TO_YF: dict[str, str] = {
     "5y": "5y",
 }
 
+_MIN_CHUNK_TIMEOUT = 0.5
+
 
 def _import_yfinance():
     try:
@@ -51,15 +53,70 @@ def _yf_download_chunk(tickers: str, yf_period: str) -> Any:
     )
 
 
-def get_history(symbol: str, period: str = "1y") -> pd.DataFrame:
+def _yf_history_worker(symbol: str, yf_period: str) -> Any:
+    """Top-level worker for process-isolated single-symbol history."""
     yf = _import_yfinance()
     if yf is None:
+        return None
+    return yf.Ticker(symbol).history(period=yf_period, auto_adjust=True)
+
+
+def _yf_info_worker(symbol: str) -> dict[str, Any]:
+    """Top-level worker for process-isolated Ticker.info (must be picklable)."""
+    yf = _import_yfinance()
+    if yf is None:
+        return {}
+    info = yf.Ticker(symbol).info or {}
+    return {
+        "symbol": symbol,
+        "shortName": info.get("shortName") or info.get("longName") or "",
+        "sector": info.get("sector", ""),
+        "industry": info.get("industry", ""),
+        "marketCap": info.get("marketCap"),
+        "currentPrice": info.get("currentPrice") or info.get("regularMarketPrice"),
+        "averageVolume": info.get("averageVolume"),
+        "beta": info.get("beta"),
+        "trailingPE": info.get("trailingPE"),
+        "profitMargins": info.get("profitMargins"),
+        "revenueGrowth": info.get("revenueGrowth"),
+        "earningsGrowth": info.get("earningsGrowth"),
+        "debtToEquity": info.get("debtToEquity"),
+        "returnOnEquity": info.get("returnOnEquity"),
+        "freeCashflow": info.get("freeCashflow"),
+        "totalRevenue": info.get("totalRevenue"),
+        "fiftyTwoWeekHigh": info.get("fiftyTwoWeekHigh"),
+        "fiftyTwoWeekLow": info.get("fiftyTwoWeekLow"),
+        "source": "yfinance",
+    }
+
+
+def _info_timeout_seconds() -> float:
+    try:
+        from config import YFINANCE_INFO_TIMEOUT_SECONDS
+
+        return max(0.5, float(YFINANCE_INFO_TIMEOUT_SECONDS))
+    except Exception:
+        return 8.0
+
+
+def get_history(symbol: str, period: str = "1y") -> pd.DataFrame:
+    if _import_yfinance() is None:
         return pd.DataFrame()
     sym = symbol.upper()
     yf_period = _PERIOD_TO_YF.get(period, period)
     try:
-        hist = yf.Ticker(sym).history(period=yf_period, auto_adjust=True)
+        from utils.process_timeout import run_with_process_timeout
+
+        hist = run_with_process_timeout(
+            _yf_history_worker,
+            sym,
+            yf_period,
+            timeout=_info_timeout_seconds(),
+        )
         return _normalize(hist)
+    except TimeoutError:
+        logger.warning("yfinance history timed out for %s", sym)
+        return pd.DataFrame()
     except Exception as exc:
         logger.warning("yfinance history failed for %s: %s", sym, exc)
         return pd.DataFrame()
@@ -73,36 +130,43 @@ def download_batch(
 ) -> dict[str, pd.DataFrame]:
     """Batch OHLC via yfinance.download — much faster than per-symbol API calls.
 
-    Honors ``max_runtime_seconds`` and stops early on rate-limit errors so Stage A
-    cannot hang indefinitely when Yahoo throttles.
+    Honors ``max_runtime_seconds`` as a hard monotonic deadline and stops early on
+    rate-limit errors so Stage A cannot hang indefinitely when Yahoo throttles.
     """
-    yf = _import_yfinance()
-    if yf is None or not symbols:
+    if _import_yfinance() is None or not symbols:
         return {}
     unique = list(dict.fromkeys(s.upper() for s in symbols if s))
     yf_period = _PERIOD_TO_YF.get(period, period)
     result: dict[str, pd.DataFrame] = {}
     chunk_size = 40
-    started = time.monotonic()
+    deadline: float | None = None
+    if max_runtime_seconds and max_runtime_seconds > 0:
+        deadline = time.monotonic() + float(max_runtime_seconds)
+
     for i in range(0, len(unique), chunk_size):
-        if max_runtime_seconds and max_runtime_seconds > 0:
-            if (time.monotonic() - started) >= float(max_runtime_seconds):
+        if deadline is not None:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
                 logger.warning(
-                    "yfinance batch hit runtime cap (%.0fs) after %s/%s symbols",
-                    float(max_runtime_seconds),
+                    "yfinance batch hit runtime deadline after %s/%s symbols",
                     len(result),
                     len(unique),
                 )
                 break
+        else:
+            remaining = 20.0
+
         chunk = unique[i : i + chunk_size]
         tickers = " ".join(chunk)
+        # Never extend past the deadline with a minimum floor.
+        chunk_timeout = min(20.0, remaining) if deadline is not None else 20.0
+        if chunk_timeout < _MIN_CHUNK_TIMEOUT:
+            logger.warning(
+                "yfinance batch skipped remaining chunks — only %.2fs left of deadline",
+                chunk_timeout,
+            )
+            break
         try:
-            # Hard-cap each Yahoo chunk in a disposable process so a hung download
-            # cannot wedge Stage A (thread timeouts cannot kill running work).
-            chunk_timeout = 20.0
-            if max_runtime_seconds and max_runtime_seconds > 0:
-                remaining = float(max_runtime_seconds) - (time.monotonic() - started)
-                chunk_timeout = min(chunk_timeout, max(3.0, remaining))
             from utils.process_timeout import run_with_process_timeout
 
             raw = run_with_process_timeout(
@@ -145,36 +209,24 @@ def download_batch(
 
 
 def get_info(symbol: str) -> dict[str, Any]:
-    yf = _import_yfinance()
-    if yf is None:
+    if _import_yfinance() is None:
         return {}
     sym = symbol.upper()
     try:
-        info = yf.Ticker(sym).info or {}
+        from utils.process_timeout import run_with_process_timeout
+
+        info = run_with_process_timeout(
+            _yf_info_worker,
+            sym,
+            timeout=_info_timeout_seconds(),
+        )
+        return info if isinstance(info, dict) else {}
+    except TimeoutError:
+        logger.warning("yfinance info timed out for %s", sym)
+        return {}
     except Exception as exc:
         logger.warning("yfinance info failed for %s: %s", sym, exc)
         return {}
-    return {
-        "symbol": sym,
-        "shortName": info.get("shortName") or info.get("longName") or "",
-        "sector": info.get("sector", ""),
-        "industry": info.get("industry", ""),
-        "marketCap": info.get("marketCap"),
-        "currentPrice": info.get("currentPrice") or info.get("regularMarketPrice"),
-        "averageVolume": info.get("averageVolume"),
-        "beta": info.get("beta"),
-        "trailingPE": info.get("trailingPE"),
-        "profitMargins": info.get("profitMargins"),
-        "revenueGrowth": info.get("revenueGrowth"),
-        "earningsGrowth": info.get("earningsGrowth"),
-        "debtToEquity": info.get("debtToEquity"),
-        "returnOnEquity": info.get("returnOnEquity"),
-        "freeCashflow": info.get("freeCashflow"),
-        "totalRevenue": info.get("totalRevenue"),
-        "fiftyTwoWeekHigh": info.get("fiftyTwoWeekHigh"),
-        "fiftyTwoWeekLow": info.get("fiftyTwoWeekLow"),
-        "source": "yfinance",
-    }
 
 
 def _normalize(hist: pd.DataFrame) -> pd.DataFrame:

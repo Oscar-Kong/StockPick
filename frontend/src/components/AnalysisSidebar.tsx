@@ -146,8 +146,6 @@ export function AnalysisSidebar({
 
   return (
     <div className="analysis-sidebar space-y-2 p-3">
-      <p className="analysis-sidebar__hint">{t.analysis.sidebarInsightsHint}</p>
-
       <SidebarSection title={t.analysis.technicals}>
         <div className="stat-tile-grid grid grid-cols-2 gap-1.5">
           <StatCell label={t.analysis.trend} value={tech.trend_score ?? "—"} />

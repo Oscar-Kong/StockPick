@@ -5,7 +5,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 function hasChartDimensions(el: HTMLElement): boolean {
   const { width, height } = el.getBoundingClientRect();
-  return width > 0 && height > 0;
+  // Require >1px — Recharts logs when ResponsiveContainer measures width/height as -1/0.
+  return width > 1 && height > 1;
 }
 
 export function ChartMount({
@@ -49,7 +50,7 @@ export function ChartMount({
   }, []);
 
   return (
-    <div ref={ref} className={className} style={{ minWidth: 0, minHeight: 0 }}>
+    <div ref={ref} className={className} style={{ minWidth: 0 }}>
       {ready ? children : null}
     </div>
   );

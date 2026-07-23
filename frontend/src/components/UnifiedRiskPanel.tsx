@@ -102,8 +102,8 @@ export function UnifiedRiskPanel({ data, loading, error, onRetry }: UnifiedRiskP
             <div>
               <h4 className="label-caps mb-1">{t.riskPanel.macro}</h4>
               <ul className="list-inside list-disc text-zinc-400">
-                {data.macro.map((line) => (
-                  <li key={line}>{line}</li>
+                {data.macro.map((line, idx) => (
+                  <li key={`macro-${idx}`}>{line}</li>
                 ))}
               </ul>
             </div>
@@ -113,14 +113,14 @@ export function UnifiedRiskPanel({ data, loading, error, onRetry }: UnifiedRiskP
             <h4 className="label-caps mb-1">{t.riskPanel.liquidityRisk}</h4>
             {liquidity.length > 0 ? (
               <ul className="list-inside list-disc text-zinc-400">
-                {liquidity.map((line) => (
-                  <li key={line}>{line}</li>
+                {liquidity.map((line, idx) => (
+                  <li key={`liq-${idx}`}>{line}</li>
                 ))}
               </ul>
             ) : data.company.length > 0 ? (
               <ul className="list-inside list-disc text-zinc-400">
-                {data.company.slice(0, 3).map((line) => (
-                  <li key={line}>{line}</li>
+                {data.company.slice(0, 3).map((line, idx) => (
+                  <li key={`co-${idx}`}>{line}</li>
                 ))}
               </ul>
             ) : (
@@ -132,8 +132,8 @@ export function UnifiedRiskPanel({ data, loading, error, onRetry }: UnifiedRiskP
             <h4 className="label-caps mb-1">{t.riskPanel.eventRisk}</h4>
             {data.events.length > 0 ? (
               <ul className="list-inside list-disc text-zinc-400">
-                {data.events.map((line) => (
-                  <li key={line}>{line}</li>
+                {data.events.map((line, idx) => (
+                  <li key={`evt-${idx}`}>{line}</li>
                 ))}
               </ul>
             ) : (

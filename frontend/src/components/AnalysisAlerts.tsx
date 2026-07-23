@@ -1,13 +1,13 @@
-// Renders analysis alert pills and severity labels for a selected symbol.
+// Compact inline alert chips for analysis warnings (severity + type).
 "use client";
 
 import { useTranslation } from "@/lib/i18n";
 import type { AnalyzeAlert } from "@/lib/types";
 
 const SEVERITY_STYLES: Record<string, string> = {
-  high: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300",
-  medium: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
-  low: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
+  high: "border-red-800/60 bg-red-950/40 text-red-300",
+  medium: "border-amber-800/50 bg-amber-950/35 text-amber-200",
+  low: "border-zinc-700/80 bg-zinc-900/60 text-zinc-300",
 };
 
 export function AnalysisAlerts({ alerts }: { alerts: AnalyzeAlert[] }) {
@@ -18,15 +18,14 @@ export function AnalysisAlerts({ alerts }: { alerts: AnalyzeAlert[] }) {
   }
 
   return (
-    <ul className="space-y-2">
+    <ul className="analysis-alerts" role="list">
       {alerts.map((a, i) => (
         <li
           key={`${a.type}-${i}`}
-          className={`rounded-md px-2 py-1.5 text-xs ${SEVERITY_STYLES[a.severity] ?? SEVERITY_STYLES.low}`}
+          className={`analysis-alert-chip ${SEVERITY_STYLES[a.severity] ?? SEVERITY_STYLES.low}`}
         >
-          <span className="font-medium capitalize">{a.type.replace("_", " ")}</span>
-          {" — "}
-          {a.message}
+          <span className="analysis-alert-chip__type">{a.type.replace("_", " ")}</span>
+          <span className="analysis-alert-chip__msg">{a.message}</span>
         </li>
       ))}
     </ul>

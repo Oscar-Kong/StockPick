@@ -12,7 +12,7 @@ from data.cache import Cache
 from data.price_service import PERIOD_LIMIT, PriceService, _rows_to_dataframe
 from data.candidate_builder import _load_cached_fundamentals
 from data.reconciler import DataReconciler
-from config import ANALYZE_RESULT_TTL
+from config import ANALYZE_RESULT_TTL, WATCHLIST_MATRIX_TTL
 from models.schemas import Bucket, ScanOptions
 from scoring.technical import (
     breakout_score,
@@ -33,6 +33,8 @@ _SCREENERS = {
     Bucket.compounder: CompounderScreener,
 }
 
+_WATCHLIST_MATRIX_CACHE_KEY = "analyze:watchlist:matrix"
+
 
 def _analysis_cache_key(symbol: str, bucket: Bucket) -> str:
     return f"analyze:{symbol.upper()}:{bucket.value}"
@@ -40,6 +42,33 @@ def _analysis_cache_key(symbol: str, bucket: Bucket) -> str:
 
 def get_cached_symbol_analysis(symbol: str, bucket: Bucket) -> dict[str, Any] | None:
     return Cache().get(_analysis_cache_key(symbol, bucket))
+
+
+def get_cached_watchlist_matrix() -> list[dict[str, Any]] | None:
+    cached = Cache().get(_WATCHLIST_MATRIX_CACHE_KEY)
+    if isinstance(cached, list):
+        return cached
+    if isinstance(cached, dict) and isinstance(cached.get("rows"), list):
+        return cached["rows"]
+    return None
+
+
+def invalidate_watchlist_matrix_cache() -> None:
+    session = Cache()._get_session()
+    try:
+        from data.cache import CacheEntry
+
+        entry = session.get(CacheEntry, _WATCHLIST_MATRIX_CACHE_KEY)
+        if entry:
+            session.delete(entry)
+            session.commit()
+    except Exception:
+        pass
+    finally:
+        try:
+            session.close()
+        except Exception:
+            pass
 
 
 def _quick_technicals_from_hist(
@@ -62,17 +91,24 @@ def _quick_technicals_from_hist(
     }
 
 
-def _quick_technicals(symbol: str, ps: PriceService, *, db_only: bool = False) -> dict[str, Any]:
+def _quick_technicals(
+    symbol: str,
+    ps: PriceService,
+    *,
+    db_only: bool = False,
+    spy: pd.DataFrame | None = None,
+) -> dict[str, Any]:
     if db_only:
         rows = ps.store.get_quotes(symbol.upper(), limit=PERIOD_LIMIT.get("1y", 280))
         hist = _rows_to_dataframe(rows)
         if len(hist) < 55:
             return {}
-        spy_rows = ps.store.get_quotes("SPY", limit=280)
-        spy = _rows_to_dataframe(spy_rows)
+        if spy is None:
+            spy_rows = ps.store.get_quotes("SPY", limit=280)
+            spy = _rows_to_dataframe(spy_rows)
     else:
         hist = ps.get_history(symbol, period="1y")
-        spy = ps.get_spy_history(period="1y")
+        spy = spy if spy is not None else ps.get_spy_history(period="1y")
     if hist.empty:
         return {}
     return _quick_technicals_from_hist(hist, spy)
@@ -228,16 +264,25 @@ def build_symbol_analysis(
     return json_safe(payload)
 
 
-def build_watchlist_matrix() -> list[dict[str, Any]]:
+def build_watchlist_matrix(*, force_refresh: bool = False) -> list[dict[str, Any]]:
+    if not force_refresh:
+        cached = get_cached_watchlist_matrix()
+        if cached is not None:
+            return cached
+
     items = cache_module.get_watchlist()
     ps = PriceService()
     rows: list[dict[str, Any]] = []
+
+    # Load SPY once for relative-strength technicals across the rail.
+    spy_rows = ps.store.get_quotes("SPY", limit=PERIOD_LIMIT.get("1y", 280))
+    spy_hist = _rows_to_dataframe(spy_rows)
 
     for item in items:
         sym = item["symbol"]
         bucket = item.get("bucket", "penny")
         stale = _is_stale(item.get("last_scanned_at"))
-        technicals = _quick_technicals(sym, ps, db_only=True)
+        technicals = _quick_technicals(sym, ps, db_only=True, spy=spy_hist)
 
         alerts = compute_alerts(
             sym,
@@ -271,6 +316,7 @@ def build_watchlist_matrix() -> list[dict[str, Any]]:
         )
 
     rows.sort(key=lambda r: (-(r.get("alert_count") or 0), -(r.get("score") or 0)))
+    Cache().set(_WATCHLIST_MATRIX_CACHE_KEY, json_safe(rows), WATCHLIST_MATRIX_TTL)
     return rows
 
 

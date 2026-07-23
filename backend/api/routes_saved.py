@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import ValidationError
@@ -40,6 +41,10 @@ def _stock_result_from_row(row: dict) -> StockResult | None:
         return None
 
 
+def _bucket_from_row(value: Any) -> Bucket:
+    return Bucket(normalize_sleeve(str(value) if value is not None else "penny"))
+
+
 def _to_saved_scan_item(row: dict) -> SavedScanItem:
     completed = row.get("completed_at")
     created = row.get("created_at")
@@ -58,7 +63,7 @@ def _to_saved_scan_item(row: dict) -> SavedScanItem:
     return SavedScanItem(
         id=int(row["id"]),
         name=row.get("name") or "",
-        bucket=Bucket(row["bucket"]),
+        bucket=_bucket_from_row(row.get("bucket")),
         options=row.get("options") or {},
         results=results,
         result_count=int(row.get("result_count") or 0),
@@ -73,7 +78,7 @@ def _to_saved_report_item(row: dict) -> SavedReportItem:
     return SavedReportItem(
         id=int(row["id"]),
         symbol=row["symbol"],
-        bucket=Bucket(bucket) if bucket else None,
+        bucket=_bucket_from_row(bucket) if bucket else None,
         title=row.get("title") or "",
         notes=row.get("notes") or "",
         report=row.get("report") or {},
@@ -86,7 +91,7 @@ def _to_saved_analyze_item(row: dict) -> SavedAnalyzeItem:
     return SavedAnalyzeItem(
         id=int(row["id"]),
         symbol=row["symbol"],
-        bucket=Bucket(row["bucket"]),
+        bucket=_bucket_from_row(row.get("bucket")),
         payload=row.get("payload") or {},
         score=row.get("score"),
         data_quality_score=row.get("data_quality_score"),
@@ -220,16 +225,14 @@ def progress_summary():
         report_count=report_count,
         analyze_count=analyze_count,
         trade_count=trade_count,
-        latest_scan_bucket=Bucket(latest_scan["bucket"]) if latest_scan else None,
-        latest_scan_at=datetime.fromisoformat(latest_scan["created_at"]) if latest_scan else None,
+        latest_scan_bucket=_bucket_from_row(latest_scan["bucket"]) if latest_scan else None,
+        latest_scan_at=parse_api_datetime(latest_scan.get("created_at")) if latest_scan else None,
         latest_report_symbol=latest_report["symbol"] if latest_report else None,
-        latest_report_at=datetime.fromisoformat(latest_report["updated_at"]) if latest_report else None,
+        latest_report_at=parse_api_datetime(latest_report.get("updated_at")) if latest_report else None,
         latest_analyze_symbol=latest_analyze["symbol"] if latest_analyze else None,
-        latest_analyze_bucket=Bucket(latest_analyze["bucket"]) if latest_analyze else None,
-        latest_analyze_at=datetime.fromisoformat(latest_analyze["updated_at"])
-        if latest_analyze
-        else None,
+        latest_analyze_bucket=_bucket_from_row(latest_analyze["bucket"]) if latest_analyze else None,
+        latest_analyze_at=parse_api_datetime(latest_analyze.get("updated_at")) if latest_analyze else None,
         latest_trade_symbol=latest_trade["symbol"] if latest_trade else None,
-        latest_trade_at=datetime.fromisoformat(latest_trade["updated_at"]) if latest_trade else None,
+        latest_trade_at=parse_api_datetime(latest_trade.get("updated_at")) if latest_trade else None,
     )
 

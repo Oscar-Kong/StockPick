@@ -60,6 +60,7 @@ def build_v2_score(
     validate_parity: bool = True,
     persist_snapshot: bool = True,
     include_sizing: bool = True,
+    analysis_context: Any | None = None,
 ) -> V2ScoreResponse | dict[str, Any]:
     if not SCORE_ENGINE_V2_ENABLED:
         return {"error": "SCORE_ENGINE_V2_ENABLED is false"}
@@ -69,13 +70,32 @@ def build_v2_score(
     if sleeve not in _SCREENERS:
         return {"error": f"Invalid sleeve: {sleeve}"}
 
-    screener = _SCREENERS[sleeve]()
-    ctx = screener.enrich(sym)
-    if ctx is None:
-        return {"error": f"Could not load data for {sym}"}
+    if analysis_context is not None:
+        ctx = analysis_context.ctx
+        rec = analysis_context.reconcile
+        quality = (
+            analysis_context.features.quality_score
+            if analysis_context.features
+            else (rec.quality_score if rec else ctx.info.get("_reconcile_quality"))
+        )
+        metrics = dict(analysis_context.features.enriched_metrics or {})
+    else:
+        screener = _SCREENERS[sleeve]()
+        ctx = screener.enrich(sym)
+        if ctx is None:
+            return {"error": f"Could not load data for {sym}"}
 
-    rec = DataReconciler().reconcile(sym)
-    quality = rec.quality_score if rec else ctx.info.get("_reconcile_quality")
+        rec = DataReconciler().reconcile(sym)
+        quality = rec.quality_score if rec else ctx.info.get("_reconcile_quality")
+        metrics = enrich_metrics(
+            sym,
+            ctx.info,
+            ctx.fundamentals,
+            {},
+            Bucket(sleeve),
+            allow_openbb_fetch=False,
+        )
+
     try:
         from data.pit_fundamentals import persist_reconcile_as_pit
 
@@ -83,16 +103,6 @@ def build_v2_score(
             persist_reconcile_as_pit(sym, rec.canonical)
     except Exception:
         pass
-
-    metrics: dict[str, Any] = {}
-    metrics = enrich_metrics(
-        sym,
-        ctx.info,
-        ctx.fundamentals,
-        metrics,
-        Bucket(sleeve),
-        allow_openbb_fetch=False,
-    )
 
     scoring = ScoringEngine.score(
         ctx,

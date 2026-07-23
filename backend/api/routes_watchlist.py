@@ -57,6 +57,12 @@ def list_watchlist():
 @router.post("", response_model=WatchlistItem)
 def add_watchlist_item(body: WatchlistCreate):
     result = cache_module.add_to_watchlist(body.symbol, body.bucket.value, body.notes)
+    try:
+        from services.analyze_service import invalidate_watchlist_matrix_cache
+
+        invalidate_watchlist_matrix_cache()
+    except Exception:
+        pass
     return _to_item(result)
 
 
@@ -87,6 +93,12 @@ def import_watchlist(body: WatchlistImportRequest):
     )
     rows = [WatchlistImportRow(**o) for o in outcomes]
     added = sum(1 for r in rows if r.added)
+    try:
+        from services.analyze_service import invalidate_watchlist_matrix_cache
+
+        invalidate_watchlist_matrix_cache()
+    except Exception:
+        pass
     return WatchlistImportResponse(
         results=rows,
         added_count=added,
@@ -103,6 +115,12 @@ def refresh_all_watchlist():
     )
     refreshed = sum(1 for o in outcomes if o.get("added"))
     failed = len(outcomes) - refreshed
+    try:
+        from services.analyze_service import invalidate_watchlist_matrix_cache
+
+        invalidate_watchlist_matrix_cache()
+    except Exception:
+        pass
     return WatchlistRefreshResponse(refreshed=refreshed, failed=failed, results=outcomes)
 
 
@@ -145,4 +163,10 @@ def remove_watchlist_item(symbol: str):
     removed = cache_module.remove_from_watchlist(symbol)
     if not removed:
         raise HTTPException(status_code=404, detail="Symbol not in watchlist")
+    try:
+        from services.analyze_service import invalidate_watchlist_matrix_cache
+
+        invalidate_watchlist_matrix_cache()
+    except Exception:
+        pass
     return {"ok": True}

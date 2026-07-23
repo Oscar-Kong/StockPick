@@ -23,8 +23,8 @@
 | Density is intentional | — | Group related tabs; inspector/drawer for secondary evidence on narrow screens (§12.3) |
 
 **Audit recommendations to add:**
-- Group related analysis tabs (core vs research vs diagnostics)
-- Keep price chart and current decision visible where possible
+- Prefer a flat five-tab row (Overview · Drivers · Risk · Evidence · Research) — avoid labeled group chrome that competes with tab labels
+- Keep price chart full-width; pair decision summary with position sizing in a balanced row
 - Show latest data date prominently in toolbar
 - Use inspector/drawer for secondary evidence below `lg`
 
@@ -34,10 +34,11 @@
 
 ## Page purpose
 
-Analyze is the **deep symbol research workspace**: watchlist navigation, multi-tab analysis (overview, score, risk, chart, report, etc.), and persistent metric context.
+Analyze is the **deep symbol research workspace**: watchlist navigation, five analysis sections (Overview / Drivers / Risk / Evidence / Research), and persistent metric context.
 
-**Preserve:** All analysis tabs, V2 score/risk/position sizing, factor attribution, price chart ranges, research report save, watchlist import, prev/next symbol nav, every API hook in `AnalysisPanel`.
+**Preserve:** Decision Overview, V2 score/risk/position sizing, factor attribution, price chart ranges, research report save, watchlist import, prev/next symbol nav, every analysis capability (moved into the five sections — do not delete features).
 
+**Loading:** Rail loads independently of symbol analysis. Snapshot-first then `/analyze/{symbol}/core`. Do not block `AnalysisPanel` on watchlist matrix refresh.
 ---
 
 ## Makeover vision
@@ -66,7 +67,7 @@ ui-ux-pro-max: **minimal single-column focus on mobile** — one primary task pe
 |------|---------|----------|----------|
 | Empty state | Centered text, large dead zone | Split layout always visible: watchlist + “Select a symbol” panel with search + import CTA | Major |
 | Metrics rail | Hidden until `lg` — empty right gap on md | Show **compact horizontal stat strip** at md; vertical rail at lg+ | Major |
-| Tab nav | Segmented `AppTabBar` style mixed with analysis tabs | Group tabs (core / research / tools); underline style for content tabs (Master §10.5) | Done |
+| Tab nav | Segmented `AppTabBar` / grouped CORE·RESEARCH·WORKSPACE labels | Flat Master §10.5 underline tabs — static row, not scrollable | Done (2026-07-23) |
 | Toolbar | Multiple rows (meta + stats) | Single toolbar with **latest data date** prominent; stats inline scroll on mobile | Partial — hero shows score/risk/bucket/quality/bar; score source moved to Score tab context |
 | Watchlist rail | Hidden on mobile; native `<select>` | Keep select but add **watchlist sheet** (bottom drawer) showing scores + rec badges | Partial — desktop rail upgraded (score bar, skeleton, glass header) |
 
@@ -75,8 +76,11 @@ ui-ux-pro-max: **minimal single-column focus on mobile** — one primary task pe
 ## Tab content upgrades
 
 ### Overview / Score / Risk
+- Chart full-width; decision + trade plan share a row with position sizing; drivers / execution / evidence / delta span full width below so cards share one left edge
+- Decision Overview: shared `analysis-decision-block` padding (beats `.analysis-section { padding: 0 }`), metric tiles, hold-hint callout, thesis cards, invalidation deduped vs bear case, drivers collapse when one side empty
 - Keep existing blocks; wrap in `data-panel` with consistent `--space-4` padding
 - `UnifiedRiskPanel`, `ScoreBreakdown`: collapse secondary sections by default
+- Alerts render as compact inline chips (not stacked full-width bars)
 
 ### Chart tab (`PriceChart`)
 - ui-ux-pro-max: Line chart for price; provide **sr-only summary** (“AAPL up 3.2% over selected range”)
@@ -120,7 +124,7 @@ Loading: skeleton rows, not `text-zinc-500` one-liner.
 
 | Breakpoint | Behavior |
 |------------|----------|
-| 375px | Symbol select + bottom sheet watchlist; tabs scroll horizontally |
+| 375px | Symbol select + bottom sheet watchlist; analysis tabs are a static non-scrolling row |
 | 768px | Optional collapsible rail icon |
 | 1024px | Horizontal stat strip + single column — **validate grid before changing** (§12.3) |
 | 1280px | Two-column grid + vertical metrics rail |
@@ -172,7 +176,7 @@ Keep in main column: price chart, recommendation/score summary, unified risk hea
 ### Phase 4 — Analyze/Workspace
 - [ ] Browser-confirm 1024–1279px empty margin
 - [ ] Empty workspace: search + recent symbols + watchlist preview (§12.3)
-- [x] Group related tabs; underline content-tab style (2026-07-03)
+- [x] Flat Master §10.5 underline tabs (group chrome removed 2026-07-23)
 - [ ] Inspector drawer for secondary evidence on narrow screens
 - [ ] md horizontal stats strip (if validated)
 - [ ] Mobile watchlist bottom sheet — keep native `<select>` unless usability test proves replacement (§16)

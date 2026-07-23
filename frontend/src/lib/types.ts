@@ -649,6 +649,70 @@ export interface AnalyzeSymbolResponse {
   price_history_bar_count?: number;
 }
 
+export interface AnalyzeTradePlan {
+  sleeve?: string;
+  price?: number | null;
+  invalidation?: string[];
+  bull_case?: string | null;
+  bear_case?: string | null;
+  position_weight_pct?: number | null;
+  max_weight_pct?: number | null;
+  stop_loss_pct?: number | null;
+  time_horizon_days?: number | null;
+  expected_return_pct?: number | null;
+  expected_downside_pct?: number | null;
+  liquidity_note?: string | null;
+  relative_volume?: number | null;
+  avg_dollar_volume?: number | null;
+  atr_pct?: number | null;
+  spread_estimate?: number | null;
+  float?: number | null;
+  market_cap?: number | null;
+  data_confidence?: number | null;
+  max_hold_hint?: string | null;
+  initial_stop?: number | null;
+  target_1?: number | null;
+  target_2?: number | null;
+  risk_reward?: number | null;
+  fair_value?: number | null;
+  fair_value_bull?: number | null;
+  fair_value_bear?: number | null;
+}
+
+export interface AnalyzeDelta {
+  previous_updated_at?: string | null;
+  score?: { from?: number | null; to?: number | null };
+  recommendation?: { from?: string | null; to?: string | null };
+  risk?: { from?: string | null; to?: string | null };
+  price?: { from?: number | null; to?: number | null };
+  changes?: { field: string; from?: unknown; to?: unknown }[];
+  main_change?: string | null;
+}
+
+export interface AnalyzeFreshness {
+  status?: string;
+  cached_at?: string | null;
+  age_seconds?: number | null;
+  data_as_of?: string | null;
+  served_from?: string | null;
+}
+
+export interface AnalyzeCoreResponse {
+  symbol: string;
+  sleeve: string;
+  base: AnalyzeSymbolResponse | null;
+  v2: V2ScoreResponse | null;
+  trade_plan?: AnalyzeTradePlan | null;
+  delta?: AnalyzeDelta | null;
+  freshness?: AnalyzeFreshness;
+  timings_ms?: Record<string, number>;
+  error?: string | null;
+}
+
+export interface AnalyzeSnapshotResponse extends AnalyzeCoreResponse {
+  stale?: boolean;
+}
+
 export interface PositionSizingV2 {
   symbol: string;
   sleeve: string;

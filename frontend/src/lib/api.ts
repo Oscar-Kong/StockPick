@@ -96,6 +96,8 @@ import type {
   WatchlistItem,
   WatchlistRefreshResponse,
   AnalyzeSymbolResponse,
+  AnalyzeCoreResponse,
+  AnalyzeSnapshotResponse,
   AnalyzeWatchlistResponse,
   ResearchOverviewResponse,
   ResearchIdea,
@@ -360,8 +362,11 @@ export function importWatchlist(
   });
 }
 
-export function getAnalyzeWatchlist(): Promise<AnalyzeWatchlistResponse> {
-  return request("/analyze/watchlist");
+export function getAnalyzeWatchlist(options?: {
+  refresh?: boolean;
+}): Promise<AnalyzeWatchlistResponse> {
+  const qs = options?.refresh ? "?refresh=1" : "";
+  return request(`/analyze/watchlist${qs}`);
 }
 
 export type AnalyzeSymbolOptions = {
@@ -381,6 +386,42 @@ export function getAnalyzeSymbol(
   if (options?.includeBucketFit) params.set("include_bucket_fit", "1");
   const qs = params.toString();
   return request(`/analyze/${symbol}${qs ? `?${qs}` : ""}`, {
+    signal: options?.signal,
+    timeoutMs: ANALYZE_REQUEST_TIMEOUT_MS,
+  });
+}
+
+export type AnalyzeCoreOptions = {
+  signal?: AbortSignal;
+  refresh?: boolean;
+  includeBucketFit?: boolean;
+};
+
+export function getAnalyzeSnapshot(
+  symbol: string,
+  bucket?: Bucket,
+  options?: { signal?: AbortSignal }
+): Promise<AnalyzeSnapshotResponse> {
+  const params = new URLSearchParams();
+  if (bucket) params.set("bucket", normalizeBucket(bucket));
+  const qs = params.toString();
+  return request(`/analyze/${symbol}/snapshot${qs ? `?${qs}` : ""}`, {
+    signal: options?.signal,
+    timeoutMs: 8000,
+  });
+}
+
+export function getAnalyzeCore(
+  symbol: string,
+  bucket?: Bucket,
+  options?: AnalyzeCoreOptions
+): Promise<AnalyzeCoreResponse> {
+  const params = new URLSearchParams();
+  if (bucket) params.set("bucket", normalizeBucket(bucket));
+  if (options?.refresh) params.set("refresh", "1");
+  if (options?.includeBucketFit) params.set("include_bucket_fit", "1");
+  const qs = params.toString();
+  return request(`/analyze/${symbol}/core${qs ? `?${qs}` : ""}`, {
     signal: options?.signal,
     timeoutMs: ANALYZE_REQUEST_TIMEOUT_MS,
   });
@@ -542,9 +583,17 @@ export function getPortfolioFactorExposure(
 export function getV2Score(
   symbol: string,
   bucket?: Bucket,
-  options?: { signal?: AbortSignal }
+  options?: {
+    signal?: AbortSignal;
+    validateParity?: boolean;
+    persistSnapshot?: boolean;
+  }
 ): Promise<V2ScoreResponse> {
-  const qs = bucket ? `?sleeve=${bucket}` : "";
+  const params = new URLSearchParams();
+  if (bucket) params.set("sleeve", bucket);
+  params.set("validate_parity", options?.validateParity ? "true" : "false");
+  params.set("persist_snapshot", options?.persistSnapshot ? "true" : "false");
+  const qs = params.toString() ? `?${params}` : "";
   return request(`/api/v2/score/${symbol}${qs}`, { signal: options?.signal });
 }
 

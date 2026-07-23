@@ -1,35 +1,53 @@
-// Main symbol analysis panel — wide two-column layout with persistent metrics rail.
+// Main symbol analysis panel — snapshot-first core load with decision Overview.
 "use client";
 
+import dynamic from "next/dynamic";
 import {
   getAnalyzeBucketFit,
-  getAnalyzeSymbol,
+  getAnalyzeCore,
+  getAnalyzeSnapshot,
   getSymbolDiagnostics,
-  getV2PositionSizing,
-  getV2Score,
   getV2UnifiedRisk,
   getResearchReport,
   listSavedReports,
   saveReportSnapshot,
   updateWatchlistNotes,
 } from "@/lib/api";
+import {
+  analysisCacheKey,
+  clearAnalysisCache,
+  getAnalysisCache,
+  setAnalysisCache,
+} from "@/lib/analysisClientCache";
 import { getBucketMeta } from "@/lib/buckets";
 import { useTranslation, useTRef } from "@/lib/i18n";
-import type { AnalyzeSymbolResponse, Bucket, PositionSizingV2, StockResearchReport, SymbolDiagnosticsResponse, UnifiedRiskV2, V2ScoreResponse } from "@/lib/types";
+import type {
+  AnalyzeDelta,
+  AnalyzeFreshness,
+  AnalyzeSymbolResponse,
+  AnalyzeTradePlan,
+  Bucket,
+  PositionSizingV2,
+  StockResearchReport,
+  SymbolDiagnosticsResponse,
+  UnifiedRiskV2,
+  V2ScoreResponse,
+} from "@/lib/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnalysisAlerts } from "./AnalysisAlerts";
 import { AnalysisHeaderStats } from "./AnalysisHeaderStats";
 import { AnalysisSidebar } from "./AnalysisSidebar";
 import { AnalysisSymbolNav } from "./AnalysisSymbolNav";
-import { AnalysisTabNav, analysisPanelId, type AnalysisTabConfig, type AnalysisTabId } from "./AnalysisTabNav";
-import { BacktestPanel } from "./BacktestPanel";
-import { DiagnosticsPanel } from "./DiagnosticsPanel";
+import {
+  AnalysisTabNav,
+  analysisPanelId,
+  normalizeAnalysisTab,
+  type AnalysisTabConfig,
+  type AnalysisTabId,
+} from "./AnalysisTabNav";
+import { DecisionOverviewDetails, DecisionOverviewLead } from "./DecisionOverview";
 import { PositionSizingBlock } from "./PositionSizingBlock";
-import { PriceChart } from "./PriceChart";
-import { ResearchReport } from "./ResearchReport";
-import { Round2Panel } from "./Round2Panel";
 import { ScoreBreakdown } from "./ScoreBreakdown";
-import { UnifiedRiskPanel } from "./UnifiedRiskPanel";
 import { V2FallbackBanner } from "./V2FallbackBanner";
 import { FactorAttributionTable } from "./quant/FactorAttributionTable";
 import { NotFinancialAdviceFooter } from "./ui/NotFinancialAdviceFooter";
@@ -44,6 +62,27 @@ import {
   type V2UnavailableReason,
 } from "@/lib/v2Score";
 import { explainAnalysisLoadError, isAbortError } from "@/lib/workspaceLoadError";
+
+const PriceChart = dynamic(
+  () => import("./PriceChart").then((m) => m.PriceChart),
+  { loading: () => <div className="analysis-loading__chart" /> }
+);
+const BacktestPanel = dynamic(
+  () => import("./BacktestPanel").then((m) => m.BacktestPanel),
+  { loading: () => <p className="text-xs text-zinc-500">…</p> }
+);
+const DiagnosticsPanel = dynamic(
+  () => import("./DiagnosticsPanel").then((m) => m.DiagnosticsPanel),
+  { loading: () => <p className="text-xs text-zinc-500">…</p> }
+);
+const UnifiedRiskPanel = dynamic(
+  () => import("./UnifiedRiskPanel").then((m) => m.UnifiedRiskPanel),
+  { loading: () => <p className="text-xs text-zinc-500">…</p> }
+);
+const ResearchReport = dynamic(
+  () => import("./ResearchReport").then((m) => m.ResearchReport),
+  { loading: () => <p className="text-xs text-zinc-500">…</p> }
+);
 
 interface AnalysisPanelProps {
   symbol: string;
@@ -97,6 +136,33 @@ function AnalysisLoading({ symbol, embedded }: { symbol: string; embedded?: bool
   );
 }
 
+function applyCorePayload(
+  setData: (d: AnalyzeSymbolResponse) => void,
+  setV2Score: (v: V2ScoreResponse | null) => void,
+  setPositionSizing: (p: PositionSizingV2 | null) => void,
+  setTradePlan: (p: AnalyzeTradePlan | null) => void,
+  setDelta: (d: AnalyzeDelta | null) => void,
+  setFreshness: (f: AnalyzeFreshness | null) => void,
+  setV2UnavailableReason: (r: V2UnavailableReason | null) => void,
+  payload: {
+    base?: AnalyzeSymbolResponse | null;
+    v2?: V2ScoreResponse | null;
+    trade_plan?: AnalyzeTradePlan | null;
+    delta?: AnalyzeDelta | null;
+    freshness?: AnalyzeFreshness | null;
+  }
+) {
+  if (payload.base) setData(payload.base);
+  if (payload.v2) {
+    setV2Score(payload.v2);
+    setV2UnavailableReason(null);
+    if (payload.v2.position_sizing) setPositionSizing(payload.v2.position_sizing);
+  }
+  if (payload.trade_plan !== undefined) setTradePlan(payload.trade_plan ?? null);
+  if (payload.delta !== undefined) setDelta(payload.delta ?? null);
+  if (payload.freshness) setFreshness(payload.freshness);
+}
+
 export function AnalysisPanel({
   symbol,
   bucket,
@@ -117,63 +183,30 @@ export function AnalysisPanel({
         label: t.analysis.tabOverview,
         shortLabel: t.analysis.tabOverviewShort,
         hint: t.analysis.tabOverviewHint,
-        group: "core",
       },
       {
-        id: "score",
-        label: t.analysis.tabScoreBreakdown,
-        shortLabel: t.analysis.tabScoreShort,
-        hint: t.analysis.tabScoreHint,
-        group: "core",
+        id: "drivers",
+        label: t.analysis.tabDrivers,
+        shortLabel: t.analysis.tabDriversShort,
+        hint: t.analysis.tabDriversHint,
       },
       {
         id: "risk",
         label: t.analysis.tabRisk,
         shortLabel: t.analysis.tabRiskShort,
         hint: t.analysis.tabRiskHint,
-        group: "core",
       },
       {
-        id: "diagnostics",
-        label: t.analysis.tabDiagnostics,
-        shortLabel: t.analysis.tabDiagnosticsShort,
-        hint: t.analysis.tabDiagnosticsHint,
-        group: "research",
+        id: "evidence",
+        label: t.analysis.tabEvidence,
+        shortLabel: t.analysis.tabEvidenceShort,
+        hint: t.analysis.tabEvidenceHint,
       },
       {
-        id: "valuation",
-        label: t.analysis.tabValuation,
-        shortLabel: t.analysis.tabValuationShort,
-        hint: t.analysis.tabValuationHint,
-        group: "research",
-      },
-      {
-        id: "backtest",
-        label: t.analysis.tabBacktest,
-        shortLabel: t.analysis.tabBacktestShort,
-        hint: t.analysis.tabBacktestHint,
-        group: "research",
-      },
-      {
-        id: "similar",
-        label: t.analysis.tabSimilar,
-        shortLabel: t.analysis.tabSimilarShort,
-        hint: t.analysis.tabSimilarHint,
-        group: "research",
-      },
-      {
-        id: "report",
-        label: t.analysis.tabReport,
-        shortLabel: t.analysis.tabReportShort,
-        hint: t.analysis.tabReportHint,
-        group: "workspace",
-      },
-      {
-        id: "notes",
-        label: t.analysis.tabNotes,
-        shortLabel: t.analysis.tabNotesShort,
-        hint: t.analysis.tabNotesHint,
-        group: "workspace",
+        id: "research",
+        label: t.analysis.tabResearch,
+        shortLabel: t.analysis.tabResearchShort,
+        hint: t.analysis.tabResearchHint,
       },
     ],
     [t]
@@ -192,6 +225,7 @@ export function AnalysisPanel({
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [data, setData] = useState<AnalyzeSymbolResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notes, setNotes] = useState(initialNotes);
   const [savingNotes, setSavingNotes] = useState(false);
@@ -203,11 +237,11 @@ export function AnalysisPanel({
   const [savingReport, setSavingReport] = useState(false);
   const [reportMsg, setReportMsg] = useState<string | null>(null);
   const [positionSizing, setPositionSizing] = useState<PositionSizingV2 | null>(null);
-  const [sizingLoading, setSizingLoading] = useState(false);
-  const [sizingError, setSizingError] = useState<string | null>(null);
   const [v2Score, setV2Score] = useState<V2ScoreResponse | null>(null);
-  const [v2Loading, setV2Loading] = useState(false);
   const [v2UnavailableReason, setV2UnavailableReason] = useState<V2UnavailableReason | null>(null);
+  const [tradePlan, setTradePlan] = useState<AnalyzeTradePlan | null>(null);
+  const [delta, setDelta] = useState<AnalyzeDelta | null>(null);
+  const [freshness, setFreshness] = useState<AnalyzeFreshness | null>(null);
   const [diagnostics, setDiagnostics] = useState<SymbolDiagnosticsResponse | null>(null);
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
   const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null);
@@ -218,17 +252,24 @@ export function AnalysisPanel({
   const riskOkRef = useRef<string | null>(null);
   const [insightsRetryTick, setInsightsRetryTick] = useState(0);
   const loadGenRef = useRef(0);
+  const notesSyncedRef = useRef(initialNotes);
+
+  // Sync notes from parent without re-fetching analysis
+  useEffect(() => {
+    if (initialNotes !== notesSyncedRef.current) {
+      notesSyncedRef.current = initialNotes;
+      setNotes(initialNotes);
+    }
+  }, [initialNotes]);
 
   useEffect(() => {
     if (!symbol) return;
 
     const gen = ++loadGenRef.current;
     const ac = new AbortController();
+    const cacheKey = analysisCacheKey(symbol, bucket);
 
-    setData(null);
     setError(null);
-    setLoading(true);
-    setNotes(initialNotes);
     setTab("overview");
     setInsightsOpen(false);
     setBucketFit(null);
@@ -236,10 +277,6 @@ export function AnalysisPanel({
     setReport(null);
     setReportError(null);
     setReportMsg(null);
-    setPositionSizing(null);
-    setSizingError(null);
-    setV2Score(null);
-    setV2UnavailableReason(null);
     setDiagnostics(null);
     setDiagnosticsError(null);
     setUnifiedRisk(null);
@@ -247,28 +284,122 @@ export function AnalysisPanel({
     diagnosticsOkRef.current = null;
     riskOkRef.current = null;
     setInsightsRetryTick(0);
+    setV2UnavailableReason(null);
+
+    const cached = getAnalysisCache(cacheKey);
+    if (cached?.base) {
+      setData(cached.base);
+      setV2Score(cached.v2 ?? null);
+      if (cached.v2?.position_sizing) setPositionSizing(cached.v2.position_sizing);
+      else setPositionSizing(null);
+      setFreshness(cached.freshness ?? { status: "cached", served_from: "client" });
+      setLoading(false);
+    } else {
+      setData(null);
+      setV2Score(null);
+      setPositionSizing(null);
+      setTradePlan(null);
+      setDelta(null);
+      setFreshness(null);
+      setLoading(true);
+    }
+
+    performance.mark(`analyze-snapshot-start-${symbol}`);
 
     void (async () => {
       try {
-        const res = await getAnalyzeSymbol(symbol, bucket, { signal: ac.signal });
+        // Snapshot paint (best-effort)
+        try {
+          const snap = await getAnalyzeSnapshot(symbol, bucket, { signal: ac.signal });
+          if (gen !== loadGenRef.current) return;
+          if (snap.base) {
+            applyCorePayload(
+              setData,
+              setV2Score,
+              setPositionSizing,
+              setTradePlan,
+              setDelta,
+              setFreshness,
+              setV2UnavailableReason,
+              snap
+            );
+            setLoading(false);
+            performance.mark(`analyze-snapshot-paint-${symbol}`);
+            try {
+              performance.measure(
+                `analyze-snapshot-${symbol}`,
+                `analyze-snapshot-start-${symbol}`,
+                `analyze-snapshot-paint-${symbol}`
+              );
+            } catch {
+              /* ignore */
+            }
+          }
+        } catch {
+          /* snapshot miss is fine */
+        }
+
         if (gen !== loadGenRef.current) return;
-        setData(res);
+        setRefreshing(true);
+        const core = await getAnalyzeCore(symbol, bucket, { signal: ac.signal });
+        if (gen !== loadGenRef.current) return;
+        if (!core.base) {
+          throw new Error(core.error || tRef.current.analysis.failed);
+        }
+        applyCorePayload(
+          setData,
+          setV2Score,
+          setPositionSizing,
+          setTradePlan,
+          setDelta,
+          setFreshness,
+          setV2UnavailableReason,
+          core
+        );
+        if (!core.v2) {
+          setV2UnavailableReason("error");
+        }
+        setAnalysisCache(cacheKey, {
+          base: core.base,
+          v2: core.v2 ?? null,
+          freshness: core.freshness,
+        });
+        performance.mark(`analyze-core-settle-${symbol}`);
+        try {
+          performance.measure(
+            `analyze-core-${symbol}`,
+            `analyze-snapshot-start-${symbol}`,
+            `analyze-core-settle-${symbol}`
+          );
+        } catch {
+          /* ignore */
+        }
       } catch (err) {
         if (ac.signal.aborted || gen !== loadGenRef.current || isAbortError(err)) return;
-        setError(explainAnalysisLoadError(err, tRef.current, symbol));
-        setData(null);
+        if (!getAnalysisCache(cacheKey)?.base) {
+          setError(explainAnalysisLoadError(err, tRef.current, symbol));
+          setData(null);
+        }
+        setV2UnavailableReason(parseV2FetchError(err));
       } finally {
-        if (gen === loadGenRef.current) setLoading(false);
+        if (gen === loadGenRef.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     })();
 
     return () => ac.abort();
-  }, [symbol, bucket, initialNotes, tRef]);
+  }, [symbol, bucket, tRef]);
 
+  // Lazy bucket-fit when sidebar needs dual-sleeve and scores are empty
   useEffect(() => {
     if (!data || data.symbol !== symbol) return;
     const scores = bucketFit?.scores ?? data.bucket_fit?.scores ?? {};
     if (Object.keys(scores).length > 0) return;
+    // Only fetch when insights rail is open or on desktop (sidebar always visible on lg)
+    // Defer until after core settled
+    if (loading || refreshing) return;
 
     const ac = new AbortController();
     setBucketFitLoading(true);
@@ -284,52 +415,7 @@ export function AnalysisPanel({
       });
 
     return () => ac.abort();
-  }, [data, symbol, bucketFit?.scores]);
-
-  useEffect(() => {
-    if (!data || data.symbol !== symbol) return;
-    const ac = new AbortController();
-    const b = (bucket ?? data.assigned_bucket) as Bucket;
-    setV2Loading(true);
-    setSizingLoading(true);
-    setSizingError(null);
-    setV2UnavailableReason(null);
-    void getV2Score(symbol, b, { signal: ac.signal })
-      .then((s) => {
-        if (ac.signal.aborted) return;
-        setV2Score(s);
-        setV2UnavailableReason(null);
-        if (s.position_sizing) {
-          setPositionSizing(s.position_sizing);
-          setSizingLoading(false);
-        } else {
-          return getV2PositionSizing(symbol, b, { signal: ac.signal })
-            .then((sz) => {
-              if (!ac.signal.aborted) setPositionSizing(sz);
-            })
-            .catch((err) => {
-              if (ac.signal.aborted) return;
-              const msg = err instanceof Error ? err.message : tRef.current.analysis.sizingUnavailable;
-              if (!msg.includes("503")) setSizingError(msg);
-              setPositionSizing(null);
-            })
-            .finally(() => {
-              if (!ac.signal.aborted) setSizingLoading(false);
-            });
-        }
-      })
-      .catch((err) => {
-        if (!ac.signal.aborted) {
-          setV2Score(null);
-          setV2UnavailableReason(parseV2FetchError(err));
-        }
-        setSizingLoading(false);
-      })
-      .finally(() => {
-        if (!ac.signal.aborted) setV2Loading(false);
-      });
-    return () => ac.abort();
-  }, [data, symbol, bucket, tRef]);
+  }, [data, symbol, bucketFit?.scores, loading, refreshing]);
 
   const retryDiagnostics = useCallback(() => {
     diagnosticsOkRef.current = null;
@@ -341,13 +427,15 @@ export function AnalysisPanel({
     setInsightsRetryTick((n) => n + 1);
   }, []);
 
+  const activeTab = normalizeAnalysisTab(tab);
+
   useEffect(() => {
     if (!data || data.symbol !== symbol) return;
     const b = (bucket ?? data.assigned_bucket) as Bucket;
     const cacheKey = `${symbol}:${b}`;
     const ac = new AbortController();
 
-    if (tab === "diagnostics" && diagnosticsOkRef.current !== cacheKey) {
+    if (activeTab === "evidence" && diagnosticsOkRef.current !== cacheKey) {
       setDiagnosticsLoading(true);
       setDiagnosticsError(null);
       void getSymbolDiagnostics(symbol, 252, { signal: ac.signal })
@@ -365,7 +453,7 @@ export function AnalysisPanel({
         });
     }
 
-    if (tab === "risk" && riskOkRef.current !== cacheKey) {
+    if (activeTab === "risk" && riskOkRef.current !== cacheKey) {
       setRiskLoading(true);
       setRiskError(null);
       void getV2UnifiedRisk(symbol, b, { signal: ac.signal })
@@ -389,10 +477,10 @@ export function AnalysisPanel({
     }
 
     return () => ac.abort();
-  }, [tab, data, symbol, bucket, insightsRetryTick, tRef]);
+  }, [activeTab, data, symbol, bucket, insightsRetryTick, tRef]);
 
   useEffect(() => {
-    if (tab !== "report" || !symbol) return;
+    if (activeTab !== "research" || !symbol) return;
     if (report) return;
 
     const ac = new AbortController();
@@ -406,28 +494,47 @@ export function AnalysisPanel({
       .catch(() => {});
 
     return () => ac.abort();
-  }, [tab, symbol, report]);
+  }, [activeTab, symbol, report]);
 
   const refresh = useCallback(async () => {
     if (!symbol) return;
     const gen = ++loadGenRef.current;
     const ac = new AbortController();
-    setData(null);
-    setLoading(true);
+    const cacheKey = analysisCacheKey(symbol, bucket);
+    clearAnalysisCache(cacheKey);
+    setRefreshing(true);
     setError(null);
     setBucketFit(null);
     try {
-      const res = await getAnalyzeSymbol(symbol, bucket, {
+      const core = await getAnalyzeCore(symbol, bucket, {
         signal: ac.signal,
         refresh: true,
       });
       if (gen !== loadGenRef.current) return;
-      setData(res);
+      if (!core.base) throw new Error(core.error || tRef.current.analysis.failed);
+      applyCorePayload(
+        setData,
+        setV2Score,
+        setPositionSizing,
+        setTradePlan,
+        setDelta,
+        setFreshness,
+        setV2UnavailableReason,
+        core
+      );
+      setAnalysisCache(cacheKey, {
+        base: core.base,
+        v2: core.v2 ?? null,
+        freshness: core.freshness,
+      });
     } catch (err) {
       if (ac.signal.aborted || gen !== loadGenRef.current || isAbortError(err)) return;
       setError(explainAnalysisLoadError(err, tRef.current, symbol));
     } finally {
-      if (gen === loadGenRef.current) setLoading(false);
+      if (gen === loadGenRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [symbol, bucket, tRef]);
 
@@ -474,21 +581,17 @@ export function AnalysisPanel({
   };
 
   if (!symbol) {
-    return (
-      <p className="p-6 text-sm text-zinc-500">{t.analysis.selectSymbol}</p>
-    );
+    return <p className="p-6 text-sm text-zinc-500">{t.analysis.selectSymbol}</p>;
   }
 
-  const ready = data && data.symbol === symbol && !loading;
+  const ready = data && data.symbol === symbol;
 
   if (!ready) {
     if (error) {
       return (
         <div
           className={
-            embedded
-              ? "flex flex-1 items-start p-6"
-              : "analysis-shell p-6"
+            embedded ? "flex flex-1 items-start p-6" : "analysis-shell p-6"
           }
         >
           <ErrorState
@@ -534,10 +637,10 @@ export function AnalysisPanel({
             <button
               type="button"
               onClick={() => void refresh()}
-              disabled={loading}
+              disabled={loading || refreshing}
               className="btn-ghost shrink-0 px-3 py-1.5 text-sm"
             >
-              {loading ? "…" : t.common.refresh}
+              {loading || refreshing ? "…" : t.common.refresh}
             </button>
           </div>
         </div>
@@ -580,45 +683,46 @@ export function AnalysisPanel({
 
       <div className="analysis-grid min-h-0 flex-1 overflow-hidden">
         <div className="analysis-primary p-3 lg:p-4">
-          {tab === "overview" && (
+          {activeTab === "overview" && (
             <div
               id={analysisPanelId("overview")}
               role="tabpanel"
               aria-labelledby="analysis-tab-overview"
               className="analysis-overview"
             >
-              {v2Loading && <p className="text-xs text-zinc-500">{t.analysis.loadingQuantV2}</p>}
-              {!v2Loading && !v2Score && v2UnavailableReason && (
+              {refreshing && !v2Score && (
+                <p className="text-xs text-zinc-500">{t.analysis.loadingQuantV2}</p>
+              )}
+              {!refreshing && !v2Score && v2UnavailableReason && (
                 <V2FallbackBanner reason={v2UnavailableReason} />
               )}
+              <div className="analysis-glass-panel analysis-glass-panel--chart analysis-overview-chart">
+                <PriceChart
+                  ohlc={data.ohlc}
+                  priceHistoryLastDate={data.price_history_last_date}
+                  priceHistoryIsStale={data.price_history_is_stale}
+                  priceHistoryRefreshedAt={data.price_history_refreshed_at}
+                  heightClassName="h-[min(17rem,38vh)]"
+                />
+              </div>
               <div className="analysis-overview-grid">
-                <div className="analysis-glass-panel analysis-glass-panel--chart analysis-overview-chart">
-                  <PriceChart
-                    ohlc={data.ohlc}
-                    priceHistoryLastDate={data.price_history_last_date}
-                    priceHistoryIsStale={data.price_history_is_stale}
-                    priceHistoryRefreshedAt={data.price_history_refreshed_at}
-                    heightClassName="h-[min(17rem,38vh)]"
+                <div className="analysis-overview-main min-w-0">
+                  <DecisionOverviewLead
+                    v2={v2Score}
+                    score={display.score}
+                    riskLabel={riskLabel(String(display.riskLevel))}
+                    tradePlan={tradePlan}
+                    freshness={freshness}
+                    refreshing={refreshing}
                   />
                 </div>
                 <div className="analysis-glass-panel analysis-overview-side">
-                  {v2Score ? (
-                    <Round2Panel score={v2Score} variant="overview" />
-                  ) : (
-                    !v2Loading && (
-                      <div className="analysis-section analysis-section--flush">
-                        <h3 className="analysis-section__title">{t.analysis.summary}</h3>
-                        <p className="text-sm leading-relaxed text-secondary">{display.summary}</p>
-                      </div>
-                    )
-                  )}
-                  <div className="analysis-side-divider" />
-                  <div className="analysis-section analysis-section--flush">
+                  <div className="analysis-section analysis-section--flush analysis-overview-side__body">
                     <h3 className="analysis-section__title">{t.analysis.positionSizing}</h3>
                     <PositionSizingBlock
                       sizing={positionSizing ?? v2Score?.position_sizing ?? null}
-                      loading={sizingLoading}
-                      error={sizingError}
+                      loading={refreshing && !positionSizing}
+                      error={null}
                     />
                   </div>
                   {data.valuation_warnings?.length > 0 && (
@@ -627,8 +731,8 @@ export function AnalysisPanel({
                       <div className="analysis-section analysis-section--flush">
                         <h3 className="analysis-section__title">{t.analysis.tabValuation}</h3>
                         <ul className="space-y-1 text-sm text-amber-200/90">
-                          {data.valuation_warnings.map((w) => (
-                            <li key={w}>{w}</li>
+                          {data.valuation_warnings.map((w, idx) => (
+                            <li key={`${idx}-${w}`}>{w}</li>
                           ))}
                         </ul>
                       </div>
@@ -636,17 +740,22 @@ export function AnalysisPanel({
                   )}
                 </div>
               </div>
+              <DecisionOverviewDetails
+                v2={v2Score}
+                tradePlan={tradePlan}
+                delta={delta}
+              />
             </div>
           )}
 
-          {tab === "score" && (
+          {activeTab === "drivers" && (
             <div
-              id={analysisPanelId("score")}
+              id={analysisPanelId("drivers")}
               role="tabpanel"
-              aria-labelledby="analysis-tab-score"
+              aria-labelledby="analysis-tab-drivers"
               className="space-y-4"
             >
-              {v2Loading && <p className="text-xs text-zinc-500">{t.analysis.loadingQuantV2}</p>}
+              {refreshing && <p className="text-xs text-zinc-500">{t.analysis.loadingQuantV2}</p>}
               {v2Score ? (
                 <>
                   <FactorAttributionTable factors={v2Score.factors} />
@@ -655,75 +764,71 @@ export function AnalysisPanel({
                       {t.scanDrawer.parityDelta}: {v2Score.parity_delta.toFixed(2)}
                     </p>
                   )}
-                  <ScoreBreakdown signals={data.signals} className="analysis-chart-box h-64 w-full p-3" />
+                  <ScoreBreakdown
+                    signals={data.signals}
+                    className="analysis-chart-box h-64 w-full p-3"
+                  />
+                  {v2Score.valuation ? (
+                    <ValuationBlock data={v2Score.valuation} />
+                  ) : (
+                    <p className="text-sm text-zinc-500">{t.analysis.valuationUnavailable}</p>
+                  )}
+                  {v2Score.earnings_setup && Object.keys(v2Score.earnings_setup).length > 0 && (
+                    <div className="analysis-section">
+                      <h3 className="analysis-section__title">{t.analysis.earningsSetup}</h3>
+                      <pre className="overflow-x-auto text-[11px] text-zinc-400">
+                        {JSON.stringify(v2Score.earnings_setup, null, 2)}
+                      </pre>
+                    </div>
+                  )}
                 </>
               ) : (
-                <ScoreBreakdown signals={data.signals} className="analysis-chart-box h-80 w-full p-3" />
+                <ScoreBreakdown
+                  signals={data.signals}
+                  className="analysis-chart-box h-80 w-full p-3"
+                />
               )}
             </div>
           )}
 
-          {tab === "risk" && (
+          {activeTab === "risk" && (
             <div
               id={analysisPanelId("risk")}
               role="tabpanel"
               aria-labelledby="analysis-tab-risk"
+              className="space-y-4"
             >
-            <UnifiedRiskPanel
-              data={unifiedRisk}
-              loading={riskLoading}
-              error={riskError}
-              onRetry={riskError ? retryUnifiedRisk : undefined}
-            />
-            </div>
-          )}
-
-          {tab === "diagnostics" && (
-            <div
-              id={analysisPanelId("diagnostics")}
-              role="tabpanel"
-              aria-labelledby="analysis-tab-diagnostics"
-            >
-            <DiagnosticsPanel
-              data={diagnostics}
-              loading={diagnosticsLoading}
-              error={diagnosticsError}
-              onRetry={diagnosticsError ? retryDiagnostics : undefined}
-            />
-            </div>
-          )}
-
-          {tab === "valuation" && (
-            <div
-              id={analysisPanelId("valuation")}
-              role="tabpanel"
-              aria-labelledby="analysis-tab-valuation"
-              className="space-y-3"
-            >
-              {v2Score?.valuation ? (
-                <ValuationBlock data={v2Score.valuation} />
-              ) : (
-                <p className="text-sm text-zinc-500">{t.analysis.valuationUnavailable}</p>
+              <UnifiedRiskPanel
+                data={unifiedRisk}
+                loading={riskLoading}
+                error={riskError}
+                onRetry={riskError ? retryUnifiedRisk : undefined}
+              />
+              <div className="analysis-section">
+                <h3 className="analysis-section__title">{t.analysis.positionSizing}</h3>
+                <PositionSizingBlock
+                  sizing={positionSizing ?? v2Score?.position_sizing ?? null}
+                  loading={false}
+                  error={null}
+                />
+              </div>
+              {v2Score?.portfolio_impact && (
+                <div className="analysis-section">
+                  <h3 className="analysis-section__title">{t.analysis.portfolioImpact}</h3>
+                  <pre className="overflow-x-auto text-[11px] text-zinc-400">
+                    {JSON.stringify(v2Score.portfolio_impact, null, 2)}
+                  </pre>
+                </div>
               )}
             </div>
           )}
 
-          {tab === "backtest" && (
+          {activeTab === "evidence" && (
             <div
-              id={analysisPanelId("backtest")}
+              id={analysisPanelId("evidence")}
               role="tabpanel"
-              aria-labelledby="analysis-tab-backtest"
-            >
-              <BacktestPanel symbol={data.symbol} bucket={data.assigned_bucket} />
-            </div>
-          )}
-
-          {tab === "similar" && (
-            <div
-              id={analysisPanelId("similar")}
-              role="tabpanel"
-              aria-labelledby="analysis-tab-similar"
-              className="space-y-3"
+              aria-labelledby="analysis-tab-evidence"
+              className="space-y-4"
             >
               <ResearchWarning />
               {v2Score?.similar_signal ? (
@@ -731,15 +836,22 @@ export function AnalysisPanel({
               ) : (
                 <p className="text-sm text-zinc-500">{t.quant.similarInsufficient}</p>
               )}
+              <DiagnosticsPanel
+                data={diagnostics}
+                loading={diagnosticsLoading}
+                error={diagnosticsError}
+                onRetry={diagnosticsError ? retryDiagnostics : undefined}
+              />
+              <BacktestPanel symbol={data.symbol} bucket={data.assigned_bucket} />
             </div>
           )}
 
-          {tab === "report" && (
+          {activeTab === "research" && (
             <div
-              id={analysisPanelId("report")}
+              id={analysisPanelId("research")}
               role="tabpanel"
-              aria-labelledby="analysis-tab-report"
-              className="space-y-3"
+              aria-labelledby="analysis-tab-research"
+              className="space-y-4"
             >
               <p className="text-xs text-zinc-400">{t.analysis.llmDoesNotOverride}</p>
               <div className="flex flex-wrap gap-2">
@@ -762,32 +874,24 @@ export function AnalysisPanel({
               </div>
               {reportMsg && <p className="text-xs text-zinc-500">{reportMsg}</p>}
               <ResearchReport report={report} loading={reportLoading} error={reportError} />
+              <div className="analysis-glass-panel analysis-block">
+                <label className="text-xs font-medium text-zinc-500">{t.analysis.yourNotes}</label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={8}
+                  className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950/80 p-2 text-sm text-zinc-100"
+                />
+                <button
+                  type="button"
+                  onClick={saveNotes}
+                  disabled={savingNotes}
+                  className="btn-ghost mt-2 px-2 py-1 text-xs"
+                >
+                  {savingNotes ? t.common.saving : t.analysis.saveNotes}
+                </button>
+              </div>
               <NotFinancialAdviceFooter llmNote />
-            </div>
-          )}
-
-          {tab === "notes" && (
-            <div
-              id={analysisPanelId("notes")}
-              role="tabpanel"
-              aria-labelledby="analysis-tab-notes"
-              className="analysis-glass-panel analysis-block"
-            >
-              <label className="text-xs font-medium text-zinc-500">{t.analysis.yourNotes}</label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={8}
-                className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950/80 p-2 text-sm text-zinc-100"
-              />
-              <button
-                type="button"
-                onClick={saveNotes}
-                disabled={savingNotes}
-                className="btn-ghost mt-2 px-2 py-1 text-xs"
-              >
-                {savingNotes ? t.common.saving : t.analysis.saveNotes}
-              </button>
             </div>
           )}
         </div>
@@ -812,9 +916,16 @@ export function AnalysisPanel({
             aria-label={t.common.close}
             onClick={() => setInsightsOpen(false)}
           />
-          <div className="analysis-insights-sheet" role="dialog" aria-modal="true" aria-label={t.analysis.insightsPanelTitle}>
+          <div
+            className="analysis-insights-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t.analysis.insightsPanelTitle}
+          >
             <div className="analysis-insights-sheet-header">
-              <h3 className="text-sm font-semibold text-zinc-100">{t.analysis.insightsPanelTitle}</h3>
+              <h3 className="text-sm font-semibold text-zinc-100">
+                {t.analysis.insightsPanelTitle}
+              </h3>
               <button
                 type="button"
                 className="btn-ghost px-2 py-1 text-xs"

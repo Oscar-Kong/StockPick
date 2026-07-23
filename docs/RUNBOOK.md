@@ -142,7 +142,9 @@ Primary data roles default to **finnhub** for quotes and **FMP** for fundamental
 
 **FMP 403 / blocked history:** if FMP returns HTTP 403 (common on free-tier keys), the backend trips a process-wide circuit breaker and falls back to **yfinance** for OHLC during scans and analyze. Install `yfinance` (`pip install yfinance`) — it is listed in `backend/requirements.txt`. Logs will show `FMP access denied (403) — disabling FMP for this process`. Restart the backend to retry FMP after fixing the key or tier.
 
-**Yahoo Stage A ops:** bulk `yfinance.download` runs each chunk in a **disposable process** with a hard timeout (~20s, or remaining `SCAN_PRICE_DOWNLOAD_MAX_SECONDS` budget). On timeout the child is terminated — thread-based timeouts cannot stop a hung Yahoo call. After a bulk pass, MarketDataClient **skips** per-symbol Yahoo→AkShare hammering. If coverage is below `SCAN_BULK_COVERAGE_MIN` (default `0.70`), it attempts one **bounded FMP fill** for missing symbols (when FMP is enabled), then still skips Yahoo/AkShare per-symbol fallback. Prefer Finnhub/AV when configured; keep `UNIVERSE_SCAN_BATCH_SIZE` bounded (default `100`).
+**Yahoo Stage A ops:** bulk `yfinance.download` runs each chunk in a **disposable process** with a hard timeout (~20s, or remaining `SCAN_PRICE_DOWNLOAD_MAX_SECONDS` budget). The parent **polls/receives the pipe result before joining** the child so large multi-symbol DataFrames cannot false-timeout (classic Queue feeder deadlock). On timeout the child is terminated. A single monotonic deadline governs Yahoo chunks, FMP fill, and per-symbol loops — providers are not granted extra floor time past the deadline. After a bulk pass, MarketDataClient **skips** per-symbol Yahoo→AkShare hammering. If coverage is below `SCAN_BULK_COVERAGE_MIN` (default `0.70`), it attempts one **bounded FMP fill** for missing symbols (when FMP is enabled), then still skips Yahoo/AkShare per-symbol fallback. Prefer Finnhub/AV when configured; keep `UNIVERSE_SCAN_BATCH_SIZE` bounded (default `100`).
+
+**Yahoo fundamentals / single-symbol history:** `Ticker.info` and `Ticker.history` also run under process isolation with `YFINANCE_INFO_TIMEOUT_SECONDS` (default `8`). Timeouts return empty and are logged separately from empty data. Fundamentals cache TTL is completeness-aware: empty → 5m; price XOR mcap → 15m; both cores but sparse → 1h; both cores + sector + valuation/growth → 24h.
 
 **Partial universe gate:** when final bulk coverage is below `SCAN_BULK_COVERAGE_MIN`, the job still completes (status `completed`) with a clear message and `universe_coverage` metadata, but **does not overwrite** `/scan/latest/{bucket}` — the prior complete ranking is preserved. Job results for that attempt remain available on `GET /scan/{job_id}`.
 
@@ -191,6 +193,7 @@ These were previously hard-coded inside `backend/services/scan_manager.py`. They
 | `SCAN_STAGE_B_TOP_N_FAST`         | `15`                             | Candidate cap when `ScanOptions.mode="fast"` — used for low-latency exploratory scans. |
 | `SCAN_PRICE_DOWNLOAD_MAX_SECONDS` | `45`                             | Hard cap (seconds) on the Stage A bulk OHLC provider fetch.                            |
 | `SCAN_BULK_COVERAGE_MIN`            | `0.70`                           | Minimum OHLC coverage before publishing a scan as latest (partial attempts preserve prior latest). |
+| `YFINANCE_INFO_TIMEOUT_SECONDS`     | `8`                              | Process timeout for single-symbol Yahoo `Ticker.info` / `Ticker.history`. |
 | `SCAN_PENNY_STAGE_A_PERIOD`         | `6mo`                            | Penny Stage A bulk OHLC horizon.                                                       |
 | `SCAN_PENNY_STAGE_B_PERIOD`         | `6mo`                            | Penny Stage B candidate build horizon.                                                   |
 | `SCAN_COMPOUNDER_STAGE_A_PERIOD`    | `1y`                             | Compounder Stage A cheap universe filter horizon.                                      |
@@ -353,28 +356,32 @@ Or production mode: `npm run build && npm run start`
 
 ### Analyze slow or 504
 
-- Bucket-fit loads three screeners — wait for sidebar tiles
+- Prefer Workspace’s `/analyze/{symbol}/core` path (one shared enrich) over chaining legacy analyze + v2 + sizing
+- Interactive V2 defaults skip parity and prediction-snapshot persist (`validate_parity=false`, `persist_snapshot=false`)
+- Watchlist rail is cached (`WATCHLIST_MATRIX_TTL`, default 45s) and must not block symbol analysis
+- Bucket-fit is lazy — wait for sidebar tiles only when dual-sleeve comparison is needed
 - Use **Refresh** sparingly on large names
-- Check `ANALYZE_ROUTE_TIMEOUT_SECONDS` in config
+- Check `ANALYZE_ROUTE_TIMEOUT_SECONDS` in config; pipelines also use an internal deadline (thread-pool timeout alone cannot cancel CPU work)
 
 ### “Analysis unavailable” while `/health` works
 
 The workspace shows this when the **browser** reports a network failure (`Failed to fetch`) — not only when the API process is down.
 
-1. Open DevTools → **Network** → find the failed `/analyze/{symbol}` request.
+1. Open DevTools → **Network** → find the failed `/analyze/{symbol}/core` or `/snapshot` request.
 2. **(failed)** with no status, or a CORS console error → your UI origin is not in `ALLOWED_ORIGINS`. Dev defaults allow `http://localhost:18730` and `http://127.0.0.1:18730`; custom `.env` overrides replace those defaults.
-3. **(canceled)** → request aborted on refresh/navigation; retry or wait for the watchlist to finish loading first.
-4. **504 / pending then failed** → analyze timed out or the connection dropped mid-request; retry or raise `ANALYZE_ROUTE_TIMEOUT_SECONDS`.
+3. **(canceled)** → request aborted on symbol switch/navigation; retry. Rail loading no longer blocks analysis.
+4. **504 / pending then failed** → analyze timed out or the connection dropped mid-request; retry or raise `ANALYZE_ROUTE_TIMEOUT_SECONDS`. Snapshot/core may still serve a stale cached body.
 5. **500 on `/analyze/...?refresh=1`** → backend bug during fresh analyze (e.g. numpy scalars in the JSON snapshot). Check the API response `message` field or backend logs; cached requests without `refresh=1` may still return 200.
 
 Quick check from the same machine:
 
 ```bash
 curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:18731/health
-curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:18731/analyze/CLOV
+curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:18731/analyze/CLOV/snapshot
+curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:18731/analyze/CLOV/core
 ```
 
-Both should return `200`. If curl succeeds but the browser fails, suspect CORS or a non-default UI URL (LAN IP, forwarded port, `localhost` vs `127.0.0.1` mismatch in `ALLOWED_ORIGINS`).
+Both health and snapshot should return `200` when warm; core may take longer on a cold symbol. If curl succeeds but the browser fails, suspect CORS or a non-default UI URL (LAN IP, forwarded port, `localhost` vs `127.0.0.1` mismatch in `ALLOWED_ORIGINS`).
 
 ### Walk-forward times out in Quant Lab
 

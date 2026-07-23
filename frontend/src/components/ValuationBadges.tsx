@@ -32,9 +32,9 @@ export function ValuationBadges({
           {fmt(t.badges.earningsOn, { date: earningsDate })}
         </span>
       )}
-      {warnings.map((w) => (
+      {warnings.map((w, idx) => (
         <span
-          key={w}
+          key={`${idx}-${w}`}
           className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800 dark:bg-orange-950 dark:text-orange-300"
           title={w}
         >

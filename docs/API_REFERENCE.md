@@ -314,3 +314,26 @@ Base path: `/scan` (not under `/api/v2/research`)
 **Coverage gate:** Stage A bulk OHLC must reach `SCAN_BULK_COVERAGE_MIN` (default `0.70`) before `save_scan_results` overwrites latest. Below that, the job completes with a partial-universe message; `/scan/latest` is unchanged. Cached metadata includes `universe_coverage` and `data_flow.bulk_*` when a complete scan is published.
 
 **Timestamps:** `completed_at` / `last_attempt_failed_at` use UTC `Z` → `+00:00` parsing; invalid cached stamps become `null` (no 500).
+
+## Saved progress
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/saved/progress-summary` | Counts + latest timestamps for scans/reports/analyze/trades |
+
+Timestamps use `parse_api_datetime` (malformed → `null`). Legacy sleeve `medium` on saved rows maps to `penny` via `normalize_sleeve`.
+
+## Workspace / Analyze
+
+Base path: `/analyze` (Workspace UI at `/workspace`).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/analyze/watchlist` | Watchlist rail matrix (technicals + alerts). Cached ~45s (`WATCHLIST_MATRIX_TTL`). `?refresh=1` bypasses cache. Timeout returns stale cache when available. |
+| GET | `/analyze/{symbol}/snapshot` | Cached-first paint (memory core → memory analyze → saved_analyze). No full recompute. Emits `Server-Timing`. |
+| GET | `/analyze/{symbol}/core` | Shared `AnalysisContext`: one enrich/reconcile/history → base analyze + v2 decision + trade_plan + delta. Single-flight dedupe. `trade_plan.invalidation` is order-preserving deduped (bear case often repeats an alert). `?refresh=1`, `?include_bucket_fit=1`. Emits `Server-Timing`. |
+| GET | `/analyze/{symbol}` | Legacy full symbol analysis (still supported). |
+| GET | `/analyze/{symbol}/bucket-fit` | Dual-sleeve scores (lazy; not required for core Overview). |
+| GET | `/api/v2/score/{symbol}` | V2 score. Interactive defaults: `validate_parity=false`, `persist_snapshot=false`. Opt in for CI/shadow/evaluation jobs. |
+
+**Performance notes:** Workspace loads the rail independently of symbol analysis. Switching tickers must not refetch `/analyze/watchlist`. Core targets: cached switch &lt;300ms client paint; fresh core &lt;2s when data is warm. Route timeouts do not kill worker threads — pipelines honor a monotonic deadline where checked.

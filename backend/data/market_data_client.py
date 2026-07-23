@@ -343,11 +343,31 @@ class MarketDataClient:
             "fiftyTwoWeekLow": info.get("fiftyTwoWeekLow"),
             "source": info.get("source"),
         }
-        has_core = bool(slim.get("currentPrice") or slim.get("marketCap"))
-        # Do not apply a 24h TTL to empty/provider-error results.
-        ttl = 86400 if has_core else 300
+        ttl = self._info_cache_ttl(slim)
         self.cache.set(f"info:{sym}", slim, ttl)
         return slim
+
+    @staticmethod
+    def _info_cache_ttl(slim: dict[str, Any]) -> int:
+        """Completeness-aware TTL — incomplete records must not stick for 24h."""
+        price = slim.get("currentPrice")
+        mcap = slim.get("marketCap")
+        has_price = price not in (None, "", 0)
+        has_mcap = mcap not in (None, "", 0)
+        if not has_price and not has_mcap:
+            return 300
+        if has_price ^ has_mcap:
+            return 900
+        sector = slim.get("sector") or ""
+        rich = bool(sector) and bool(
+            slim.get("trailingPE")
+            or slim.get("revenueGrowth")
+            or slim.get("earningsGrowth")
+            or slim.get("profitMargins")
+        )
+        if rich:
+            return 86400
+        return 3600
 
     def bulk_info(self, symbols: list[str]) -> dict[str, dict[str, Any]]:
         result: dict[str, dict[str, Any]] = {}
@@ -367,8 +387,7 @@ class MarketDataClient:
         missing: list[str],
         period: str,
         *,
-        start: float,
-        max_runtime_seconds: int,
+        deadline: float | None,
     ) -> list[str]:
         """Bounded FMP fill for symbols Yahoo bulk missed — no Yahoo/AkShare hammering."""
         if not missing or not self.fmp or FMPClient.is_disabled():
@@ -376,11 +395,11 @@ class MarketDataClient:
         remaining = list(missing)
         filled = 0
         for sym in list(remaining):
-            if max_runtime_seconds > 0 and (time.time() - start) >= max_runtime_seconds:
+            if deadline is not None and time.monotonic() >= deadline:
                 logger.warning(
-                    "Batch history: FMP fill hit runtime cap after %s fills (%s still missing)",
+                    "Batch history: FMP fill hit deadline after %s fills (%s still missing)",
                     filled,
-                    len(remaining) - filled,
+                    len([s for s in remaining if s not in result]),
                 )
                 break
             try:
@@ -433,20 +452,25 @@ class MarketDataClient:
             self._set_batch_meta(requested=0, result=result, source="none")
             return result
 
-        start = time.time()
+        deadline: float | None = None
+        if max_runtime_seconds and max_runtime_seconds > 0:
+            deadline = time.monotonic() + float(max_runtime_seconds)
         missing = list(unique)
         source = "none"
+
+        def _remaining() -> float | None:
+            if deadline is None:
+                return None
+            return max(0.0, deadline - time.monotonic())
 
         # Fast path: bulk yfinance when FMP is blocked or not the primary price source.
         use_yf_bulk = PRIMARY_PRICE_SOURCE != "fmp" or FMPClient.is_disabled()
         if use_yf_bulk and missing:
-            remaining = max_runtime_seconds
-            if max_runtime_seconds > 0:
-                remaining = max(1, int(max_runtime_seconds - (time.time() - start)))
+            rem = _remaining()
             yf_batch = yf_client.download_batch(
                 missing,
                 period=period,
-                max_runtime_seconds=remaining if max_runtime_seconds > 0 else None,
+                max_runtime_seconds=rem if rem is not None else None,
             )
             for sym, df in yf_batch.items():
                 if not df.empty:
@@ -469,8 +493,7 @@ class MarketDataClient:
                     result,
                     missing,
                     period,
-                    start=start,
-                    max_runtime_seconds=max_runtime_seconds,
+                    deadline=deadline,
                 )
                 if len(result) > yf_count:
                     source = "yfinance+fmp" if yf_count else "fmp"
@@ -485,16 +508,23 @@ class MarketDataClient:
         batch_size = max(1, chunk_size)
         source = "per_symbol"
         for i in range(0, len(missing), batch_size):
-            if max_runtime_seconds > 0 and (time.time() - start) >= max_runtime_seconds:
+            if deadline is not None and time.monotonic() >= deadline:
                 logger.warning(
-                    "Batch history fetch reached %ss runtime cap; returning partial results (%s/%s symbols)",
-                    max_runtime_seconds,
+                    "Batch history fetch reached runtime deadline; returning partial results (%s/%s symbols)",
                     len(result),
                     len(unique),
                 )
                 break
             chunk = missing[i : i + batch_size]
             for sym in chunk:
+                if deadline is not None and time.monotonic() >= deadline:
+                    logger.warning(
+                        "Batch history fetch reached runtime deadline mid-chunk; returning partial (%s/%s)",
+                        len(result),
+                        len(unique),
+                    )
+                    self._set_batch_meta(requested=len(unique), result=result, source=source)
+                    return result
                 try:
                     df = self.get_history(
                         sym,
@@ -516,6 +546,8 @@ class MarketDataClient:
             )
             source = "alpha_vantage_probe"
             for sym in probes:
+                if deadline is not None and time.monotonic() >= deadline:
+                    break
                 try:
                     df = self.get_history(
                         sym,

@@ -1,0 +1,10 @@
+# Ruff — fail CI on undefined names (e.g. NameError after import cleanup).
+target-version = "py311"
+src = ["."]
+
+[lint]
+select = ["F821"]
+
+# Forward-ref string annotations resolved via lazy imports (not runtime NameErrors).
+[lint.per-file-ignores]
+"data/portfolio_store.py" = ["F821"]

@@ -12,7 +12,9 @@ Read **`design-system/MASTER.md`** first, then **`analyze.md`** for full page-sp
 |------|-------|
 | Route | `/workspace` |
 | Legacy redirect | `/analyze` → `/workspace` |
-| Primary components | `WorkspacePage`, `WatchlistRail`, `AnalysisPanel`, `AnalysisTabNav` |
+| Primary components | `WorkspacePage`, `WatchlistRail`, `AnalysisPanel`, `AnalysisTabNav`, `DecisionOverview` |
+| Sections | Overview · Drivers · Risk · Evidence · Research |
+| Loading | Rail independent of symbol; snapshot → core |
 | URL params | `symbol`, analysis tab state |
 | Audit sections | `docs/UI_AUDIT_REVISED.md` §12.3 |
 

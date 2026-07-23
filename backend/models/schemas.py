@@ -1018,6 +1018,35 @@ class AnalyzeSymbolResponse(BaseModel):
     price_history_bar_count: int = 0
 
 
+class AnalyzeCoreResponse(BaseModel):
+    """Shared-context Workspace payload: base analyze + v2 from one enrich."""
+
+    symbol: str
+    sleeve: str
+    base: AnalyzeSymbolResponse | dict[str, Any] | None = None
+    v2: dict[str, Any] | None = None
+    trade_plan: dict[str, Any] | None = None
+    delta: dict[str, Any] | None = None
+    freshness: dict[str, Any] = {}
+    timings_ms: dict[str, float] = {}
+    error: str | None = None
+
+
+class AnalyzeSnapshotResponse(BaseModel):
+    """Cached-first paint for Workspace — may be stale."""
+
+    symbol: str
+    sleeve: str
+    base: AnalyzeSymbolResponse | dict[str, Any] | None = None
+    v2: dict[str, Any] | None = None
+    trade_plan: dict[str, Any] | None = None
+    delta: dict[str, Any] | None = None
+    freshness: dict[str, Any] = {}
+    timings_ms: dict[str, float] = {}
+    stale: bool = True
+    error: str | None = None
+
+
 class AnalyzeCompareEntry(BaseModel):
     symbol: str
     assigned_bucket: str | None = None

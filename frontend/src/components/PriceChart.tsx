@@ -150,7 +150,8 @@ export function PriceChart({
       </div>
 
       <ChartMount className={clsx("w-full min-w-0", heightClassName)}>
-        <ResponsiveContainer width="100%" height="100%" minWidth={280} minHeight={220}>
+        {/* Numeric height avoids Recharts measuring width/height -1 on first paint. */}
+        <ResponsiveContainer width="100%" height={272} minWidth={280}>
           <LineChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#27272a" opacity={0.45} />
             <XAxis

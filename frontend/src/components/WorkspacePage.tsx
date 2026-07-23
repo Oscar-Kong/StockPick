@@ -43,19 +43,24 @@ function WorkspaceContent() {
   const [matrix, setMatrix] = useState<AnalyzeWatchlistRow[]>([]);
   const [items, setItems] = useState<WatchlistItem[]>([]);
   const [alertTotal, setAlertTotal] = useState(0);
-  const [selected, setSelected] = useState<string | null>(initialSymbol);
+  const [selectedSymbol, setSelectedSymbol] = useState<string | null>(initialSymbol);
   const [selectedNotes, setSelectedNotes] = useState("");
   const [selectedBucket, setSelectedBucket] = useState<AnalyzeWatchlistRow["bucket"] | undefined>();
-  const [loading, setLoading] = useState(true);
+  const [railLoading, setRailLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState("");
   const [showImport, setShowImport] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const autoPickedRef = useRef(false);
+  const selectedRef = useRef(selectedSymbol);
+
+  useEffect(() => {
+    selectedRef.current = selectedSymbol;
+  }, [selectedSymbol]);
 
   const symbolOrder = useMemo(() => items.map((i) => i.symbol.toUpperCase()), [items]);
-  const selectedIndex = selected ? symbolOrder.indexOf(selected.toUpperCase()) : -1;
+  const selectedIndex = selectedSymbol ? symbolOrder.indexOf(selectedSymbol.toUpperCase()) : -1;
   const prevSymbol = selectedIndex > 0 ? symbolOrder[selectedIndex - 1] : null;
   const nextSymbol =
     selectedIndex >= 0 && selectedIndex < symbolOrder.length - 1
@@ -70,7 +75,7 @@ function WorkspaceContent() {
   const selectSymbol = useCallback(
     (sym: string) => {
       const upper = sym.toUpperCase();
-      setSelected(upper);
+      setSelectedSymbol(upper);
       const row = matrixBySymbol.get(upper);
       setSelectedNotes(row?.notes ?? "");
       setSelectedBucket(normalizeBucket(row?.bucket));
@@ -82,8 +87,8 @@ function WorkspaceContent() {
     [matrixBySymbol]
   );
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const loadRail = useCallback(async () => {
+    setRailLoading(true);
     setFetchError(null);
     try {
       const [analyzeRes, watchlist] = await Promise.all([
@@ -93,8 +98,10 @@ function WorkspaceContent() {
       setMatrix(analyzeRes.rows);
       setAlertTotal(analyzeRes.alert_total);
       setItems(watchlist);
-      if (selected) {
-        const row = analyzeRes.rows.find((r) => r.symbol === selected);
+
+      const current = selectedRef.current;
+      if (current) {
+        const row = analyzeRes.rows.find((r) => r.symbol === current);
         if (row) {
           setSelectedNotes(row.notes);
           setSelectedBucket(normalizeBucket(row.bucket));
@@ -106,7 +113,7 @@ function WorkspaceContent() {
       ) {
         autoPickedRef.current = true;
         const first = analyzeRes.rows[0];
-        setSelected(first.symbol);
+        setSelectedSymbol(first.symbol);
         setSelectedNotes(first.notes);
         setSelectedBucket(normalizeBucket(first.bucket));
       }
@@ -115,17 +122,17 @@ function WorkspaceContent() {
       setItems([]);
       setFetchError(explainWorkspaceLoadError(err, t));
     } finally {
-      setLoading(false);
+      setRailLoading(false);
     }
-  }, [initialSymbol, selected, t]);
+  }, [initialSymbol, t]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void loadRail();
+  }, [loadRail]);
 
   useEffect(() => {
     if (initialSymbol) {
-      setSelected(initialSymbol);
+      setSelectedSymbol(initialSymbol);
       const row = matrixBySymbol.get(initialSymbol);
       if (row) {
         setSelectedNotes(row.notes);
@@ -140,7 +147,7 @@ function WorkspaceContent() {
     try {
       const res = await refreshWatchlist();
       setMsg(fmt(t.workspace.refreshed, { count: res.refreshed }));
-      await load();
+      await loadRail();
     } catch (err) {
       setMsg(err instanceof Error ? err.message : t.workspace.refreshFailed);
     } finally {
@@ -150,11 +157,11 @@ function WorkspaceContent() {
 
   const handleRemove = async (symbol: string) => {
     await removeFromWatchlist(symbol);
-    if (selected === symbol) {
-      setSelected(null);
+    if (selectedSymbol === symbol) {
+      setSelectedSymbol(null);
       router.replace("/workspace");
     }
-    await load();
+    await loadRail();
   };
 
   const metaAlerts =
@@ -164,7 +171,9 @@ function WorkspaceContent() {
           label: alertTotal === 1 ? t.common.alert : t.common.alerts,
         })
       : "";
-  const metaSelected = selected ? fmt(t.workspace.selectedSuffix, { symbol: selected }) : "";
+  const metaSelected = selectedSymbol
+    ? fmt(t.workspace.selectedSuffix, { symbol: selectedSymbol })
+    : "";
 
   return (
     <div className="workspace-layout workspace-layout--fill">
@@ -185,7 +194,7 @@ function WorkspaceContent() {
         <div className="workspace-fetch-notice shrink-0 px-3 pb-2 md:px-4">
           <ErrorState
             message={`${t.workspace.fetchFailedTitle}. ${fetchError}`}
-            onRetry={() => void load()}
+            onRetry={() => void loadRail()}
           />
         </div>
       )}
@@ -196,7 +205,7 @@ function WorkspaceContent() {
             <WatchlistRail
               items={items}
               matrixBySymbol={matrixBySymbol}
-              selected={selected}
+              selected={selectedSymbol}
               filter={filter}
               onFilterChange={setFilter}
               onSelect={selectSymbol}
@@ -205,9 +214,9 @@ function WorkspaceContent() {
               onToggleImport={() => setShowImport((v) => !v)}
               showImport={showImport}
               refreshing={refreshing}
-              loading={loading}
+              loading={railLoading}
               msg={msg}
-              onImported={() => void load()}
+              onImported={() => void loadRail()}
             />
           </aside>
 
@@ -215,13 +224,13 @@ function WorkspaceContent() {
             <div className="workspace-analyze-pane">
               {showImport && (
                 <div className="shrink-0 border-b border-zinc-800 bg-zinc-950/80 p-4 md:hidden">
-                  <WatchlistImport onImported={() => void load()} />
+                  <WatchlistImport onImported={() => void loadRail()} />
                 </div>
               )}
 
               <div className="shrink-0 border-b border-zinc-800 p-2 md:hidden">
                 <select
-                  value={selected ?? ""}
+                  value={selectedSymbol ?? ""}
                   onChange={(e) => e.target.value && selectSymbol(e.target.value)}
                   className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
                 >
@@ -234,10 +243,9 @@ function WorkspaceContent() {
                 </select>
               </div>
 
-              {selected && !loading ? (
+              {selectedSymbol ? (
                 <AnalysisPanel
-                  key={selected}
-                  symbol={selected}
+                  symbol={selectedSymbol}
                   bucket={selectedBucket}
                   initialNotes={selectedNotes}
                   embedded
@@ -245,10 +253,6 @@ function WorkspaceContent() {
                   nextSymbol={nextSymbol}
                   onNavigateSymbol={selectSymbol}
                 />
-              ) : selected && loading ? (
-                <div className="flex flex-1 items-center justify-center p-10 text-center text-sm text-secondary">
-                  {t.workspace.loading}
-                </div>
               ) : (
                 <WorkspaceEmptyPanel
                   items={items}

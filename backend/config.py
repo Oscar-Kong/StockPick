@@ -386,6 +386,7 @@ PRICE_CACHE_TTL = int(os.getenv("PRICE_CACHE_TTL", "300"))
 FUNDAMENTALS_CACHE_TTL = int(os.getenv("FUNDAMENTALS_CACHE_TTL", "604800"))
 SCAN_RESULT_TTL = int(os.getenv("SCAN_RESULT_TTL", "900"))
 ANALYZE_RESULT_TTL = int(os.getenv("ANALYZE_RESULT_TTL", "1800"))
+WATCHLIST_MATRIX_TTL = int(os.getenv("WATCHLIST_MATRIX_TTL", "45"))
 PORTFOLIO_PERFORMANCE_CACHE_TTL = int(os.getenv("PORTFOLIO_PERFORMANCE_CACHE_TTL", "120"))
 
 # --- Route runtime caps (seconds) ---
@@ -440,6 +441,8 @@ SCAN_PRICE_DOWNLOAD_MAX_SECONDS = float(os.getenv("SCAN_PRICE_DOWNLOAD_MAX_SECON
 # Minimum fraction of universe OHLC required before publishing a scan as "latest".
 # Below this, the job may complete with diagnostics but must not overwrite the prior complete latest.
 SCAN_BULK_COVERAGE_MIN = float(os.getenv("SCAN_BULK_COVERAGE_MIN", "0.70"))
+# Hard timeout for single-symbol yfinance Ticker.info / Ticker.history process calls.
+YFINANCE_INFO_TIMEOUT_SECONDS = float(os.getenv("YFINANCE_INFO_TIMEOUT_SECONDS", "8"))
 # Bucket-specific OHLC horizons for two-stage scans (Stage A cheap filter → Stage B deep).
 SCAN_PENNY_STAGE_A_PERIOD = os.getenv("SCAN_PENNY_STAGE_A_PERIOD", "6mo")
 SCAN_PENNY_STAGE_B_PERIOD = os.getenv("SCAN_PENNY_STAGE_B_PERIOD", "6mo")
