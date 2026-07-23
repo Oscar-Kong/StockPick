@@ -1,10 +1,12 @@
 """Saved scans and saved reports CRUD routes."""
 from __future__ import annotations
 
-from datetime import datetime
+import logging
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import ValidationError
 
+from core.sleeve import normalize_sleeve
 from data import cache as cache_module
 from models.schemas import (
     Bucket,
@@ -17,22 +19,52 @@ from models.schemas import (
     SavedScanItem,
     StockResult,
 )
+from utils.datetime_util import parse_api_datetime
+from utils.pydantic_util import json_safe
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/saved", tags=["saved"])
 
 
+def _stock_result_from_row(row: dict) -> StockResult | None:
+    try:
+        payload = json_safe(row)
+        if not isinstance(payload, dict):
+            return None
+        if "bucket" in payload:
+            payload["bucket"] = normalize_sleeve(str(payload.get("bucket") or "penny"))
+        return StockResult(**payload)
+    except (ValidationError, TypeError, ValueError) as exc:
+        logger.warning("Skipping invalid saved StockResult row: %s", exc)
+        return None
+
+
 def _to_saved_scan_item(row: dict) -> SavedScanItem:
     completed = row.get("completed_at")
+    created = row.get("created_at")
+    results: list[StockResult] = []
+    for r in row.get("results") or []:
+        if not isinstance(r, dict):
+            continue
+        parsed = _stock_result_from_row(r)
+        if parsed is not None:
+            results.append(parsed)
+    created_at = parse_api_datetime(created if isinstance(created, str) else None)
+    if created_at is None and created is not None:
+        created_at = parse_api_datetime(str(created))
+    if created_at is None:
+        raise ValueError(f"saved scan {row.get('id')} missing created_at")
     return SavedScanItem(
         id=int(row["id"]),
         name=row.get("name") or "",
         bucket=Bucket(row["bucket"]),
         options=row.get("options") or {},
-        results=[StockResult(**r) for r in (row.get("results") or [])],
+        results=results,
         result_count=int(row.get("result_count") or 0),
         strategy_version=row.get("strategy_version"),
-        completed_at=datetime.fromisoformat(completed) if completed else None,
-        created_at=datetime.fromisoformat(row["created_at"]),
+        completed_at=parse_api_datetime(completed if isinstance(completed, str) else None),
+        created_at=created_at,
     )
 
 
@@ -45,8 +77,8 @@ def _to_saved_report_item(row: dict) -> SavedReportItem:
         title=row.get("title") or "",
         notes=row.get("notes") or "",
         report=row.get("report") or {},
-        created_at=datetime.fromisoformat(row["created_at"]),
-        updated_at=datetime.fromisoformat(row["updated_at"]),
+        created_at=parse_api_datetime(row.get("created_at") if isinstance(row.get("created_at"), str) else None),
+        updated_at=parse_api_datetime(row.get("updated_at") if isinstance(row.get("updated_at"), str) else None),
     )
 
 
@@ -58,8 +90,8 @@ def _to_saved_analyze_item(row: dict) -> SavedAnalyzeItem:
         payload=row.get("payload") or {},
         score=row.get("score"),
         data_quality_score=row.get("data_quality_score"),
-        created_at=datetime.fromisoformat(row["created_at"]),
-        updated_at=datetime.fromisoformat(row["updated_at"]),
+        created_at=parse_api_datetime(row.get("created_at") if isinstance(row.get("created_at"), str) else None),
+        updated_at=parse_api_datetime(row.get("updated_at") if isinstance(row.get("updated_at"), str) else None),
     )
 
 

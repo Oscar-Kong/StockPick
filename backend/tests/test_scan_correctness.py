@@ -190,6 +190,15 @@ def test_scan_records_skip_reason_when_history_missing():
         patch("services.scan_pipeline.PriceService") as ps_cls,
     ):
         ps_cls.return_value.download_batch.return_value = {}
+        # Coverage meta says the bulk pass completed; empty hist still records missing_history skips.
+        ps_cls.return_value.last_batch_meta = {
+            "requested": 1,
+            "received": 1,
+            "missing_count": 0,
+            "coverage": 1.0,
+            "source": "db",
+            "partial": False,
+        }
         reg_cls.return_value.get_active.return_value = MagicMock(version_id="test-v1")
         options = MagicMock(max_results=25, mode="deep")
         options.model_dump.return_value = {"max_results": 25, "mode": "deep"}

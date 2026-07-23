@@ -19,6 +19,7 @@ from config import (
     FMP_ENABLED,
     PRIMARY_FUNDAMENTALS_SOURCE,
     PRIMARY_PRICE_SOURCE,
+    SCAN_BULK_COVERAGE_MIN,
 )
 from data.akshare_client import AkShareClient
 from data.av_client import AlphaVantageClient
@@ -46,6 +47,7 @@ class MarketDataClient:
         self.cache = cache or Cache()
         self._last_call = 0.0
         self._min_interval = 0.2
+        self.last_batch_meta: dict[str, Any] | None = None
         self.ak = AkShareClient(cache=self.cache) if AKSHARE_ENABLED else None
         self.fmp = FMPClient(cache=self.cache) if FMP_API_KEY and FMP_ENABLED else None
         self.finnhub = FinnhubClient(cache=self.cache) if FINNHUB_API_KEY and FINNHUB_ENABLED else None
@@ -232,7 +234,16 @@ class MarketDataClient:
                     "beta": profile.get("beta"),
                     "source": "fmp",
                 }
+        yf_info = yf_client.get_info(sym)
+        if yf_info.get("currentPrice") or yf_info.get("marketCap"):
+            return yf_info
         return {}
+
+    @staticmethod
+    def _fill_missing(target: dict[str, Any], source: dict[str, Any], fields: list[str]) -> None:
+        for field in fields:
+            if not target.get(field) and source.get(field) not in (None, ""):
+                target[field] = source[field]
 
     def get_info(self, symbol: str) -> dict[str, Any]:
         sym = symbol.upper()
@@ -254,15 +265,61 @@ class MarketDataClient:
 
         info = {**profile, **ratios, **quote}
         if av:
-            info.setdefault("shortName", av.get("name"))
-            info.setdefault("sector", av.get("sector"))
-            info.setdefault("industry", av.get("industry"))
-            info.setdefault("marketCap", av.get("market_cap"))
-            info.setdefault("beta", av.get("beta"))
-            info.setdefault("trailingPE", av.get("pe_ratio"))
-            info.setdefault("profitMargins", av.get("profit_margin"))
-            info.setdefault("fiftyTwoWeekHigh", av.get("52_week_high"))
-            info.setdefault("fiftyTwoWeekLow", av.get("52_week_low"))
+            self._fill_missing(
+                info,
+                {
+                    "shortName": av.get("name"),
+                    "sector": av.get("sector"),
+                    "industry": av.get("industry"),
+                    "marketCap": av.get("market_cap"),
+                    "beta": av.get("beta"),
+                    "trailingPE": av.get("pe_ratio"),
+                    "profitMargins": av.get("profit_margin"),
+                    "fiftyTwoWeekHigh": av.get("52_week_high"),
+                    "fiftyTwoWeekLow": av.get("52_week_low"),
+                },
+                [
+                    "shortName",
+                    "sector",
+                    "industry",
+                    "marketCap",
+                    "beta",
+                    "trailingPE",
+                    "profitMargins",
+                    "fiftyTwoWeekHigh",
+                    "fiftyTwoWeekLow",
+                ],
+            )
+
+        # Final bounded Yahoo fundamentals fallback when paid providers are sparse.
+        if not info.get("currentPrice") or not info.get("marketCap") or not info.get("sector"):
+            yf_info = yf_client.get_info(sym)
+            if yf_info:
+                self._fill_missing(
+                    info,
+                    yf_info,
+                    [
+                        "shortName",
+                        "sector",
+                        "industry",
+                        "marketCap",
+                        "currentPrice",
+                        "averageVolume",
+                        "beta",
+                        "trailingPE",
+                        "profitMargins",
+                        "revenueGrowth",
+                        "earningsGrowth",
+                        "debtToEquity",
+                        "returnOnEquity",
+                        "freeCashflow",
+                        "totalRevenue",
+                        "fiftyTwoWeekHigh",
+                        "fiftyTwoWeekLow",
+                    ],
+                )
+                if not info.get("source"):
+                    info["source"] = yf_info.get("source") or "yfinance"
 
         slim = {
             "symbol": sym,
@@ -284,8 +341,12 @@ class MarketDataClient:
             "ebitdaMargins": info.get("ebitdaMargins"),
             "fiftyTwoWeekHigh": info.get("fiftyTwoWeekHigh"),
             "fiftyTwoWeekLow": info.get("fiftyTwoWeekLow"),
+            "source": info.get("source"),
         }
-        self.cache.set(f"info:{sym}", slim, 86400)
+        has_core = bool(slim.get("currentPrice") or slim.get("marketCap"))
+        # Do not apply a 24h TTL to empty/provider-error results.
+        ttl = 86400 if has_core else 300
+        self.cache.set(f"info:{sym}", slim, ttl)
         return slim
 
     def bulk_info(self, symbols: list[str]) -> dict[str, dict[str, Any]]:
@@ -300,6 +361,62 @@ class MarketDataClient:
     def get_spy_history(self, period: str = "1y") -> pd.DataFrame:
         return self.get_history("SPY", period=period)
 
+    def _fill_missing_via_fmp(
+        self,
+        result: dict[str, pd.DataFrame],
+        missing: list[str],
+        period: str,
+        *,
+        start: float,
+        max_runtime_seconds: int,
+    ) -> list[str]:
+        """Bounded FMP fill for symbols Yahoo bulk missed — no Yahoo/AkShare hammering."""
+        if not missing or not self.fmp or FMPClient.is_disabled():
+            return missing
+        remaining = list(missing)
+        filled = 0
+        for sym in list(remaining):
+            if max_runtime_seconds > 0 and (time.time() - start) >= max_runtime_seconds:
+                logger.warning(
+                    "Batch history: FMP fill hit runtime cap after %s fills (%s still missing)",
+                    filled,
+                    len(remaining) - filled,
+                )
+                break
+            try:
+                df = self._get_history_fmp(sym, period=period)
+                df = _normalize_hist_frame(df)
+                if not df.empty:
+                    result[sym] = df
+                    filled += 1
+            except Exception as exc:
+                logger.warning("FMP bulk fill failed for %s: %s", sym, exc)
+        if filled:
+            logger.info(
+                "Batch history: FMP fill recovered %s/%s missing symbols",
+                filled,
+                len(missing),
+            )
+        return [s for s in missing if s not in result]
+
+    def _set_batch_meta(
+        self,
+        *,
+        requested: int,
+        result: dict[str, pd.DataFrame],
+        source: str,
+    ) -> None:
+        received = len(result)
+        coverage = (received / requested) if requested else 1.0
+        self.last_batch_meta = {
+            "requested": requested,
+            "received": received,
+            "missing_count": max(0, requested - received),
+            "coverage": round(coverage, 4),
+            "source": source,
+            "partial": bool(requested and coverage < SCAN_BULK_COVERAGE_MIN),
+        }
+
     def download_batch(
         self,
         symbols: list[str],
@@ -313,10 +430,12 @@ class MarketDataClient:
         result: dict[str, pd.DataFrame] = {}
         unique = list(dict.fromkeys(s.upper() for s in symbols if s))
         if not unique:
+            self._set_batch_meta(requested=0, result=result, source="none")
             return result
 
         start = time.time()
         missing = list(unique)
+        source = "none"
 
         # Fast path: bulk yfinance when FMP is blocked or not the primary price source.
         use_yf_bulk = PRIMARY_PRICE_SOURCE != "fmp" or FMPClient.is_disabled()
@@ -333,31 +452,38 @@ class MarketDataClient:
                 if not df.empty:
                     result[sym] = df
             missing = [s for s in missing if s not in result]
-            if use_yf_bulk:
-                if result:
-                    logger.info(
-                        "Batch history: yfinance returned %s/%s symbols (%s)",
-                        len(result),
-                        len(unique),
-                        period,
-                    )
-                    # Avoid per-symbol Yahoo/AkShare hammering after a bulk pass — that path
-                    # re-triggers rate limits and can wedge the sync API worker for minutes.
-                    if missing:
-                        logger.warning(
-                            "Batch history: skipping per-symbol fallback for %s symbols after yfinance bulk",
-                            len(missing),
-                        )
-                    return result
-                # Bulk returned nothing (rate-limit / DNS). Do not spend the remaining
-                # budget on per-symbol Yahoo→AkShare→AV — that path wedges Stage A.
-                logger.warning(
-                    "Batch history: yfinance bulk returned 0/%s symbols; skipping per-symbol fallback",
-                    len(unique),
+            yf_count = len(result)
+            source = "yfinance"
+            coverage = yf_count / len(unique) if unique else 1.0
+            logger.info(
+                "Batch history: yfinance returned %s/%s symbols (coverage=%.1f%%, %s)",
+                yf_count,
+                len(unique),
+                coverage * 100.0,
+                period,
+            )
+            # One bounded FMP fill when coverage is below the publish gate — still no
+            # per-symbol Yahoo/AkShare hammering after the bulk pass.
+            if missing and coverage < SCAN_BULK_COVERAGE_MIN:
+                missing = self._fill_missing_via_fmp(
+                    result,
+                    missing,
+                    period,
+                    start=start,
+                    max_runtime_seconds=max_runtime_seconds,
                 )
-                missing = []
+                if len(result) > yf_count:
+                    source = "yfinance+fmp" if yf_count else "fmp"
+            if missing:
+                logger.warning(
+                    "Batch history: skipping per-symbol fallback for %s symbols after bulk path",
+                    len(missing),
+                )
+            self._set_batch_meta(requested=len(unique), result=result, source=source)
+            return result
 
         batch_size = max(1, chunk_size)
+        source = "per_symbol"
         for i in range(0, len(missing), batch_size):
             if max_runtime_seconds > 0 and (time.time() - start) >= max_runtime_seconds:
                 logger.warning(
@@ -388,6 +514,7 @@ class MarketDataClient:
                 "Batch history fallback: probing %s symbols via Alpha Vantage",
                 len(probes),
             )
+            source = "alpha_vantage_probe"
             for sym in probes:
                 try:
                     df = self.get_history(
@@ -399,6 +526,7 @@ class MarketDataClient:
                         result[sym] = df
                 except Exception as exc:
                     logger.warning("AV probe history failed for %s: %s", sym, exc)
+        self._set_batch_meta(requested=len(unique), result=result, source=source)
         return result
 
     def get_latest_quote_from_history(self, symbol: str, hist: pd.DataFrame | None = None) -> dict:

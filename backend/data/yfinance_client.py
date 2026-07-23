@@ -36,6 +36,21 @@ def _is_rate_limit_error(exc: BaseException) -> bool:
     return "too many requests" in text or "rate limit" in text or "ratelimit" in text
 
 
+def _yf_download_chunk(tickers: str, yf_period: str) -> Any:
+    """Top-level worker for process-isolated Yahoo batch downloads (must be picklable)."""
+    yf = _import_yfinance()
+    if yf is None:
+        return None
+    return yf.download(
+        tickers,
+        period=yf_period,
+        group_by="ticker",
+        auto_adjust=True,
+        threads=True,
+        progress=False,
+    )
+
+
 def get_history(symbol: str, period: str = "1y") -> pd.DataFrame:
     yf = _import_yfinance()
     if yf is None:
@@ -82,40 +97,34 @@ def download_batch(
         chunk = unique[i : i + chunk_size]
         tickers = " ".join(chunk)
         try:
-            # Hard-cap each Yahoo chunk so Stage A cannot wedge the sync API worker.
+            # Hard-cap each Yahoo chunk in a disposable process so a hung download
+            # cannot wedge Stage A (thread timeouts cannot kill running work).
             chunk_timeout = 20.0
             if max_runtime_seconds and max_runtime_seconds > 0:
                 remaining = float(max_runtime_seconds) - (time.monotonic() - started)
                 chunk_timeout = min(chunk_timeout, max(3.0, remaining))
-            from concurrent.futures import ThreadPoolExecutor
-            from concurrent.futures import TimeoutError as FuturesTimeout
+            from utils.process_timeout import run_with_process_timeout
 
-            with ThreadPoolExecutor(max_workers=1) as pool:
-                fut = pool.submit(
-                    yf.download,
-                    tickers,
-                    period=yf_period,
-                    group_by="ticker",
-                    auto_adjust=True,
-                    threads=True,
-                    progress=False,
-                )
-                try:
-                    raw = fut.result(timeout=chunk_timeout)
-                except FuturesTimeout:
-                    logger.warning(
-                        "yfinance batch chunk timed out after %.0fs (%s symbols)",
-                        chunk_timeout,
-                        len(chunk),
-                    )
-                    break
+            raw = run_with_process_timeout(
+                _yf_download_chunk,
+                tickers,
+                yf_period,
+                timeout=chunk_timeout,
+            )
+        except TimeoutError:
+            logger.warning(
+                "yfinance batch chunk timed out after %.0fs (%s symbols)",
+                chunk_timeout,
+                len(chunk),
+            )
+            break
         except Exception as exc:
             logger.warning("yfinance batch download failed: %s", exc)
             if _is_rate_limit_error(exc):
                 logger.warning("yfinance rate-limited — stopping remaining batch chunks")
                 break
             continue
-        if raw is None or raw.empty:
+        if raw is None or getattr(raw, "empty", True):
             continue
         if len(chunk) == 1:
             sym = chunk[0]

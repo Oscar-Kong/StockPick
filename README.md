@@ -182,9 +182,9 @@ Optional LLM profile tuning:
 | `FINRL_ENABLED` | `false` | FinRL allocation workflow flag |
 | `LEAN_EXPORT_ENABLED` | `false` | LEAN handoff workflow flag |
 | `SCORE_ENGINE_V2_ENABLED` | `true` | v2 score API (`/api/v2/score`) |
-| `SCAN_SCORING_MODE` | *(unset → legacy)* | Stage B scorer: `legacy`, `engine`, or `parity_sample` |
+| `SCAN_SCORING_MODE` | `engine` | Stage B scorer: `legacy`, `engine`, or `parity_sample` |
 | `SCAN_PARITY_SAMPLE_RATE` | `0.10` | Legacy comparison fraction in `parity_sample` mode (hash of `scan_id:symbol`) |
-| `USE_SCORING_ENGINE_IN_SCAN` | `false` | Deprecated fallback when `SCAN_SCORING_MODE` unset (`true` → `engine`) |
+| `USE_SCORING_ENGINE_IN_SCAN` | `false` | Deprecated fallback when `SCAN_SCORING_MODE` empty/invalid (`true` → `engine`) |
 | `PERSIST_SCORE_ATTRIBUTION` | `true` | Persist factor attribution rows on v2/scan scores |
 | `PREDICTION_SNAPSHOTS_ENABLED` | `true` | Store every v2 score as a prediction snapshot |
 | `VALUATION_ENGINE_ENABLED` | `true` | DCF + peer + reverse DCF on v2 score |

@@ -9,6 +9,10 @@ from typing import Any
 class ScanDataFlowMetrics:
     bulk_download_ms: float = 0.0
     bulk_symbols_returned: int = 0
+    bulk_symbols_requested: int = 0
+    bulk_coverage_ratio: float = 0.0
+    bulk_download_partial: bool = False
+    bulk_source: str = ""
     stage_a_rank_ms: float = 0.0
     stage_b_build_ms: float = 0.0
     bulk_cache_hits: int = 0

@@ -68,6 +68,7 @@ class ScanStatusResponse(BaseModel):
     parity_summary: dict[str, Any] | None = None
     scoring_engine_used: bool | None = None
     timings: dict[str, float] | None = None
+    invalid_result_count: int = 0
 
 
 class ScanOptions(BaseModel):
@@ -138,6 +139,7 @@ class LatestScanResponse(BaseModel):
     cache_age_seconds: float | None = None
     last_attempt_failed_at: datetime | None = None
     last_attempt_error: str | None = None
+    invalid_result_count: int = 0
 
 
 class SavedScanCreateRequest(BaseModel):

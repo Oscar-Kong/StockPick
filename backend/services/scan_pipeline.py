@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from config import (
     MAX_CANDIDATES_PER_BUCKET,
+    SCAN_BULK_COVERAGE_MIN,
     SCAN_PARITY_SAMPLE_RATE,
     SCAN_PRICE_DOWNLOAD_MAX_SECONDS,
     SCAN_RESULT_TTL,
@@ -327,8 +328,27 @@ def run_scan_pipeline(manager: "ScanService", job_id: str, options: ScanOptions 
         )
         flow_metrics.bulk_download_ms = round((time.monotonic() - bulk_download_started) * 1000.0, 1)
         flow_metrics.bulk_symbols_returned = len(bulk_hist)
+        raw_meta = getattr(ps, "last_batch_meta", None)
+        batch_meta = raw_meta if isinstance(raw_meta, dict) else {}
+        requested = int(batch_meta.get("requested") or len(universe) or 0)
+        if requested <= 0:
+            requested = len(universe)
+        coverage = float(
+            batch_meta["coverage"]
+            if "coverage" in batch_meta
+            else (len(bulk_hist) / requested if requested else 1.0)
+        )
+        partial_flag = batch_meta.get("partial")
+        if not isinstance(partial_flag, bool):
+            partial_flag = coverage < SCAN_BULK_COVERAGE_MIN
+        flow_metrics.bulk_symbols_requested = requested
+        flow_metrics.bulk_coverage_ratio = round(coverage, 4)
+        flow_metrics.bulk_download_partial = bool(partial_flag)
+        flow_metrics.bulk_source = str(batch_meta.get("source") or "")
         job.timings["stage_a_bulk_download_ms"] = flow_metrics.bulk_download_ms
         job.timings["stage_a_bulk_symbols"] = float(flow_metrics.bulk_symbols_returned)
+        job.timings["stage_a_bulk_coverage"] = flow_metrics.bulk_coverage_ratio
+        partial_universe = flow_metrics.bulk_download_partial
 
         rank_started = time.monotonic()
         stage_a_result = rank_stage_a_candidates(job.bucket, bulk_hist, universe=universe)
@@ -564,7 +584,13 @@ def run_scan_pipeline(manager: "ScanService", job_id: str, options: ScanOptions 
             ranking_meta = ranking_out.to_metadata()
         job.status = ScanStatus.completed
         job.progress = 100.0
-        if job.results and not any(not r.metrics.get("provider_limited_partial_data") for r in job.results):
+        if partial_universe:
+            job.message = (
+                f"Partial universe coverage {flow_metrics.bulk_coverage_ratio:.0%} "
+                f"({flow_metrics.bulk_symbols_returned}/{flow_metrics.bulk_symbols_requested}); "
+                f"prior complete latest preserved. Found {len(job.results)} candidates on this attempt."
+            )
+        elif job.results and not any(not r.metrics.get("provider_limited_partial_data") for r in job.results):
             job.message = (
                 f"Found {len(job.results)} candidates (partial-data fallback; provider-limited)"
             )
@@ -595,8 +621,18 @@ def run_scan_pipeline(manager: "ScanService", job_id: str, options: ScanOptions 
         )
 
         scan_metadata: dict = {"timings": dict(job.timings)}
+        scan_metadata["scan_schema_version"] = 1
         scan_metadata["stage_a_diagnostics"] = stage_a_result.to_diagnostics(advanced_count=total)
         scan_metadata["data_flow"] = flow_metrics.to_dict()
+        scan_metadata["universe_coverage"] = {
+            "requested": flow_metrics.bulk_symbols_requested,
+            "received": flow_metrics.bulk_symbols_returned,
+            "coverage": flow_metrics.bulk_coverage_ratio,
+            "minimum": SCAN_BULK_COVERAGE_MIN,
+            "partial_universe": partial_universe,
+            "source": flow_metrics.bulk_source,
+            "published_as_latest": not partial_universe,
+        }
         scan_metadata["history_horizons"] = {
             "stage_a_period": period_a,
             "stage_b_period": period_b,
@@ -615,31 +651,39 @@ def run_scan_pipeline(manager: "ScanService", job_id: str, options: ScanOptions 
             scan_metadata["parity_summary"] = job.parity_summary
         scan_metadata["ranking_diagnostics"] = ranking_meta
 
-        cache_module.save_scan_results(
-            job.bucket.value,
-            models_to_dicts(job.results),
-            job.completed_at.isoformat(),
-            _ttl_for_bucket(job.bucket),
-            strategy_version=strategy.version_id,
-            metadata=scan_metadata,
-        )
-        cache_module.save_scan_snapshot(
-            bucket=job.bucket.value,
-            results=models_to_dicts(job.results),
-            options=model_to_dict(options),
-            name=f"{job.bucket.value.title()} auto scan",
-            strategy_version=strategy.version_id,
-            completed_at=job.completed_at,
-        )
-        # A successful scan supersedes any prior failed-attempt marker.
-        try:
-            cache_module.clear_scan_attempt_failure(job.bucket.value)
-        except Exception as clear_exc:
+        if partial_universe:
             logger.warning(
-                "Failed to clear scan_attempt_failure marker for %s: %s",
+                "Scan %s coverage %.0f%% below minimum %.0f%% — not overwriting latest complete scan",
                 job.bucket.value,
-                clear_exc,
+                flow_metrics.bulk_coverage_ratio * 100.0,
+                SCAN_BULK_COVERAGE_MIN * 100.0,
             )
+        else:
+            cache_module.save_scan_results(
+                job.bucket.value,
+                models_to_dicts(job.results),
+                job.completed_at.isoformat(),
+                _ttl_for_bucket(job.bucket),
+                strategy_version=strategy.version_id,
+                metadata=scan_metadata,
+            )
+            cache_module.save_scan_snapshot(
+                bucket=job.bucket.value,
+                results=models_to_dicts(job.results),
+                options=model_to_dict(options),
+                name=f"{job.bucket.value.title()} auto scan",
+                strategy_version=strategy.version_id,
+                completed_at=job.completed_at,
+            )
+            # A successful scan supersedes any prior failed-attempt marker.
+            try:
+                cache_module.clear_scan_attempt_failure(job.bucket.value)
+            except Exception as clear_exc:
+                logger.warning(
+                    "Failed to clear scan_attempt_failure marker for %s: %s",
+                    job.bucket.value,
+                    clear_exc,
+                )
     except Exception as exc:
         logger.exception("Scan failed: %s", exc)
         job.status = ScanStatus.failed

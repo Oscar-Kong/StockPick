@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from typing import Literal
 
 from config import SCAN_PARITY_SAMPLE_RATE, SCAN_SCORING_MODE, USE_SCORING_ENGINE_IN_SCAN
+
+logger = logging.getLogger(__name__)
 
 ScanScoringMode = Literal["legacy", "engine", "parity_sample"]
 
@@ -12,13 +15,29 @@ VALID_SCAN_SCORING_MODES: frozenset[str] = frozenset({"legacy", "engine", "parit
 
 
 def resolve_scan_scoring_mode() -> ScanScoringMode:
-    """Resolve effective scoring mode from env (with legacy flag fallback)."""
+    """Resolve effective scoring mode from env (engine is the canonical default).
+
+    ``USE_SCORING_ENGINE_IN_SCAN`` is a deprecated alias used only when
+    ``SCAN_SCORING_MODE`` is empty/invalid. When both are set and disagree, log a warning.
+    """
     explicit = (SCAN_SCORING_MODE or "").strip().lower()
     if explicit in VALID_SCAN_SCORING_MODES:
+        if USE_SCORING_ENGINE_IN_SCAN and explicit == "legacy":
+            logger.warning(
+                "SCAN_SCORING_MODE=legacy disagrees with USE_SCORING_ENGINE_IN_SCAN=true; "
+                "using SCAN_SCORING_MODE (canonical). Remove USE_SCORING_ENGINE_IN_SCAN after migration."
+            )
+        if not USE_SCORING_ENGINE_IN_SCAN and explicit in ("engine", "parity_sample"):
+            # Common: .env.example sets engine + USE=false — not a conflict worth warning every call.
+            pass
         return explicit  # type: ignore[return-value]
     if USE_SCORING_ENGINE_IN_SCAN:
+        logger.warning(
+            "SCAN_SCORING_MODE unset/invalid; using deprecated USE_SCORING_ENGINE_IN_SCAN → engine"
+        )
         return "engine"
-    return "legacy"
+    # Canonical default when mode is empty/invalid.
+    return "engine"
 
 
 def primary_scorer_is_engine(mode: ScanScoringMode) -> bool:

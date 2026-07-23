@@ -9,6 +9,8 @@ const eslintConfig = defineConfig([
     rules: {
       // Data-fetch on mount via useEffect is intentional in this app
       "react-hooks/set-state-in-effect": "off",
+      // Incomplete ARIA trees must fail CI (was warning-only on AstTreeView).
+      "jsx-a11y/role-has-required-aria-props": "error",
     },
   },
   // Override default ignores of eslint-config-next.

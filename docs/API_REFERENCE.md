@@ -299,3 +299,18 @@ Base path: `/api/brokerage` (mutating routes require non-demo mode)
 | POST | `/buying-power` | Save explicit cash / IPO reserved amounts |
 
 **CSV flow:** UI calls preview → user edits/unchecks rows → approve sends the edited payload (not the raw file). Semantic dedupe on append includes activity date, symbol, side, quantity, and price.
+
+## Scan
+
+Base path: `/scan` (not under `/api/v2/research`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/scan/penny` | Start penny Stage A→B scan (async job) |
+| POST | `/scan/compounder` | Start compounder scan |
+| GET | `/scan/{job_id}` | Job status + attempt results; `invalid_result_count` for skipped schema-drift rows |
+| GET | `/scan/latest/{bucket}` | Last **published** complete ranking; preserves prior latest when a refresh fails the coverage gate |
+
+**Coverage gate:** Stage A bulk OHLC must reach `SCAN_BULK_COVERAGE_MIN` (default `0.70`) before `save_scan_results` overwrites latest. Below that, the job completes with a partial-universe message; `/scan/latest` is unchanged. Cached metadata includes `universe_coverage` and `data_flow.bulk_*` when a complete scan is published.
+
+**Timestamps:** `completed_at` / `last_attempt_failed_at` use UTC `Z` → `+00:00` parsing; invalid cached stamps become `null` (no 500).

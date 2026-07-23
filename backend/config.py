@@ -99,8 +99,9 @@ REGIME_OVERLAY_ENABLED = _env_bool("REGIME_OVERLAY_ENABLED", "true")
 SCORE_ENGINE_V2_ENABLED = _env_bool("SCORE_ENGINE_V2_ENABLED", "true")
 USE_SCORING_ENGINE_IN_SCAN = _env_bool("USE_SCORING_ENGINE_IN_SCAN", "false")
 # Stage B scoring mode: legacy | engine | parity_sample (see scan_scoring_config.py).
-# When unset, falls back to legacy unless USE_SCORING_ENGINE_IN_SCAN=true → engine.
-SCAN_SCORING_MODE = os.getenv("SCAN_SCORING_MODE", "").strip().lower()
+# Default is engine (canonical). Empty env still resolves to engine; USE_SCORING_ENGINE_IN_SCAN
+# remains a deprecated alias when mode is unset — removal planned after one release.
+SCAN_SCORING_MODE = os.getenv("SCAN_SCORING_MODE", "engine").strip().lower()
 SCAN_PARITY_SAMPLE_RATE = float(os.getenv("SCAN_PARITY_SAMPLE_RATE", "0.10"))
 
 # --- Scan final ranking (alpha / confidence / tradability) ---
@@ -436,6 +437,9 @@ UNIVERSE_SCAN_BATCH_SIZE = int(os.getenv("UNIVERSE_SCAN_BATCH_SIZE", "100"))
 SCAN_STAGE_B_TOP_N = int(os.getenv("SCAN_STAGE_B_TOP_N", "50"))
 SCAN_STAGE_B_TOP_N_FAST = int(os.getenv("SCAN_STAGE_B_TOP_N_FAST", "15"))
 SCAN_PRICE_DOWNLOAD_MAX_SECONDS = float(os.getenv("SCAN_PRICE_DOWNLOAD_MAX_SECONDS", "45"))
+# Minimum fraction of universe OHLC required before publishing a scan as "latest".
+# Below this, the job may complete with diagnostics but must not overwrite the prior complete latest.
+SCAN_BULK_COVERAGE_MIN = float(os.getenv("SCAN_BULK_COVERAGE_MIN", "0.70"))
 # Bucket-specific OHLC horizons for two-stage scans (Stage A cheap filter → Stage B deep).
 SCAN_PENNY_STAGE_A_PERIOD = os.getenv("SCAN_PENNY_STAGE_A_PERIOD", "6mo")
 SCAN_PENNY_STAGE_B_PERIOD = os.getenv("SCAN_PENNY_STAGE_B_PERIOD", "6mo")

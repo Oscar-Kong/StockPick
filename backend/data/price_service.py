@@ -74,6 +74,7 @@ class PriceService:
         self.store = store or HistoricalStore()
         self.market = market or MarketDataClient()
         self.history_fetch_count = 0
+        self.last_batch_meta: dict[str, Any] | None = None
 
     def get_history(
         self,
@@ -154,6 +155,8 @@ class PriceService:
         max_runtime_seconds: int = 45,
     ) -> dict[str, pd.DataFrame]:
         """Load from DB where sufficient; fetch only missing symbols."""
+        from config import SCAN_BULK_COVERAGE_MIN
+
         unique = list(dict.fromkeys(s.upper() for s in symbols if s))
         min_bars = PERIOD_MIN_BARS.get(period, 100)
         result: dict[str, pd.DataFrame] = {}
@@ -168,6 +171,7 @@ class PriceService:
             else:
                 missing.append(sym)
 
+        source = "db"
         if missing:
             logger.info(
                 "PriceService: fetching %s/%s symbols from provider fallback (%s)",
@@ -183,12 +187,27 @@ class PriceService:
                 max_runtime_seconds=max_runtime_seconds,
                 alpha_vantage_probe_symbols=5,
             )
+            market_meta = getattr(self.market, "last_batch_meta", None) or {}
+            source = str(market_meta.get("source") or "provider")
+            if result:
+                source = f"db+{source}"
             for sym, df in fetched.items():
                 if not df.empty:
                     trimmed = self._trim_period(df, period)
                     self._persist(sym, trimmed)
                     result[sym.upper()] = trimmed
 
+        requested = len(unique)
+        received = len(result)
+        coverage = (received / requested) if requested else 1.0
+        self.last_batch_meta = {
+            "requested": requested,
+            "received": received,
+            "missing_count": max(0, requested - received),
+            "coverage": round(coverage, 4),
+            "source": source,
+            "partial": bool(requested and coverage < SCAN_BULK_COVERAGE_MIN),
+        }
         return result
 
     def _persist(self, symbol: str, df: pd.DataFrame) -> None:

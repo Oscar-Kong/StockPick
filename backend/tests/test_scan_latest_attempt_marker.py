@@ -1,9 +1,4 @@
-"""GET /scan/latest/{bucket} must surface last-attempt-failed marker.
-
-Verifies that a failed scan attempt does NOT clobber the previously cached
-results but does annotate the response with `last_attempt_failed_at` and
-`last_attempt_error` so the UI can render a "last attempt failed" badge.
-"""
+"""GET /scan/latest must tolerate bad timestamps and invalid cached rows."""
 from __future__ import annotations
 
 import sys
@@ -62,3 +57,42 @@ def test_latest_scan_without_failed_attempt_marker_is_clean():
     assert resp.last_attempt_failed_at is None
     assert resp.last_attempt_error is None
     assert resp.cache_age_seconds == 10.0
+
+
+def test_latest_scan_malformed_failed_at_returns_none():
+    attempt = {"failed_at": "not-a-timestamp", "error": "boom"}
+    with patch("api.routes_scan.scan_manager.get_latest_scan", return_value=None):
+        with patch("api.routes_scan.cache_module.get_last_scan_attempt_failure", return_value=attempt):
+            resp = get_latest_scan(Bucket.penny)
+    assert resp.last_attempt_failed_at is None
+    assert resp.last_attempt_error == "boom"
+
+
+def test_latest_scan_skips_invalid_rows():
+    payload = {
+        "results": [
+            {
+                "symbol": "GOOD",
+                "price": 10.0,
+                "score": 80.0,
+                "bucket": "penny",
+                "risk_level": "medium",
+            },
+            {
+                "symbol": "BAD",
+                "price": None,
+                "score": 999.0,
+                "bucket": "medium",
+                "risk_level": "nope",
+            },
+        ],
+        "completed_at": "2026-06-11T09:00:00Z",
+    }
+    with patch("api.routes_scan.scan_manager.get_latest_scan", return_value=payload):
+        with patch("api.routes_scan.cache_module.get_last_scan_attempt_failure", return_value=None):
+            with patch("api.routes_scan.cache_module.get_latest_scan_cache_age_seconds", return_value=1.0):
+                resp = get_latest_scan(Bucket.penny)
+    assert len(resp.results) == 1
+    assert resp.results[0].symbol == "GOOD"
+    assert resp.invalid_result_count == 1
+    assert resp.completed_at is not None

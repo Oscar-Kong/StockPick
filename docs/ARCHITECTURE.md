@@ -13,7 +13,8 @@ Active sleeves: **penny**, **compounder**. Legacy API/database values may still 
 | Infrastructure | `backend/core/` | `database.py`, `errors.py`, `sleeve.py` |
 | HTTP routes | `backend/api/` | FastAPI routers registered in `main.py` |
 | Domain services | `backend/services/` | Scan, portfolio ledger & decisions, research, quant (migrating to `domains/`) |
-| Scan pipeline | `backend/services/scan_pipeline.py` | Deep module: Stage A → Stage B → rank → persist (`run_scan_pipeline`) |
+| Scan pipeline | `backend/services/scan_pipeline.py` | Deep module: Stage A → Stage B → rank → persist (`run_scan_pipeline`). Bulk OHLC coverage below `SCAN_BULK_COVERAGE_MIN` completes the job but does not overwrite latest. |
+| Market data | `backend/data/market_data_client.py`, `yfinance_client.py` | Yahoo bulk chunks use process-isolated hard timeouts (`utils/process_timeout.py`); quote/info fall back to Yahoo with completeness-aware TTLs. |
 | Scan public API | `backend/services/scan_service.py` | `start_async`, `get_latest`, `get_status`; `scan_manager` is a backwards-compat alias |
 | Scan job shim | `backend/services/scan_manager.py` | Re-exports `scan_service` / `ScanService` |
 | Portfolio refresh | `backend/services/refresh_orchestrator.py` | `PortfolioRefresh` deep module: holdings → prices → decision (+ penny scan on home); re-prices when holdings change so TTL cannot skip new symbols |

@@ -277,9 +277,16 @@ def test_enrichment_not_duplicated_per_candidate(scoring_patches):
 def test_resolve_mode_fallback_from_legacy_flag():
     with patch("services.scan_scoring_config.SCAN_SCORING_MODE", ""):
         with patch("services.scan_scoring_config.USE_SCORING_ENGINE_IN_SCAN", False):
-            assert resolve_scan_scoring_mode() == "legacy"
+            # Canonical default is engine when mode is unset.
+            assert resolve_scan_scoring_mode() == "engine"
         with patch("services.scan_scoring_config.USE_SCORING_ENGINE_IN_SCAN", True):
             assert resolve_scan_scoring_mode() == "engine"
+
+
+def test_resolve_mode_explicit_legacy_still_works():
+    with patch("services.scan_scoring_config.SCAN_SCORING_MODE", "legacy"):
+        with patch("services.scan_scoring_config.USE_SCORING_ENGINE_IN_SCAN", False):
+            assert resolve_scan_scoring_mode() == "legacy"
 
 
 def test_prepare_candidate_features_returns_shared_bundle():

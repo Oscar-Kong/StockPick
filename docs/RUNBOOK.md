@@ -142,7 +142,9 @@ Primary data roles default to **finnhub** for quotes and **FMP** for fundamental
 
 **FMP 403 / blocked history:** if FMP returns HTTP 403 (common on free-tier keys), the backend trips a process-wide circuit breaker and falls back to **yfinance** for OHLC during scans and analyze. Install `yfinance` (`pip install yfinance`) — it is listed in `backend/requirements.txt`. Logs will show `FMP access denied (403) — disabling FMP for this process`. Restart the backend to retry FMP after fixing the key or tier.
 
-**Yahoo Stage A ops:** bulk `yfinance.download` honors `SCAN_PRICE_DOWNLOAD_MAX_SECONDS` (per-chunk timeout ~20s, stop on rate-limit). After a bulk pass (partial or empty), MarketDataClient **skips** per-symbol Yahoo→AkShare fallback so a throttled provider cannot wedge the sync API worker for minutes. Prefer Finnhub/AV when configured; keep `UNIVERSE_SCAN_BATCH_SIZE` bounded (default `100`).
+**Yahoo Stage A ops:** bulk `yfinance.download` runs each chunk in a **disposable process** with a hard timeout (~20s, or remaining `SCAN_PRICE_DOWNLOAD_MAX_SECONDS` budget). On timeout the child is terminated — thread-based timeouts cannot stop a hung Yahoo call. After a bulk pass, MarketDataClient **skips** per-symbol Yahoo→AkShare hammering. If coverage is below `SCAN_BULK_COVERAGE_MIN` (default `0.70`), it attempts one **bounded FMP fill** for missing symbols (when FMP is enabled), then still skips Yahoo/AkShare per-symbol fallback. Prefer Finnhub/AV when configured; keep `UNIVERSE_SCAN_BATCH_SIZE` bounded (default `100`).
+
+**Partial universe gate:** when final bulk coverage is below `SCAN_BULK_COVERAGE_MIN`, the job still completes (status `completed`) with a clear message and `universe_coverage` metadata, but **does not overwrite** `/scan/latest/{bucket}` — the prior complete ranking is preserved. Job results for that attempt remain available on `GET /scan/{job_id}`.
 
 **Analyze OHLC freshness:** `PriceService.get_history()` now checks the **last bar date**, not only row count. Stale SQLite history triggers a provider fetch, merge, and persist. `GET /analyze/{symbol}?refresh=true` bypasses the analysis cache **and** forces a price-history refresh. The response includes `price_history_last_date`, `price_history_is_stale`, `price_history_refreshed_at`, and `price_history_bar_count`.
 
@@ -188,6 +190,7 @@ These were previously hard-coded inside `backend/services/scan_manager.py`. They
 | `SCAN_STAGE_B_TOP_N`              | `50`                             | Max candidates deep-scored per scan (`mode=deep`).                                     |
 | `SCAN_STAGE_B_TOP_N_FAST`         | `15`                             | Candidate cap when `ScanOptions.mode="fast"` — used for low-latency exploratory scans. |
 | `SCAN_PRICE_DOWNLOAD_MAX_SECONDS` | `45`                             | Hard cap (seconds) on the Stage A bulk OHLC provider fetch.                            |
+| `SCAN_BULK_COVERAGE_MIN`            | `0.70`                           | Minimum OHLC coverage before publishing a scan as latest (partial attempts preserve prior latest). |
 | `SCAN_PENNY_STAGE_A_PERIOD`         | `6mo`                            | Penny Stage A bulk OHLC horizon.                                                       |
 | `SCAN_PENNY_STAGE_B_PERIOD`         | `6mo`                            | Penny Stage B candidate build horizon.                                                   |
 | `SCAN_COMPOUNDER_STAGE_A_PERIOD`    | `1y`                             | Compounder Stage A cheap universe filter horizon.                                      |
@@ -203,12 +206,14 @@ These were previously hard-coded inside `backend/services/scan_manager.py`. They
 
 - `timings`: `{stage_a_ms, stage_a_bulk_download_ms, stage_a_rank_ms, stage_a_bulk_symbols, stage_b_ms, stage_b_candidate_build_ms, stage_b_bulk_cache_hits, stage_b_provider_fallbacks, stage_b_history_reloads, stage_b_candidate_build_calls, stage_b_candidates, stage_b_mode, stage_a_eligible, stage_a_excluded}`
 - `history_horizons`: `{stage_a_period, stage_b_period, bucket}` — OHLC windows used for the scan.
-- `data_flow` (cached scan metadata): `{bulk_download_ms, bulk_symbols_returned, stage_a_rank_ms, stage_b_build_ms, bulk_cache_hits, provider_fallbacks, history_reload_count, fundamental_cache_hits, fundamental_refreshes, candidate_build_calls, per_symbol_sources[], per_symbol_diagnostics[]}`.
+- `data_flow` (cached scan metadata): `{bulk_download_ms, bulk_symbols_returned, bulk_symbols_requested, bulk_coverage_ratio, bulk_download_partial, bulk_source, stage_a_rank_ms, stage_b_build_ms, bulk_cache_hits, provider_fallbacks, history_reload_count, fundamental_cache_hits, fundamental_refreshes, candidate_build_calls, per_symbol_sources[], per_symbol_diagnostics[]}`.
+- `universe_coverage` (cached when published): `{requested, received, coverage, minimum, partial_universe, source, published_as_latest}`.
 - `data_flow.per_symbol_diagnostics[]`: per-symbol `{price_history_period, price_history_bars, fundamental_snapshot_date, fundamental_source, reconciliation_quality, missing_fundamental_fields, confidence_penalty, ...}`.
 - `stage_a_diagnostics` (cached scan metadata): `{eligible_count, excluded_count, advanced_count, candidates[], excluded[]}` where each candidate includes `pre_score`, percentile `features`, `rank`, `warnings`, and optional `data_quality`.
 - `skipped_candidates` / `skipped_count` (cached scan metadata): structured Stage B skip records `{symbol, reason, detail?}` where `reason` is one of `missing_history`, `stale_history`, `provider_failure`, `invalid_price`, `missing_required_fundamentals`, `candidate_build_exception`, or `strict_filter_rejection`.
+- `invalid_result_count` (latest + job status): number of cached/job rows skipped because they failed `StockResult` validation (schema drift); valid rows are still returned.
 - `cache_age_seconds` (latest only): seconds since the result was written to the cache table.
-- `last_attempt_failed_at` / `last_attempt_error` (latest only): set when the most recent scan attempt failed. The previously cached successful results are **not** clobbered — they remain visible alongside the failure marker so the UI can render "showing prior results; last attempt failed at …".
+- `last_attempt_failed_at` / `last_attempt_error` (latest only): set when the most recent scan attempt failed. The previously cached successful results are **not** clobbered — they remain visible alongside the failure marker so the UI can render "showing prior results; last attempt failed at …". Malformed timestamps parse to `null` (no 500).
 
 All new fields are nullable and backward-compatible — clients that ignore them keep working.
 
@@ -249,12 +254,13 @@ display metrics and setup classification — it is not a separate composite leg.
 | `engine` | ScoringEngine | Never | Production rollout (recommended) |
 | `parity_sample` | ScoringEngine | Deterministic sample | Staging comparison |
 
-When `SCAN_SCORING_MODE` is unset, `USE_SCORING_ENGINE_IN_SCAN=true` maps to `engine`; otherwise `legacy`.
+When `SCAN_SCORING_MODE` is unset or invalid, the resolver defaults to **`engine`** (canonical). Deprecated `USE_SCORING_ENGINE_IN_SCAN=true` still maps an empty mode to `engine`; prefer setting `SCAN_SCORING_MODE` explicitly. Removal of the alias is planned after one release.
 
 | Env | Default | Role |
 |-----|---------|------|
-| `SCAN_SCORING_MODE` | *(unset)* | `legacy` \| `engine` \| `parity_sample` |
+| `SCAN_SCORING_MODE` | `engine` | `legacy` \| `engine` \| `parity_sample` |
 | `SCAN_PARITY_SAMPLE_RATE` | `0.10` | Legacy comparison fraction in parity mode (hash of `scan_id:symbol`) |
+| `USE_SCORING_ENGINE_IN_SCAN` | `false` | Deprecated alias when mode unset |
 
 Parity diagnostics include `scan_id`, `timestamp`, `scoring_version`, `factor_differences`, and score deltas. Scan timings add `stage_b_scoring_*_ms` and call counts — in `engine` mode legacy screener work is skipped (~50% less Stage B scoring vs the old always-run-both path).
 
