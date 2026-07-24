@@ -30,6 +30,12 @@ export function deriveScanTradeHint(stock: StockResult): ScanTradeHint {
   const dq = metrics.data_quality_score as number | undefined;
   const earningsSoon = Boolean(stock.earnings_soon ?? metrics.earnings_soon);
   const providerLimited = Boolean(metrics.provider_limited_partial_data);
+  const fallbackReason =
+    typeof metrics.fallback_reason === "string" ? metrics.fallback_reason : "";
+  const nonProviderFallback =
+    Boolean(fallbackReason) &&
+    fallbackReason !== "none" &&
+    !providerLimited;
 
   let buyRaw = Math.max(0, (score - 35) * 1.4);
   let waitRaw = Math.max(5, 100 - score * 0.85) + riskWaitBonus(risk);
@@ -41,6 +47,9 @@ export function deriveScanTradeHint(stock: StockResult): ScanTradeHint {
   if (providerLimited) {
     waitRaw += 20;
     buyRaw *= 0.6;
+  } else if (nonProviderFallback) {
+    waitRaw += 12;
+    buyRaw *= 0.75;
   }
   if (dq != null) {
     if (dq < 50) {
@@ -75,6 +84,12 @@ export function deriveScanTradeHint(stock: StockResult): ScanTradeHint {
   } else if (providerLimited && (recommendation === "strong_buy" || recommendation === "buy")) {
     recommendation = "watch";
     reason = "Partial provider data";
+  } else if (
+    nonProviderFallback &&
+    (recommendation === "strong_buy" || recommendation === "buy")
+  ) {
+    recommendation = "watch";
+    reason = "Fallback ranking — verify filters";
   } else if (dq != null && dq < 50 && (recommendation === "strong_buy" || recommendation === "buy")) {
     recommendation = "watch";
     reason = "Low data quality";

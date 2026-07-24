@@ -260,14 +260,6 @@ export function PortfolioPerformancePanel({
           >
             {signedCurrency(data?.realized_pl)}
           </span>
-          {data?.realized_pl_source === "robinhood_mcp" &&
-            (data.realized_pl_events ?? 0) !== 0 && (
-              <span className="portfolio-performance-kpi__hint text-tertiary">
-                {t.portfolio.performanceRealizedBreakdown
-                  .replace("{equity}", signedCurrency(data.realized_pl_equity ?? 0))
-                  .replace("{events}", signedCurrency(data.realized_pl_events ?? 0))}
-              </span>
-            )}
         </div>
       </div>
 

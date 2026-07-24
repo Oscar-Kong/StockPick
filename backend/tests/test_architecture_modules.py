@@ -54,7 +54,7 @@ def test_fallback_score_from_history():
 def test_candidate_gate_rejects_low_quality():
     ctx = MagicMock()
     ctx.price = 5.0
-    ctx.history = pd.DataFrame({"close": [1.0] * 5})
+    ctx.history = pd.DataFrame({"close": [1.0] * 5, "volume": [1_000_000] * 5})
     ctx.info = {}
     screener = MagicMock()
     screener.hard_filter.return_value = True
@@ -62,7 +62,7 @@ def test_candidate_gate_rejects_low_quality():
     result = evaluate_stage_b_gate(
         ctx=ctx,
         symbol="TEST",
-        bucket=MagicMock(),
+        bucket=Bucket.penny,
         screener=screener,
         options=options,
         quality_score=10.0,
@@ -70,6 +70,7 @@ def test_candidate_gate_rejects_low_quality():
     )
     assert isinstance(result, CandidateGateResult)
     assert result.passed is False
+    assert result.history_gate_exclusion is True
 
 
 def test_apply_canonical_scores_sets_metrics():
@@ -82,4 +83,6 @@ def test_apply_canonical_scores_sets_metrics():
     )
     _apply_canonical_scores(result, decomposed, stage_b_score=72.0)
     assert result.ranking_score == 68.0
+    assert result.score == 68.0
     assert result.metrics["stage_b_score"] == 72.0
+    assert result.metrics["ranking_score"] == 68.0

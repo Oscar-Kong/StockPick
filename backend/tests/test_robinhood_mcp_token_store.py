@@ -103,3 +103,67 @@ def test_fresh_tokens_keep_access(tmp_path: Path):
     token = asyncio.run(storage.get_tokens())
     assert token is not None
     assert token.access_token == "fresh"
+
+
+def test_atomic_save_creates_valid_json(tmp_path: Path):
+    storage = FileTokenStorage(base_dir=tmp_path)
+    asyncio.run(
+        storage.set_tokens(
+            OAuthToken(access_token="a", token_type="Bearer", expires_in=60, refresh_token="r")
+        )
+    )
+    path = tmp_path / "oauth.json"
+    assert path.is_file()
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data["tokens"]["access_token"] == "a"
+    # Temp files should not remain.
+    assert not list(tmp_path.glob(".oauth-*.tmp"))
+
+
+def test_access_token_valid_false_when_expired(tmp_path: Path):
+    from integrations.robinhood.mcp_token_store import access_token_valid, credentials_present
+
+    path = tmp_path / "oauth.json"
+    path.write_text(
+        json.dumps(
+            {
+                "tokens": {"access_token": "a", "refresh_token": "r", "token_type": "Bearer"},
+                "expires_at": time.time() - 10,
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert credentials_present(tmp_path) is True
+    assert access_token_valid(tmp_path) is False
+
+
+def test_concurrent_set_tokens_do_not_corrupt_json(tmp_path: Path):
+    import threading
+
+    storage = FileTokenStorage(base_dir=tmp_path)
+    errors: list[BaseException] = []
+
+    def writer(i: int) -> None:
+        try:
+            asyncio.run(
+                storage.set_tokens(
+                    OAuthToken(
+                        access_token=f"access-{i}",
+                        token_type="Bearer",
+                        expires_in=3600,
+                        refresh_token=f"refresh-{i}",
+                    )
+                )
+            )
+        except BaseException as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    threads = [threading.Thread(target=writer, args=(i,)) for i in range(12)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=5)
+    assert not errors
+    data = json.loads((tmp_path / "oauth.json").read_text(encoding="utf-8"))
+    assert "tokens" in data
+    assert data["tokens"]["access_token"].startswith("access-")

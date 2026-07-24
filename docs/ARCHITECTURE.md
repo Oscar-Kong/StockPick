@@ -14,6 +14,7 @@ Active sleeves: **penny**, **compounder**. Legacy API/database values may still 
 | HTTP routes | `backend/api/` | FastAPI routers registered in `main.py` |
 | Domain services | `backend/services/` | Scan, portfolio ledger & decisions, research, quant (migrating to `domains/`) |
 | Scan pipeline | `backend/services/scan_pipeline.py` | Deep module: Stage A → Stage B → rank → persist (`run_scan_pipeline`). Bulk OHLC coverage below `SCAN_BULK_COVERAGE_MIN` completes the job but does not overwrite latest. |
+| History policy | `backend/services/scan_history_config.py` | Strategy-aware `HistoryPolicy` (`resolve_history_policy`): period, trim limit, gate/preload min, preferred bars, session lag. Penny Stage B min **80** (indicator floor 32); compounder Stage B **252**. Shared by download sufficiency, Stage B preload, and `candidate_gate`. |
 | Market data | `backend/data/market_data_client.py`, `yfinance_client.py` | Yahoo bulk chunks use process-isolated hard timeouts (`utils/process_timeout.py`); quote/info fall back to Yahoo with completeness-aware TTLs. |
 | Scan public API | `backend/services/scan_service.py` | `start_async`, `get_latest`, `get_status`; `scan_manager` is a backwards-compat alias |
 | Scan job shim | `backend/services/scan_manager.py` | Re-exports `scan_service` / `ScanService` |

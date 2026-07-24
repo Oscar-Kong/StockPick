@@ -13,10 +13,20 @@ def test_status_without_probe_includes_login_script_and_auth_flags():
             "services.portfolio_snapshot_service._token_expiry_meta",
             return_value={"token_expires_at": 1784823317.0, "token_expired": False},
         ):
-            status = robinhood_mcp_status(probe=False)
+            with patch(
+                "integrations.robinhood.mcp_token_store.credentials_present",
+                return_value=True,
+            ):
+                with patch(
+                    "integrations.robinhood.mcp_token_store.access_token_valid",
+                    return_value=True,
+                ):
+                    status = robinhood_mcp_status(probe=False)
 
     assert status["enabled"] is True
     assert status["authenticated"] is True
+    assert status["credentials_present"] is True
+    assert status["access_token_valid"] is True
     assert status["login_script"] == "./scripts/robinhood-mcp-login.sh"
     assert status["sync_script"] == "./scripts/sync-robinhood-mcp.sh"
     assert status["token_expired"] is False

@@ -103,7 +103,24 @@ ROBINHOOD_MCP_URL=https://agent.robinhood.com/mcp/trading
 ROBINHOOD_MCP_REDIRECT_URI=http://127.0.0.1:8765/callback
 # Optional: specific account if you have several
 # ROBINHOOD_MCP_ACCOUNT_ID=
+# Timeouts / session reuse (seconds)
+# ROBINHOOD_MCP_TOOL_TIMEOUT_SEC=15
+# ROBINHOOD_MCP_SYNC_TIMEOUT_SEC=90
+# ROBINHOOD_MCP_PROBE_TIMEOUT_SEC=45
+# ROBINHOOD_MCP_INIT_TIMEOUT_SEC=10
 ```
+
+---
+
+## Sync reliability (how StockPick reads MCP)
+
+1. **Tool errors** — MCP `isError=true` raises immediately; error JSON is never treated as positions/orders.
+2. **Decode priority** — Prefer `structuredContent` when present; otherwise merge content blocks (so pagination cursors are not lost).
+3. **Completeness** — Sync records `history_complete` / `orders_truncated`. The Activity ledger is replaced **only** when order history completed successfully. Incomplete/truncated fetches keep the previous ledger and set `sync_status=degraded` while still updating live holdings.
+4. **Single-flight** — A second `POST /sync/robinhood-mcp` while one is running returns the same `job_id` (`reused: true` on the job record).
+5. **Status fields** — `credentials_present` / `access_token_valid` describe the local OAuth file; they do **not** prove a live Robinhood session. Use `?probe=true` or **Test connection** for a live check.
+
+Genuine **cash-only** is reported only when positions tool succeeded and the payload is an empty holdings container. Unparseable non-empty payloads are treated as probe failures (not cash-only).
 
 ---
 
@@ -114,13 +131,15 @@ ROBINHOOD_MCP_REDIRECT_URI=http://127.0.0.1:8765/callback
 | Cursor MCP "errored" | Settings → Tools & MCP → disconnect/reconnect; complete OAuth on desktop |
 | `401 authentication required` | Run `./scripts/robinhood-mcp-login.sh` |
 | `Robinhood MCP session expired` / opaque `TaskGroup` sync error | Access token expired and refresh failed — run `./scripts/robinhood-mcp-login.sh` again. StockPick blanks stale access tokens so refresh is attempted; if refresh returns 404, a full browser login is required. |
-| Sync says authenticated but fails immediately | Same as above — `oauth.json` can still exist while tokens are dead. Re-login refreshes `storage/robinhood_mcp/oauth.json` (and writes absolute `expires_at`). |
+| Sync says authenticated but fails immediately | Same as above — `oauth.json` can still exist while tokens are dead. Re-login refreshes `storage/robinhood_mcp/oauth.json` (and writes absolute `expires_at`). Check `credentials_present` vs `access_token_valid` on status. |
 | `502 MCP sync failed` | Check rollout eligibility; reconnect OAuth |
-| Positions empty after sync | Often real: Robinhood reports `equity_value=0` (cash-only). Confirm with `./scripts/sync-robinhood-mcp.sh --status --probe` or Portfolio → **Troubleshoot connection**. If you expect shares, set `ROBINHOOD_MCP_ACCOUNT_ID` to the account that holds them (default uses `is_default`). |
-| UI shows red “sync failed / taking longer” but status is Connected | Soft client timeout while the job was still running (or cash-only sync finished with 0 positions). Re-sync or refresh Today — empty equity is success, not failure. MCP diagnostics stay collapsed unless auth is broken. |
+| Positions empty after sync | Often real: Robinhood reports `equity_value=0` (cash-only). Confirm with `./scripts/sync-robinhood-mcp.sh --status --probe` or Portfolio → **Troubleshoot connection**. If probe says positions could not be parsed, that is **not** cash-only — check account id / schema. If you expect shares, set `ROBINHOOD_MCP_ACCOUNT_ID` to the account that holds them (default uses `is_default`). |
+| False “cash-only” | Fixed for tool errors, ignored `structuredContent`, and symbol-keyed holdings maps. Re-probe after upgrade. |
+| UI shows red “sync failed / taking longer” but status is Connected | Soft client timeout while the job was still running (or cash-only sync finished with 0 positions). Re-sync or refresh Today — empty equity is success, not failure. MCP diagnostics stay collapsed unless auth is broken. Concurrent Sync clicks reuse one job. |
 | Phantom symbol (e.g. `ZZZZ`) on Today with 0 holdings | Leftover from a journal/API healthcheck trade that wrote a decision snapshot. Cash-only MCP sync now clears that snapshot; dashboard also drops decision rows not in open holdings. |
 | UI says "Import needed" but sync succeeded | Fixed for cash-only MCP: synced $0 equity is not treated as missing import. Re-sync or refresh Today. |
-| Activity / ledger after sync | MCP sync replaces trade history from filled orders each run; holdings always come from live positions |
+| Activity / ledger after sync | Ledger is replaced only when MCP order history is complete (`history_complete`). Degraded syncs keep the previous ledger; holdings still come from live positions |
+| Sync hangs / times out | Defaults: 15s per tool, 90s full sync. Raise `ROBINHOOD_MCP_*_TIMEOUT_SEC` if needed; read tools retry up to 3× on 429/5xx/timeouts. |
 
 ---
 

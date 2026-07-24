@@ -29,8 +29,15 @@ def test_cash_only_mcp_sync_skips_decision(isolated_backend_env):
             "services.portfolio_snapshot_service.get_or_create_account",
             return_value={"id": 1},
         ), patch(
-            "services.portfolio_snapshot_service.clear_trade_ledger",
-            return_value=0,
+            "services.portfolio_snapshot_service.replace_trade_ledger",
+            return_value=(0, 0, 0),
+        ), patch(
+            "services.portfolio_snapshot_service.purge_duplicate_trades",
+        ), patch(
+            "services.portfolio_snapshot_service.repair_phantom_journal_buys",
+        ), patch(
+            "services.portfolio_snapshot_service._rebuild_from_store",
+            return_value=MagicMock(closed_positions=[], event_ledger=[]),
         ), patch(
             "services.portfolio_snapshot_service._apply_ledger_to_portfolio",
             return_value={

@@ -11,7 +11,12 @@ def should_exclude_low_quality(
     min_quality: float | None = None,
     min_bars: int | None = None,
 ) -> tuple[bool, str]:
-    """Hard exclude only when data is clearly unusable."""
+    """Hard exclude only when data is clearly unusable.
+
+    ``min_bars`` defaults to ``MIN_HISTORY_BARS`` (252) for Analyze / distress /
+    non-scan callers. Scan Stage B must pass the sleeve-aware value from
+    ``resolve_history_policy(...).minimum_required_bars``.
+    """
     min_q = min_quality if min_quality is not None else MIN_DATA_QUALITY_SCORE
     min_h = min_bars if min_bars is not None else MIN_HISTORY_BARS
 

@@ -38,14 +38,19 @@ from services.scan_display import enrich_scan_display
 from services.scan_data_flow import ScanDataFlowMetrics
 from services.scan_skip_reasons import (
     CANDIDATE_BUILD_EXCEPTION,
+    FALLBACK_NONE,
     INVALID_PRICE,
     MISSING_HISTORY,
     PROVIDER_FAILURE,
+    classify_scan_fallback_reason,
+    is_provider_limited_fallback,
     record_scan_skip,
 )
 from services.scan_history_config import (
+    ScanStage,
     bulk_history_reusable,
     compounder_stage_b_needs_fundamentals,
+    resolve_history_policy,
     stage_a_period,
     stage_b_min_history_bars,
     stage_b_period,
@@ -235,6 +240,8 @@ def _append_partial_data_fallback(
     strategy,
     quality_score: float | None,
     fallback_candidates: list[StockResult],
+    fallback_reason: str = FALLBACK_NONE,
+    provider_limited: bool = False,
 ) -> None:
     """Keep a lightweight backup candidate when strict filters reject everything."""
     hist = ctx.history
@@ -248,10 +255,11 @@ def _append_partial_data_fallback(
         vol_ratio = float(vol.tail(5).mean() / max(vol.tail(20).mean(), 1.0))
         fallback_metrics = {
             "strategy_version": strategy.version_id,
-            "provider_limited_partial_data": True,
+            "provider_limited_partial_data": bool(provider_limited),
+            "fallback_reason": fallback_reason,
             "fallback_ret_20d_pct": round(ret_20, 2),
             "fallback_volume_ratio_5d_20d": round(vol_ratio, 2),
-            "fallback_reason": "strict filters rejected all candidates with current provider data",
+            "history_bars": int(len(hist)) if hist is not None else 0,
         }
         fallback_risk = RiskLevel.high if job.bucket == Bucket.penny else RiskLevel.medium
         fallback_summary, fallback_metrics = enrich_scan_display(
@@ -259,7 +267,11 @@ def _append_partial_data_fallback(
             ctx.fundamentals,
             ctx.history,
             fallback_metrics,
-            legacy_summary="Partial-data candidate — verify before trading.",
+            legacy_summary=(
+                "Partial-data candidate — verify before trading."
+                if provider_limited
+                else "Fallback candidate — filters rejected primary pool; verify before trading."
+            ),
         )
         fallback_metrics = attach_trade_hint_to_metrics(
             fallback_metrics,
@@ -267,7 +279,7 @@ def _append_partial_data_fallback(
             sleeve=job.bucket.value,
             risk_level=fallback_risk,
             data_quality_score=quality_score,
-            provider_limited=True,
+            provider_limited=bool(provider_limited),
         )
         fallback_candidates.append(
             screener.to_result(
@@ -320,11 +332,16 @@ def run_scan_pipeline(manager: "ScanService", job_id: str, options: ScanOptions 
         job.progress = 5.0
         period_a = stage_a_period(job.bucket)
         period_b = stage_b_period(job.bucket)
+        policy_a = resolve_history_policy(job.bucket, ScanStage.STAGE_A)
+        policy_b = resolve_history_policy(job.bucket, ScanStage.STAGE_B)
         bulk_download_started = time.monotonic()
         bulk_hist = ps.download_batch(
             universe,
             period=period_a,
             max_runtime_seconds=SCAN_PRICE_DOWNLOAD_MAX_SECONDS,
+            min_bars=policy_a.preferred_bars,
+            bar_limit=policy_a.returned_bar_limit,
+            max_session_lag=policy_a.allowed_session_lag,
         )
         flow_metrics.bulk_download_ms = round((time.monotonic() - bulk_download_started) * 1000.0, 1)
         flow_metrics.bulk_symbols_returned = len(bulk_hist)
@@ -380,6 +397,7 @@ def run_scan_pipeline(manager: "ScanService", job_id: str, options: ScanOptions 
         parity_records: list = []
         stage_b_started = time.monotonic()
         skipped_candidates: list[dict] = []
+        history_gate_exclusion_count = 0
         scoring_timing_totals = {
             "enrich_ms": 0.0,
             "legacy_ms": 0.0,
@@ -391,6 +409,14 @@ def run_scan_pipeline(manager: "ScanService", job_id: str, options: ScanOptions 
         parity_sampled_count = 0
 
         scoring_mode = resolve_scan_scoring_mode()
+        provisional_provider_limited = bool(
+            partial_universe
+            or (
+                int(batch_meta.get("provider_requested") or 0) > 0
+                and int(batch_meta.get("provider_received") or 0)
+                < int(batch_meta.get("provider_requested") or 0)
+            )
+        )
 
         for idx, symbol in enumerate(stage_b_symbols):
             if (
@@ -431,6 +457,8 @@ def run_scan_pipeline(manager: "ScanService", job_id: str, options: ScanOptions 
                     strategy=strategy,
                     quality_score=quality_score,
                     fallback_candidates=fallback_candidates,
+                    fallback_reason=FALLBACK_NONE,
+                    provider_limited=provisional_provider_limited,
                 )
 
                 gate = evaluate_stage_b_gate(
@@ -441,8 +469,11 @@ def run_scan_pipeline(manager: "ScanService", job_id: str, options: ScanOptions 
                     options=options,
                     quality_score=quality_score,
                     hist_len=hist_len,
+                    history_policy=policy_b,
                 )
                 if not gate.passed:
+                    if gate.history_gate_exclusion:
+                        history_gate_exclusion_count += 1
                     record_scan_skip(
                         skipped_candidates,
                         symbol=symbol,
@@ -569,7 +600,27 @@ def run_scan_pipeline(manager: "ScanService", job_id: str, options: ScanOptions 
             bulk_hist=bulk_hist,
             previous_results=previous_rows,
         )
+        used_fallback_candidates = False
         if not ranking_out.results and fallback_candidates:
+            used_fallback_candidates = True
+            provider_requested = int(batch_meta.get("provider_requested") or 0)
+            provider_received = int(batch_meta.get("provider_received") or 0)
+            scan_fallback_reason = classify_scan_fallback_reason(
+                published_normal_pool=False,
+                partial_universe=partial_universe,
+                provider_requested=provider_requested,
+                provider_received=provider_received,
+                skipped=skipped_candidates,
+                history_gate_exclusion_count=history_gate_exclusion_count,
+                used_fallback_candidates=True,
+            )
+            provider_limited = is_provider_limited_fallback(scan_fallback_reason)
+            for fb in fallback_candidates:
+                metrics = dict(fb.metrics or {})
+                metrics["fallback_reason"] = scan_fallback_reason
+                metrics["provider_limited_partial_data"] = provider_limited
+                metrics["history_policy_min_bars"] = policy_b.minimum_required_bars
+                fb.metrics = metrics
             fallback_ranked = apply_final_scan_ranking(
                 fallback_candidates,
                 bucket=job.bucket,
@@ -580,6 +631,7 @@ def run_scan_pipeline(manager: "ScanService", job_id: str, options: ScanOptions 
             job.results = fallback_ranked.results
             ranking_meta = fallback_ranked.to_metadata()
         else:
+            scan_fallback_reason = FALLBACK_NONE
             job.results = ranking_out.results
             ranking_meta = ranking_out.to_metadata()
         job.status = ScanStatus.completed
@@ -590,10 +642,17 @@ def run_scan_pipeline(manager: "ScanService", job_id: str, options: ScanOptions 
                 f"({flow_metrics.bulk_symbols_returned}/{flow_metrics.bulk_symbols_requested}); "
                 f"prior complete latest preserved. Found {len(job.results)} candidates on this attempt."
             )
-        elif job.results and not any(not r.metrics.get("provider_limited_partial_data") for r in job.results):
-            job.message = (
-                f"Found {len(job.results)} candidates (partial-data fallback; provider-limited)"
-            )
+        elif used_fallback_candidates:
+            if is_provider_limited_fallback(scan_fallback_reason):
+                job.message = (
+                    f"Found {len(job.results)} candidates "
+                    f"(partial-data fallback; {scan_fallback_reason})"
+                )
+            else:
+                job.message = (
+                    f"Found {len(job.results)} candidates "
+                    f"(fallback; {scan_fallback_reason})"
+                )
         elif parity_summary_obj is not None:
             job.message = (
                 f"Found {len(job.results)} candidates "
@@ -620,8 +679,13 @@ def run_scan_pipeline(manager: "ScanService", job_id: str, options: ScanOptions 
             scoring_mode, 0.0
         )
 
+        provider_requested = int(batch_meta.get("provider_requested") or 0)
+        provider_received = int(batch_meta.get("provider_received") or 0)
+        database_hits = int(batch_meta.get("database_hits") or 0)
+        live_refresh_coverage = float(batch_meta.get("live_refresh_coverage") or 1.0)
+
         scan_metadata: dict = {"timings": dict(job.timings)}
-        scan_metadata["scan_schema_version"] = 1
+        scan_metadata["scan_schema_version"] = 2
         scan_metadata["stage_a_diagnostics"] = stage_a_result.to_diagnostics(advanced_count=total)
         scan_metadata["data_flow"] = flow_metrics.to_dict()
         scan_metadata["universe_coverage"] = {
@@ -638,6 +702,27 @@ def run_scan_pipeline(manager: "ScanService", job_id: str, options: ScanOptions 
             "stage_b_period": period_b,
             "bucket": job.bucket.value,
         }
+        scan_metadata["history_policy"] = {
+            "stage_a": policy_a.to_dict(),
+            "stage_b": policy_b.to_dict(),
+        }
+        scan_metadata["coverage_diagnostics"] = {
+            "requested_symbols": flow_metrics.bulk_symbols_requested,
+            "database_hits": database_hits,
+            "provider_requested": provider_requested,
+            "provider_received": provider_received,
+            "availability_coverage": float(
+                batch_meta.get("availability_coverage") or flow_metrics.bulk_coverage_ratio
+            ),
+            "live_refresh_coverage": live_refresh_coverage,
+            "lag_0_symbols": int(batch_meta.get("lag_0_symbols") or 0),
+            "lag_1_symbols": int(batch_meta.get("lag_1_symbols") or 0),
+            "stale_symbols": int(batch_meta.get("stale_symbols") or 0),
+        }
+        scan_metadata["stage_a_returned_bar_limit"] = policy_a.returned_bar_limit
+        scan_metadata["stage_b_minimum_required_bars"] = policy_b.minimum_required_bars
+        scan_metadata["history_gate_exclusion_count"] = float(history_gate_exclusion_count)
+        scan_metadata["fallback_reason"] = scan_fallback_reason
         if skipped_candidates:
             scan_metadata["skipped_candidates"] = skipped_candidates
             scan_metadata["skipped_count"] = float(len(skipped_candidates))

@@ -548,6 +548,88 @@ def clear_trade_ledger(account_id: int = DEFAULT_ACCOUNT_ID) -> int:
         session.close()
 
 
+def replace_trade_ledger(
+    account_id: int,
+    rows: list,
+    *,
+    source_file_id: int | None = None,
+) -> tuple[int, int, int]:
+    """Atomically replace the full trade ledger with the given rows.
+
+    Clears then upserts inside one DB session/commit so a failed mid-write
+    does not leave an empty ledger. Returns (imported, skipped, cleared).
+    """
+    from integrations.robinhood.models import ParsedCsvRow
+    from integrations.robinhood.ledger_dedupe import (
+        apply_effective_fill_price,
+        dedupe_parsed_rows,
+        is_incomplete_ghost_row,
+        semantic_ledger_key,
+    )
+
+    rows, _ = dedupe_parsed_rows([r for r in rows if isinstance(r, ParsedCsvRow)])
+    session = SessionLocal()
+    try:
+        cleared = (
+            session.query(TradeHistory)
+            .filter(TradeHistory.account_id == account_id)
+            .delete(synchronize_session=False)
+        )
+        imported = 0
+        skipped = 0
+        now = _utcnow()
+        seen_hashes: set[str] = set()
+        seen_semantic: set[tuple] = set()
+        for r in rows:
+            if not isinstance(r, ParsedCsvRow):
+                continue
+            apply_effective_fill_price(r)
+            if is_incomplete_ghost_row(r):
+                skipped += 1
+                continue
+            if r.row_hash in seen_hashes:
+                skipped += 1
+                continue
+            sem_key = semantic_ledger_key(r)
+            if sem_key in seen_semantic:
+                skipped += 1
+                continue
+            side = "event" if r.row_type == "event" else r.row_type
+            if side in ("cash", "income"):
+                side = "event"
+            qty = r.quantity if r.quantity is not None else 0.0
+            pr = r.price if r.price is not None else 0.0
+            session.add(
+                TradeHistory(
+                    account_id=account_id,
+                    symbol=(r.instrument or "").upper(),
+                    side=side,
+                    quantity=qty,
+                    price=pr,
+                    amount=r.amount,
+                    trans_code=r.trans_code,
+                    description=r.description,
+                    activity_date=r.activity_date,
+                    process_date=r.process_date,
+                    executed_at=r.executed_at,
+                    row_hash=r.row_hash,
+                    source_file_id=source_file_id,
+                    locked=True,
+                    created_at=now,
+                )
+            )
+            seen_hashes.add(r.row_hash)
+            seen_semantic.add(sem_key)
+            imported += 1
+        session.commit()
+        return imported, skipped, int(cleared or 0)
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
 def clear_csv_sourced_ledger(account_id: int = DEFAULT_ACCOUNT_ID) -> int:
     """Remove CSV-imported ledger rows; keep manual journal entries."""
     from integrations.robinhood.journal_verifier import is_manual_journal_ledger_row

@@ -58,3 +58,10 @@ def test_pick_account_id_prefers_default_nested():
 def test_pick_account_id_respects_env_preferred():
     payload = {"data": {"accounts": [{"account_number": "111"}, {"account_number": "222"}]}}
     assert _pick_account_id(payload, "222") == "222"
+
+
+def test_parse_equity_positions_symbol_keyed_map():
+    payload = {"holdings": {"AAPL": {"quantity": 2, "average_buy_price": 190}}}
+    holdings = parse_equity_positions(payload)
+    assert len(holdings) == 1
+    assert holdings[0].symbol == "AAPL"

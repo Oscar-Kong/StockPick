@@ -21,6 +21,7 @@ export function readPillar(stock: StockResult, key: ScanPillarKey): number | nul
   return null;
 }
 
+/** Headline score for the scan table SCORE column. */
 export function readRankingScore(stock: StockResult): number {
   if (typeof stock.ranking_score === "number" && Number.isFinite(stock.ranking_score)) {
     return stock.ranking_score;
@@ -44,11 +45,9 @@ export function isNeutralPillar(value: number | null | undefined): boolean {
   return Math.abs(value - NEUTRAL_PILLAR_SCORE) <= NEUTRAL_EPSILON;
 }
 
-/** True when decomposed pillars add information beyond the composite ranking. */
-export function hasInformativePillarBreakdown(parts: ScanScoreParts): boolean {
-  const confInformative = parts.confidence != null && !isNeutralPillar(parts.confidence);
-  const tradeInformative = parts.tradability != null && !isNeutralPillar(parts.tradability);
-  return confInformative || tradeInformative;
+/** Pillar chips are disabled in the scan table — SCORE is a single number. */
+export function hasInformativePillarBreakdown(_parts: ScanScoreParts): boolean {
+  return false;
 }
 
 export function hasDecomposedScores(stock: StockResult): boolean {
@@ -62,17 +61,7 @@ export type DisplayPillar = {
   value: number;
 };
 
-/** Pillars worth showing — skips neutral confidence/tradability placeholders. */
-export function displayPillars(parts: ScanScoreParts): DisplayPillar[] {
-  const out: DisplayPillar[] = [];
-  if (parts.alpha != null && !isNeutralPillar(parts.alpha)) {
-    out.push({ key: "alpha", metricKey: "alpha_score", value: parts.alpha });
-  }
-  if (parts.confidence != null && !isNeutralPillar(parts.confidence)) {
-    out.push({ key: "confidence", metricKey: "confidence_score", value: parts.confidence });
-  }
-  if (parts.tradability != null && !isNeutralPillar(parts.tradability)) {
-    out.push({ key: "trade", metricKey: "tradability_score", value: parts.tradability });
-  }
-  return out;
+/** Always empty — scan SCORE column stays a single number (Action carries buy/wait). */
+export function displayPillars(_parts: ScanScoreParts): DisplayPillar[] {
+  return [];
 }

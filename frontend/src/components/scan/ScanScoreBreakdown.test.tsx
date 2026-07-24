@@ -1,12 +1,14 @@
-import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
 import { en } from "@/lib/i18n/messages/en";
-import { ScanScoreBreakdown } from "./ScanScoreBreakdown";
+import { ScanScoreBandLegend, ScanScoreBreakdown } from "./ScanScoreBreakdown";
 import type { StockResult } from "@/lib/types";
 
 vi.mock("@/lib/i18n", () => ({
   useTranslation: () => ({ t: en, locale: "en" }),
 }));
+
+afterEach(() => cleanup());
 
 function stock(overrides: Partial<StockResult> = {}): StockResult {
   return {
@@ -21,42 +23,36 @@ function stock(overrides: Partial<StockResult> = {}): StockResult {
 }
 
 describe("ScanScoreBreakdown", () => {
-  it("shows a single score when confidence and tradability are neutral", () => {
+  it("shows score with Strong band at ≥70", () => {
     render(
       <ScanScoreBreakdown
-        stock={stock({
-          ranking_score: 68,
-          alpha_score: 82,
-          confidence_score: 50,
-          tradability_score: 50,
-        })}
+        stock={stock({ ranking_score: 72 })}
         compact
-      />
-    );
-    expect(screen.getByText("68")).toBeInTheDocument();
-    expect(screen.queryByText("Conf")).not.toBeInTheDocument();
-    expect(screen.queryByText("Trade")).not.toBeInTheDocument();
-    expect(screen.queryByText("Alpha")).not.toBeInTheDocument();
-  });
-
-  it("shows non-neutral pillars in compact mode", () => {
-    render(
-      <ScanScoreBreakdown
-        stock={stock({
-          ranking_score: 72,
-          confidence_score: 38,
-          tradability_score: 50,
-        })}
-        compact
+        scanScores={[50, 60, 72]}
       />
     );
     expect(screen.getByText("72")).toBeInTheDocument();
-    expect(screen.getByText("Conf")).toBeInTheDocument();
-    expect(screen.queryByText("Trade")).not.toBeInTheDocument();
+    expect(screen.getByText("Strong")).toBeInTheDocument();
   });
 
-  it("falls back to legacy score without decomposed fields", () => {
-    render(<ScanScoreBreakdown stock={stock({ score: 77 })} compact />);
-    expect(screen.getByText("77")).toBeInTheDocument();
+  it("labels fallback 100s so they are not mistaken for Strong", () => {
+    const { container } = render(
+      <ScanScoreBreakdown
+        stock={stock({
+          score: 100,
+          ranking_score: 100,
+          metrics: { provider_limited_partial_data: true, ranking_score: 100 },
+        })}
+        compact
+      />
+    );
+    expect(screen.getByText("100")).toBeInTheDocument();
+    expect(container.querySelector(".scan-score-band--fallback")).toHaveTextContent("Fallback");
+    expect(container.querySelector(".scan-score-band--strong")).toBeNull();
+  });
+
+  it("renders the band legend", () => {
+    render(<ScanScoreBandLegend />);
+    expect(screen.getByText(/Score guide: Strong ≥70/i)).toBeInTheDocument();
   });
 });

@@ -5,9 +5,12 @@ import asyncio
 import json
 import logging
 import os
+import random
+import time
 import webbrowser
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from datetime import timedelta
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
 from typing import Any
@@ -20,6 +23,12 @@ from mcp.shared.auth import OAuthClientMetadata
 from pydantic import AnyUrl
 
 from integrations.robinhood.base import BrokerageProvider, classify_holding_bucket
+from integrations.robinhood.mcp_decode import (
+    RobinhoodToolError,
+    decode_tool_result,
+    looks_like_ticker,
+    positions_payload_is_genuinely_empty,
+)
 from integrations.robinhood.mcp_orders import MCP_MAX_ORDER_PAGES, _order_cursor, parse_mcp_equity_orders
 from integrations.robinhood.mcp_pnl import MCP_MAX_PNL_PAGES, RealizedPnlSummary, _pnl_cursor, parse_pnl_trade_history_pages
 from integrations.robinhood.mcp_token_store import FileTokenStorage, has_valid_tokens
@@ -41,6 +50,48 @@ READ_TOOLS = frozenset({
     "get_realized_pnl",
 })
 
+_CONTAINER_KEYS = ("positions", "equity_positions", "holdings", "results", "data", "items")
+
+
+def _env_float(name: str, default: float) -> float:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
+def tool_timeout_sec() -> float:
+    return max(1.0, _env_float("ROBINHOOD_MCP_TOOL_TIMEOUT_SEC", 15.0))
+
+
+def sync_timeout_sec() -> float:
+    return max(15.0, _env_float("ROBINHOOD_MCP_SYNC_TIMEOUT_SEC", 90.0))
+
+
+def probe_timeout_sec() -> float:
+    return max(10.0, _env_float("ROBINHOOD_MCP_PROBE_TIMEOUT_SEC", 45.0))
+
+
+def init_timeout_sec() -> float:
+    return max(1.0, _env_float("ROBINHOOD_MCP_INIT_TIMEOUT_SEC", 10.0))
+
+
+@dataclass
+class SnapshotCompleteness:
+    positions_ok: bool = False
+    portfolio_ok: bool = False
+    orders_ok: bool = False
+    orders_truncated: bool = False
+    history_complete: bool = False
+    warnings: list[str] = field(default_factory=list)
+
+    @property
+    def publication_allowed(self) -> bool:
+        return self.positions_ok and self.portfolio_ok
+
 
 @dataclass
 class LivePortfolioSnapshot:
@@ -53,6 +104,16 @@ class LivePortfolioSnapshot:
     order_rows: list[ParsedCsvRow] = field(default_factory=list)
     orders_imported: int = 0
     orders_skipped: int = 0
+    completeness: SnapshotCompleteness = field(default_factory=SnapshotCompleteness)
+
+
+@dataclass
+class _OrderFetchResult:
+    rows: list[ParsedCsvRow]
+    truncated: bool
+    pages_fetched: int
+    ok: bool
+    error: str | None = None
 
 
 def _enabled() -> bool:
@@ -60,39 +121,9 @@ def _enabled() -> bool:
     return flag not in ("0", "false", "no", "off")
 
 
-def _extract_json(payload: Any) -> Any:
-    if payload is None:
-        return None
-    if isinstance(payload, (dict, list)):
-        return payload
-    text = str(payload).strip()
-    if not text:
-        return None
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        return {"text": text}
-
-
 def _tool_json(result: Any) -> Any:
-    content = getattr(result, "content", None) or []
-    chunks: list[Any] = []
-    for block in content:
-        if hasattr(block, "text"):
-            chunks.append(getattr(block, "text"))
-        elif isinstance(block, dict) and block.get("text"):
-            chunks.append(block["text"])
-        elif hasattr(block, "data"):
-            chunks.append(getattr(block, "data"))
-    if not chunks:
-        structured = getattr(result, "structuredContent", None) or getattr(result, "structured_content", None)
-        if structured is not None:
-            return structured
-        return None
-    if len(chunks) == 1:
-        parsed = _extract_json(chunks[0])
-        return parsed if parsed is not None else chunks[0]
-    return [_extract_json(c) for c in chunks]
+    """Deprecated wrapper — prefer decode_tool_result (checks isError, structuredContent)."""
+    return decode_tool_result(result, tool="unknown")
 
 
 def _walk_numbers(node: Any, keys: tuple[str, ...]) -> float | None:
@@ -115,6 +146,23 @@ def _walk_numbers(node: Any, keys: tuple[str, ...]) -> float | None:
     return None
 
 
+def _normalize_symbol_keyed(node: dict[str, Any]) -> list[dict[str, Any]]:
+    """Promote ticker-keyed maps into list-of-dicts with injected symbol."""
+    out: list[dict[str, Any]] = []
+    for key, value in node.items():
+        if not isinstance(value, dict):
+            continue
+        if not looks_like_ticker(str(key)):
+            continue
+        if _position_symbol(value) and _position_quantity(value) is not None:
+            out.append(value)
+            continue
+        injected = {"symbol": str(key).upper().strip(), **value}
+        if _position_quantity(injected) is not None:
+            out.append(injected)
+    return out
+
+
 def _iter_position_dicts(node: Any) -> list[dict[str, Any]]:
     if isinstance(node, list):
         out: list[dict[str, Any]] = []
@@ -127,11 +175,23 @@ def _iter_position_dicts(node: Any) -> list[dict[str, Any]]:
     qty = _position_quantity(node)
     if symbol and qty is not None and qty > 0:
         return [node]
+
     out: list[dict[str, Any]] = []
-    for key in ("positions", "equity_positions", "holdings", "results", "data", "items"):
-        if key in node:
-            out.extend(_iter_position_dicts(node[key]))
+    for key in _CONTAINER_KEYS:
+        if key not in node:
+            continue
+        child = node[key]
+        if isinstance(child, dict):
+            keyed = _normalize_symbol_keyed(child)
+            if keyed:
+                out.extend(keyed)
+                continue
+        out.extend(_iter_position_dicts(child))
+
     if not out:
+        keyed = _normalize_symbol_keyed(node)
+        if keyed:
+            return keyed
         for value in node.values():
             if isinstance(value, (dict, list)):
                 out.extend(_iter_position_dicts(value))
@@ -202,6 +262,21 @@ def parse_equity_positions(payload: Any) -> list[ReconstructedHolding]:
             bucket=classify_holding_bucket(symbol, avg),
         )
     return sorted(by_symbol.values(), key=lambda h: h.symbol)
+
+
+def assess_positions_parse(payload: Any) -> tuple[list[ReconstructedHolding], list[str]]:
+    """Parse holdings and emit warnings when a non-empty payload yields zero rows."""
+    holdings = parse_equity_positions(payload)
+    warnings: list[str] = []
+    if holdings:
+        return holdings, warnings
+    if positions_payload_is_genuinely_empty(payload):
+        return holdings, warnings
+    warnings.append(
+        "Positions payload was non-empty but no equity holdings could be parsed "
+        "(possible schema change or symbol-keyed shape missed)"
+    )
+    return holdings, warnings
 
 
 def parse_buying_power(portfolio_payload: Any) -> float:
@@ -285,6 +360,8 @@ def _flatten_exc(exc: BaseException) -> BaseException:
 
 def _auth_error(exc: BaseException) -> ValueError:
     leaf = _flatten_exc(exc)
+    if isinstance(leaf, RobinhoodToolError):
+        return ValueError(f"Robinhood MCP tool error ({leaf.tool}): {leaf.message[:300]}")
     msg = str(leaf)
     lowered = msg.lower()
     if (
@@ -298,6 +375,35 @@ def _auth_error(exc: BaseException) -> ValueError:
     return ValueError(f"Robinhood MCP sync failed: {msg[:300]}")
 
 
+def _is_retryable_exc(exc: BaseException) -> bool:
+    leaf = _flatten_exc(exc)
+    if isinstance(leaf, RobinhoodToolError):
+        return leaf.retryable
+    if isinstance(leaf, (TimeoutError, asyncio.TimeoutError, ConnectionError, OSError)):
+        return True
+    msg = str(leaf).lower()
+    markers = (
+        "timeout",
+        "timed out",
+        "connection reset",
+        "connection refused",
+        "temporarily",
+        "429",
+        "502",
+        "503",
+        "504",
+        "rate_limit",
+        "rate limit",
+    )
+    return any(m in msg for m in markers)
+
+
+def _retry_delay_sec(attempt: int) -> float:
+    """attempt is 0-based after first failure."""
+    base = 0.6 if attempt == 0 else 1.8
+    return base + random.uniform(0.0, 0.9)
+
+
 class RobinhoodMcpClient(BrokerageProvider):
     source = "robinhood_mcp"
 
@@ -307,15 +413,14 @@ class RobinhoodMcpClient(BrokerageProvider):
     def is_configured(self) -> bool:
         return _enabled() and has_valid_tokens(self.storage.base_dir)
 
-    @asynccontextmanager
-    async def _session(self):
+    def _build_oauth(self) -> OAuthClientProvider:
         async def _redirect_handler(url: str) -> None:
             raise ValueError(_REAUTH_HINT)
 
         async def _callback_handler() -> tuple[str, str | None]:
             raise ValueError(_REAUTH_HINT)
 
-        oauth = OAuthClientProvider(
+        return OAuthClientProvider(
             server_url=ROBINHOOD_MCP_URL,
             client_metadata=OAuthClientMetadata(
                 client_name="StockPick",
@@ -329,11 +434,24 @@ class RobinhoodMcpClient(BrokerageProvider):
             redirect_handler=_redirect_handler,
             callback_handler=_callback_handler,
         )
+
+    @asynccontextmanager
+    async def _session(self):
+        """Open a fresh MCP session for this asyncio.run() boundary.
+
+        Do not cache sessions/locks across event loops — StockPick calls MCP via
+        ``asyncio.run()`` from sync HTTP handlers and worker threads.
+        One session is still reused for all tools inside a single fetch/probe.
+        """
+        oauth = self._build_oauth()
         try:
             async with streamablehttp_client(ROBINHOOD_MCP_URL, auth=oauth) as (read, write, _):
                 async with ClientSession(read, write) as session:
-                    await session.initialize()
+                    async with asyncio.timeout(init_timeout_sec()):
+                        await session.initialize()
                     yield session
+        except (asyncio.CancelledError, GeneratorExit):
+            raise
         except BaseException as exc:
             raise _auth_error(exc) from exc
 
@@ -345,23 +463,63 @@ class RobinhoodMcpClient(BrokerageProvider):
 
     @staticmethod
     async def _call_tool(session: ClientSession, name: str, arguments: dict[str, Any]) -> Any:
-        result = await session.call_tool(name, arguments)
-        return _tool_json(result)
+        timeout = tool_timeout_sec()
+        last_exc: BaseException | None = None
+        for attempt in range(3):
+            try:
+                result = await session.call_tool(
+                    name,
+                    arguments,
+                    read_timeout_seconds=timedelta(seconds=timeout),
+                )
+                return decode_tool_result(result, tool=name)
+            except BaseException as exc:
+                last_exc = exc
+                if attempt >= 2 or not _is_retryable_exc(exc):
+                    raise
+                delay = _retry_delay_sec(attempt)
+                logger.warning(
+                    "Robinhood MCP tool %s failed (attempt %s/3): %s; retry in %.2fs",
+                    name,
+                    attempt + 1,
+                    _flatten_exc(exc),
+                    delay,
+                )
+                await asyncio.sleep(delay)
+        assert last_exc is not None
+        raise last_exc
 
-    async def _fetch_filled_orders(self, session: ClientSession, account_number: str) -> list[ParsedCsvRow]:
+    async def _fetch_filled_orders(self, session: ClientSession, account_number: str) -> _OrderFetchResult:
         merged: list[ParsedCsvRow] = []
         cursor: str | None = None
+        pages = 0
 
-        for _ in range(MCP_MAX_ORDER_PAGES):
-            args: dict[str, Any] = {"account_number": account_number, "state": "filled"}
-            if cursor:
-                args["cursor"] = cursor
-            payload = await self._call_tool(session, "get_equity_orders", args)
-            merged.extend(parse_mcp_equity_orders(payload))
-            cursor = _order_cursor(payload)
-            if not cursor:
-                break
-        return merged
+        try:
+            for _ in range(MCP_MAX_ORDER_PAGES):
+                args: dict[str, Any] = {"account_number": account_number, "state": "filled"}
+                if cursor:
+                    args["cursor"] = cursor
+                payload = await self._call_tool(session, "get_equity_orders", args)
+                pages += 1
+                merged.extend(parse_mcp_equity_orders(payload))
+                cursor = _order_cursor(payload)
+                if not cursor:
+                    return _OrderFetchResult(rows=merged, truncated=False, pages_fetched=pages, ok=True)
+            return _OrderFetchResult(
+                rows=merged,
+                truncated=bool(cursor),
+                pages_fetched=pages,
+                ok=True,
+            )
+        except Exception as exc:
+            logger.exception("Robinhood MCP order history fetch failed")
+            return _OrderFetchResult(
+                rows=merged,
+                truncated=False,
+                pages_fetched=pages,
+                ok=False,
+                error=str(_flatten_exc(exc))[:300],
+            )
 
     async def _fetch_pnl_trade_history(self, session: ClientSession, account_number: str, *, span: str = "ytd") -> list[Any]:
         pages: list[Any] = []
@@ -410,72 +568,121 @@ class RobinhoodMcpClient(BrokerageProvider):
 
     async def fetch_live_portfolio(self, *, include_orders: bool = True) -> LivePortfolioSnapshot:
         preferred = os.getenv("ROBINHOOD_MCP_ACCOUNT_ID", "").strip() or None
-        async with self._session() as session:
-            accounts = await self._call_tool(session, "get_accounts", {})
-            account_id = _pick_account_id(accounts, preferred)
+        completeness = SnapshotCompleteness()
 
-            if not account_id:
-                raise ValueError("No Robinhood account_number found — set ROBINHOOD_MCP_ACCOUNT_ID")
+        async def _run() -> LivePortfolioSnapshot:
+            async with self._session() as session:
+                accounts = await self._call_tool(session, "get_accounts", {})
+                account_id = _pick_account_id(accounts, preferred)
 
-            account_args = {"account_number": account_id}
-            positions_raw = await self._call_tool(session, "get_equity_positions", account_args)
-            portfolio_raw = await self._call_tool(session, "get_portfolio", account_args)
-            order_rows: list[ParsedCsvRow] = []
-            if include_orders:
-                order_rows = await self._fetch_filled_orders(session, account_id)
+                if not account_id:
+                    raise ValueError("No Robinhood account_number found — set ROBINHOOD_MCP_ACCOUNT_ID")
 
-        return LivePortfolioSnapshot(
-            holdings=parse_equity_positions(positions_raw),
-            buying_power=parse_buying_power(portfolio_raw),
-            portfolio_value=parse_portfolio_value(portfolio_raw),
-            account_id=account_id,
-            raw_positions=positions_raw,
-            raw_portfolio=portfolio_raw,
-            order_rows=order_rows,
-        )
+                account_args = {"account_number": account_id}
+                positions_raw = await self._call_tool(session, "get_equity_positions", account_args)
+                completeness.positions_ok = True
+                holdings, pos_warnings = assess_positions_parse(positions_raw)
+                completeness.warnings.extend(pos_warnings)
+
+                portfolio_raw = await self._call_tool(session, "get_portfolio", account_args)
+                completeness.portfolio_ok = True
+
+                order_rows: list[ParsedCsvRow] = []
+                if include_orders:
+                    order_result = await self._fetch_filled_orders(session, account_id)
+                    order_rows = order_result.rows
+                    completeness.orders_ok = order_result.ok
+                    completeness.orders_truncated = order_result.truncated
+                    if order_result.error:
+                        completeness.warnings.append(f"Order history incomplete: {order_result.error}")
+                    if order_result.truncated:
+                        completeness.warnings.append(
+                            f"Order history truncated after {order_result.pages_fetched} pages "
+                            f"(max {MCP_MAX_ORDER_PAGES}); retaining previous ledger"
+                        )
+                    completeness.history_complete = (
+                        order_result.ok and not order_result.truncated
+                    )
+                else:
+                    completeness.orders_ok = True
+                    completeness.history_complete = False
+                    completeness.warnings.append("Order history not requested")
+
+                return LivePortfolioSnapshot(
+                    holdings=holdings,
+                    buying_power=parse_buying_power(portfolio_raw),
+                    portfolio_value=parse_portfolio_value(portfolio_raw),
+                    account_id=account_id,
+                    raw_positions=positions_raw,
+                    raw_portfolio=portfolio_raw,
+                    order_rows=order_rows,
+                    completeness=completeness,
+                )
+
+        try:
+            async with asyncio.timeout(sync_timeout_sec()):
+                return await _run()
+        except TimeoutError as exc:
+            raise ValueError(
+                f"Robinhood MCP sync exceeded {sync_timeout_sec():.0f}s deadline"
+            ) from exc
 
     async def _probe_async(self) -> dict[str, Any]:
         """Lightweight live check: accounts + portfolio + positions (no order history)."""
-        import time as _time
-
-        t0 = _time.monotonic()
+        t0 = time.monotonic()
         preferred = os.getenv("ROBINHOOD_MCP_ACCOUNT_ID", "").strip() or None
-        async with self._session() as session:
-            accounts = await self._call_tool(session, "get_accounts", {})
-            account_id = _pick_account_id(accounts, preferred)
-            if not account_id:
-                raise ValueError("No Robinhood account_number found — set ROBINHOOD_MCP_ACCOUNT_ID")
-            account_args = {"account_number": account_id}
-            positions_raw = await self._call_tool(session, "get_equity_positions", account_args)
-            portfolio_raw = await self._call_tool(session, "get_portfolio", account_args)
 
-        holdings = parse_equity_positions(positions_raw)
-        cash = parse_buying_power(portfolio_raw)
-        portfolio_value = parse_portfolio_value(portfolio_raw)
-        equity_value = parse_equity_value(portfolio_raw)
-        latency_ms = int((_time.monotonic() - t0) * 1000)
-        if holdings:
-            message = f"Connected — {len(holdings)} equity position(s)"
-        else:
-            message = "Connected — account is cash-only (0 equity positions)"
-        return {
-            "ok": True,
-            "latency_ms": latency_ms,
-            "account_id": account_id,
-            "accounts_count": _count_accounts(accounts),
-            "holdings_count": len(holdings),
-            "cash": cash,
-            "equity_value": equity_value,
-            "portfolio_value": portfolio_value,
-            "error": None,
-            "needs_reauth": False,
-            "message": message,
-        }
+        async def _run() -> dict[str, Any]:
+            async with self._session() as session:
+                accounts = await self._call_tool(session, "get_accounts", {})
+                account_id = _pick_account_id(accounts, preferred)
+                if not account_id:
+                    raise ValueError("No Robinhood account_number found — set ROBINHOOD_MCP_ACCOUNT_ID")
+                account_args = {"account_number": account_id}
+                positions_raw = await self._call_tool(session, "get_equity_positions", account_args)
+                portfolio_raw = await self._call_tool(session, "get_portfolio", account_args)
+
+            holdings, pos_warnings = assess_positions_parse(positions_raw)
+            cash = parse_buying_power(portfolio_raw)
+            portfolio_value = parse_portfolio_value(portfolio_raw)
+            equity_value = parse_equity_value(portfolio_raw)
+            latency_ms = int((time.monotonic() - t0) * 1000)
+
+            if holdings:
+                message = f"Connected — {len(holdings)} equity position(s)"
+                ok = True
+                error = None
+            elif positions_payload_is_genuinely_empty(positions_raw) and not pos_warnings:
+                message = "Connected — account is cash-only (0 equity positions)"
+                ok = True
+                error = None
+            else:
+                message = (
+                    "Connected — positions response could not be parsed "
+                    "(not treating as cash-only)"
+                )
+                ok = False
+                error = pos_warnings[0] if pos_warnings else "Unparseable positions payload"
+            return {
+                "ok": ok,
+                "latency_ms": latency_ms,
+                "account_id": account_id,
+                "accounts_count": _count_accounts(accounts),
+                "holdings_count": len(holdings),
+                "cash": cash,
+                "equity_value": equity_value,
+                "portfolio_value": portfolio_value,
+                "error": error,
+                "needs_reauth": False,
+                "message": message,
+                "warnings": pos_warnings,
+            }
+
+        async with asyncio.timeout(probe_timeout_sec()):
+            return await _run()
 
     def probe_connection(self) -> dict[str, Any]:
         """Sync wrapper for UI/CLI connectivity test."""
-        import time as _time
-
         if not _enabled():
             return {
                 "ok": False,
@@ -504,11 +711,11 @@ class RobinhoodMcpClient(BrokerageProvider):
                 "needs_reauth": True,
                 "message": f"Not authenticated — run {_LOGIN_SCRIPT}",
             }
-        t0 = _time.monotonic()
+        t0 = time.monotonic()
         try:
             return asyncio.run(self._probe_async())
         except Exception as exc:
-            latency_ms = int((_time.monotonic() - t0) * 1000)
+            latency_ms = int((time.monotonic() - t0) * 1000)
             err = _auth_error(exc)
             needs_reauth = _REAUTH_HINT in str(err) or "session expired" in str(err).lower()
             return {

@@ -153,25 +153,46 @@ class PriceService:
         chunk_size: int = 50,
         *,
         max_runtime_seconds: int = 45,
+        min_bars: int | None = None,
+        bar_limit: int | None = None,
+        max_session_lag: int | None = None,
     ) -> dict[str, pd.DataFrame]:
         """Load from DB where sufficient; fetch only missing symbols."""
         from config import SCAN_BULK_COVERAGE_MIN
 
         unique = list(dict.fromkeys(s.upper() for s in symbols if s))
-        min_bars = PERIOD_MIN_BARS.get(period, 100)
+        sufficiency_bars = min_bars if min_bars is not None else PERIOD_MIN_BARS.get(period, 100)
+        trim_limit = bar_limit if bar_limit is not None else PERIOD_LIMIT.get(period, 500)
         result: dict[str, pd.DataFrame] = {}
         missing: list[str] = []
+        database_hits = 0
+        lag_0 = 0
+        lag_1 = 0
+        stale_symbols = 0
 
         for sym in unique:
-            rows = self.store.get_quotes(sym, limit=PERIOD_LIMIT.get(period, 500))
+            rows = self.store.get_quotes(sym, limit=trim_limit)
             df = _rows_to_dataframe(rows)
-            info = assess_history_freshness(df, min_bars)
+            info = assess_history_freshness(
+                df,
+                sufficiency_bars,
+                max_session_lag=max_session_lag,
+            )
             if info.is_sufficient and info.is_fresh:
-                result[sym] = self._trim_period(df, period)
+                result[sym] = self._trim_period(df, period, bar_limit=trim_limit)
+                database_hits += 1
+                if info.session_lag <= 0:
+                    lag_0 += 1
+                elif info.session_lag == 1:
+                    lag_1 += 1
             else:
                 missing.append(sym)
+                if info.session_lag > (max_session_lag if max_session_lag is not None else 1):
+                    stale_symbols += 1
 
         source = "db"
+        provider_requested = len(missing)
+        provider_received = 0
         if missing:
             logger.info(
                 "PriceService: fetching %s/%s symbols from provider fallback (%s)",
@@ -193,13 +214,17 @@ class PriceService:
                 source = f"db+{source}"
             for sym, df in fetched.items():
                 if not df.empty:
-                    trimmed = self._trim_period(df, period)
+                    trimmed = self._trim_period(df, period, bar_limit=trim_limit)
                     self._persist(sym, trimmed)
                     result[sym.upper()] = trimmed
+                    provider_received += 1
 
         requested = len(unique)
         received = len(result)
         coverage = (received / requested) if requested else 1.0
+        live_refresh_coverage = (
+            (provider_received / provider_requested) if provider_requested else 1.0
+        )
         self.last_batch_meta = {
             "requested": requested,
             "received": received,
@@ -207,6 +232,16 @@ class PriceService:
             "coverage": round(coverage, 4),
             "source": source,
             "partial": bool(requested and coverage < SCAN_BULK_COVERAGE_MIN),
+            "database_hits": database_hits,
+            "provider_requested": provider_requested,
+            "provider_received": provider_received,
+            "availability_coverage": round(coverage, 4),
+            "live_refresh_coverage": round(live_refresh_coverage, 4),
+            "lag_0_symbols": lag_0,
+            "lag_1_symbols": lag_1,
+            "stale_symbols": stale_symbols,
+            "min_bars": sufficiency_bars,
+            "bar_limit": trim_limit,
         }
         return result
 
@@ -228,8 +263,13 @@ class PriceService:
             logger.warning("Failed to persist quotes for %s: %s", symbol, exc)
 
     @staticmethod
-    def _trim_period(df: pd.DataFrame, period: str) -> pd.DataFrame:
-        bars = PERIOD_LIMIT.get(period)
+    def _trim_period(
+        df: pd.DataFrame,
+        period: str,
+        *,
+        bar_limit: int | None = None,
+    ) -> pd.DataFrame:
+        bars = bar_limit if bar_limit is not None else PERIOD_LIMIT.get(period)
         if bars and len(df) > bars:
             return df.iloc[-bars:].copy().reset_index(drop=True)
         return df.copy().reset_index(drop=True)

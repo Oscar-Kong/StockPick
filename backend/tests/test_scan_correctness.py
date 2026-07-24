@@ -119,7 +119,12 @@ def test_partial_data_fallback_candidates_returned_when_strict_filters_reject_al
         ),
         patch(
             "services.scan_pipeline.evaluate_stage_b_gate",
-            return_value=CandidateGateResult(passed=False, quality_filter={}, skip_reason="hard_filter"),
+            return_value=CandidateGateResult(
+                passed=False,
+                quality_filter={},
+                skip_reason="strict_filter_rejection",
+                skip_detail="hard_filter",
+            ),
         ),
         patch(
             "services.scan_pipeline.enrich_scan_display",
@@ -140,6 +145,21 @@ def test_partial_data_fallback_candidates_returned_when_strict_filters_reject_al
         patch("services.scan_pipeline.PriceService") as ps_cls,
     ):
         ps_cls.return_value.download_batch.return_value = bulk_hist
+        ps_cls.return_value.last_batch_meta = {
+            "requested": 1,
+            "received": 1,
+            "coverage": 1.0,
+            "source": "db",
+            "partial": False,
+            "database_hits": 1,
+            "provider_requested": 0,
+            "provider_received": 0,
+            "availability_coverage": 1.0,
+            "live_refresh_coverage": 1.0,
+            "lag_0_symbols": 1,
+            "lag_1_symbols": 0,
+            "stale_symbols": 0,
+        }
         reg_cls.return_value.get_active.return_value = MagicMock(version_id="test-v1")
         options = MagicMock(max_results=25, mode="deep")
         options.model_dump.return_value = {"max_results": 25, "mode": "deep"}
@@ -148,8 +168,12 @@ def test_partial_data_fallback_candidates_returned_when_strict_filters_reject_al
     finished = manager.get_job(job.job_id)
     assert finished.status == ScanStatus.completed
     assert len(finished.results) == 1
-    assert finished.results[0].metrics.get("provider_limited_partial_data") is True
-    assert "partial-data fallback" in (finished.message or "").lower()
+    # Strict-filter-only fallback is not a provider limitation when Stage A was DB-complete.
+    assert finished.results[0].metrics.get("provider_limited_partial_data") is False
+    assert finished.results[0].metrics.get("fallback_reason") == "strict_filters_rejected_all"
+    assert "fallback" in (finished.message or "").lower()
+    meta = saved.get("metadata") or {}
+    assert meta.get("fallback_reason") == "strict_filters_rejected_all"
 
 
 def test_scan_records_skip_reason_when_history_missing():
@@ -217,6 +241,16 @@ def test_scan_records_strict_filter_rejection_reason():
     ctx = _make_ctx(symbol)
     mock_screener = MagicMock()
     mock_screener.hard_filter.return_value = False
+    mock_screener.to_result.side_effect = (
+        lambda ctx, score, signals, risk, summary, metrics, **kwargs: MagicMock(
+            symbol=ctx.symbol,
+            score=score,
+            metrics=metrics,
+            risk_level=risk,
+            summary=summary,
+            signals=signals,
+        )
+    )
     saved: dict = {}
 
     with (
@@ -236,7 +270,7 @@ def test_scan_records_strict_filter_rejection_reason():
                 excluded=[],
             ),
         ),
-        patch("services.scan_pipeline.build_candidate", return_value=ctx),
+        patch("services.scan_pipeline._resolve_stage_b_context", return_value=ctx),
         patch("services.scan_pipeline.StrategyRegistry") as reg_cls,
         patch("services.scan_pipeline.HistoricalStore"),
         patch("services.scan_pipeline.cache_module.save_scan_snapshot"),
@@ -247,6 +281,7 @@ def test_scan_records_strict_filter_rejection_reason():
             ),
         ),
         patch("services.scan_pipeline.cache_module.clear_scan_attempt_failure"),
+        patch("services.scan_pipeline.cache_module.get_latest_scan", return_value=None),
         patch("services.scan_scoring_config.resolve_scan_scoring_mode", return_value="legacy"),
         patch("services.scan_pipeline.resolve_scan_scoring_mode", return_value="legacy"),
         patch("data.candidate_gate.should_exclude_low_quality", return_value=(False, "")),
@@ -257,7 +292,23 @@ def test_scan_records_strict_filter_rejection_reason():
             side_effect=lambda info, fund, hist, metrics, legacy_summary="": (legacy_summary, metrics),
         ),
     ):
-        ps_cls.return_value.download_batch.return_value = {symbol: ctx.history}
+        ps = ps_cls.return_value
+        ps.download_batch.return_value = {symbol: ctx.history}
+        ps.last_batch_meta = {
+            "requested": 1,
+            "received": 1,
+            "coverage": 1.0,
+            "source": "db",
+            "partial": False,
+            "database_hits": 1,
+            "provider_requested": 0,
+            "provider_received": 0,
+            "availability_coverage": 1.0,
+            "live_refresh_coverage": 1.0,
+            "lag_0_symbols": 1,
+            "lag_1_symbols": 0,
+            "stale_symbols": 0,
+        }
         reg_cls.return_value.get_active.return_value = MagicMock(version_id="test-v1")
         options = MagicMock(max_results=25, mode="deep")
         options.model_dump.return_value = {"max_results": 25, "mode": "deep"}

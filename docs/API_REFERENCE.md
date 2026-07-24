@@ -292,10 +292,10 @@ Base path: `/api/brokerage` (mutating routes require non-demo mode)
 | POST | `/preview/robinhood-csv` | Parse CSV; return editable preview rows + current/projected holdings (Form: `file`, optional `replace=true`) |
 | POST | `/import/robinhood-csv/approve` | Apply reviewed rows from preview (`CsvApproveRequest`: `filename`, `replace`, `rows[]` with `included`, editable fields) |
 | POST | `/import/robinhood-csv` | Legacy direct import (no review step) |
-| GET | `/robinhood-mcp/status` | OAuth configured? Returns `login_script`, `token_expired`, optional `?probe=true` live check |
-| POST | `/robinhood-mcp/test` | Live MCP connectivity probe (accounts/portfolio/positions; no ledger sync) |
-| POST | `/sync/robinhood-mcp` | Start background Robinhood MCP sync → `{ job_id, status: "running" }`. Always refreshes live marks after positions. Query `?run_decision=true` re-runs the daily decision **only when holdings_count > 0** (cash-only skips decision). UI Sync button uses `run_decision=true`. |
-| GET | `/sync/robinhood-mcp/{job_id}` | Poll sync job until `completed` or `failed` |
+| GET | `/robinhood-mcp/status` | OAuth configured? Returns `login_script`, `credentials_present`, `access_token_valid`, `token_expired`, `needs_reauth`, optional `?probe=true` live check |
+| POST | `/robinhood-mcp/test` | Live MCP connectivity probe (accounts/portfolio/positions; no ledger sync). Unparseable positions → `ok=false` (not cash-only). |
+| POST | `/sync/robinhood-mcp` | Start background Robinhood MCP sync → `{ job_id, status: "running" }`. Concurrent requests for the same account **reuse** the active job. Always refreshes live marks after positions. Query `?run_decision=true` re-runs the daily decision **only when holdings_count > 0** (cash-only skips decision). UI Sync button uses `run_decision=true`. Result includes `sync_status` (`ok` \| `degraded`), `history_complete`, `ledger_replaced`, `warnings`. Ledger is replaced only when order history completed. |
+| GET | `/sync/robinhood-mcp/{job_id}` | Poll sync job until `completed` or `failed`. Fields: `phase`, `heartbeat`, `reused`, `deadline_sec`, `error`, `result`. |
 | POST | `/buying-power` | Save explicit cash / IPO reserved amounts |
 
 **CSV flow:** UI calls preview → user edits/unchecks rows → approve sends the edited payload (not the raw file). Semantic dedupe on append includes activity date, symbol, side, quantity, and price.
@@ -311,7 +311,11 @@ Base path: `/scan` (not under `/api/v2/research`)
 | GET | `/scan/{job_id}` | Job status + attempt results; `invalid_result_count` for skipped schema-drift rows |
 | GET | `/scan/latest/{bucket}` | Last **published** complete ranking; preserves prior latest when a refresh fails the coverage gate |
 
-**Coverage gate:** Stage A bulk OHLC must reach `SCAN_BULK_COVERAGE_MIN` (default `0.70`) before `save_scan_results` overwrites latest. Below that, the job completes with a partial-universe message; `/scan/latest` is unchanged. Cached metadata includes `universe_coverage` and `data_flow.bulk_*` when a complete scan is published.
+**Coverage gate:** Stage A bulk OHLC must reach `SCAN_BULK_COVERAGE_MIN` (default `0.70`) before `save_scan_results` overwrites latest. Below that, the job completes with a partial-universe message; `/scan/latest` is unchanged. Cached metadata includes `universe_coverage`, `data_flow.bulk_*`, `history_policy`, `coverage_diagnostics`, `fallback_reason`, `stage_b_minimum_required_bars`, and `history_gate_exclusion_count` when a complete scan is published (`scan_schema_version` ≥ 2).
+
+**History policy:** Stage B eligibility uses sleeve-aware minima from `resolve_history_policy` (penny **80** bars for default `6mo`; compounder **252**). `MIN_HISTORY_BARS` (default 252) remains the Analyze / non-scan DQ default only. Candidate `metrics.provider_limited_partial_data` is set only for true provider coverage failures — not for internal filter / history-policy rejects.
+
+**Scan SCORE column:** Published `score` / sort key is `ranking_score` (Alpha/Conf/Trade weighted composite). The UI shows a single number; buy/wait lives in Action. Pillar fields remain in metrics for diagnostics.
 
 **Timestamps:** `completed_at` / `last_attempt_failed_at` use UTC `Z` → `+00:00` parsing; invalid cached stamps become `null` (no 500).
 

@@ -7,12 +7,12 @@ from typing import Any
 import pandas as pd
 
 from config import (
-    MIN_HISTORY_BARS,
     PENNY_MIN_VOLUME,
     PENNY_PRICE_MAX,
     PENNY_PRICE_MIN,
 )
 from models.schemas import Bucket
+from services.scan_history_config import ScanStage, resolve_history_policy
 
 OTC_SUFFIXES = (".PK", ".OB", ".FQ", ".YY")
 OTC_EXCHANGE_KEYWORDS = ("otc", "pink", "grey", "gray", "otc markets")
@@ -85,6 +85,7 @@ def apply_quality_filters(
     *,
     min_volume: float | None = None,
     allow_penny: bool = True,
+    min_bars: int | None = None,
 ) -> QualityFilterResult:
     """Apply fixed rules to exclude low-quality names before scoring."""
     reasons: list[str] = []
@@ -95,9 +96,10 @@ def apply_quality_filters(
     if is_likely_delisted(symbol, history, info):
         reasons.append("Delisted or stale price history")
 
-    required_bars = MIN_HISTORY_BARS
-    if bucket == Bucket.penny:
-        required_bars = min(80, MIN_HISTORY_BARS)
+    if min_bars is not None:
+        required_bars = int(min_bars)
+    else:
+        required_bars = resolve_history_policy(bucket, ScanStage.STAGE_B).minimum_required_bars
 
     if history is None or history.empty or len(history) < required_bars:
         reasons.append(f"Insufficient history (<{required_bars} bars)")

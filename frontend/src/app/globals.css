@@ -3862,6 +3862,43 @@ body::before {
   max-width: 100%;
 }
 
+.scan-score-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.125rem;
+  line-height: 1.15;
+}
+
+.scan-score-band {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.scan-score-band--strong {
+  color: rgb(110 231 183); /* emerald-300 */
+}
+
+.scan-score-band--watch {
+  color: rgb(253 230 138); /* amber-200 */
+}
+
+.scan-score-band--skip {
+  color: rgb(161 161 170); /* zinc-400 */
+}
+
+.scan-score-band--fallback {
+  color: rgb(252 165 165); /* red-300 */
+}
+
+.scan-score-band-legend {
+  margin: 0;
+}
+
 .scan-results-table td .scan-score-breakdown__pillars {
   justify-content: center;
 }

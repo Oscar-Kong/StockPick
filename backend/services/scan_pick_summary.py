@@ -48,6 +48,12 @@ def _rule_based_summary(
     business = str(metrics.get("business_line") or summary or f"{symbol} is a US-listed equity.")
     theme = str(metrics.get("theme_module") or metrics.get("sector") or "General equity")
     partial = bool(metrics.get("provider_limited_partial_data"))
+    fallback_reason = str(metrics.get("fallback_reason") or "")
+    non_provider_fallback = bool(
+        fallback_reason
+        and fallback_reason != "none"
+        and not partial
+    )
     top = _top_signals(signals)
     zh = locale.lower().startswith("zh")
 
@@ -61,6 +67,8 @@ def _rule_based_summary(
             pick_bits.append("财报窗口临近。")
         if partial:
             pick_bits.append("数据有限条件下的候选 — 请核实基本面。")
+        elif non_provider_fallback:
+            pick_bits.append("严格筛选后备选 — 请核实后再决策。")
         background = f"{business} 主题：{theme}。"
         why_picked = " ".join(pick_bits)
         why_label = "入选原因"
@@ -74,6 +82,8 @@ def _rule_based_summary(
             pick_bits.append("Earnings event is approaching.")
         if partial:
             pick_bits.append("Ranked under provider-limited data — confirm fundamentals before acting.")
+        elif non_provider_fallback:
+            pick_bits.append("Fallback after strict filters — verify before acting.")
         background = f"{business} Theme: {theme}."
         why_picked = " ".join(pick_bits)
         why_label = "Why it ranked"
@@ -147,7 +157,15 @@ def generate_scan_pick_summary(
         if loc == "zh" and metrics.get("provider_limited_partial_data")
         else "Note: candidate ranked with limited provider data."
         if metrics.get("provider_limited_partial_data")
-        else ""
+        else (
+            "注意：严格筛选后备选，请核实。"
+            if loc == "zh"
+            and metrics.get("fallback_reason")
+            and metrics.get("fallback_reason") != "none"
+            else "Note: fallback after strict filters — verify carefully."
+            if metrics.get("fallback_reason") and metrics.get("fallback_reason") != "none"
+            else ""
+        )
     )
 
     if loc == "zh":

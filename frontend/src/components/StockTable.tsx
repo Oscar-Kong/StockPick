@@ -2,11 +2,12 @@
 "use client";
 
 import { ScoreSourceBadge } from "@/components/ScoreSourceBadge";
-import { ScanScoreBreakdown } from "@/components/scan/ScanScoreBreakdown";
+import { ScanScoreBandLegend, ScanScoreBreakdown } from "@/components/scan/ScanScoreBreakdown";
 import { ScanTradeHintCell } from "@/components/scan/ScanTradeHintCell";
 import { DenseTable, DenseTableToolbar } from "@/components/ui/DenseTable";
 import { formatDateTime } from "@/lib/datetime";
 import { fmt, useTranslation } from "@/lib/i18n";
+import { readRankingScore } from "@/lib/scanScoreDisplay";
 import type { HeldPositionSummary, StockResult } from "@/lib/types";
 import clsx from "clsx";
 import { useRouter } from "next/navigation";
@@ -147,6 +148,8 @@ export function StockTable({
     ? results.filter((r) => heldPositions.has(r.symbol.toUpperCase())).length
     : 0;
 
+  const scanScores = useMemo(() => results.map((r) => readRankingScore(r)), [results]);
+
   const columnLabels: Record<ColumnId, string> = useMemo(
     () => ({
       rank: "#",
@@ -239,6 +242,7 @@ export function StockTable({
           )}
         </div>
       </DenseTableToolbar>
+      {results.length > 0 ? <ScanScoreBandLegend className="px-3 pb-1.5 text-[11px] leading-snug" /> : null}
       <div className="scan-results-table__scroll min-h-0 flex-1 overflow-auto">
         <DenseTable caption={t.scan.candidatesRanked} className="scan-results-table__grid">
           <colgroup>
@@ -279,7 +283,7 @@ export function StockTable({
                 ),
                 recommendation: <ScanTradeHintCell stock={stock} compact />,
                 score: (
-                  <ScanScoreBreakdown stock={stock} compact />
+                  <ScanScoreBreakdown stock={stock} compact scanScores={scanScores} />
                 ),
                 price: <span className="finance-value">${stock.price.toFixed(2)}</span>,
                 change: (

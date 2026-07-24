@@ -118,14 +118,16 @@ def assess_history_freshness(
     *,
     now: datetime | None = None,
     source: str = "local",
+    max_session_lag: int | None = None,
 ) -> HistoryFreshnessInfo:
     bar_count = len(df) if df is not None and not df.empty else 0
     last = _last_bar_date(df)
     expected = expected_last_completed_session(now)
     is_sufficient = bar_count >= min_bars
     lag = session_lag_business_days(last, expected) if last else 999
-    is_fresh = is_sufficient and last is not None and lag <= _MAX_SESSION_LAG
-    needs_refresh = not is_fresh and (not is_sufficient or lag > _MAX_SESSION_LAG)
+    allowed_lag = _MAX_SESSION_LAG if max_session_lag is None else int(max_session_lag)
+    is_fresh = is_sufficient and last is not None and lag <= allowed_lag
+    needs_refresh = not is_fresh and (not is_sufficient or lag > allowed_lag)
     return HistoryFreshnessInfo(
         last_date=last,
         bar_count=bar_count,

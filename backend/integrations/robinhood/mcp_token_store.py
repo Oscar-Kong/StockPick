@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import tempfile
+import threading
 import time
 from pathlib import Path
 
@@ -14,6 +17,12 @@ DEFAULT_TOKEN_DIR = Path(__file__).resolve().parents[3] / "storage" / "robinhood
 TOKEN_FILE = "oauth.json"
 # Refresh a few minutes early so sync does not race the hard expiry.
 _EXPIRY_SKEW_SEC = 120
+_PROCESS_LOCK = threading.RLock()
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - non-Unix
+    fcntl = None  # type: ignore[assignment]
 
 
 def token_path(base_dir: Path | None = None) -> Path:
@@ -52,65 +61,101 @@ class FileTokenStorage:
             logger.warning("Could not read Robinhood MCP token file: %s", exc)
             return {}
 
-    def _save(self, data: dict) -> None:
+    def _atomic_write(self, data: dict) -> None:
         self.base_dir.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        payload = json.dumps(data, indent=2)
+        fd, tmp_name = tempfile.mkstemp(
+            prefix=".oauth-",
+            suffix=".tmp",
+            dir=str(self.base_dir),
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as tmp:
+                tmp.write(payload)
+                tmp.flush()
+                os.fsync(tmp.fileno())
+            os.replace(tmp_name, self.path)
+        except Exception:
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
+            raise
         try:
             self.path.chmod(0o600)
         except OSError:
             pass
 
+    def _save(self, data: dict) -> None:
+        """Persist JSON with process + optional file lock. Caller may already hold _PROCESS_LOCK."""
+        if fcntl is None:
+            self._atomic_write(data)
+            return
+        lock_path = self.base_dir / ".oauth.lock"
+        self.base_dir.mkdir(parents=True, exist_ok=True)
+        with open(lock_path, "a+", encoding="utf-8") as lock_file:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            try:
+                self._atomic_write(data)
+            finally:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
     async def get_tokens(self) -> OAuthToken | None:
-        data = self._load()
-        raw = data.get("tokens")
-        if not raw:
-            return None
-        try:
-            token = OAuthToken.model_validate(raw)
-        except Exception:
-            return None
+        with _PROCESS_LOCK:
+            data = self._load()
+            raw = data.get("tokens")
+            if not raw:
+                return None
+            try:
+                token = OAuthToken.model_validate(raw)
+            except Exception:
+                return None
 
-        expires_at = _infer_expires_at(data, token, self.path)
-        now = time.time()
-        expired = expires_at is not None and now >= (expires_at - _EXPIRY_SKEW_SEC)
+            expires_at = _infer_expires_at(data, token, self.path)
+            now = time.time()
+            expired = expires_at is not None and now >= (expires_at - _EXPIRY_SKEW_SEC)
 
-        # MCP SDK never sets token_expiry_time when loading from storage, so an
-        # expired access_token is still treated as valid until the server 401s —
-        # then it tries a browser grant with no redirect handler. Blank the
-        # access token when we know it is stale so refresh_token is used instead.
-        if expired and token.refresh_token:
-            return token.model_copy(update={"access_token": ""})
-        return token
+            # MCP SDK never sets token_expiry_time when loading from storage, so an
+            # expired access_token is still treated as valid until the server 401s —
+            # then it tries a browser grant with no redirect handler. Blank the
+            # access token when we know it is stale so refresh_token is used instead.
+            if expired and token.refresh_token:
+                return token.model_copy(update={"access_token": ""})
+            return token
 
     async def set_tokens(self, tokens: OAuthToken) -> None:
-        data = self._load()
-        data["tokens"] = tokens.model_dump(mode="json")
-        if tokens.expires_in is not None:
-            try:
-                data["expires_at"] = time.time() + int(tokens.expires_in)
-            except (TypeError, ValueError):
+        with _PROCESS_LOCK:
+            data = self._load()
+            data["tokens"] = tokens.model_dump(mode="json")
+            if tokens.expires_in is not None:
+                try:
+                    data["expires_at"] = time.time() + int(tokens.expires_in)
+                except (TypeError, ValueError):
+                    data.pop("expires_at", None)
+            else:
                 data.pop("expires_at", None)
-        else:
-            data.pop("expires_at", None)
-        self._save(data)
+            self._save(data)
 
     async def get_client_info(self) -> OAuthClientInformationFull | None:
-        raw = self._load().get("client_info")
-        if not raw:
-            return None
-        try:
-            return OAuthClientInformationFull.model_validate(raw)
-        except Exception:
-            return None
+        with _PROCESS_LOCK:
+            data = self._load()
+            raw = data.get("client_info")
+            if not raw:
+                return None
+            try:
+                return OAuthClientInformationFull.model_validate(raw)
+            except Exception:
+                return None
 
     async def set_client_info(self, client_info: OAuthClientInformationFull) -> None:
-        data = self._load()
-        data["client_info"] = client_info.model_dump(mode="json")
-        self._save(data)
+        with _PROCESS_LOCK:
+            data = self._load()
+            data["client_info"] = client_info.model_dump(mode="json")
+            self._save(data)
 
 
-def has_valid_tokens(base_dir: Path | None = None) -> bool:
-    """True when we have credentials that can authenticate (access or refresh)."""
+def credentials_present(base_dir: Path | None = None) -> bool:
+    """True when the token file has a non-empty access or refresh token string."""
     path = token_path(base_dir)
     if not path.is_file():
         return False
@@ -121,3 +166,31 @@ def has_valid_tokens(base_dir: Path | None = None) -> bool:
     access = (tokens.get("access_token") or tokens.get("accessToken") or "").strip()
     refresh = (tokens.get("refresh_token") or tokens.get("refreshToken") or "").strip()
     return bool(access or refresh)
+
+
+def access_token_valid(base_dir: Path | None = None) -> bool:
+    """True when credentials exist and access token is not past expiry skew."""
+    path = token_path(base_dir)
+    if not path.is_file():
+        return False
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return False
+    tokens = data.get("tokens") or {}
+    access = (tokens.get("access_token") or tokens.get("accessToken") or "").strip()
+    if not access:
+        return False
+    raw = data.get("expires_at")
+    try:
+        expires_at = float(raw) if raw is not None else None
+    except (TypeError, ValueError):
+        expires_at = None
+    if expires_at is None:
+        return True
+    return time.time() < (expires_at - _EXPIRY_SKEW_SEC)
+
+
+def has_valid_tokens(base_dir: Path | None = None) -> bool:
+    """Backward-compatible alias for credentials_present (access or refresh)."""
+    return credentials_present(base_dir)

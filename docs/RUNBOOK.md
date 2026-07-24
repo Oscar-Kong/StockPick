@@ -93,6 +93,10 @@ Diagnose without a full sync: `POST /brokerage/robinhood-mcp/test` (also Portfol
 
 If sync fails with **session expired** (or a vague `TaskGroup` error on older builds), tokens in `storage/robinhood_mcp/oauth.json` are stale — re-run the login script. StockPick stores absolute `expires_at` and refreshes access tokens when possible.
 
+**Status vs probe:** `credentials_present` / `authenticated` only mean a token file exists (access or refresh). They do **not** prove a live session — use `--probe` / Test connection. `access_token_valid` is false when the access token is past expiry skew (refresh may still work).
+
+**False cash-only:** If the UI says cash-only but you hold shares, check the probe message. Unparseable positions report failure (not cash-only). Confirm `ROBINHOOD_MCP_ACCOUNT_ID` points at the account with equity. Incomplete order history no longer wipes Activity — look for `sync_status=degraded` / `history_complete=false` on the job result.
+
 Cursor chat (optional): `.cursor/mcp.json` + **Settings → Tools & MCP → Connect** if MCP shows errored until OAuth completes.
 
 Full guide: [ROBINHOOD_MCP.md](ROBINHOOD_MCP.md).
@@ -202,6 +206,24 @@ These were previously hard-coded inside `backend/services/scan_manager.py`. They
 | `SCAN_STAGE_B_TIME_BUDGET_SECONDS`| `0` (unlimited)                  | Stop Stage B after this many seconds; `0` = score all candidates. Partial results if capped. |
 | `SCAN_RESULT_TTL_PENNY`           | inherits `SCAN_RESULT_TTL` (900) | TTL for `scan:latest:penny`.                                                           |
 | `SCAN_RESULT_TTL_COMPOUNDER`      | `86400`                          | TTL for `scan:latest:compounder`; compounder data changes slowly.                      |
+| `MIN_HISTORY_BARS`                  | `252`                            | Default for Analyze / non-scan DQ callers only. **Scan Stage B uses strategy-aware `HistoryPolicy`** (penny **80**, compounder **252**) from `services.scan_history_config.resolve_history_policy`. |
+
+### Strategy-aware history policy
+
+Scan OHLC length is resolved by sleeve + stage (`backend/services/scan_history_config.py`), not by a single global bar constant:
+
+| Context | Period | Trim limit | Gate / preload min | DB sufficiency (preferred) |
+|---------|--------|------------|--------------------|----------------------------|
+| Penny Stage A | `6mo` | 160 | 21 (rank features) | 100 |
+| Penny Stage B | `6mo` | 160 | **80** | 160 |
+| Compounder Stage A | `1y` | 280 | 60 | 200 |
+| Compounder Stage B | `5y` | 1400 | **252** | 1000 |
+
+Penny indicator math only needs ~32 bars (`PENNY_INDICATOR_HISTORY_FLOOR`); Stage B uses 80 so 6mo trimmed frames (≤160) are not rejected by the legacy 252-bar global gate. Stage B preload and the candidate gate share the same minimum. When Stage B period is longer than Stage A (compounder `1y`→`5y`), bulk reuse additionally requires the Stage B period floor (~1000 bars) so short Stage A frames are never reused for deep scoring.
+
+**Fallback taxonomy** (scan metadata `fallback_reason`): `none`, `provider_coverage_insufficient`, `provider_unavailable`, `history_policy_mismatch`, `strict_filters_rejected_all`, `insufficient_valid_candidates`, `stale_data_fallback`. Candidate metric `provider_limited_partial_data` is **true only** for provider_* reasons — not when a DB-complete scan fails internal filters.
+
+**Provider hardening (follow-up):** when DB is cold/stale, Yahoo may still be the bulk path; FMP can 403; per-symbol rescue is intentionally skipped for latency. A later bounded recovery (primary bulk → one secondary bulk → top-N rescue → degraded status) is separate from the history-gate fix.
 
 ### Scan response shape additions
 
@@ -209,11 +231,15 @@ These were previously hard-coded inside `backend/services/scan_manager.py`. They
 
 - `timings`: `{stage_a_ms, stage_a_bulk_download_ms, stage_a_rank_ms, stage_a_bulk_symbols, stage_b_ms, stage_b_candidate_build_ms, stage_b_bulk_cache_hits, stage_b_provider_fallbacks, stage_b_history_reloads, stage_b_candidate_build_calls, stage_b_candidates, stage_b_mode, stage_a_eligible, stage_a_excluded}`
 - `history_horizons`: `{stage_a_period, stage_b_period, bucket}` — OHLC windows used for the scan.
+- `history_policy` (cached): `{stage_a, stage_b}` each with `{requested_period, returned_bar_limit, minimum_required_bars, preferred_bars, allowed_session_lag}`.
+- `coverage_diagnostics` (cached): `{requested_symbols, database_hits, provider_requested, provider_received, availability_coverage, live_refresh_coverage, lag_0_symbols, lag_1_symbols, stale_symbols}`.
+- `stage_a_returned_bar_limit`, `stage_b_minimum_required_bars`, `history_gate_exclusion_count`, `fallback_reason` (machine-readable; see taxonomy above).
 - `data_flow` (cached scan metadata): `{bulk_download_ms, bulk_symbols_returned, bulk_symbols_requested, bulk_coverage_ratio, bulk_download_partial, bulk_source, stage_a_rank_ms, stage_b_build_ms, bulk_cache_hits, provider_fallbacks, history_reload_count, fundamental_cache_hits, fundamental_refreshes, candidate_build_calls, per_symbol_sources[], per_symbol_diagnostics[]}`.
 - `universe_coverage` (cached when published): `{requested, received, coverage, minimum, partial_universe, source, published_as_latest}`.
 - `data_flow.per_symbol_diagnostics[]`: per-symbol `{price_history_period, price_history_bars, fundamental_snapshot_date, fundamental_source, reconciliation_quality, missing_fundamental_fields, confidence_penalty, ...}`.
 - `stage_a_diagnostics` (cached scan metadata): `{eligible_count, excluded_count, advanced_count, candidates[], excluded[]}` where each candidate includes `pre_score`, percentile `features`, `rank`, `warnings`, and optional `data_quality`.
-- `skipped_candidates` / `skipped_count` (cached scan metadata): structured Stage B skip records `{symbol, reason, detail?}` where `reason` is one of `missing_history`, `stale_history`, `provider_failure`, `invalid_price`, `missing_required_fundamentals`, `candidate_build_exception`, or `strict_filter_rejection`.
+- `skipped_candidates` / `skipped_count` (cached scan metadata): structured Stage B skip records `{symbol, reason, detail?}` where `reason` is one of `missing_history`, `insufficient_history`, `stale_history`, `provider_failure`, `invalid_price`, `missing_required_fundamentals`, `candidate_build_exception`, or `strict_filter_rejection`.
+- `scan_schema_version`: `2` when history-policy / coverage diagnostics are present (older caches may still be `1`).
 - `invalid_result_count` (latest + job status): number of cached/job rows skipped because they failed `StockResult` validation (schema drift); valid rows are still returned.
 - `cache_age_seconds` (latest only): seconds since the result was written to the cache table.
 - `last_attempt_failed_at` / `last_attempt_error` (latest only): set when the most recent scan attempt failed. The previously cached successful results are **not** clobbered — they remain visible alongside the failure marker so the UI can render "showing prior results; last attempt failed at …". Malformed timestamps parse to `null` (no 500).
@@ -269,16 +295,17 @@ Parity diagnostics include `scan_id`, `timestamp`, `scoring_version`, `factor_di
 
 **Final scan ranking** (Stage B output, after factor scoring):
 
-Each candidate exposes three independent 0–100 pillars plus a weighted composite:
+Each candidate stores three 0–100 pillars plus a weighted composite. The **published SCORE** (and sort order) is `ranking_score`:
 
 | Field | Meaning |
 |-------|---------|
 | `alpha_score` | Setup attractiveness from bucket factors |
 | `confidence_score` | Data completeness, freshness, provider agreement, history, reconciliation |
 | `tradability_score` | Liquidity, volume, volatility, spread proxy, gap risk |
-| `ranking_score` | Weighted composite used for sort order (see env weights below) |
+| `ranking_score` | Weighted composite used for sort order and the SCORE column |
+| `stage_b_score` | Raw Stage B factor composite (kept in metrics; not the table headline) |
 
-The scan results table shows **only `ranking_score`** when `confidence_score` and `tradability_score` are at the neutral placeholder (~50, meaning insufficient data to differentiate). Pillar chips appear only when a sub-score materially differs from 50.
+The scan results table shows a **single SCORE number** plus a compact band chip (`Strong` ≥70 / `Watch` ≥65 / `Skip` / `Fallback` for partial-data). Buy / wait percentages live in the Action column. A one-line score guide sits above the results table.
 
 `StockResult.score` mirrors final `ranking_score` after diversification and persistence. Scan metadata includes `ranking_diagnostics` with exclusion reasons (`excluded_by_sector_limit`, `excluded_by_correlation_limit`, `excluded_by_share_class`, `replaced_by_higher_confidence_candidate`, `retained_by_persistence_rule`, etc.).
 
