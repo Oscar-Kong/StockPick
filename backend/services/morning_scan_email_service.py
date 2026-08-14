@@ -23,6 +23,7 @@ from services.scan_email_config import (
     load_scan_email_settings,
     mask_recipients,
 )
+from services.scan_email_overrides_store import schedule_label_from_time
 from services.scan_manager import scan_manager
 from sqlalchemy.orm import Session, sessionmaker
 from utils.datetime_util import utc_now
@@ -293,6 +294,8 @@ async def run_morning_scan_email(
     dry_run: bool = False,
     retry_attempt: int = 0,
     source: str = "scheduler",
+    subject_template: str | None = None,
+    intro_note: str | None = None,
 ) -> MorningScanEmailResult:
     """Internal entry point for scheduler and ops API."""
     settings = load_scan_email_settings()
@@ -374,6 +377,8 @@ async def run_morning_scan_email(
             unavailable=unavailable,
             partial=partial,
             global_is_stale=global_stale,
+            subject_template=subject_template if subject_template is not None else settings.subject_template,
+            intro_note=intro_note if intro_note is not None else settings.intro_note,
         )
 
         if dry_run:
@@ -382,8 +387,8 @@ async def run_morning_scan_email(
                 message=f"Email built successfully (dry run) — would send to {format_recipient_list(settings.recipients)}",
                 dry_run=True,
                 subject=content.subject,
-                html_preview=content.html[:2000],
-                text_preview=content.text[:2000],
+                html_preview=content.html,
+                text_preview=content.text,
                 recipients=settings.recipients,
             )
 
@@ -564,7 +569,12 @@ def get_morning_scan_email_status() -> dict[str, Any]:
         "recipients": list(settings.recipients),
         "recipient_count": len(settings.recipients),
         "recipient_source": _recipient_source(),
-        "schedule_label": "9:20 AM ET",
+        "schedule_label": schedule_label_from_time(settings.send_time_et, timezone_name=settings.timezone),
+        "send_time_et": settings.send_time_et,
+        "stale_after_minutes": settings.stale_after_minutes,
+        "subject_template": settings.subject_template,
+        "intro_note": settings.intro_note,
+        "overrides_updated_at": settings.overrides_updated_at,
         "cron": settings.cron,
         "timezone": settings.timezone,
         "buckets": list(settings.buckets),
@@ -575,6 +585,33 @@ def get_morning_scan_email_status() -> dict[str, Any]:
         "last_attempted_delivery": _delivery_to_dict(last_attempt),
         "scan_freshness": freshness,
     }
+
+
+def update_morning_scan_email_settings(
+    *,
+    send_time_et: str | None = None,
+    stale_after_minutes: int | None = None,
+    subject_template: str | None = None,
+    intro_note: str | None = None,
+    clear_subject_template: bool = False,
+    clear_intro_note: bool = False,
+) -> dict[str, Any]:
+    """Persist Ops overrides and reschedule the morning email job when send time changes."""
+    from services.scan_email_overrides_store import get_scan_email_overrides_store
+    from services.scheduler import reschedule_morning_scan_email
+
+    store = get_scan_email_overrides_store()
+    store.update(
+        send_time_et=send_time_et,
+        stale_after_minutes=stale_after_minutes,
+        subject_template=subject_template,
+        intro_note=intro_note,
+        clear_subject_template=clear_subject_template,
+        clear_intro_note=clear_intro_note,
+    )
+    if send_time_et is not None:
+        reschedule_morning_scan_email()
+    return get_morning_scan_email_status()
 
 
 def get_morning_scan_email_history(limit: int = 20) -> list[dict[str, Any]]:

@@ -4,8 +4,9 @@ import {
   getMorningScanEmailStatus,
   previewMorningScanEmail,
   sendMorningScanEmailTest,
+  updateMorningScanEmailSettings,
 } from "@/lib/api";
-import type { MorningScanEmailStatusResponse } from "@/lib/types";
+import type { MorningScanEmailSendResponse, MorningScanEmailStatusResponse } from "@/lib/types";
 import { fmt, useTranslation } from "@/lib/i18n";
 import clsx from "clsx";
 import { useCallback, useEffect, useState } from "react";
@@ -31,14 +32,26 @@ export function MorningScanEmailPanel() {
   const [status, setStatus] = useState<MorningScanEmailStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [actionPending, setActionPending] = useState<"test" | "preview" | null>(null);
+  const [actionPending, setActionPending] = useState<"test" | "preview" | "save" | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+
+  const [sendTime, setSendTime] = useState("09:20");
+  const [staleMinutes, setStaleMinutes] = useState(1440);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewSubject, setPreviewSubject] = useState("");
+  const [previewIntro, setPreviewIntro] = useState("");
+  const [previewResult, setPreviewResult] = useState<MorningScanEmailSendResponse | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      setStatus(await getMorningScanEmailStatus());
+      const next = await getMorningScanEmailStatus();
+      setStatus(next);
+      setSendTime(next.send_time_et || "09:20");
+      setStaleMinutes(next.stale_after_minutes ?? 1440);
+      setPreviewSubject(next.subject_template || "");
+      setPreviewIntro(next.intro_note || "");
     } catch (e) {
       setError(e instanceof Error ? e.message : t.morningScanEmail.loadFailed);
       setStatus(null);
@@ -59,11 +72,75 @@ export function MorningScanEmailPanel() {
     window.setTimeout(() => setToast(null), 5000);
   };
 
-  const onPreview = async () => {
+  const onSaveSchedule = async () => {
+    setActionPending("save");
+    try {
+      const next = await updateMorningScanEmailSettings({
+        send_time_et: sendTime,
+        stale_after_minutes: staleMinutes,
+      });
+      setStatus(next);
+      setSendTime(next.send_time_et || sendTime);
+      setStaleMinutes(next.stale_after_minutes ?? staleMinutes);
+      showToast(t.morningScanEmail.settingsSaved);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : t.morningScanEmail.actionFailed);
+    } finally {
+      setActionPending(null);
+    }
+  };
+
+  const onOpenPreview = async () => {
     setActionPending("preview");
     try {
-      const res = await previewMorningScanEmail();
+      const res = await previewMorningScanEmail({
+        subject_template: previewSubject || null,
+        intro_note: previewIntro || null,
+      });
+      setPreviewResult(res);
+      setPreviewOpen(true);
       showToast(res.message || t.morningScanEmail.previewOk);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : t.morningScanEmail.actionFailed);
+    } finally {
+      setActionPending(null);
+    }
+  };
+
+  const onRefreshPreview = async () => {
+    setActionPending("preview");
+    try {
+      const res = await previewMorningScanEmail({
+        subject_template: previewSubject || null,
+        intro_note: previewIntro || null,
+      });
+      setPreviewResult(res);
+      showToast(t.morningScanEmail.previewRefreshed);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : t.morningScanEmail.actionFailed);
+    } finally {
+      setActionPending(null);
+    }
+  };
+
+  const onSavePreviewCopy = async () => {
+    setActionPending("save");
+    try {
+      const next = await updateMorningScanEmailSettings({
+        subject_template: previewSubject,
+        intro_note: previewIntro,
+        clear_subject_template: !previewSubject.trim(),
+        clear_intro_note: !previewIntro.trim(),
+      });
+      setStatus(next);
+      setPreviewSubject(next.subject_template || "");
+      setPreviewIntro(next.intro_note || "");
+      showToast(t.morningScanEmail.previewSaved);
+      const res = await previewMorningScanEmail({
+        subject_template: next.subject_template,
+        intro_note: next.intro_note,
+      });
+      setPreviewResult(res);
     } catch (e) {
       showToast(e instanceof Error ? e.message : t.morningScanEmail.actionFailed);
     } finally {
@@ -74,7 +151,10 @@ export function MorningScanEmailPanel() {
   const onTestSend = async () => {
     setActionPending("test");
     try {
-      const res = await sendMorningScanEmailTest();
+      const res = await sendMorningScanEmailTest({
+        subject_template: previewSubject || null,
+        intro_note: previewIntro || null,
+      });
       showToast(res.message || t.morningScanEmail.testOk);
       await load();
     } catch (e) {
@@ -124,6 +204,53 @@ export function MorningScanEmailPanel() {
             </span>
           </div>
 
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block space-y-1">
+              <span className="text-xs uppercase tracking-wide text-zinc-500">
+                {t.morningScanEmail.sendTime}
+              </span>
+              <input
+                type="time"
+                value={sendTime}
+                onChange={(e) => setSendTime(e.target.value)}
+                className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100"
+                aria-describedby="morning-scan-send-time-hint"
+              />
+              <span id="morning-scan-send-time-hint" className="block text-xs text-zinc-500">
+                {t.morningScanEmail.sendTimeHint}
+              </span>
+            </label>
+            <label className="block space-y-1">
+              <span className="text-xs uppercase tracking-wide text-zinc-500">
+                {t.morningScanEmail.freshnessMinutes}
+              </span>
+              <input
+                type="number"
+                min={1}
+                max={10080}
+                value={staleMinutes}
+                onChange={(e) => setStaleMinutes(Number(e.target.value) || 1)}
+                className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100"
+                aria-describedby="morning-scan-freshness-hint"
+              />
+              <span id="morning-scan-freshness-hint" className="block text-xs text-zinc-500">
+                {t.morningScanEmail.freshnessHint}
+              </span>
+            </label>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <PrimaryButton
+              type="button"
+              disabled={!!actionPending}
+              onClick={() => void onSaveSchedule()}
+            >
+              {actionPending === "save" ? t.common.loading : t.morningScanEmail.saveSchedule}
+            </PrimaryButton>
+            <span className="text-xs text-zinc-500">
+              {fmt(t.morningScanEmail.scheduleSummary, { label: status.schedule_label })}
+            </span>
+          </div>
+
           <dl className="grid gap-2 sm:grid-cols-2">
             <div>
               <dt className="text-xs uppercase tracking-wide text-zinc-500">{t.morningScanEmail.provider}</dt>
@@ -148,10 +275,6 @@ export function MorningScanEmailPanel() {
                     ? t.morningScanEmail.sourceEnv
                     : t.morningScanEmail.sourceNone}
               </dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-zinc-500">{t.morningScanEmail.schedule}</dt>
-              <dd className="text-zinc-200">{status.schedule_label}</dd>
             </div>
             <div>
               <dt className="text-xs uppercase tracking-wide text-zinc-500">{t.morningScanEmail.buckets}</dt>
@@ -208,7 +331,7 @@ export function MorningScanEmailPanel() {
             <PrimaryButton
               type="button"
               disabled={!!actionPending || !status.configured}
-              onClick={() => void onPreview()}
+              onClick={() => void onOpenPreview()}
             >
               {actionPending === "preview" ? t.common.loading : t.morningScanEmail.preview}
             </PrimaryButton>
@@ -219,6 +342,102 @@ export function MorningScanEmailPanel() {
             >
               {actionPending === "test" ? t.common.loading : t.morningScanEmail.sendTest}
             </GhostButton>
+          </div>
+        </div>
+      )}
+
+      {previewOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="morning-scan-preview-title"
+          onClick={() => setPreviewOpen(false)}
+        >
+          <div
+            className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg border border-zinc-700 bg-zinc-950 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-zinc-800 px-4 py-3">
+              <div>
+                <h4 id="morning-scan-preview-title" className="text-base font-semibold text-zinc-100">
+                  {t.morningScanEmail.previewEditorTitle}
+                </h4>
+                <p className="mt-1 text-xs text-zinc-500">{t.morningScanEmail.previewEditorHint}</p>
+              </div>
+              <GhostButton type="button" className="text-xs" onClick={() => setPreviewOpen(false)}>
+                {t.common.close}
+              </GhostButton>
+            </div>
+            <div className="space-y-3 overflow-y-auto px-4 py-3">
+              <label className="block space-y-1">
+                <span className="text-xs uppercase tracking-wide text-zinc-500">
+                  {t.morningScanEmail.subjectTemplate}
+                </span>
+                <input
+                  type="text"
+                  value={previewSubject}
+                  onChange={(e) => setPreviewSubject(e.target.value)}
+                  placeholder={t.morningScanEmail.subjectPlaceholder}
+                  className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+                  maxLength={200}
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-xs uppercase tracking-wide text-zinc-500">
+                  {t.morningScanEmail.introNote}
+                </span>
+                <textarea
+                  value={previewIntro}
+                  onChange={(e) => setPreviewIntro(e.target.value)}
+                  placeholder={t.morningScanEmail.introPlaceholder}
+                  rows={3}
+                  maxLength={2000}
+                  className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+                />
+              </label>
+              {previewResult?.subject && (
+                <p className="text-xs text-zinc-400">
+                  {t.morningScanEmail.renderedSubject}:{" "}
+                  <span className="text-zinc-200">{previewResult.subject}</span>
+                </p>
+              )}
+              <div className="overflow-hidden rounded-md border border-zinc-800 bg-white">
+                {previewResult?.html_preview ? (
+                  <iframe
+                    title={t.morningScanEmail.previewFrameTitle}
+                    srcDoc={previewResult.html_preview}
+                    className="h-[50vh] w-full bg-white"
+                    sandbox=""
+                  />
+                ) : (
+                  <p className="p-4 text-sm text-zinc-600">{t.morningScanEmail.previewEmpty}</p>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 border-t border-zinc-800 px-4 py-3">
+              <GhostButton
+                type="button"
+                disabled={!!actionPending}
+                onClick={() => void onRefreshPreview()}
+              >
+                {t.morningScanEmail.refreshPreview}
+              </GhostButton>
+              <PrimaryButton
+                type="button"
+                disabled={!!actionPending}
+                onClick={() => void onSavePreviewCopy()}
+              >
+                {t.morningScanEmail.savePreviewCopy}
+              </PrimaryButton>
+              <GhostButton
+                type="button"
+                disabled={!!actionPending || !status?.configured || (status?.recipients.length ?? 0) === 0}
+                onClick={() => void onTestSend()}
+              >
+                {t.morningScanEmail.sendTest}
+              </GhostButton>
+            </div>
           </div>
         </div>
       )}

@@ -10,8 +10,6 @@ import type {
   PortfolioDecisionResponse,
   PortfolioDecisionRunResponse,
   DailyDashboardResponse,
-  HomeRefreshResponse,
-  HomeRefreshStatusResponse,
   BrokerageCsvImportResponse,
   CsvApproveRequest,
   CsvPreviewResponse,
@@ -66,6 +64,7 @@ import type {
   PairsResearchResponse,
   SchedulerStatusResponse,
   MorningScanEmailSendResponse,
+  MorningScanEmailSettingsUpdate,
   MorningScanEmailStatusResponse,
   MailingListImportEnvResponse,
   MailingListResponse,
@@ -160,8 +159,6 @@ export {
   runPortfolioPolicyBacktest,
   runPortfolioDailyDecision,
   getDailyDashboard,
-  refreshHomeData,
-  getHomeRefreshStatus,
   runDailyDecisionNow,
   getDailyTradingPlanReview,
   saveDailyTradingPlanReview,
@@ -850,23 +847,46 @@ export async function getMorningScanEmailStatus(
   });
 }
 
+export async function updateMorningScanEmailSettings(
+  body: MorningScanEmailSettingsUpdate,
+  options?: V2RequestOptions
+): Promise<MorningScanEmailStatusResponse> {
+  return request<MorningScanEmailStatusResponse>("/ops/notifications/morning-scan/settings", {
+    method: "PATCH",
+    signal: options?.signal,
+    body: JSON.stringify(body),
+  });
+}
+
 export async function previewMorningScanEmail(
+  body?: { subject_template?: string | null; intro_note?: string | null },
   options?: V2RequestOptions
 ): Promise<MorningScanEmailSendResponse> {
   return request<MorningScanEmailSendResponse>("/ops/notifications/morning-scan/send", {
     method: "POST",
     signal: options?.signal,
-    body: JSON.stringify({ force: false, dry_run: true }),
+    body: JSON.stringify({
+      force: false,
+      dry_run: true,
+      subject_template: body?.subject_template,
+      intro_note: body?.intro_note,
+    }),
   });
 }
 
 export async function sendMorningScanEmailTest(
+  body?: { subject_template?: string | null; intro_note?: string | null },
   options?: V2RequestOptions
 ): Promise<MorningScanEmailSendResponse> {
   return request<MorningScanEmailSendResponse>("/ops/notifications/morning-scan/send", {
     method: "POST",
     signal: options?.signal,
-    body: JSON.stringify({ force: true, dry_run: false }),
+    body: JSON.stringify({
+      force: true,
+      dry_run: false,
+      subject_template: body?.subject_template,
+      intro_note: body?.intro_note,
+    }),
   });
 }
 

@@ -30,6 +30,10 @@ class ScanEmailSettings:
     public_url: str
     config_valid: bool
     config_errors: tuple[str, ...] = field(default_factory=tuple)
+    send_time_et: str = "09:20"
+    subject_template: str | None = None
+    intro_note: str | None = None
+    overrides_updated_at: str | None = None
 
     @property
     def recipient_hash(self) -> str:
@@ -105,6 +109,28 @@ def load_scan_email_settings() -> ScanEmailSettings:
             if not SMTP_PASSWORD:
                 errors.append("SMTP_PASSWORD is required when SCAN_EMAIL_PROVIDER=smtp (use a Gmail App Password)")
 
+    from services.scan_email_overrides_store import (
+        cron_from_send_time,
+        get_scan_email_overrides_store,
+        parse_send_time_et,
+        send_time_from_cron,
+    )
+
+    overrides = get_scan_email_overrides_store().get()
+    cron = SCAN_EMAIL_CRON
+    send_time = send_time_from_cron(SCAN_EMAIL_CRON) or "09:20"
+    if overrides.send_time_et:
+        try:
+            hour, minute = parse_send_time_et(overrides.send_time_et)
+            cron = cron_from_send_time(hour, minute)
+            send_time = f"{hour:02d}:{minute:02d}"
+        except ValueError as exc:
+            errors.append(f"Invalid saved send time: {exc}")
+
+    stale_after = max(1, int(SCAN_EMAIL_STALE_AFTER_MINUTES))
+    if overrides.stale_after_minutes is not None:
+        stale_after = max(1, int(overrides.stale_after_minutes))
+
     config_valid = not errors
     if SCAN_EMAIL_ENABLED and errors:
         logger.warning(
@@ -119,14 +145,18 @@ def load_scan_email_settings() -> ScanEmailSettings:
         from_address=SCAN_EMAIL_FROM.strip(),
         buckets=tuple(buckets),
         top_n=max(1, int(SCAN_EMAIL_TOP_N)),
-        cron=SCAN_EMAIL_CRON,
+        cron=cron,
         timezone=SCAN_EMAIL_TIMEZONE,
-        stale_after_minutes=max(1, int(SCAN_EMAIL_STALE_AFTER_MINUTES)),
+        stale_after_minutes=stale_after,
         retry_delay_minutes=max(1, int(SCAN_EMAIL_RETRY_DELAY_MINUTES)),
         max_retries=max(0, int(SCAN_EMAIL_MAX_RETRIES)),
         public_url=APP_PUBLIC_URL.rstrip("/"),
         config_valid=config_valid,
         config_errors=tuple(errors),
+        send_time_et=send_time,
+        subject_template=overrides.subject_template,
+        intro_note=overrides.intro_note,
+        overrides_updated_at=overrides.updated_at,
     )
 
 

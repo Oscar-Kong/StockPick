@@ -93,9 +93,11 @@ Diagnose without a full sync: `POST /brokerage/robinhood-mcp/test` (also Portfol
 
 If sync fails with **session expired** (or a vague `TaskGroup` error on older builds), tokens in `storage/robinhood_mcp/oauth.json` are stale — re-run the login script. StockPick stores absolute `expires_at` and refreshes access tokens when possible.
 
-**Status vs probe:** `credentials_present` / `authenticated` only mean a token file exists (access or refresh). They do **not** prove a live session — use `--probe` / Test connection. `access_token_valid` is false when the access token is past expiry skew (refresh may still work).
+**Status vs probe:** `credentials_present` means a token file exists (access or refresh); `authenticated` requires a currently valid access token. Neither proves a live session — use `--probe` / Test connection. When `access_token_valid=false`, re-run the login script. An overdue sync keeps its single-flight slot until its worker exits, so retry clicks cannot start overlapping portfolio writes.
 
 **False cash-only:** If the UI says cash-only but you hold shares, check the probe message. Unparseable positions report failure (not cash-only). Confirm `ROBINHOOD_MCP_ACCOUNT_ID` points at the account with equity. Incomplete order history no longer wipes Activity — look for `sync_status=degraded` / `history_complete=false` on the job result.
+
+**Closed lots vs Robinhood P/L:** Today’s YTD realized KPI prefers MCP trade history. Activity closed-position cards rebuild from the ledger; multi-cycle symbols now accumulate realized P/L (not only the last round-trip). Re-sync after upgrading so the persisted snapshot refreshes.
 
 Cursor chat (optional): `.cursor/mcp.json` + **Settings → Tools & MCP → Connect** if MCP shows errored until OAuth completes.
 
@@ -134,19 +136,22 @@ Important for local dev:
 
 | Variable            | Suggested local                   |
 | ------------------- | --------------------------------- |
-| `SCHEDULER_ENABLED` | `false` — less background load    |
-| `SCAN_EMAIL_ENABLED` | `false` — morning scan email off locally |
+| `SCHEDULER_ENABLED` | `false` (code default) — no post-close `daily_pipeline` / universe FMP burn |
+| `MARKET_DATA_REFRESH_ENABLED` | `false` (code default) — no intraday holdings/scan loops |
+| `SCAN_EMAIL_ENABLED` | `false` locally unless you want 9:20 ET morning email (that **does** run scans → FMP) |
 | `SCAN_EMAIL_TO` | fallback recipient(s) when Settings mailing list is empty; comma-separated |
 | `SMTP_USER` / `SMTP_PASSWORD` | Gmail + App Password when using SMTP |
 | `OPENBB_ON_SCAN`    | `false` — faster bulk scans       |
 | `OPENBB_ENABLED`    | `true` only when OpenBB installed |
 | Quant flags         | keep `false` until deps installed |
 
-Primary data roles default to **finnhub** for quotes and **FMP** for fundamentals (`PRIMARY_PRICE_SOURCE`, `PRIMARY_FUNDAMENTALS_SOURCE`). Set API keys for Finnhub, FMP, AV as needed.
+Primary data roles default to **finnhub** for quotes and **FMP** for fundamentals (`PRIMARY_PRICE_SOURCE`, `PRIMARY_FUNDAMENTALS_SOURCE`). For **Stage A bulk OHLC**, set `PRIMARY_PRICE_SOURCE=fmp` on a paid FMP tier so scans skip Yahoo/`yfinance` bulk (rate-limit prone) and pull history via FMP first. Set API keys for Finnhub, FMP, AV as needed.
 
-**FMP 403 / blocked history:** if FMP returns HTTP 403 (common on free-tier keys), the backend trips a process-wide circuit breaker and falls back to **yfinance** for OHLC during scans and analyze. Install `yfinance` (`pip install yfinance`) — it is listed in `backend/requirements.txt`. Logs will show `FMP access denied (403) — disabling FMP for this process`. Restart the backend to retry FMP after fixing the key or tier.
+**FMP stable API (required for new keys):** StockPick uses `https://financialmodelingprep.com/stable/*`. Legacy `/api/v3/*` returns HTTP 403 (`Legacy Endpoint`) for keys created after FMP retired those routes — that is **not** a bad API key. If logs still show legacy URLs, restart the backend after pulling this change.
 
-**Yahoo Stage A ops:** bulk `yfinance.download` runs each chunk in a **disposable process** with a hard timeout (~20s, or remaining `SCAN_PRICE_DOWNLOAD_MAX_SECONDS` budget). The parent **polls/receives the pipe result before joining** the child so large multi-symbol DataFrames cannot false-timeout (classic Queue feeder deadlock). On timeout the child is terminated. A single monotonic deadline governs Yahoo chunks, FMP fill, and per-symbol loops — providers are not granted extra floor time past the deadline. After a bulk pass, MarketDataClient **skips** per-symbol Yahoo→AkShare hammering. If coverage is below `SCAN_BULK_COVERAGE_MIN` (default `0.70`), it attempts one **bounded FMP fill** for missing symbols (when FMP is enabled), then still skips Yahoo/AkShare per-symbol fallback. Prefer Finnhub/AV when configured; keep `UNIVERSE_SCAN_BATCH_SIZE` bounded (default `100`).
+**FMP 403 / blocked history:** a non-legacy HTTP 403 (auth/tier block) trips a process-wide circuit breaker and falls back to **yfinance** for OHLC during scans and analyze. Install `yfinance` (`pip install yfinance`) — it is listed in `backend/requirements.txt`. Logs will show `FMP access denied (403) — disabling FMP for this process`. Restart the backend to retry FMP after fixing the key or tier. Legacy-endpoint 403s do **not** trip the breaker.
+
+**Yahoo Stage A ops:** when `PRIMARY_PRICE_SOURCE=fmp` and FMP is enabled, Stage A uses a **bounded FMP primary** pass (no Yahoo bulk). Otherwise bulk `yfinance.download` runs each chunk in a **disposable process** with a hard timeout (~20s, or remaining `SCAN_PRICE_DOWNLOAD_MAX_SECONDS` budget). The parent **polls/receives the pipe result before joining** the child so large multi-symbol DataFrames cannot false-timeout (classic Queue feeder deadlock). On timeout the child is terminated. A single monotonic deadline governs Yahoo chunks, FMP fill, and per-symbol loops — providers are not granted extra floor time past the deadline. After a bulk pass, MarketDataClient **skips** per-symbol Yahoo→AkShare hammering. If Yahoo coverage is below `SCAN_BULK_COVERAGE_MIN` (default `0.70`), it attempts one **bounded FMP fill** for missing symbols (when FMP is enabled), then still skips Yahoo/AkShare per-symbol fallback. Prefer Finnhub/AV for quotes; keep `UNIVERSE_SCAN_BATCH_SIZE` bounded (default `300`).
 
 **Yahoo fundamentals / single-symbol history:** `Ticker.info` and `Ticker.history` also run under process isolation with `YFINANCE_INFO_TIMEOUT_SECONDS` (default `8`). Timeouts return empty and are logged separately from empty data. Fundamentals cache TTL is completeness-aware: empty → 5m; price XOR mcap → 15m; both cores but sparse → 1h; both cores + sector + valuation/growth → 24h.
 
@@ -154,11 +159,11 @@ Primary data roles default to **finnhub** for quotes and **FMP** for fundamental
 
 **Analyze OHLC freshness:** `PriceService.get_history()` now checks the **last bar date**, not only row count. Stale SQLite history triggers a provider fetch, merge, and persist. `GET /analyze/{symbol}?refresh=true` bypasses the analysis cache **and** forces a price-history refresh. The response includes `price_history_last_date`, `price_history_is_stale`, `price_history_refreshed_at`, and `price_history_bar_count`.
 
-**Portfolio live marks:** During regular and extended market hours, `PriceService.get_latest_price()`, **Refresh data** (`POST /home/refresh`), **Sync Robinhood**, and **Run daily decision** use Finnhub/AkShare live quotes (not only the last stored daily close). `refresh_prices_for_holdings` persists today's session bar from the live quote when available. Outside market hours, holdings still use the latest completed daily bar.
+**Portfolio live marks:** During regular and extended market hours, `PriceService.get_latest_price()`, **Sync Robinhood** (re-prices holdings), and **Run daily decision** use Finnhub/AkShare live quotes (not only the last stored daily close). `refresh_prices_for_holdings` persists today's session bar from the live quote when available. Outside market hours, holdings still use the latest completed daily bar.
 
-**Mark alignment:** Today’s holdings table and hero value read the last **daily decision snapshot**. Sync / Refresh re-price and re-run that decision so shares×mark match live holdings. The hero invested value is always `current_shares × mark` (never a frozen `market_value` from an older decision). If prices still disagree with the Robinhood app, check Finnhub/FMP keys and whether the session is outside regular/extended hours (StockPick then shows last daily close).
+**Mark alignment:** Today’s holdings table and hero value read the last **daily decision snapshot**. **Sync Robinhood** updates live positions + marks; run **Daily decision** separately to refresh the action queue. The hero invested value is always `current_shares × mark` (never a frozen `market_value` from an older decision). If prices still disagree with the Robinhood app, check Finnhub/FMP keys and whether the session is outside regular/extended hours (StockPick then shows last daily close).
 
-**Scan default in UI:** bucket scans now default to `mode=fast` (15 deep-scored candidates). Use deep mode from the API (`POST /scan/{bucket}` with `"mode":"deep"`) when you want the full Stage B cap (`SCAN_STAGE_B_TOP_N`, default 50).
+**Scan default in UI:** bucket scans default to `mode=deep` (Stage B over `SCAN_STAGE_B_TOP_N`, default 20). Pass `"mode":"fast"` from the API or UI options when you want the quicker first pass (`SCAN_STAGE_B_TOP_N_FAST`, default 10).
 
 ### Scan performance knobs
 
@@ -179,7 +184,7 @@ Ticker universes are built in three layers (`backend/data/universe.py`, `backend
 
 **Adding a thematic seed:** append symbols to the appropriate `_PENNY_*` group in `universe.py`; they are validated against the listing master at runtime. Multi-theme membership is tracked in `SYMBOL_THEMES`. Remove symbols that fail listing validation, and add permanently dead names to `STALE_OR_DELISTED`.
 
-Set `UNIVERSE_SCAN_BATCH_SIZE=0` in `.env` to scan the full validated universe. Positive caps use a deterministic hash sample (`cap_universe_for_scan`) — not an alphabetical prefix — so larger seed lists do not amplify A–ticker bias. Default remains `100` to keep Stage A provider load bounded.
+Set `UNIVERSE_SCAN_BATCH_SIZE=0` in `.env` to scan the full validated universe. Positive caps use `select_scan_universe`: a deterministic daily rotating cohort rather than an alphabetical prefix. Eligible candidates from the previous durable Scan snapshot are protected as anchors; remaining slots rotate with the New York trading date. Default `300` broadens cheap discovery while keeping provider load bounded.
 
 **Bulk scan fast path:** universe scans set `services.scan_context.set_bulk_scan(True)` for the job thread. While active, Stage B skips per-symbol reconcile, StockTwits/Finnhub sentiment, and OpenBB governance fetches. Single-symbol **Workspace → Analyze** keeps full depth. Set `OPENBB_ON_SCAN=false` as well for fastest scans.
 
@@ -191,10 +196,10 @@ These were previously hard-coded inside `backend/services/scan_manager.py`. They
 
 | Variable                          | Default                          | Effect                                                                                 |
 | --------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------- |
-| `UNIVERSE_SCAN_BATCH_SIZE`        | `100`                            | Cap Stage A symbols via hash sample (`0` = full validated universe; heavy when penny seeds are large). |
-| `MAX_CANDIDATES_PER_BUCKET`       | `25`                             | Hard cap on rows returned per scan (UI `max_results` cannot exceed this).              |
-| `SCAN_STAGE_B_TOP_N`              | `50`                             | Max candidates deep-scored per scan (`mode=deep`).                                     |
-| `SCAN_STAGE_B_TOP_N_FAST`         | `15`                             | Candidate cap when `ScanOptions.mode="fast"` — used for low-latency exploratory scans. |
+| `UNIVERSE_SCAN_BATCH_SIZE`        | `300`                            | Daily rotating Stage A cohort (`0` = full validated universe); retains prior published candidates. |
+| `MAX_CANDIDATES_PER_BUCKET`       | `15`                             | Hard cap on rows returned per scan (UI `max_results` cannot exceed this).              |
+| `SCAN_STAGE_B_TOP_N`              | `20`                             | Max candidates deep-scored per scan (`mode=deep`).                                     |
+| `SCAN_STAGE_B_TOP_N_FAST`         | `10`                             | Candidate cap when `ScanOptions.mode="fast"` — used for low-latency exploratory scans. |
 | `SCAN_PRICE_DOWNLOAD_MAX_SECONDS` | `45`                             | Hard cap (seconds) on the Stage A bulk OHLC provider fetch.                            |
 | `SCAN_BULK_COVERAGE_MIN`            | `0.70`                           | Minimum OHLC coverage before publishing a scan as latest (partial attempts preserve prior latest). |
 | `YFINANCE_INFO_TIMEOUT_SECONDS`     | `8`                              | Process timeout for single-symbol Yahoo `Ticker.info` / `Ticker.history`. |
@@ -256,6 +261,24 @@ All new fields are nullable and backward-compatible — clients that ignore them
 | `atr_percent`, `gap_percent`, `spread_estimate_pct` | Raw volatility / gap / intraday spread proxies |
 | `liquidity_warnings` | Non-fatal risk flags (unconfirmed volume spike, extreme gap, wide spread, etc.) |
 
+Penny rows also publish an independent **stability shadow assessment**. It does
+not change `alpha_score` or final ranking. It gates an unsafe candidate to
+Action `avoid` / `decision_state=no_trade`, or caps an extended daily entry
+proxy at `watch`:
+
+| Field | Meaning |
+|-------|---------|
+| `stability_score`, `stability_classification` | Independent 0–100 tradability stability and `rejected` / `high_risk` / `normal` / `stable` band |
+| `stability_factors`, `stability_raw` | Dollar liquidity, Amihud quality, downside volatility, gap stability, trend efficiency, volume consistency, and their raw inputs |
+| `stability_hard_gates` | Explainable gate codes; initially insufficient median dollar liquidity or history |
+| `entry_risk_score`, `entry_risk_classification` | Daily OHLCV entry proxy (`normal` through `no_chase`), kept separate from alpha |
+| `entry_risk_source` | Currently `daily_ohlcv_proxy`; this is not a live premarket quote |
+| `decision_state` | Shadow decision state: `watch` or `no_trade` |
+
+`range_proxy_pct = (high-low)/close` is explicitly a daily range proxy. It is
+not a quoted bid/ask spread and must not be presented as one. Real premarket
+entry decisions require timestamped bid/ask and intraday bars.
+
 Penny **hard filters** reject on price bounds, minimum share/dollar volume, min history, stale data quality, OTC/PINK, and **extreme** spread (`PENNY_MAX_SPREAD_PCT`, default 15%) — not on moderate spread or missing momentum signals.
 
 | Env | Default | Role |
@@ -314,8 +337,8 @@ The scan results table shows a **single SCORE number** plus a compact band chip 
 | `SCAN_RANK_ALPHA_WEIGHT_PENNY` | `0.65` | Alpha weight (penny bucket; compounder has `_COMPOUNDER` variant) |
 | `SCAN_RANK_CONFIDENCE_WEIGHT_PENNY` | `0.20` | Confidence weight |
 | `SCAN_RANK_TRADABILITY_WEIGHT_PENNY` | `0.15` | Tradability weight |
-| `SCAN_MAX_PER_SECTOR` | `3` | Max final results from one sector |
-| `SCAN_MAX_PER_CORRELATION_CLUSTER` | `2` | Max final results from one return-correlation cluster |
+| `SCAN_MAX_PER_SECTOR` | `5` | Max final results from one sector |
+| `SCAN_MAX_PER_CORRELATION_CLUSTER` | `3` | Max final results from one return-correlation cluster |
 | `SCAN_CORRELATION_CLUSTER_THRESHOLD` | `0.75` | Pairwise return correlation to merge clusters |
 | `SCAN_PERSISTENCE_DELTA` | `3.0` | Minimum score gap before a newcomer displaces a prior-scan incumbent |
 | `SCAN_MIN_RESULTS_AFTER_DIVERSIFICATION` | `3` | Target minimum breadth (sector cap may relax; share-class and correlation caps do not) |
@@ -334,14 +357,35 @@ See [SCAN_EVALUATION.md](SCAN_EVALUATION.md) for MacBook quick start, algorithm 
 
 `data/scan_eval/` and generated `data/factor_discovery/{snapshots,acceptance,extended_staging,staging_input/batches}/` are **gitignored** — regenerate locally; do not commit evaluation or factor-discovery run artifacts.
 
-### Auto-refresh slot reservation
+### Home data updates (no bulk refresh)
 
-`services.refresh_orchestrator.try_begin_auto_refresh()` is the only correct
-way to start a stale-while-revalidate background refresh from a dashboard GET.
-It atomically (under a single lock acquire) checks running-status, checks the
-cooldown, reserves the slot, and stamps the cooldown — so concurrent dashboard
-loads cannot double-fire the refresh. Manual refresh (`POST /home/refresh`)
-still uses `start_home_refresh_async` and bypasses the cooldown when `force=true`.
+Bulk home refresh (`POST /home/refresh` / auto-refresh on dashboard GET) has been
+**removed**. Opening Home / `dev-up` only reads cached cockpit data.
+
+Use:
+- **Sync Robinhood** — holdings + buying power + KPI inputs (no auto Daily decision)
+- **Daily decision** — re-price holdings and score the action queue
+- **Scan** — universe rankings / opportunities
+
+Pair with `SCHEDULER_ENABLED=false` and `MARKET_DATA_REFRESH_ENABLED=false`
+when protecting free-tier FMP/Finnhub quotas. You can keep
+`SCAN_EMAIL_ENABLED=true` without enabling the full scheduler — only the
+morning-email cron starts.
+
+### Daily FMP-safe local loop
+
+Goal: start the site quietly, spend quota only on intentional clicks.
+
+1. `./scripts/dev-up.sh` — backend serves cached Home; no FMP on open.
+2. Optional: sync Robinhood (`./scripts/sync-robinhood-mcp.sh` or **Sync Robinhood**).
+3. Click **Daily decision** when you want live marks / action queue on holdings.
+4. Run `/scan` only when you need new candidates (deep mode burns the most; prefer `fast` for a first pass).
+5. If morning email is on, budget for one penny scan around 9:20 ET — that is the main automatic FMP spend.
+
+`PRIMARY_PRICE_SOURCE=fmp` makes Stage A pull OHLC from FMP (paid tier recommended).
+`PRIMARY_PRICE_SOURCE=finnhub` (or other non-`fmp`) keeps Yahoo bulk + optional FMP
+fill when coverage is below `SCAN_BULK_COVERAGE_MIN`. Finnhub remains the live-quote
+path for holdings marks regardless of Stage A setting.
 
 ---
 
@@ -511,11 +555,13 @@ Scheduled job `morning_scan_email` sends a digest of the **latest persisted** sc
 | Setting | Default | Notes |
 |---------|---------|-------|
 | `SCAN_EMAIL_ENABLED` | `false` | Independent of `SCHEDULER_ENABLED` |
-| `SCAN_EMAIL_CRON` | `20 9 * * 1-5` | Interpreted in `SCAN_EMAIL_TIMEZONE` |
+| `SCAN_EMAIL_CRON` | `20 9 * * 1-5` | Interpreted in `SCAN_EMAIL_TIMEZONE`; overridden by Settings → Ops send time when set |
 | `SCAN_EMAIL_TIMEZONE` | `America/New_York` | DST-safe IANA zone |
-| `SCAN_EMAIL_STALE_AFTER_MINUTES` | `1440` | Marks cached scans as stale in the email |
-| `SCAN_EMAIL_RETRY_DELAY_MINUTES` | `5` | Retry when a scan is still running at 9:20 |
+| `SCAN_EMAIL_STALE_AFTER_MINUTES` | `1440` | Marks cached scans as stale in the email; overridden by Ops “Scan freshness” |
+| `SCAN_EMAIL_RETRY_DELAY_MINUTES` | `5` | Retry when a scan is still running at send time |
 | `SCAN_EMAIL_MAX_RETRIES` | `3` | Max retries before sending best available |
+
+**Ops UI overrides** (Settings → Ops → Morning Scan Email) persist to `backend/data_store/scan_email_overrides.json`: send time (ET), scan freshness minutes, optional subject template (`{date}` placeholder) and intro note. Saving send time calls `reschedule_morning_scan_email()` so the next run updates without restarting the backend.
 
 **Gmail SMTP setup:** enable 2-Step Verification on your Google account, create an [App Password](https://myaccount.google.com/apppasswords), then set:
 

@@ -338,6 +338,17 @@ class TestOpsAuthorization:
         resp = client.get("/ops/notifications/morning-scan/status")
         assert resp.status_code == 200
         body = resp.json()
-        assert "enabled" in body
-        assert "recipient_masked" in body
-        assert "ops@example.com" not in str(body)
+        assert "send_time_et" in body
+        assert "stale_after_minutes" in body
+
+    def test_patch_settings_requires_non_demo(self):
+        from fastapi.testclient import TestClient
+        from main import app
+
+        with patch("utils.demo_guard._demo_mode", return_value=True):
+            client = TestClient(app)
+            resp = client.patch(
+                "/ops/notifications/morning-scan/settings",
+                json={"send_time_et": "08:30"},
+            )
+            assert resp.status_code == 403

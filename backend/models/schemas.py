@@ -809,6 +809,11 @@ class MorningScanEmailStatusResponse(BaseModel):
     recipient_count: int = 0
     recipient_source: str = "none"
     schedule_label: str = "9:20 AM ET"
+    send_time_et: str = "09:20"
+    stale_after_minutes: int = 1440
+    subject_template: str | None = None
+    intro_note: str | None = None
+    overrides_updated_at: str | None = None
     cron: str = "20 9 * * 1-5"
     timezone: str = "America/New_York"
     buckets: list[str] = []
@@ -827,6 +832,17 @@ class MorningScanEmailHistoryResponse(BaseModel):
 class MorningScanEmailSendRequest(BaseModel):
     force: bool = False
     dry_run: bool = False
+    subject_template: str | None = None
+    intro_note: str | None = None
+
+
+class MorningScanEmailSettingsUpdateRequest(BaseModel):
+    send_time_et: str | None = None
+    stale_after_minutes: int | None = None
+    subject_template: str | None = None
+    intro_note: str | None = None
+    clear_subject_template: bool = False
+    clear_intro_note: bool = False
 
 
 class MorningScanEmailSendResponse(BaseModel):
@@ -1280,21 +1296,6 @@ class DashboardFreshnessSummary(BaseModel):
     last_price_update_at: str | None = None
     last_decision_run_at: str | None = None
     last_penny_scan_at: str | None = None
-
-
-class HomeRefreshResponse(BaseModel):
-    job_id: str
-    status: str = "running"
-    message: str = ""
-
-
-class HomeRefreshStatusResponse(BaseModel):
-    job_id: str
-    status: str  # pending | running | completed | failed
-    started_at: str | None = None
-    finished_at: str | None = None
-    error: str | None = None
-    result: dict[str, Any] | None = None
 
 
 class DailyDashboardResponse(BaseModel):

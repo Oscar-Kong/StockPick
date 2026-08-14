@@ -242,9 +242,12 @@ Protected ops routes for the daily scan digest. `POST /send` requires non-demo m
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/ops/notifications/morning-scan/send` | Send or dry-run email. Body: `{ "force": false, "dry_run": false }` |
-| `GET` | `/ops/notifications/morning-scan/status` | Enabled flag, masked recipient, recipient source/count, schedule, last delivery, scan freshness |
+| `POST` | `/ops/notifications/morning-scan/send` | Send or dry-run email. Body: `{ "force": false, "dry_run": false, "subject_template"?: string, "intro_note"?: string }` |
+| `GET` | `/ops/notifications/morning-scan/status` | Enabled flag, recipients, `send_time_et`, `stale_after_minutes`, subject/intro overrides, schedule, last delivery, scan freshness |
+| `PATCH` | `/ops/notifications/morning-scan/settings` | Persist Ops overrides: `send_time_et` (HH:MM ET), `stale_after_minutes`, `subject_template`, `intro_note` (and clear_* flags). Reschedules the job when send time changes. Stored in `backend/data_store/scan_email_overrides.json`. |
 | `GET` | `/ops/notifications/morning-scan/history?limit=20` | Recent delivery attempts (no secrets) |
+
+UI: Settings → **Ops** → Morning Scan Email — edit send time, scan freshness limit, and preview/edit subject + intro before test send.
 
 ## Related legacy Quant Lab endpoints
 
@@ -255,8 +258,6 @@ See [QUANT_LAB.md](./QUANT_LAB.md) for `/api/v2/quant-lab/evidence`, `/research/
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/home/daily-dashboard` | Portfolio Today payload: holdings, `decision`, `top_penny_opportunities`, `freshness`, and nested `daily_trading_plan` |
-| POST | `/home/refresh` | Background refresh (holdings, prices, decision, scans) |
-| GET | `/home/refresh-status/{job_id}` | Poll refresh job |
 
 **`daily_trading_plan`** (nested on `DailyDashboardResponse`): deterministic short-term plan from policy engine — `decision` (`buy` \| `manage` \| `reduce` \| `exit` \| `watch` \| `stay_in_cash`), exposure meters, `focus_list` (3–5 symbols), `primary_candidate` (entry/stop/target sizing), `rule_checklist`, `holiday_risk`, `data_freshness`. Reuses latest cached penny scan (no new scan on page load).
 
@@ -276,7 +277,7 @@ Decision support only — no order execution.
 | GET | `/portfolio/performance` | P/L summary and mark-to-market equity curves for current holdings |
 | GET | `/portfolio/summary` | Canonical portfolio summary (value, cash, freshness) from the same ledger as Home |
 
-**`PortfolioPerformanceResponse`:** `total_value`, `today_pl`, `today_pl_pct`, `unrealized_pl`, `unrealized_pl_pct`, `realized_pl`, optional `realized_pl_equity`, `realized_pl_events`, `realized_pl_source` (`robinhood_mcp` \| `ledger`), `curves`, `period_change_pct`, `disclaimer`. When Robinhood MCP is authenticated, **realized P/L (YTD)** comes from `get_pnl_trade_history` (includes partial equity sells and prediction/event contracts with empty symbol). Otherwise falls back to YTD closed lots in the ledger. Unrealized = open-position cost basis. Response cached **120s** (`PORTFOLIO_PERFORMANCE_CACHE_TTL`); chart builds one 1y price series and slices ranges (avoids 5× redundant fetches).
+**`PortfolioPerformanceResponse`:** `total_value`, `today_pl`, `today_pl_pct`, `unrealized_pl`, `unrealized_pl_pct`, `realized_pl`, optional `realized_pl_equity`, `realized_pl_events`, `realized_pl_source` (`robinhood_mcp` \| `ledger`), `curves`, `period_change_pct`, `disclaimer`. When Robinhood MCP is authenticated, **realized P/L (YTD)** comes from `get_pnl_trade_history` **only if that history has trades** (empty payloads from the wrong/agentic account fall back to YTD closed lots in the ledger). MCP results with `trade_count > 0` are cached after sync. Unrealized = open-position cost basis. Chart replays the equity ledger (sell cash is capped to shares actually held). Response cached **120s** (`PORTFOLIO_PERFORMANCE_CACHE_TTL`); chart builds one 1y price series and slices ranges (avoids 5× redundant fetches).
 
 ## Brokerage — portfolio ledger & CSV import
 
@@ -294,7 +295,7 @@ Base path: `/api/brokerage` (mutating routes require non-demo mode)
 | POST | `/import/robinhood-csv` | Legacy direct import (no review step) |
 | GET | `/robinhood-mcp/status` | OAuth configured? Returns `login_script`, `credentials_present`, `access_token_valid`, `token_expired`, `needs_reauth`, optional `?probe=true` live check |
 | POST | `/robinhood-mcp/test` | Live MCP connectivity probe (accounts/portfolio/positions; no ledger sync). Unparseable positions → `ok=false` (not cash-only). |
-| POST | `/sync/robinhood-mcp` | Start background Robinhood MCP sync → `{ job_id, status: "running" }`. Concurrent requests for the same account **reuse** the active job. Always refreshes live marks after positions. Query `?run_decision=true` re-runs the daily decision **only when holdings_count > 0** (cash-only skips decision). UI Sync button uses `run_decision=true`. Result includes `sync_status` (`ok` \| `degraded`), `history_complete`, `ledger_replaced`, `warnings`. Ledger is replaced only when order history completed. |
+| POST | `/sync/robinhood-mcp` | Start **slim** background Robinhood MCP sync → `{ job_id, status: "running" }`. Pulls positions + buying power + realized YTD (cached) + latest one trade; retains Activity ledger; light re-prices marks. Concurrent requests reuse the active job. Query `?run_decision=true` optionally runs Daily decision when holdings > 0 (UI Sync uses `run_decision=false`). Result includes `orders_mode`, `latest_trade`, `realized_pl`, `ledger_replaced` (false on slim). |
 | GET | `/sync/robinhood-mcp/{job_id}` | Poll sync job until `completed` or `failed`. Fields: `phase`, `heartbeat`, `reused`, `deadline_sec`, `error`, `result`. |
 | POST | `/buying-power` | Save explicit cash / IPO reserved amounts |
 
@@ -311,11 +312,22 @@ Base path: `/scan` (not under `/api/v2/research`)
 | GET | `/scan/{job_id}` | Job status + attempt results; `invalid_result_count` for skipped schema-drift rows |
 | GET | `/scan/latest/{bucket}` | Last **published** complete ranking; preserves prior latest when a refresh fails the coverage gate |
 
-**Coverage gate:** Stage A bulk OHLC must reach `SCAN_BULK_COVERAGE_MIN` (default `0.70`) before `save_scan_results` overwrites latest. Below that, the job completes with a partial-universe message; `/scan/latest` is unchanged. Cached metadata includes `universe_coverage`, `data_flow.bulk_*`, `history_policy`, `coverage_diagnostics`, `fallback_reason`, `stage_b_minimum_required_bars`, and `history_gate_exclusion_count` when a complete scan is published (`scan_schema_version` ≥ 2).
+**Coverage gate:** Stage A bulk OHLC must reach `SCAN_BULK_COVERAGE_MIN` (default `0.70`) before `save_scan_results` overwrites latest. Below that, the job completes with a partial-universe message; `/scan/latest` is unchanged. Cached metadata includes `universe_selection` (`full_universe_size`, `selected_size`, `anchor_count`, `selection_coverage`, `rotation_key`, `revision`), `universe_coverage`, `data_flow.bulk_*`, `history_policy`, `coverage_diagnostics`, `fallback_reason`, `stage_b_minimum_required_bars`, and `history_gate_exclusion_count` when a complete scan is published (`scan_schema_version` ≥ 2). The selected cohort is deterministic for a New York calendar date, advances through a stable revision-specific ordering on the next date, and preserves eligible symbols from the previous durable Scan snapshot.
 
 **History policy:** Stage B eligibility uses sleeve-aware minima from `resolve_history_policy` (penny **80** bars for default `6mo`; compounder **252**). `MIN_HISTORY_BARS` (default 252) remains the Analyze / non-scan DQ default only. Candidate `metrics.provider_limited_partial_data` is set only for true provider coverage failures — not for internal filter / history-policy rejects.
 
 **Scan SCORE column:** Published `score` / sort key is `ranking_score` (Alpha/Conf/Trade weighted composite). The UI shows a single number; buy/wait lives in Action. Pillar fields remain in metrics for diagnostics.
+
+**Penny Stability shadow fields:** Penny `StockResult.metrics` includes
+`stability_score`, `stability_classification`, `stability_hard_gates`,
+`stability_factors`, `stability_raw`, `entry_risk_score`,
+`entry_risk_classification`, `entry_risk_reasons`, `entry_risk_source`, and
+`decision_state`. These fields are backward-compatible and do not change
+`alpha_score` or ranking. Rejected Stability produces `decision_state=no_trade`
+and Action `avoid`; `wait` / `extended` / `no_chase` Entry Risk caps an otherwise
+strong candidate at `watch`. The initial
+entry assessment is labeled `daily_ohlcv_proxy`; it is not a live premarket
+quote or quoted bid/ask spread.
 
 **Timestamps:** `completed_at` / `last_attempt_failed_at` use UTC `Z` → `+00:00` parsing; invalid cached stamps become `null` (no 500).
 

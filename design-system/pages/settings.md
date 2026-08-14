@@ -81,7 +81,9 @@ ui-ux-pro-max: **Operations dashboard** — health status as labeled metrics (gr
 
 ### Ops (`MorningScanEmailPanel`)
 - Already uses skeleton + ErrorState — **promote as reference implementation**
-- Schedule picker: native inputs with visible labels
+- Schedule picker: native `time` + freshness minutes inputs with visible labels
+- Preview editor: modal with subject/intro fields + sandboxed HTML preview; Save persists copy for scheduled sends
+- Do not remove mailing-list integration or dry-run / test-send actions
 
 ---
 

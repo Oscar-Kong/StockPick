@@ -325,7 +325,7 @@ def start_scheduler() -> None:
         if email_settings.enabled:
             _scheduler.add_job(
                 _scheduled_morning_scan_email,
-                CronTrigger.from_crontab(SCAN_EMAIL_CRON, timezone=SCAN_EMAIL_TIMEZONE),
+                CronTrigger.from_crontab(email_settings.cron, timezone=email_settings.timezone),
                 id="morning_scan_email",
                 replace_existing=True,
             )
@@ -335,16 +335,66 @@ def start_scheduler() -> None:
                 "; ".join(email_settings.config_errors) or "disabled",
             )
     _scheduler.start()
+    email_cron_label = "off"
+    if SCAN_EMAIL_ENABLED:
+        try:
+            from services.scan_email_config import load_scan_email_settings as _load_email
+
+            email_cron_label = _load_email().cron
+        except Exception:
+            email_cron_label = SCAN_EMAIL_CRON
     logger.info(
         "Scheduler started — pipeline '%s' (%s); scan email '%s' (%s); portfolio decision '%s' (%s); market refresh '%s'",
         SCHEDULER_CRON if SCHEDULER_ENABLED else "off",
         SCHEDULER_TZ if SCHEDULER_ENABLED else "—",
-        SCAN_EMAIL_CRON if SCAN_EMAIL_ENABLED else "off",
+        email_cron_label,
         SCAN_EMAIL_TIMEZONE if SCAN_EMAIL_ENABLED else "—",
         PORTFOLIO_DECISION_CRON if SCHEDULER_ENABLED and PORTFOLIO_DECISION_ENABLED else "off",
         PORTFOLIO_DECISION_TZ,
         MARKET_DATA_REFRESH_CRON if SCHEDULER_ENABLED and MARKET_DATA_REFRESH_ENABLED else "off",
     )
+
+
+def reschedule_morning_scan_email() -> dict:
+    """Re-apply morning scan email cron from current settings (env + Ops overrides)."""
+    global _scheduler
+    from services.scan_email_config import load_scan_email_settings
+
+    settings = load_scan_email_settings()
+    if _scheduler is None:
+        return {"rescheduled": False, "reason": "scheduler_not_running", "cron": settings.cron}
+
+    try:
+        from apscheduler.triggers.cron import CronTrigger
+    except ImportError:
+        return {"rescheduled": False, "reason": "apscheduler_missing", "cron": settings.cron}
+
+    if not settings.enabled:
+        try:
+            _scheduler.remove_job("morning_scan_email")
+        except Exception:
+            pass
+        return {"rescheduled": False, "reason": "email_disabled", "cron": settings.cron}
+
+    _scheduler.add_job(
+        _scheduled_morning_scan_email,
+        CronTrigger.from_crontab(settings.cron, timezone=settings.timezone),
+        id="morning_scan_email",
+        replace_existing=True,
+    )
+    info = get_morning_scan_email_scheduler_info()
+    logger.info(
+        "Morning scan email rescheduled to cron '%s' (%s); next_run=%s",
+        settings.cron,
+        settings.timezone,
+        info.get("next_run_at"),
+    )
+    return {
+        "rescheduled": True,
+        "cron": settings.cron,
+        "timezone": settings.timezone,
+        "next_run_at": info.get("next_run_at"),
+    }
 
 
 def stop_scheduler() -> None:

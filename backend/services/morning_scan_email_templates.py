@@ -96,7 +96,18 @@ def build_email_subject(
     market_date_label: str,
     is_stale: bool,
     unavailable: bool,
+    subject_template: str | None = None,
 ) -> str:
+    if subject_template and subject_template.strip():
+        try:
+            custom = subject_template.strip().format(date=market_date_label)
+        except (KeyError, ValueError, IndexError):
+            custom = subject_template.strip().replace("{date}", market_date_label)
+        if unavailable:
+            return f"[Scan Unavailable] {custom}"
+        if is_stale:
+            return f"[STALE] {custom}"
+        return custom
     if unavailable:
         return f"[Scan Unavailable] StockPick Morning Update — {market_date_label}"
     if is_stale:
@@ -116,17 +127,21 @@ def build_morning_scan_email(
     unavailable: bool,
     partial: bool,
     global_is_stale: bool,
+    subject_template: str | None = None,
+    intro_note: str | None = None,
 ) -> MorningScanEmailContent:
     subject = build_email_subject(
         market_date_label=market_date_label,
         is_stale=global_is_stale,
         unavailable=unavailable,
+        subject_template=subject_template,
     )
 
     scan_url = f"{public_url}/scan"
     penny_url = f"{public_url}/scan?bucket=penny"
     compounder_url = f"{public_url}/scan?bucket=compounder"
     quant_lab_url = f"{public_url}/quant-lab"
+    note = (intro_note or "").strip()
 
     text_lines = [
         "StockPick Morning Scan",
@@ -138,8 +153,10 @@ def build_morning_scan_email(
         "",
         "Research only — not financial advice.",
         "",
-        "Executive summary",
     ]
+    if note:
+        text_lines.extend(["Operator note", note, ""])
+    text_lines.append("Executive summary")
 
     if unavailable:
         text_lines.append("No completed scan results were available at send time.")
@@ -224,6 +241,13 @@ def build_morning_scan_email(
         f"{escape(freshness_label)}</span> · Strategy {escape(strategy_version)}</p>",
         "<p class='meta'><em>Research only — not financial advice.</em></p>",
     ]
+    if note:
+        html_parts.extend(
+            [
+                "<h2>Operator note</h2>",
+                f"<p>{escape(note)}</p>",
+            ]
+        )
 
     if unavailable:
         html_parts.append(

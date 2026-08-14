@@ -1292,21 +1292,6 @@ export interface DashboardFreshnessSummary {
   last_penny_scan_at?: string | null;
 }
 
-export interface HomeRefreshResponse {
-  job_id: string;
-  status: string;
-  message: string;
-}
-
-export interface HomeRefreshStatusResponse {
-  job_id: string;
-  status: string;
-  started_at?: string | null;
-  finished_at?: string | null;
-  error?: string | null;
-  result?: Record<string, unknown> | null;
-}
-
 export interface DailyDashboardResponse {
   portfolio_value: number;
   cash: number;
@@ -1976,6 +1961,11 @@ export interface MorningScanEmailStatusResponse {
   recipient_count: number;
   recipient_source: string;
   schedule_label: string;
+  send_time_et: string;
+  stale_after_minutes: number;
+  subject_template: string | null;
+  intro_note: string | null;
+  overrides_updated_at: string | null;
   cron: string;
   timezone: string;
   buckets: string[];
@@ -1996,6 +1986,15 @@ export interface MorningScanEmailSendResponse {
   html_preview?: string | null;
   text_preview?: string | null;
   recipients?: string[];
+}
+
+export interface MorningScanEmailSettingsUpdate {
+  send_time_et?: string | null;
+  stale_after_minutes?: number | null;
+  subject_template?: string | null;
+  intro_note?: string | null;
+  clear_subject_template?: boolean;
+  clear_intro_note?: boolean;
 }
 
 export interface MailingListSubscriberItem {
