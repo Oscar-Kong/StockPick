@@ -34,12 +34,12 @@ def _fetch_fmp_income(symbol: str) -> list[dict]:
     if not FMP_ENABLED or not FMP_API_KEY:
         return []
     try:
-        import requests
+        from data.fmp_client import FMPClient
 
-        url = f"https://financialmodelingprep.com/api/v3/income-statement/{symbol.upper()}"
-        r = requests.get(url, params={"apikey": FMP_API_KEY, "limit": 8}, timeout=15)
-        r.raise_for_status()
-        data = r.json()
+        data = FMPClient()._get(
+            "income-statement",
+            {"symbol": symbol.upper(), "limit": 8},
+        )
         return data if isinstance(data, list) else []
     except Exception as exc:
         logger.debug("FMP income fetch failed %s: %s", symbol, exc)
@@ -59,7 +59,13 @@ def ingest_fmp_pit(symbol: str) -> dict:
 
     with Session(engine) as session:
         for row in rows:
-            filing = str(row.get("fillingDate") or row.get("acceptedDate") or row.get("date") or "")[:10]
+            filing = str(
+                row.get("filingDate")
+                or row.get("fillingDate")
+                or row.get("acceptedDate")
+                or row.get("date")
+                or ""
+            )[:10]
             as_of = str(row.get("date") or filing)[:10]
             if not as_of:
                 continue

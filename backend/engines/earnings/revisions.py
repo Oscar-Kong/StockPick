@@ -43,12 +43,13 @@ def _fetch_fmp_estimates(symbol: str) -> dict[str, Any]:
     if not FMP_ENABLED or not FMP_API_KEY:
         return {}
     try:
-        import requests
+        from data.fmp_client import FMPClient
 
-        url = f"https://financialmodelingprep.com/api/v3/analyst-estimates/{symbol.upper()}"
-        r = requests.get(url, params={"apikey": FMP_API_KEY, "limit": 8}, timeout=12)
-        r.raise_for_status()
-        data = r.json()
+        # Stable analyst-estimates requires period=annual on current plans.
+        data = FMPClient()._get(
+            "analyst-estimates",
+            {"symbol": symbol.upper(), "period": "annual", "limit": 8},
+        )
         if isinstance(data, list) and data:
             latest = data[0]
             latest["history"] = data
@@ -62,12 +63,9 @@ def _fetch_fmp_grades(symbol: str) -> dict[str, int]:
     if not FMP_ENABLED or not FMP_API_KEY:
         return {"upgrades": 0, "downgrades": 0}
     try:
-        import requests
+        from data.fmp_client import FMPClient
 
-        url = f"https://financialmodelingprep.com/api/v3/grade/{symbol.upper()}"
-        r = requests.get(url, params={"apikey": FMP_API_KEY, "limit": 30}, timeout=12)
-        r.raise_for_status()
-        rows = r.json()
+        rows = FMPClient()._get("grades", {"symbol": symbol.upper()})
         if not isinstance(rows, list):
             return {"upgrades": 0, "downgrades": 0}
         upgrades = downgrades = 0

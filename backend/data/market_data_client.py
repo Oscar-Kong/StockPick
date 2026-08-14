@@ -63,15 +63,25 @@ class MarketDataClient:
         self._last_call = time.time()
 
     def _get_history_fmp(self, symbol: str, period: str) -> pd.DataFrame:
-        if not self.fmp or not self.fmp.api_key:
+        if not self.fmp or not self.fmp.api_key or FMPClient.is_disabled():
             return pd.DataFrame()
         self._throttle()
         bars = self._period_bars.get(period, 365)
         try:
-            data = self.fmp._get(f"/historical-price-full/{symbol}", {"timeseries": bars})
-            if not isinstance(data, dict):
-                return pd.DataFrame()
-            rows = data.get("historical") or []
+            # Stable API returns a newest-first list (not legacy {historical: [...]}).
+            if hasattr(self.fmp, "get_historical_eod"):
+                rows = self.fmp.get_historical_eod(symbol, limit=bars)
+            else:
+                data = self.fmp._get(
+                    "historical-price-eod/full",
+                    {"symbol": symbol.upper()},
+                )
+                if isinstance(data, list):
+                    rows = data[:bars]
+                elif isinstance(data, dict):
+                    rows = (data.get("historical") or [])[:bars]
+                else:
+                    rows = []
             if not isinstance(rows, list) or not rows:
                 return pd.DataFrame()
             return pd.DataFrame(
@@ -85,7 +95,7 @@ class MarketDataClient:
                         "volume": r.get("volume"),
                     }
                     for r in rows
-                    if r.get("date") is not None
+                    if isinstance(r, dict) and r.get("date") is not None
                 ]
             )
         except Exception as exc:
@@ -389,7 +399,7 @@ class MarketDataClient:
         *,
         deadline: float | None,
     ) -> list[str]:
-        """Bounded FMP fill for symbols Yahoo bulk missed — no Yahoo/AkShare hammering."""
+        """Bounded FMP OHLC for missing symbols (Stage A primary or Yahoo coverage fill)."""
         if not missing or not self.fmp or FMPClient.is_disabled():
             return missing
         remaining = list(missing)
@@ -463,8 +473,38 @@ class MarketDataClient:
                 return None
             return max(0.0, deadline - time.monotonic())
 
-        # Fast path: bulk yfinance when FMP is blocked or not the primary price source.
-        use_yf_bulk = PRIMARY_PRICE_SOURCE != "fmp" or FMPClient.is_disabled()
+        # Stage A primary: FMP when configured — skip Yahoo bulk (rate-limit prone).
+        use_fmp_primary = (
+            PRIMARY_PRICE_SOURCE == "fmp"
+            and bool(self.fmp)
+            and not FMPClient.is_disabled()
+        )
+        if use_fmp_primary and missing:
+            missing = self._fill_missing_via_fmp(
+                result,
+                missing,
+                period,
+                deadline=deadline,
+            )
+            source = "fmp"
+            coverage = len(result) / len(unique) if unique else 1.0
+            logger.info(
+                "Batch history: FMP primary returned %s/%s symbols (coverage=%.1f%%, %s)",
+                len(result),
+                len(unique),
+                coverage * 100.0,
+                period,
+            )
+            if missing:
+                logger.warning(
+                    "Batch history: skipping Yahoo/per-symbol fallback for %s symbols after FMP primary",
+                    len(missing),
+                )
+            self._set_batch_meta(requested=len(unique), result=result, source=source)
+            return result
+
+        # Fast path: bulk yfinance when FMP is not the primary price source.
+        use_yf_bulk = PRIMARY_PRICE_SOURCE != "fmp" or FMPClient.is_disabled() or not self.fmp
         if use_yf_bulk and missing:
             rem = _remaining()
             yf_batch = yf_client.download_batch(

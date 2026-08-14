@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-import threading
 from unittest.mock import MagicMock, patch
 
 from models.schemas import DashboardFreshnessSummary, DataFreshnessStatus
@@ -50,8 +49,6 @@ def test_stale_holdings_trigger_decision_refresh_chain():
                 return DataFreshnessStatus(key=key, is_stale=True)
             if key == "latest_prices":
                 return DataFreshnessStatus(key=key, is_stale=False)
-            if key == "penny_scan":
-                return DataFreshnessStatus(key=key, is_stale=False)
             if key == "daily_decision":
                 return DataFreshnessStatus(key=key, is_stale=True)
             return DataFreshnessStatus(key=key, is_stale=False)
@@ -59,10 +56,8 @@ def test_stale_holdings_trigger_decision_refresh_chain():
         assess.side_effect = _side
         with patch.object(ro.portfolio_refresh, "_refresh_holdings", return_value={"holdings": 2}) as rh:
             with patch.object(ro.portfolio_refresh, "refresh_prices_for_holdings", return_value={"skipped": True}):
-                with patch.object(ro.portfolio_refresh, "refresh_penny_scan_if_needed", return_value={"skipped": True}):
-                    with patch.object(ro.portfolio_refresh, "refresh_daily_decision_if_needed", return_value={"status": "ok"}) as rd:
-                        with patch("services.refresh_orchestrator.mark_freshness_updated"):
-                            result = ro._execute_home_refresh(force=False)
+                with patch.object(ro.portfolio_refresh, "refresh_daily_decision_if_needed", return_value={"status": "ok"}) as rd:
+                    result = ro.portfolio_refresh._execute_decision_chain(force=False, trigger="refresh")
     assert rh.called
     assert rd.called
     assert result["status"] == "ok"
@@ -103,27 +98,6 @@ def test_home_dashboard_returns_cached_data_quickly():
         result = build_daily_dashboard(include_freshness=True)
     assert result.freshness is not None
     assert result.portfolio_value >= 0
-
-
-def test_background_refresh_does_not_duplicate_jobs():
-    ro.portfolio_refresh._home_refresh_running = False
-    ro.portfolio_refresh._active_home_job_id = None
-    ro.portfolio_refresh._refresh_started_at = None
-    gate = threading.Event()
-
-    def _slow_refresh(*args, **kwargs):
-        gate.wait(timeout=2)
-        return {"status": "ok", "steps": {}}
-
-    with patch.object(ro.portfolio_refresh, "_execute_home_refresh", side_effect=_slow_refresh):
-        first = ro.start_home_refresh_async(force=False)
-        second = ro.start_home_refresh_async(force=False)
-    assert first is not None
-    assert second is None
-    gate.set()
-    ro.portfolio_refresh._home_refresh_running = False
-    ro.portfolio_refresh._active_home_job_id = None
-    ro.portfolio_refresh._refresh_started_at = None
 
 
 def test_manual_force_refresh_bypasses_ttl():

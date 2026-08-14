@@ -137,13 +137,13 @@ def test_yfinance_get_info_timeout_returns_empty():
         assert yf_mod.get_info("AAA") == {}
 
 
-def test_download_batch_respects_deadline_on_per_symbol_path():
-    """PRIMARY=fmp path checks deadline before each symbol."""
+def test_download_batch_respects_deadline_on_fmp_primary_path():
+    """PRIMARY=fmp Stage A path checks deadline before each FMP symbol."""
     market = MarketDataClient(cache=MagicMock(get_price_cache=MagicMock(return_value=None)))
     market.fmp = MagicMock(api_key="x")
     calls = {"n": 0}
 
-    def slow_history(sym, period="6mo", **kwargs):
+    def slow_fmp(sym, period="6mo"):
         calls["n"] += 1
         time.sleep(0.25)
         dates = pd.date_range("2025-01-01", periods=5, freq="B")
@@ -161,7 +161,9 @@ def test_download_batch_respects_deadline_on_per_symbol_path():
     with (
         patch("data.market_data_client.PRIMARY_PRICE_SOURCE", "fmp"),
         patch("data.market_data_client.FMPClient.is_disabled", return_value=False),
-        patch.object(market, "get_history", side_effect=slow_history),
+        patch.object(market, "_get_history_fmp", side_effect=slow_fmp),
+        patch.object(market, "get_history") as get_history,
+        patch("data.market_data_client.yf_client.download_batch") as yf_batch,
     ):
         started = time.monotonic()
         result = market.download_batch(
@@ -176,3 +178,6 @@ def test_download_batch_respects_deadline_on_per_symbol_path():
     assert elapsed < 2.5
     assert calls["n"] < 20
     assert len(result) < 20
+    get_history.assert_not_called()
+    yf_batch.assert_not_called()
+    assert market.last_batch_meta["source"] == "fmp"

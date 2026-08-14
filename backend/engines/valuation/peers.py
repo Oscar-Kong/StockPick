@@ -14,22 +14,14 @@ def peer_symbols(symbol: str, sector: str | None, *, limit: int = 12) -> list[st
     if not sector or not FMP_ENABLED or not FMP_API_KEY:
         return []
     try:
-        import requests
+        from data.fmp_client import FMPClient
 
-        url = "https://financialmodelingprep.com/api/v3/stock-screener"
-        params = {
-            "sector": sector,
-            "marketCapMoreThan": 1_000_000_000,
-            "limit": limit + 5,
-            "apikey": FMP_API_KEY,
-        }
-        r = requests.get(url, params=params, timeout=12)
-        r.raise_for_status()
-        data = r.json()
-        if not isinstance(data, list):
-            return []
-        peers = [str(row.get("symbol", "")).upper() for row in data if row.get("symbol")]
-        return [p for p in peers if p != sym][:limit]
+        peers = FMPClient().screener(
+            sector=sector,
+            market_cap_more_than=1_000_000_000,
+            limit=limit + 5,
+        )
+        return [p for p in peers if p and p != sym][:limit]
     except Exception as exc:
         logger.debug("peer_symbols failed %s: %s", sym, exc)
         return []

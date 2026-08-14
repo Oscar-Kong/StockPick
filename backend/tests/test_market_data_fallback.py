@@ -69,10 +69,13 @@ def test_download_batch_prefers_yfinance_bulk():
     )
     market = MarketDataClient(cache=MagicMock(get_price_cache=MagicMock(return_value=None)))
 
-    with patch(
-        "data.market_data_client.yf_client.download_batch",
-        return_value={"AAA": yf_df, "BBB": yf_df},
-    ) as batch_mock:
+    with (
+        patch("data.market_data_client.PRIMARY_PRICE_SOURCE", "finnhub"),
+        patch(
+            "data.market_data_client.yf_client.download_batch",
+            return_value={"AAA": yf_df, "BBB": yf_df},
+        ) as batch_mock,
+    ):
         result = market.download_batch(["AAA", "BBB"], period="6mo", max_runtime_seconds=5)
 
     assert set(result.keys()) == {"AAA", "BBB"}
@@ -97,6 +100,7 @@ def test_download_batch_skips_per_symbol_after_yf_bulk_hit():
     market = MarketDataClient(cache=MagicMock(get_price_cache=MagicMock(return_value=None)))
     market.fmp = None
     with (
+        patch("data.market_data_client.PRIMARY_PRICE_SOURCE", "finnhub"),
         patch(
             "data.market_data_client.yf_client.download_batch",
             return_value={"AAA": yf_df},
@@ -131,6 +135,7 @@ def test_download_batch_fmp_fill_when_coverage_below_min():
     market = MarketDataClient(cache=MagicMock(get_price_cache=MagicMock(return_value=None)))
     market.fmp = MagicMock(api_key="test")
     with (
+        patch("data.market_data_client.PRIMARY_PRICE_SOURCE", "finnhub"),
         patch(
             "data.market_data_client.yf_client.download_batch",
             return_value={"AAA": yf_df},
@@ -152,11 +157,50 @@ def test_download_batch_fmp_fill_when_coverage_below_min():
     assert market.last_batch_meta["partial"] is False
 
 
+def test_download_batch_fmp_primary_skips_yfinance_bulk():
+    """PRIMARY_PRICE_SOURCE=fmp: Stage A uses FMP first, not Yahoo bulk."""
+    dates = pd.date_range("2025-01-01", periods=30, freq="B")
+    fmp_df = pd.DataFrame(
+        {
+            "date": dates,
+            "open": [5.0] * 30,
+            "high": [5.5] * 30,
+            "low": [4.5] * 30,
+            "close": [5.2] * 30,
+            "volume": [500_000] * 30,
+        }
+    )
+    market = MarketDataClient(cache=MagicMock(get_price_cache=MagicMock(return_value=None)))
+    market.fmp = MagicMock(api_key="test")
+    with (
+        patch("data.market_data_client.PRIMARY_PRICE_SOURCE", "fmp"),
+        patch("data.market_data_client.FMPClient.is_disabled", return_value=False),
+        patch(
+            "data.market_data_client.yf_client.download_batch",
+            return_value={"SHOULD_NOT": fmp_df},
+        ) as yf_batch,
+        patch.object(market, "_get_history_fmp", return_value=fmp_df) as fmp_hist,
+        patch.object(market, "get_history") as get_history,
+    ):
+        result = market.download_batch(
+            ["AAA", "BBB"],
+            period="6mo",
+            max_runtime_seconds=30,
+        )
+    assert set(result.keys()) == {"AAA", "BBB"}
+    assert fmp_hist.call_count == 2
+    yf_batch.assert_not_called()
+    get_history.assert_not_called()
+    assert market.last_batch_meta["source"] == "fmp"
+    assert market.last_batch_meta["partial"] is False
+
+
 def test_download_batch_skips_per_symbol_when_yf_bulk_empty():
     """Rate-limited / empty bulk must not fall into Yahoo→AkShare per-symbol hammering."""
     market = MarketDataClient(cache=MagicMock(get_price_cache=MagicMock(return_value=None)))
     market.fmp = None
     with (
+        patch("data.market_data_client.PRIMARY_PRICE_SOURCE", "finnhub"),
         patch("data.market_data_client.yf_client.download_batch", return_value={}),
         patch.object(market, "get_history") as get_history,
     ):
