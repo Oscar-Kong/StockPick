@@ -6,7 +6,7 @@ import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { AppTabBar, AppTabButton } from "@/components/AppTabs";
-import { ActionButton, SecondaryButton } from "@/components/ui/buttons";
+import { ActionButton } from "@/components/ui/buttons";
 import { activeHomeNoticeIds, homeNoticeId, pruneDismissedNotices } from "@/lib/dismissedNotices";
 import { DismissibleNotice } from "@/components/ui/DismissibleNotice";
 import { useTranslation } from "@/lib/i18n";
@@ -33,14 +33,11 @@ export function PortfolioWorkspace() {
     data,
     loading,
     running,
-    refreshing,
     error,
     load,
-    refresh,
     runDecision,
   } = useDailyDashboard({
     loadFailed: t.home.dailyLoadFailed,
-    refreshFailed: t.home.dailyRefreshFailed,
     runFailed: t.home.dailyRunFailed,
   });
 
@@ -67,11 +64,11 @@ export function PortfolioWorkspace() {
     pruneDismissedNotices(activeHomeNoticeIds(data));
   }, [activeNoticeKey, data]);
 
-  const refreshData = (force = false) => void refresh(force);
   const runNow = () => void runDecision();
 
   const onRobinhoodSynced = useCallback(() => {
     setLedgerReloadToken((k) => k + 1);
+    // Re-read cockpit from DB only — no provider refresh on sync complete.
     void load({ silent: true });
   }, [load]);
   const rhSync = useRobinhoodMcpSync(onRobinhoodSynced);
@@ -123,14 +120,11 @@ export function PortfolioWorkspace() {
         {showRhSync && (
           <RobinhoodSyncButton
             syncing={rhSync.syncing}
-            disabled={refreshing || running}
+            disabled={running || rhSync.syncing}
             onSync={() => void rhSync.sync()}
           />
         )}
-        <SecondaryButton onClick={() => void refreshData(true)} disabled={refreshing || running}>
-          {refreshing ? t.home.dailyRefreshing : t.home.dailyRefreshNow}
-        </SecondaryButton>
-        <ActionButton onClick={() => void runNow()} disabled={running || refreshing || !canRun}>
+        <ActionButton onClick={() => void runNow()} disabled={running || !canRun}>
           {running ? t.home.dailyRunning : t.home.dailyRunNow}
         </ActionButton>
       </div>
@@ -225,7 +219,7 @@ export function PortfolioWorkspace() {
               reloadToken={ledgerReloadToken}
               onSyncRobinhood={() => void rhSync.sync()}
               syncingRobinhood={rhSync.syncing}
-              syncDisabled={refreshing || running}
+              syncDisabled={running || rhSync.syncing}
               syncMessage={rhSync.message}
               syncError={rhSync.error}
             />

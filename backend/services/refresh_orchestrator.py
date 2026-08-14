@@ -87,12 +87,9 @@ class PortfolioRefresh:
         if scope == "decision_chain":
             return self._execute_decision_chain(force=force, trigger=trigger)
         if scope in ("home", "all"):
-            if mode == "background":
-                job_id = self.start_home_async(force=force)
-                if not job_id:
-                    return {"skipped": True, "reason": "home_refresh_already_running"}
-                return {"job_id": job_id, "status": "running"}
-            return self.refresh_home_sync(force=force)
+            raise ValueError(
+                "Home bulk refresh removed — use scope=decision_chain, prices, portfolio, or penny_scan"
+            )
         raise ValueError(f"Unknown refresh scope: {scope}")
 
     def try_begin_auto_refresh(self) -> str | None:

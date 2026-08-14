@@ -22,6 +22,11 @@ def main() -> int:
         help="With --status: run a live MCP connectivity probe",
     )
     parser.add_argument("--no-decision", action="store_true", help="Skip daily decision refresh")
+    parser.add_argument(
+        "--full-history",
+        action="store_true",
+        help="Paginate full order history and replace Activity ledger (slow)",
+    )
     parser.add_argument("--json", action="store_true", help="JSON output")
     args = parser.parse_args()
 
@@ -61,7 +66,10 @@ def main() -> int:
         return 0
 
     try:
-        result = import_robinhood_mcp_and_decide(run_decision=not args.no_decision)
+        result = import_robinhood_mcp_and_decide(
+            run_decision=not args.no_decision,
+            orders_mode="full" if args.full_history else "latest",
+        )
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         print("Run: python scripts/robinhood_mcp_login.py", file=sys.stderr)

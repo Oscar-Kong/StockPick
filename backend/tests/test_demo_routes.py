@@ -15,7 +15,6 @@ DISABLED_POST_ROUTES = [
     ("/data/scheduler/refresh-fundamentals", "post", {}),
     ("/data/scheduler/refresh-listing-master", "post", {}),
     ("/data/refresh", "post", {}),
-    ("/home/refresh", "post", {}),
     ("/api/v2/jobs/ic-panel", "post", {}),
     ("/api/v2/jobs/rebalance", "post", {}),
     ("/api/v2/jobs/enqueue/quant_daily_jobs", "post", {}),

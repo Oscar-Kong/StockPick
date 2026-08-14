@@ -147,7 +147,13 @@ def get_listing_master_status():
 
 
 @router.post("/refresh")
-def data_refresh(scope: str = Query("home", description="home | portfolio | prices | penny_scan | all"), force: bool = False):
+def data_refresh(
+    scope: str = Query(
+        "decision_chain",
+        description="decision_chain | portfolio | prices | penny_scan | decision",
+    ),
+    force: bool = False,
+):
     require_non_demo_mode()
     from services.refresh_orchestrator import refresh_if_stale
 

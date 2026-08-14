@@ -33,6 +33,31 @@ def test_status_without_probe_includes_login_script_and_auth_flags():
     assert status.get("probe") is None
 
 
+def test_expired_access_token_is_not_reported_as_authenticated():
+    with patch("services.portfolio_snapshot_service.RobinhoodMcpClient") as client_cls:
+        client_cls.return_value.is_configured.return_value = True
+        with (
+            patch(
+                "services.portfolio_snapshot_service._token_expiry_meta",
+                return_value={"token_expires_at": 1.0, "token_expired": True},
+            ),
+            patch(
+                "integrations.robinhood.mcp_token_store.credentials_present",
+                return_value=True,
+            ),
+            patch(
+                "integrations.robinhood.mcp_token_store.access_token_valid",
+                return_value=False,
+            ),
+        ):
+            status = robinhood_mcp_status(probe=False)
+
+    assert status["credentials_present"] is True
+    assert status["access_token_valid"] is False
+    assert status["authenticated"] is False
+    assert status["needs_reauth"] is True
+
+
 def test_status_probe_ok_cash_only_reports_healthy_empty_positions():
     with patch("services.portfolio_snapshot_service.RobinhoodMcpClient") as client_cls:
         client = client_cls.return_value
@@ -52,9 +77,19 @@ def test_status_probe_ok_cash_only_reports_healthy_empty_positions():
                 "message": "Connected — account is cash-only (0 equity positions)",
             }
         )
-        with patch(
-            "services.portfolio_snapshot_service._token_expiry_meta",
-            return_value={"token_expires_at": None, "token_expired": False},
+        with (
+            patch(
+                "services.portfolio_snapshot_service._token_expiry_meta",
+                return_value={"token_expires_at": None, "token_expired": False},
+            ),
+            patch(
+                "integrations.robinhood.mcp_token_store.credentials_present",
+                return_value=True,
+            ),
+            patch(
+                "integrations.robinhood.mcp_token_store.access_token_valid",
+                return_value=True,
+            ),
         ):
             status = robinhood_mcp_status(probe=True)
 

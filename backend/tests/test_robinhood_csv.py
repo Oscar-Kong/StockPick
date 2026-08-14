@@ -150,6 +150,81 @@ def test_duplicate_csv_upload_dedupes():
         session.close()
 
 
+def test_multi_cycle_closed_realized_pl_accumulates():
+    """Re-open + re-close the same symbol must sum realized P/L across cycles.
+
+    Previously only the last flat cycle was kept, so Activity closed lots understated
+    Robinhood's per-symbol realized gains when a ticker was traded multiple times.
+    """
+    from datetime import datetime
+
+    from integrations.robinhood.models import ParsedCsvRow
+
+    rows = [
+        # Cycle 1: +$10
+        ParsedCsvRow(
+            activity_date="07/01/2026",
+            process_date="07/01/2026",
+            instrument="FATE",
+            description="buy",
+            trans_code="BUY",
+            quantity=10.0,
+            price=2.0,
+            amount=-20.0,
+            row_type="buy",
+            row_hash="fate-c1-buy",
+            executed_at=datetime(2026, 7, 1, 13, 0, 0),
+        ),
+        ParsedCsvRow(
+            activity_date="07/02/2026",
+            process_date="07/02/2026",
+            instrument="FATE",
+            description="sell",
+            trans_code="SELL",
+            quantity=10.0,
+            price=3.0,
+            amount=30.0,
+            row_type="sell",
+            row_hash="fate-c1-sell",
+            executed_at=datetime(2026, 7, 2, 13, 0, 0),
+        ),
+        # Cycle 2: -$4
+        ParsedCsvRow(
+            activity_date="07/10/2026",
+            process_date="07/10/2026",
+            instrument="FATE",
+            description="buy",
+            trans_code="BUY",
+            quantity=10.0,
+            price=2.5,
+            amount=-25.0,
+            row_type="buy",
+            row_hash="fate-c2-buy",
+            executed_at=datetime(2026, 7, 10, 13, 0, 0),
+        ),
+        ParsedCsvRow(
+            activity_date="07/11/2026",
+            process_date="07/11/2026",
+            instrument="FATE",
+            description="sell",
+            trans_code="SELL",
+            quantity=10.0,
+            price=2.1,
+            amount=21.0,
+            row_type="sell",
+            row_hash="fate-c2-sell",
+            executed_at=datetime(2026, 7, 11, 13, 0, 0),
+        ),
+    ]
+    rebuild = rebuild_portfolio(rows)
+    assert rebuild.open_holdings == []
+    fate = next(c for c in rebuild.closed_positions if c.symbol == "FATE")
+    assert fate.realized_pl == pytest.approx(6.0)  # 10 + (-4)
+    assert fate.total_bought == pytest.approx(20.0)
+    assert fate.total_sold == pytest.approx(20.0)
+    assert fate.last_activity == "07/11/2026"
+
+
 def test_upsert_keeps_identical_fills_on_different_dates():
     from data.portfolio_store import (
         DEFAULT_ACCOUNT_ID,

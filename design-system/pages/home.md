@@ -31,7 +31,7 @@
 
 The Home page is the **operational cockpit**: answer “What should I do with my portfolio today?” without extra clicks. It is not a marketing landing page.
 
-**Preserve:** Buy/Hold/Sell percentages, confidence, decision queue, **Daily Trading Plan** (dedicated **Daily Plan** tab — policy-gated short-term plan), holdings table, risk alerts, penny opportunities, Run Now / Refresh, data freshness banners, demo-data indicators, all API contracts.
+**Preserve:** Buy/Hold/Sell percentages, confidence, decision queue, **Daily Trading Plan** (dedicated **Daily Plan** tab — policy-gated short-term plan), holdings table, risk alerts, penny opportunities, **Sync Robinhood** / **Run daily decision**, data freshness banners, demo-data indicators, all API contracts. Home no longer exposes a bulk **Refresh data** control — use Sync + Daily decision + Scan instead.
 
 ---
 

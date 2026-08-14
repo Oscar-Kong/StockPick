@@ -5,8 +5,6 @@ import type {
   DailyDashboardResponse,
   DailyTradingPlanReviewRequest,
   DailyTradingPlanReviewResponse,
-  HomeRefreshResponse,
-  HomeRefreshStatusResponse,
   LedgerEntry,
   LedgerEntryInput,
   LedgerListResponse,
@@ -66,17 +64,8 @@ export function runPortfolioDailyDecision(
   });
 }
 
-export function getDailyDashboard(opts?: { skipAutoRefresh?: boolean }): Promise<DailyDashboardResponse> {
-  const qs = opts?.skipAutoRefresh ? "?skip_auto_refresh=true" : "";
-  return request(`/home/daily-dashboard${qs}`);
-}
-
-export function refreshHomeData(force = false): Promise<HomeRefreshResponse> {
-  return request(`/home/refresh?force=${force ? "true" : "false"}`, { method: "POST" });
-}
-
-export function getHomeRefreshStatus(jobId: string): Promise<HomeRefreshStatusResponse> {
-  return request(`/home/refresh-status/${encodeURIComponent(jobId)}`);
+export function getDailyDashboard(): Promise<DailyDashboardResponse> {
+  return request("/home/daily-dashboard");
 }
 
 export function runDailyDecisionNow(): Promise<PortfolioDecisionRunResponse> {
@@ -197,6 +186,23 @@ export type RobinhoodMcpSyncResponse = {
   orders_imported?: number;
   orders_skipped?: number;
   ledger_rows_count?: number;
+  ledger_replaced?: boolean;
+  orders_mode?: string;
+  latest_trade?: {
+    symbol?: string;
+    side?: string;
+    quantity?: number;
+    price?: number;
+    activity_date?: string;
+    description?: string;
+  } | null;
+  realized_pl?: {
+    total?: number;
+    equity?: number;
+    events?: number;
+    trade_count?: number;
+    source?: string;
+  } | null;
   message?: string;
 };
 
@@ -220,8 +226,8 @@ export type RobinhoodMcpSyncJobResponse = {
 };
 
 const MCP_SYNC_POLL_MS = 2000;
-/** ~3 minutes — positions+orders sync; decision only runs when holdings > 0. */
-const MCP_SYNC_MAX_POLLS = 90;
+/** Slim Sync is usually <30s; keep headroom for price refresh. */
+const MCP_SYNC_MAX_POLLS = 45;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

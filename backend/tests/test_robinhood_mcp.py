@@ -43,7 +43,54 @@ def test_parse_equity_positions_skips_zero_qty():
     assert parse_equity_positions(payload) == []
 
 
-def test_pick_account_id_prefers_default_nested():
+def test_pick_account_id_prefers_default_over_agentic():
+    """Funded brokerage is usually is_default; Agentic sandbox is non-default + agentic_allowed."""
+    payload = {
+        "data": {
+            "accounts": [
+                {
+                    "account_number": "555676394",
+                    "is_default": True,
+                    "agentic_allowed": False,
+                    "type": "margin",
+                },
+                {
+                    "account_number": "856805981",
+                    "is_default": False,
+                    "agentic_allowed": True,
+                    "nickname": "Agentic",
+                    "type": "cash",
+                },
+            ]
+        }
+    }
+    assert _pick_account_id(payload, None) == "555676394"
+
+
+def test_pick_account_id_skips_agentic_when_no_default_flag():
+    payload = {
+        "data": {
+            "accounts": [
+                {"account_number": "agentic", "agentic_allowed": True, "is_default": False},
+                {"account_number": "funded", "agentic_allowed": False, "is_default": False},
+            ]
+        }
+    }
+    assert _pick_account_id(payload, None) == "funded"
+
+
+def test_pick_account_id_falls_back_to_default_when_only_default():
+    payload = {
+        "data": {
+            "accounts": [
+                {"account_number": "111", "is_default": True},
+            ]
+        }
+    }
+    assert _pick_account_id(payload, None) == "111"
+
+
+def test_pick_account_id_respects_env_preferred():
     payload = {
         "data": {
             "accounts": [
@@ -52,11 +99,6 @@ def test_pick_account_id_prefers_default_nested():
             ]
         }
     }
-    assert _pick_account_id(payload, None) == "111"
-
-
-def test_pick_account_id_respects_env_preferred():
-    payload = {"data": {"accounts": [{"account_number": "111"}, {"account_number": "222"}]}}
     assert _pick_account_id(payload, "222") == "222"
 
 

@@ -76,7 +76,7 @@ export function mergeHoldingsWithDecisionItems(
       keep_pct: 100,
       sell_pct: 0,
       decision: "review",
-      suggested_action: "Review — run Refresh data now to score this holding",
+      suggested_action: "Review — run Daily decision to score this holding",
       score: 50,
       risk_index: 50,
       suggested_dollar_action: 0,

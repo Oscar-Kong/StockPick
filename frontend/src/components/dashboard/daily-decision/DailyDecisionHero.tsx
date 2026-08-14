@@ -2,7 +2,7 @@ import { formatDateTime } from "@/lib/datetime";
 import { formatCurrency, getCockpitStatus } from "@/lib/dailyDecisionUtils";
 import type { DailyDashboardResponse } from "@/lib/types";
 import { useTranslation } from "@/lib/i18n";
-import { ActionButton, GhostButton, SecondaryButton } from "@/components/ui/buttons";
+import { ActionButton, GhostButton } from "@/components/ui/buttons";
 import { CurrencyText } from "@/components/ui/typography";
 import { SummaryStrip, SummaryStripItem } from "@/components/ui/SummaryStrip";
 import { CockpitStatusPill } from "./CockpitStatusPill";
@@ -10,20 +10,16 @@ import { CockpitStatusPill } from "./CockpitStatusPill";
 interface DailyDecisionHeroProps {
   data: DailyDashboardResponse;
   onRunNow: () => void;
-  onRefreshData: () => void;
   onImportClick?: () => void;
   running: boolean;
-  refreshing: boolean;
   canRun: boolean;
 }
 
 export function DailyDecisionHero({
   data,
   onRunNow,
-  onRefreshData,
   onImportClick,
   running,
-  refreshing,
   canRun,
 }: DailyDecisionHeroProps) {
   const { t } = useTranslation();
@@ -62,13 +58,10 @@ export function DailyDecisionHero({
       </div>
 
       <div className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
-        <SecondaryButton onClick={onRefreshData} disabled={refreshing || running}>
-          {refreshing ? t.home.dailyRefreshing : t.home.dailyRefreshNow}
-        </SecondaryButton>
         {onImportClick && (
           <GhostButton onClick={onImportClick}>{t.home.dailyImportCsv}</GhostButton>
         )}
-        <ActionButton onClick={onRunNow} disabled={running || refreshing || !canRun}>
+        <ActionButton onClick={onRunNow} disabled={running || !canRun}>
           {running ? t.home.dailyRunning : t.home.dailyRunNow}
         </ActionButton>
       </div>

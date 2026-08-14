@@ -36,12 +36,6 @@ def _penny_scan_refresh(payload: dict[str, Any]) -> dict[str, Any]:
     return run_scheduled_penny_scan_refresh()
 
 
-def _home_refresh(payload: dict[str, Any]) -> dict[str, Any]:
-    from services.refresh_orchestrator import refresh_home_dashboard
-
-    return refresh_home_dashboard(force=bool(payload.get("force")))
-
-
 def _morning_scan_email(payload: dict[str, Any]) -> dict[str, Any]:
     from services.morning_scan_email_service import run_morning_scan_email_sync
 
@@ -59,7 +53,6 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "daily_portfolio_decision": _daily_portfolio_decision,
     "market_data_price_refresh": _market_data_price_refresh,
     "penny_scan_refresh": _penny_scan_refresh,
-    "home_refresh": _home_refresh,
     "morning_scan_email": _morning_scan_email,
 }
 

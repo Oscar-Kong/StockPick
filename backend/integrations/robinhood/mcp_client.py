@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import parse_qs, urlparse
 
 from mcp.client.auth import OAuthClientProvider
@@ -29,12 +29,19 @@ from integrations.robinhood.mcp_decode import (
     looks_like_ticker,
     positions_payload_is_genuinely_empty,
 )
-from integrations.robinhood.mcp_orders import MCP_MAX_ORDER_PAGES, _order_cursor, parse_mcp_equity_orders
+from integrations.robinhood.mcp_orders import (
+    MCP_MAX_ORDER_PAGES,
+    _order_cursor,
+    parse_mcp_equity_orders,
+    pick_newest_order_row,
+)
 from integrations.robinhood.mcp_pnl import MCP_MAX_PNL_PAGES, RealizedPnlSummary, _pnl_cursor, parse_pnl_trade_history_pages
 from integrations.robinhood.mcp_token_store import FileTokenStorage, has_valid_tokens
 from integrations.robinhood.models import BrokerageSyncResult, ReconstructedHolding, ParsedCsvRow
 
 logger = logging.getLogger(__name__)
+
+OrdersMode = Literal["none", "latest", "full"]
 
 ROBINHOOD_MCP_URL = os.getenv("ROBINHOOD_MCP_URL", "https://agent.robinhood.com/mcp/trading").strip()
 ROBINHOOD_MCP_REDIRECT_URI = os.getenv(
@@ -68,7 +75,8 @@ def tool_timeout_sec() -> float:
 
 
 def sync_timeout_sec() -> float:
-    return max(15.0, _env_float("ROBINHOOD_MCP_SYNC_TIMEOUT_SEC", 90.0))
+    # Slim Sync targets a short deadline; override via ROBINHOOD_MCP_SYNC_TIMEOUT_SEC.
+    return max(15.0, _env_float("ROBINHOOD_MCP_SYNC_TIMEOUT_SEC", 45.0))
 
 
 def probe_timeout_sec() -> float:
@@ -105,6 +113,7 @@ class LivePortfolioSnapshot:
     orders_imported: int = 0
     orders_skipped: int = 0
     completeness: SnapshotCompleteness = field(default_factory=SnapshotCompleteness)
+    realized_pnl: RealizedPnlSummary | None = None
 
 
 @dataclass
@@ -318,7 +327,18 @@ def _count_accounts(accounts_payload: Any) -> int:
     return 0
 
 
+def _account_number(account: dict[str, Any]) -> str | None:
+    acct_id = account.get("account_number") or account.get("id") or account.get("account_id")
+    return str(acct_id) if acct_id else None
+
+
 def _pick_account_id(accounts_payload: Any, preferred: str | None) -> str | None:
+    """Choose which Robinhood account to sync.
+
+    Robinhood's own account guide orders **default first**, then agentic sandboxes.
+    Preferring non-default previously selected empty Agentic accounts and zeroed
+    portfolio / realized-P/L charts for users whose funded brokerage is ``is_default``.
+    """
     if preferred:
         return preferred
 
@@ -333,15 +353,30 @@ def _pick_account_id(accounts_payload: Any, preferred: str | None) -> str | None
         accounts_list = [a for a in accounts_payload if isinstance(a, dict)]
 
     if accounts_list:
+        # 1) Explicit Robinhood default (usually the funded self-directed brokerage).
         default = next((a for a in accounts_list if a.get("is_default")), None)
-        picked = default or accounts_list[0]
-        acct_id = picked.get("account_number") or picked.get("id") or picked.get("account_id")
-        return str(acct_id) if acct_id else None
+        if default is not None:
+            acct_id = _account_number(default)
+            if acct_id:
+                return acct_id
+
+        # 2) Non-agentic accounts over Agentic sandboxes (often $0 equity / empty PnL).
+        non_agentic = next(
+            (
+                a
+                for a in accounts_list
+                if a.get("agentic_allowed") is not True and _account_number(a)
+            ),
+            None,
+        )
+        if non_agentic is not None:
+            return _account_number(non_agentic)
+
+        acct_id = _account_number(accounts_list[0])
+        return acct_id
 
     if isinstance(accounts_payload, dict):
-        acct_id = accounts_payload.get("account_number") or accounts_payload.get("id") or accounts_payload.get("account_id")
-        if acct_id:
-            return str(acct_id)
+        return _account_number(accounts_payload)
     return None
 
 
@@ -489,13 +524,20 @@ class RobinhoodMcpClient(BrokerageProvider):
         assert last_exc is not None
         raise last_exc
 
-    async def _fetch_filled_orders(self, session: ClientSession, account_number: str) -> _OrderFetchResult:
+    async def _fetch_filled_orders(
+        self,
+        session: ClientSession,
+        account_number: str,
+        *,
+        max_pages: int | None = None,
+    ) -> _OrderFetchResult:
         merged: list[ParsedCsvRow] = []
         cursor: str | None = None
         pages = 0
+        page_limit = MCP_MAX_ORDER_PAGES if max_pages is None else max(1, max_pages)
 
         try:
-            for _ in range(MCP_MAX_ORDER_PAGES):
+            for _ in range(page_limit):
                 args: dict[str, Any] = {"account_number": account_number, "state": "filled"}
                 if cursor:
                     args["cursor"] = cursor
@@ -521,10 +563,18 @@ class RobinhoodMcpClient(BrokerageProvider):
                 error=str(_flatten_exc(exc))[:300],
             )
 
-    async def _fetch_pnl_trade_history(self, session: ClientSession, account_number: str, *, span: str = "ytd") -> list[Any]:
+    async def _fetch_pnl_trade_history(
+        self,
+        session: ClientSession,
+        account_number: str,
+        *,
+        span: str = "ytd",
+        max_pages: int | None = None,
+    ) -> list[Any]:
         pages: list[Any] = []
         cursor: str | None = None
-        for _ in range(MCP_MAX_PNL_PAGES):
+        page_limit = MCP_MAX_PNL_PAGES if max_pages is None else max(1, max_pages)
+        for _ in range(page_limit):
             args: dict[str, Any] = {"account_number": account_number, "span": span}
             if cursor:
                 args["cursor"] = cursor
@@ -566,9 +616,39 @@ class RobinhoodMcpClient(BrokerageProvider):
             logger.exception("Robinhood MCP realized P/L sync fetch failed")
             return None
 
-    async def fetch_live_portfolio(self, *, include_orders: bool = True) -> LivePortfolioSnapshot:
+    async def fetch_live_portfolio(
+        self,
+        *,
+        include_orders: bool | None = None,
+        orders_mode: OrdersMode | None = None,
+        include_realized_pnl: bool = True,
+    ) -> LivePortfolioSnapshot:
+        """Pull live positions + portfolio; orders_mode controls order-history depth.
+
+        - latest (default): one page of filled orders, keep newest only
+        - full: paginated history (CLI / rare rebuilds)
+        - none: skip orders
+        """
         preferred = os.getenv("ROBINHOOD_MCP_ACCOUNT_ID", "").strip() or None
         completeness = SnapshotCompleteness()
+        total_timeout = sync_timeout_sec()
+        deadline = time.monotonic() + total_timeout
+        # Leave a small margin for building and returning the required snapshot so
+        # optional order/P&L calls cannot consume the outer hard deadline.
+        return_margin = min(1.0, total_timeout * 0.2)
+
+        def _optional_budget() -> float:
+            return max(0.0, deadline - time.monotonic() - return_margin)
+
+        if orders_mode is None:
+            if include_orders is False:
+                mode: OrdersMode = "none"
+            elif include_orders is True:
+                mode = "full"
+            else:
+                mode = "latest"
+        else:
+            mode = orders_mode
 
         async def _run() -> LivePortfolioSnapshot:
             async with self._session() as session:
@@ -588,8 +668,20 @@ class RobinhoodMcpClient(BrokerageProvider):
                 completeness.portfolio_ok = True
 
                 order_rows: list[ParsedCsvRow] = []
-                if include_orders:
-                    order_result = await self._fetch_filled_orders(session, account_id)
+                realized: RealizedPnlSummary | None = None
+
+                if mode == "full":
+                    budget = _optional_budget()
+                    try:
+                        if budget <= 0:
+                            raise TimeoutError("no sync budget left")
+                        async with asyncio.timeout(budget):
+                            order_result = await self._fetch_filled_orders(session, account_id)
+                    except TimeoutError:
+                        order_result = _OrderFetchResult(
+                            rows=[], truncated=True, pages_fetched=0, ok=False,
+                            error="Order history timed out; retained previous ledger",
+                        )
                     order_rows = order_result.rows
                     completeness.orders_ok = order_result.ok
                     completeness.orders_truncated = order_result.truncated
@@ -600,13 +692,48 @@ class RobinhoodMcpClient(BrokerageProvider):
                             f"Order history truncated after {order_result.pages_fetched} pages "
                             f"(max {MCP_MAX_ORDER_PAGES}); retaining previous ledger"
                         )
-                    completeness.history_complete = (
-                        order_result.ok and not order_result.truncated
-                    )
+                    completeness.history_complete = order_result.ok and not order_result.truncated
+                elif mode == "latest":
+                    budget = _optional_budget()
+                    try:
+                        if budget <= 0:
+                            raise TimeoutError("no sync budget left")
+                        async with asyncio.timeout(budget):
+                            order_result = await self._fetch_filled_orders(
+                                session, account_id, max_pages=1
+                            )
+                    except TimeoutError:
+                        order_result = _OrderFetchResult(
+                            rows=[], truncated=True, pages_fetched=0, ok=False,
+                            error="Latest trade timed out",
+                        )
+                    order_rows = pick_newest_order_row(order_result.rows)
+                    completeness.orders_ok = order_result.ok
+                    completeness.orders_truncated = True  # intentional: not a full history sync
+                    completeness.history_complete = False
+                    if order_result.error:
+                        completeness.warnings.append(f"Latest trade fetch incomplete: {order_result.error}")
+                    completeness.warnings.append("Slim sync: latest trade only — retained previous trade ledger")
                 else:
                     completeness.orders_ok = True
                     completeness.history_complete = False
                     completeness.warnings.append("Order history not requested")
+
+                if include_realized_pnl:
+                    try:
+                        # Bound PnL pagination so Sync stays fast on free/agent sessions.
+                        budget = _optional_budget()
+                        if budget <= 0:
+                            raise TimeoutError("no sync budget left")
+                        async with asyncio.timeout(budget):
+                            pages = await self._fetch_pnl_trade_history(
+                                session, account_id, span="ytd", max_pages=3
+                            )
+                        if pages:
+                            realized = parse_pnl_trade_history_pages(pages)
+                    except Exception as exc:
+                        logger.warning("Robinhood MCP realized P/L during sync failed: %s", exc)
+                        completeness.warnings.append(f"Realized P/L fetch failed: {str(exc)[:120]}")
 
                 return LivePortfolioSnapshot(
                     holdings=holdings,
@@ -617,14 +744,15 @@ class RobinhoodMcpClient(BrokerageProvider):
                     raw_portfolio=portfolio_raw,
                     order_rows=order_rows,
                     completeness=completeness,
+                    realized_pnl=realized,
                 )
 
         try:
-            async with asyncio.timeout(sync_timeout_sec()):
+            async with asyncio.timeout(total_timeout):
                 return await _run()
         except TimeoutError as exc:
             raise ValueError(
-                f"Robinhood MCP sync exceeded {sync_timeout_sec():.0f}s deadline"
+                f"Robinhood MCP sync exceeded {total_timeout:.0f}s deadline"
             ) from exc
 
     async def _probe_async(self) -> dict[str, Any]:

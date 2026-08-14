@@ -13,16 +13,27 @@ Robinhood docs: [Agentic Trading overview](https://robinhood.com/us/en/support/a
 | Tool (read-only) | Data |
 |------------------|------|
 | `get_equity_positions` | Current holdings → StockPick Home / Today |
-| `get_equity_orders` | Filled order history → Activity transaction ledger (auto-import) |
-| `get_pnl_trade_history` | Per-trade **realized P/L (YTD)** — equities, partial sells, **prediction/event contracts** (World Cup, etc.) → Today performance KPI |
 | `get_portfolio` | Buying power, portfolio value |
-| `get_accounts` | Pick account (optional `ROBINHOOD_MCP_ACCOUNT_ID` = Robinhood `account_number`) |
+| `get_pnl_trade_history` | Per-trade **realized P/L (YTD)** → Today performance KPI (cached on Sync) |
+| `get_equity_orders` | **Latest filled trade only** on Sync (not full history) |
+| `get_accounts` | Pick account — prefers **`is_default`**, then non-agentic funded accounts (skips empty Agentic sandboxes); override with `ROBINHOOD_MCP_ACCOUNT_ID` |
 
 StockPick **does not** call trade tools (`place_equity_order`, etc.) — portfolio read sync only.
 
-After sync, StockPick **re-prices holdings** (Finnhub/AkShare live quotes in session) and — from the in-app **Sync Robinhood** button — **re-runs the daily decision** so Today marks, shares, and portfolio value stay aligned with Robinhood. The CLI script does the same by default (`./scripts/sync-robinhood-mcp.sh`); pass `--no-decision` to skip the decision step. The raw API defaults to `run_decision=false` but still refreshes prices.
+### Slim Sync (default)
 
-**In the app:** Portfolio → **Today** — **Sync Robinhood** in the header. **Activity** is a single trading-history list (year/month filters) that replaces CSV import and the editable ledger; it refreshes on each Robinhood sync. **Refresh data** also syncs Robinhood in the background when MCP is authenticated, then refreshes prices and the daily decision.
+**Sync Robinhood** is a fast path:
+
+1. Live positions + buying power
+2. Realized YTD P/L (cached for Home KPIs)
+3. Latest one trade (for status message; Activity ledger is **retained**)
+4. Light re-price of holdings marks
+
+It does **not** paginate full order history or auto-run **Daily decision**. Run Daily decision yourself after Sync when you want the action queue.
+
+Full ledger rebuild remains available via CLI: `./scripts/sync-robinhood-mcp.sh --full-history` (slow).
+
+**In the app:** Portfolio → **Today** — **Sync Robinhood** in the header. **Activity** keeps the existing ledger unless you run a full-history CLI sync.
 
 ---
 
@@ -101,11 +112,11 @@ This path does **not** automatically update StockPick Home — run `./scripts/sy
 ROBINHOOD_MCP_ENABLED=true
 ROBINHOOD_MCP_URL=https://agent.robinhood.com/mcp/trading
 ROBINHOOD_MCP_REDIRECT_URI=http://127.0.0.1:8765/callback
-# Optional: specific account if you have several
+# Optional override (otherwise prefers is_default, then non-agentic funded accounts)
 # ROBINHOOD_MCP_ACCOUNT_ID=
-# Timeouts / session reuse (seconds)
+# Timeouts / session reuse (seconds) — slim Sync default deadline is 45s
 # ROBINHOOD_MCP_TOOL_TIMEOUT_SEC=15
-# ROBINHOOD_MCP_SYNC_TIMEOUT_SEC=90
+# ROBINHOOD_MCP_SYNC_TIMEOUT_SEC=45
 # ROBINHOOD_MCP_PROBE_TIMEOUT_SEC=45
 # ROBINHOOD_MCP_INIT_TIMEOUT_SEC=10
 ```
@@ -116,9 +127,11 @@ ROBINHOOD_MCP_REDIRECT_URI=http://127.0.0.1:8765/callback
 
 1. **Tool errors** — MCP `isError=true` raises immediately; error JSON is never treated as positions/orders.
 2. **Decode priority** — Prefer `structuredContent` when present; otherwise merge content blocks (so pagination cursors are not lost).
-3. **Completeness** — Sync records `history_complete` / `orders_truncated`. The Activity ledger is replaced **only** when order history completed successfully. Incomplete/truncated fetches keep the previous ledger and set `sync_status=degraded` while still updating live holdings.
-4. **Single-flight** — A second `POST /sync/robinhood-mcp` while one is running returns the same `job_id` (`reused: true` on the job record).
-5. **Status fields** — `credentials_present` / `access_token_valid` describe the local OAuth file; they do **not** prove a live Robinhood session. Use `?probe=true` or **Test connection** for a live check.
+3. **Completeness** — Slim Sync (`orders_mode=latest`, default) never replaces the Activity ledger. Full history (`--full-history` / `orders_mode=full`) replaces the ledger **only** when order history completed successfully; incomplete/truncated full fetches keep the previous ledger and set `sync_status=degraded` while still updating live holdings.
+4. **Account pick** — With multiple accounts and no `ROBINHOOD_MCP_ACCOUNT_ID`, StockPick prefers the Robinhood **`is_default`** account, then any non-agentic funded account. Agentic sandboxes (`agentic_allowed=true`) are skipped so empty agentic cash/PnL does not overwrite the portfolio chart.
+5. **Single-flight** — A second `POST /sync/robinhood-mcp` while one is running returns the same `job_id` (`reused: true` on the job record). A soft-timeout does not release the account slot until the original worker exits, preventing overlapping portfolio writes.
+6. **Status fields** — `credentials_present` means an OAuth file exists; `authenticated` additionally requires a currently valid access token. Neither proves a live Robinhood session. Use `?probe=true` or **Test connection** for a live check.
+7. **Optional-data degradation** — After positions and portfolio succeed, latest-order or realized-P/L timeouts produce warnings but do not discard the required holdings/cash snapshot.
 
 Genuine **cash-only** is reported only when positions tool succeeded and the payload is an empty holdings container. Unparseable non-empty payloads are treated as probe failures (not cash-only).
 
@@ -139,6 +152,7 @@ Genuine **cash-only** is reported only when positions tool succeeded and the pay
 | Phantom symbol (e.g. `ZZZZ`) on Today with 0 holdings | Leftover from a journal/API healthcheck trade that wrote a decision snapshot. Cash-only MCP sync now clears that snapshot; dashboard also drops decision rows not in open holdings. |
 | UI says "Import needed" but sync succeeded | Fixed for cash-only MCP: synced $0 equity is not treated as missing import. Re-sync or refresh Today. |
 | Activity / ledger after sync | Ledger is replaced only when MCP order history is complete (`history_complete`). Degraded syncs keep the previous ledger; holdings still come from live positions |
+| Closed-lot P/L “a bit off” vs Robinhood | Today’s performance KPI uses MCP `get_pnl_trade_history` (authoritative). Activity **closed positions** rebuild from the trade ledger with weighted-average cost and now **sum realized P/L across re-open cycles** for the same symbol (previously only the last flat cycle was kept). Small residual gaps vs Robinhood can remain when tax lots / partial fills differ from average-cost. Re-sync (or refresh Activity) after upgrade so persisted closed lots recompute. |
 | Sync hangs / times out | Defaults: 15s per tool, 90s full sync. Raise `ROBINHOOD_MCP_*_TIMEOUT_SEC` if needed; read tools retry up to 3× on 429/5xx/timeouts. |
 
 ---

@@ -75,6 +75,7 @@ Everything else is **secondary**:
 
 1. Open **Screen** → pick **Penny**, **Medium**, or **Compounder**.
 2. Run scan (defaults are fine).
+   Penny Scan checks a broad daily rotating cohort and carries forward eligible prior picks, so several daily runs do not remain permanently confined to the same alphabetical or hash sample.
 3. Click **Summary** on a row; add 1–3 names to watchlist.
 4. Open **Research** → analyze each symbol (Overview + Chart).
 
@@ -254,7 +255,7 @@ You do **not** need to touch Portfolio, Trader Intel, Round 2 admin APIs, or arc
 | Empty scan | Widen price/volume filters; check backend on `:18731` |
 | Stale watchlist prices | Refresh rail (↻) in Research |
 | Wrong holdings after import | Portfolio → Activity → review CSV rows before approve; fix or add rows in **Transaction ledger**, then **Rebuild holdings** |
-| Home stuck on “Updating” | Wait for refresh to finish; use **Refresh data now** once; reload `/` |
+| Home stuck on “Updating” | Reload `/`; run **Daily decision** or **Sync Robinhood**; check backend logs if a background job is stuck |
 | LLM Summary empty | `LLM_ENABLED` + proxy keys in `.env` |
 | Portfolio optimize fails | Need 2+ symbols with history; optional `requirements-quant.txt` |
 | Overwhelmed by factors | Disable `OPENALPHA_FACTORS_ENABLED`; read Overview only |

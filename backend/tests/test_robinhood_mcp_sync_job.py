@@ -66,3 +66,40 @@ def test_concurrent_sync_returns_same_job_id():
             break
         time.sleep(0.05)
     assert job["status"] == "completed"
+
+
+def test_overdue_sync_keeps_single_flight_until_worker_exits():
+    _reset_jobs()
+    started = threading.Event()
+    release = threading.Event()
+
+    def slow_import(**_kwargs):
+        started.set()
+        release.wait(timeout=5)
+        return {"holdings_count": 1}
+
+    with patch(
+        "services.portfolio_snapshot_service.import_robinhood_mcp_and_decide",
+        side_effect=slow_import,
+    ):
+        first = start_robinhood_mcp_sync(run_decision=False)
+        assert started.wait(timeout=2)
+        with sync_svc._lock:
+            sync_svc._jobs[first]["deadline_monotonic"] = time.monotonic() - 1
+
+        second = start_robinhood_mcp_sync(run_decision=False)
+        job = get_robinhood_mcp_sync_job(first)
+
+        assert second == first
+        assert job is not None
+        assert job["status"] == "running"
+        assert job["timed_out"] is True
+        release.set()
+
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        job = get_robinhood_mcp_sync_job(first)
+        if job and job["status"] != "running":
+            break
+        time.sleep(0.05)
+    assert job["status"] == "completed"

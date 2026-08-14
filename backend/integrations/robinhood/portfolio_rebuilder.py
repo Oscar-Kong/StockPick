@@ -121,6 +121,10 @@ def rebuild_portfolio(rows: list[ParsedCsvRow]) -> PortfolioRebuildResult:
                 warnings.append(f"Sell {sym} with no open shares — ignored")
                 continue
             sell_qty = min(qty, held)
+            if sell_qty + MIN_OPEN_SHARES < qty:
+                warnings.append(
+                    f"Sell {sym} qty {qty:g} exceeds open {held:g} — cash credited for {sell_qty:g} only"
+                )
             avg = lot["cost"] / held if held else price
             proceeds = sell_qty * price
             cost_removed = avg * sell_qty
@@ -128,14 +132,22 @@ def rebuild_portfolio(rows: list[ParsedCsvRow]) -> PortfolioRebuildResult:
             lot["shares"] -= sell_qty
             lot["cost"] -= cost_removed
             lot["sold"] += sell_qty
-            cash_delta += _cash_impact(row)
+            # Scale cash to shares actually closed (incomplete ledgers may oversell).
+            if row.amount != 0 and qty > 0:
+                cash_delta += float(row.amount) * (sell_qty / qty)
+            else:
+                cash_delta += proceeds
 
             if lot["shares"] <= MIN_OPEN_SHARES:
+                # Accumulate across re-open / re-close cycles. Overwriting would
+                # drop earlier round-trip P/L and understate Activity vs Robinhood.
+                prev = closed.get(sym)
+                cycle_pl = float(lot["realized"])
                 closed[sym] = ClosedPosition(
                     symbol=sym,
-                    total_bought=lot["bought"],
-                    total_sold=lot["sold"],
-                    realized_pl=round(lot["realized"], 2),
+                    total_bought=(prev.total_bought if prev else 0.0) + lot["bought"],
+                    total_sold=(prev.total_sold if prev else 0.0) + lot["sold"],
+                    realized_pl=round((prev.realized_pl if prev else 0.0) + cycle_pl, 2),
                     last_activity=lot["last"],
                 )
                 del lots[sym]

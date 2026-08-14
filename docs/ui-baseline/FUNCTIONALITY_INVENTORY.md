@@ -59,12 +59,12 @@ Legacy URL support: `?journal=1` → activity; `?tools=` / `#portfolio-tools` �
 * `DecisionBadge`, confidence via decision items
 * `RiskAlertsPanel` on Today tab
 
-### Refresh / sync
+### Sync / decision
 
 | Action | API |
 |--------|-----|
-| Refresh data | `refreshHomeData` → job poll `getHomeRefreshStatus` (5s interval) |
-| Run decision now | `runDailyDecisionNow` |
+| Sync Robinhood | `syncRobinhoodMcp(true)` → job poll |
+| Daily decision | `runDailyDecisionNow` |
 | CSV import | `previewRobinhoodCsv` → review → import |
 | Set buying power | `setBuyingPower` |
 
@@ -72,8 +72,7 @@ Legacy URL support: `?journal=1` → activity; `?tools=` / `#portfolio-tools` �
 
 * Initial: `LoadingSkeleton variant="home"`
 * Error: `ErrorState` with message
-* Refresh in progress: `refreshing` disables actions; `DataFreshnessBanner`
-* Stale: freshness fields on dashboard response
+* Stale: freshness fields + `DataFreshnessBanner` (use Sync / Daily decision — no bulk Refresh button)
 
 ### Mobile
 
@@ -305,7 +304,7 @@ Optional: source (column customization via `DenseTableToolbar`).
 ## API boundaries (do not change in UI phases)
 
 * `frontend/src/lib/api.ts` — primary HTTP client
-* Portfolio: `getDailyDashboard`, `refreshHomeData`, `runDailyDecisionNow`, …
+* Portfolio: `getDailyDashboard`, `runDailyDecisionNow`, `syncRobinhoodMcp`, …
 * Scan: `startScan`, `getLatestScan`, poll status endpoints
 * Analyze: `/analyze/{symbol}` wrappers
 * Quant Lab: experiment + quant endpoints

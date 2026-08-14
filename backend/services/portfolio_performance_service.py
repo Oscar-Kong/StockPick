@@ -109,10 +109,7 @@ def _closed_realized_ytd(closed: list[dict[str, Any]]) -> float:
     return total
 
 
-def _resolve_realized_ytd(closed: list[dict[str, Any]]) -> RealizedPnlSummary:
-    mcp = RobinhoodMcpClient().fetch_ytd_realized_pnl_sync()
-    if mcp is not None:
-        return mcp
+def _ledger_realized_summary(closed: list[dict[str, Any]]) -> RealizedPnlSummary:
     ledger_total = round(_closed_realized_ytd(closed), 2)
     return RealizedPnlSummary(
         total=ledger_total,
@@ -121,6 +118,28 @@ def _resolve_realized_ytd(closed: list[dict[str, Any]]) -> RealizedPnlSummary:
         trade_count=0,
         source="ledger",
     )
+
+
+def _resolve_realized_ytd(closed: list[dict[str, Any]]) -> RealizedPnlSummary:
+    try:
+        from services.robinhood_realized_pnl_cache import get_cached_realized_pnl
+
+        cached = get_cached_realized_pnl()
+        # Empty MCP payloads (wrong/agentic account) must not stick as $0 KPIs.
+        if cached is not None and cached.trade_count > 0:
+            return cached
+    except Exception:
+        logger.debug("realized P/L cache read skipped", exc_info=True)
+    mcp = RobinhoodMcpClient().fetch_ytd_realized_pnl_sync()
+    if mcp is not None and mcp.trade_count > 0:
+        try:
+            from services.robinhood_realized_pnl_cache import cache_realized_pnl
+
+            cache_realized_pnl(mcp)
+        except Exception:
+            logger.debug("realized P/L cache write skipped", exc_info=True)
+        return mcp
+    return _ledger_realized_summary(closed)
 
 
 def _unrealized_from_positions(positions: list[dict[str, Any]]) -> tuple[float, float]:
@@ -169,17 +188,23 @@ def _apply_trade_row(lots: dict[str, dict[str, float]], cash: float, row: Parsed
 
     price = float(row.price or 0)
     lot = lots.setdefault(sym, {"shares": 0.0, "cost": 0.0})
-    cash += _cash_impact(row)
 
     if row_type == "buy":
+        cash += _cash_impact(row)
         lot["shares"] += qty
         lot["cost"] += qty * price
     else:
         held = lot["shares"]
         if held <= MIN_OPEN_SHARES:
             return cash
+        # Incomplete MCP ledgers can list sells larger than tracked lots — only
+        # credit cash for shares we actually held (avoids phantom chart jumps).
         sell_qty = min(qty, held)
         avg = lot["cost"] / held if held else price
+        if row.amount != 0 and qty > 0:
+            cash += float(row.amount) * (sell_qty / qty)
+        else:
+            cash += sell_qty * price
         lot["shares"] -= sell_qty
         lot["cost"] -= avg * sell_qty
         if lot["shares"] <= MIN_OPEN_SHARES:

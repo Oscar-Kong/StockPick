@@ -159,7 +159,10 @@ def test_mcp_import_skips_ledger_clear_when_history_incomplete():
                                                     "services.refresh_orchestrator.refresh_prices_for_holdings",
                                                     return_value={},
                                                 ):
-                                                    result = import_robinhood_mcp_and_decide(run_decision=False)
+                                                    result = import_robinhood_mcp_and_decide(
+                                                        run_decision=False,
+                                                        orders_mode="full",
+                                                    )
 
     replace.assert_not_called()
     clear.assert_not_called()
@@ -221,7 +224,10 @@ def test_mcp_import_replaces_ledger_when_history_complete():
                                                         "services.refresh_orchestrator.refresh_prices_for_holdings",
                                                         return_value={},
                                                     ):
-                                                        result = import_robinhood_mcp_and_decide(run_decision=False)
+                                                        result = import_robinhood_mcp_and_decide(
+                                                            run_decision=False,
+                                                            orders_mode="full",
+                                                        )
 
     replace.assert_called_once()
     assert result["ledger_replaced"] is True

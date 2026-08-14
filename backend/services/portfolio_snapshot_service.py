@@ -483,9 +483,25 @@ def apply_manual_trade_to_portfolio(
     return portfolio_result
 
 
-def import_robinhood_mcp_and_decide(*, run_decision: bool = False) -> dict:
-    """Pull live holdings, order history, and buying power from Robinhood MCP."""
-    from integrations.robinhood.mcp_client import SnapshotCompleteness
+def import_robinhood_mcp_and_decide(
+    *,
+    run_decision: bool = False,
+    orders_mode: str = "latest",
+) -> dict:
+    """Pull live holdings + buying power from Robinhood MCP (slim by default).
+
+    orders_mode:
+      - latest (default): one newest fill for messaging; retain Activity ledger
+      - none: positions + portfolio only
+      - full: paginated order history and replace ledger when complete
+    """
+    from integrations.robinhood.mcp_client import OrdersMode, SnapshotCompleteness
+
+    mode: OrdersMode
+    if orders_mode in ("none", "latest", "full"):
+        mode = orders_mode  # type: ignore[assignment]
+    else:
+        mode = "latest"
 
     client = RobinhoodMcpClient()
     if not client.is_configured():
@@ -493,7 +509,9 @@ def import_robinhood_mcp_and_decide(*, run_decision: bool = False) -> dict:
             "Robinhood MCP not authenticated. Run: cd backend && python scripts/robinhood_mcp_login.py"
         )
 
-    snapshot = asyncio.run(client.fetch_live_portfolio(include_orders=True))
+    snapshot = asyncio.run(
+        client.fetch_live_portfolio(orders_mode=mode, include_realized_pnl=True)
+    )
     account = get_or_create_account()
     account_id = account["id"]
 
@@ -504,7 +522,7 @@ def import_robinhood_mcp_and_decide(*, run_decision: bool = False) -> dict:
             positions_ok=True,
             portfolio_ok=True,
             orders_ok=True,
-            history_complete=True,
+            history_complete=False,
             warnings=[],
         )
 
@@ -522,8 +540,8 @@ def import_robinhood_mcp_and_decide(*, run_decision: bool = False) -> dict:
     sync_status = "ok"
     warnings = list(completeness.warnings)
 
-    if completeness.history_complete:
-        # Atomic clear+insert so we never wipe the ledger before rows are ready.
+    # Full history replace only when explicitly requested and complete.
+    if mode == "full" and completeness.history_complete:
         orders_imported, orders_skipped, cleared_ledger = replace_trade_ledger(
             account_id, snapshot.order_rows
         )
@@ -537,19 +555,18 @@ def import_robinhood_mcp_and_decide(*, run_decision: bool = False) -> dict:
             else "Complete MCP order history was empty — ledger cleared (genuinely no fills)"
         )
     else:
-        sync_status = "degraded"
-        warnings.append(
-            "Order history incomplete — retained previous trade ledger; live positions still updated"
-        )
+        if mode == "full":
+            sync_status = "degraded"
+            warnings.append(
+                "Order history incomplete — retained previous trade ledger; live positions still updated"
+            )
         try:
             ledger_rebuild = _rebuild_from_store(account_id)
         except Exception:
             logger.exception("Could not rebuild closed lots from retained ledger")
             ledger_rebuild = None
 
-    # Live MCP positions are the source of truth for open holdings. Rebuilding from
-    # the ledger merges incomplete MCP order history with legacy CSV rows and drifts
-    # away from what Robinhood reports today.
+    # Live MCP positions are the source of truth for open holdings.
     rebuild = PortfolioRebuildResult(
         open_holdings=snapshot.holdings,
         closed_positions=ledger_rebuild.closed_positions if ledger_rebuild else [],
@@ -567,14 +584,36 @@ def import_robinhood_mcp_and_decide(*, run_decision: bool = False) -> dict:
         cash_override=snapshot.buying_power,
     )
     acct = update_account_source("robinhood_mcp", cash=persisted["cash"])
+
+    latest_trade: dict | None = None
+    if snapshot.order_rows:
+        row = snapshot.order_rows[0]
+        latest_trade = {
+            "symbol": row.instrument,
+            "side": row.row_type,
+            "quantity": row.quantity,
+            "price": row.price,
+            "activity_date": row.activity_date,
+            "description": row.description,
+        }
+
+    realized = getattr(snapshot, "realized_pnl", None)
+    if realized is not None and realized.trade_count > 0:
+        try:
+            from services.robinhood_realized_pnl_cache import cache_realized_pnl
+
+            cache_realized_pnl(realized)
+        except Exception:
+            logger.debug("Could not cache realized P/L from sync", exc_info=True)
+
     mark_sync(
         account_id,
         "robinhood_mcp",
         trades_imported=orders_imported,
         trades_skipped=orders_skipped,
         message=(
-            f"MCP sync ({sync_status}): {persisted['holdings_count']} positions, "
-            f"{orders_imported} order rows"
+            f"MCP slim sync ({sync_status}): {persisted['holdings_count']} positions, "
+            f"cash={persisted['cash']:.2f}"
         ),
     )
 
@@ -603,8 +642,21 @@ def import_robinhood_mcp_and_decide(*, run_decision: bool = False) -> dict:
         "sync_status": sync_status,
         "history_complete": completeness.history_complete,
         "orders_truncated": completeness.orders_truncated,
+        "orders_mode": mode,
         "warnings": warnings,
         "account": acct,
+        "latest_trade": latest_trade,
+        "realized_pl": (
+            {
+                "total": realized.total,
+                "equity": realized.equity,
+                "events": realized.events,
+                "trade_count": realized.trade_count,
+                "source": realized.source,
+            }
+            if realized is not None
+            else None
+        ),
     }
 
     # Pull live marks for the new holdings set so decision / hero values do not
@@ -661,9 +713,12 @@ def robinhood_mcp_status(*, probe: bool = False) -> dict:
 
     client = RobinhoodMcpClient()
     enabled = bool(os.getenv("ROBINHOOD_MCP_ENABLED", "true").strip().lower() not in ("0", "false", "no", "off"))
-    authenticated = client.is_configured()
     creds = credentials_present()
     access_ok = access_token_valid()
+    # A token file (or refresh token) means credentials are present, not that the
+    # current access token is usable. Keep the UI from claiming "Connected" until
+    # the access token is valid or a live probe succeeds after refresh.
+    authenticated = bool(client.is_configured() and access_ok)
     expiry = _token_expiry_meta()
     status: dict = {
         "enabled": enabled,
@@ -677,15 +732,14 @@ def robinhood_mcp_status(*, probe: bool = False) -> dict:
         "token_path": str(token_path()),
         "token_expires_at": expiry.get("token_expires_at"),
         "token_expired": bool(expiry.get("token_expired")),
-        "needs_reauth": bool(not creds or (expiry.get("token_expired") and not creds)),
+        "needs_reauth": bool(not creds or not access_ok),
         "probe": None,
     }
     # needs_reauth for status without probe: no credentials, or expired with no refresh path
     if not creds:
         status["needs_reauth"] = True
-    elif expiry.get("token_expired") and not access_ok:
-        # Refresh may still work — do not force reauth until a live probe fails.
-        status["needs_reauth"] = False
+    elif not access_ok:
+        status["needs_reauth"] = True
     if not probe:
         return status
 

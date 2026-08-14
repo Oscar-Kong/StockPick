@@ -34,24 +34,23 @@ def _sync_deadline_sec() -> float:
 
 
 def _mark_stale_active_jobs() -> None:
-    """Soft-timeout: mark overdue running jobs failed so a new sync can start."""
+    """Flag overdue workers without releasing their single-flight ownership.
+
+    Python threads cannot be cancelled safely. Releasing the account slot while
+    the old worker is still importing lets two workers mutate the same portfolio.
+    Keep the job running until the worker exits; the MCP client has its own hard
+    network deadline and will eventually complete or fail normally.
+    """
     now = time.monotonic()
-    stale_ids: list[str] = []
-    for job_id, job in _jobs.items():
+    for job in _jobs.values():
         if job.get("status") != "running":
             continue
         deadline = job.get("deadline_monotonic")
-        if deadline is not None and now > float(deadline):
-            job["status"] = "failed"
-            job["finished_at"] = _utcnow().isoformat() + "Z"
-            job["error"] = "Robinhood MCP sync exceeded soft deadline"
-            job["phase"] = "failed"
+        if deadline is not None and now > float(deadline) and not job.get("timed_out"):
+            job["timed_out"] = True
+            job["error"] = "Robinhood MCP sync exceeded soft deadline; worker is still stopping"
+            job["phase"] = "timed_out_running"
             job["heartbeat"] = _utcnow().isoformat() + "Z"
-            stale_ids.append(job_id)
-    for job_id in stale_ids:
-        for key, active_id in list(_active_by_account.items()):
-            if active_id == job_id:
-                _active_by_account.pop(key, None)
 
 
 def start_robinhood_mcp_sync(*, run_decision: bool = False) -> str:
@@ -84,6 +83,7 @@ def start_robinhood_mcp_sync(*, run_decision: bool = False) -> str:
             "heartbeat": _utcnow().isoformat() + "Z",
             "reused": False,
             "retry_count": 0,
+            "timed_out": False,
         }
         _active_by_account[account_key] = job_id
 

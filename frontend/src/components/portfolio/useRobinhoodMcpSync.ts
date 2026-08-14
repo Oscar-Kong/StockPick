@@ -15,20 +15,34 @@ export function useRobinhoodMcpSync(onComplete: () => void) {
     setError(null);
     setMessage(null);
     try {
-      // Re-run daily decision so Today marks/shares match live holdings
-      // (sync alone used to leave a stale decision snapshot on screen).
-      // Backend skips decision when holdings_count is 0 (cash-only).
-      const result = await syncRobinhoodMcp(true);
+      // Slim Sync: positions + buying power + KPIs + latest trade.
+      // Daily decision is a separate deliberate click.
+      const result = await syncRobinhoodMcp(false);
       const positions = result.holdings_count ?? result.holdings?.length ?? 0;
-      const orders = result.orders_imported ?? 0;
       const parts = [t.portfolio.robinhoodLiveSyncDone];
       if (positions === 0) {
         parts.push(t.portfolio.robinhoodLiveSyncCashOnly);
       } else {
         parts.push(`(${positions} positions)`);
       }
-      if (orders > 0) {
-        parts.push(fmt(t.portfolio.robinhoodLiveSyncDoneOrders, { orders }));
+      if (typeof result.cash === "number") {
+        parts.push(
+          fmt(t.portfolio.robinhoodLiveSyncBuyingPower, {
+            cash: result.cash.toLocaleString(undefined, {
+              style: "currency",
+              currency: "USD",
+            }),
+          }),
+        );
+      }
+      const lt = result.latest_trade;
+      if (lt?.symbol) {
+        parts.push(
+          fmt(t.portfolio.robinhoodLiveSyncLatestTrade, {
+            side: String(lt.side || "").toUpperCase() || "TRADE",
+            symbol: lt.symbol,
+          }),
+        );
       }
       setMessage(parts.join(" · "));
       onComplete();
@@ -45,10 +59,11 @@ export function useRobinhoodMcpSync(onComplete: () => void) {
     }
   }, [
     onComplete,
+    t.portfolio.robinhoodLiveSyncBuyingPower,
     t.portfolio.robinhoodLiveSyncCashOnly,
     t.portfolio.robinhoodLiveSyncDone,
-    t.portfolio.robinhoodLiveSyncDoneOrders,
     t.portfolio.robinhoodLiveSyncFailed,
+    t.portfolio.robinhoodLiveSyncLatestTrade,
   ]);
 
   return { syncing, message, error, sync, setError, setMessage };

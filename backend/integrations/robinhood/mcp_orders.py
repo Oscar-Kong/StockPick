@@ -13,6 +13,20 @@ logger = logging.getLogger(__name__)
 MCP_MAX_ORDER_PAGES = 20
 
 
+def pick_newest_order_row(rows: list[ParsedCsvRow]) -> list[ParsedCsvRow]:
+    """Keep only the newest filled execution (by executed_at, then activity_date)."""
+    if not rows:
+        return []
+    def _key(row: ParsedCsvRow) -> tuple:
+        ts = row.executed_at
+        if ts is not None:
+            return (1, ts.isoformat())
+        return (0, str(row.activity_date or ""), str(row.process_date or ""))
+
+    newest = max(rows, key=_key)
+    return [newest]
+
+
 def _parse_ts(value: str | None) -> datetime | None:
     if not value:
         return None

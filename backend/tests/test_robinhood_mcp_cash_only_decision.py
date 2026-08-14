@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+from integrations.robinhood.mcp_client import SnapshotCompleteness
 from services.portfolio_snapshot_service import import_robinhood_mcp_and_decide
 
 
@@ -13,13 +14,13 @@ def test_cash_only_mcp_sync_skips_decision(isolated_backend_env):
     snapshot.buying_power = 2105.82
     snapshot.portfolio_value = 2105.82
     snapshot.account_id = "acct-1"
+    snapshot.realized_pnl = None
+    snapshot.completeness = SnapshotCompleteness(positions_ok=True, portfolio_ok=True)
 
     with patch("services.portfolio_snapshot_service.RobinhoodMcpClient") as client_cls:
         client = client_cls.return_value
         client.is_configured.return_value = True
-        client.fetch_live_portfolio = MagicMock(return_value=snapshot)
 
-        # asyncio.run(client.fetch_live_portfolio(...)) — make fetch awaitable
         async def _fetch(**_kwargs):
             return snapshot
 
@@ -31,7 +32,7 @@ def test_cash_only_mcp_sync_skips_decision(isolated_backend_env):
         ), patch(
             "services.portfolio_snapshot_service.replace_trade_ledger",
             return_value=(0, 0, 0),
-        ), patch(
+        ) as replace_ledger, patch(
             "services.portfolio_snapshot_service.purge_duplicate_trades",
         ), patch(
             "services.portfolio_snapshot_service.repair_phantom_journal_buys",
@@ -58,6 +59,8 @@ def test_cash_only_mcp_sync_skips_decision(isolated_backend_env):
             "services.refresh_orchestrator.refresh_prices_for_holdings",
             return_value={"updated": 0},
         ), patch(
+            "services.refresh_orchestrator.portfolio_refresh",
+        ), patch(
             "services.portfolio_decision_service.run_stored_portfolio_decision",
         ) as run_decision, patch(
             "data.portfolio_store.save_decision_snapshot",
@@ -67,6 +70,8 @@ def test_cash_only_mcp_sync_skips_decision(isolated_backend_env):
     assert result["holdings_count"] == 0
     assert result.get("decision_skipped") == "cash_only"
     assert result.get("decision_cleared") is True
+    assert result.get("ledger_replaced") is False
+    replace_ledger.assert_not_called()
     run_decision.assert_not_called()
     save_snap.assert_called_once()
     payload = save_snap.call_args.args[2]
