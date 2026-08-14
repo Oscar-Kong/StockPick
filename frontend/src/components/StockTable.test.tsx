@@ -65,4 +65,31 @@ describe("StockTable holdings badge", () => {
     );
     expect(screen.getByText(new RegExp(formatDateTime(scanAt)))).toBeInTheDocument();
   });
+
+  it("labels penny stability and entry risk as a daily proxy", () => {
+    render(
+      <StockTable
+        results={[
+          {
+            ...sample,
+            metrics: {
+              recommendation: "watch",
+              buy_pct: 20,
+              wait_pct: 80,
+              trade_hint_reason: "Good candidate, poor entry",
+              stability_score: 82,
+              stability_classification: "stable",
+              entry_risk_score: 75,
+              entry_risk_classification: "extended",
+              entry_risk_source: "daily_ohlcv_proxy",
+            },
+          },
+        ]}
+        onAddWatchlist={() => {}}
+      />
+    );
+
+    expect(screen.getByText("Stability 82 · stable")).toBeInTheDocument();
+    expect(screen.getByText("Entry risk 75 · extended · daily proxy")).toBeInTheDocument();
+  });
 });

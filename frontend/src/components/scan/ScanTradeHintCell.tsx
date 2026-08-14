@@ -15,6 +15,16 @@ interface ScanTradeHintCellProps {
 export function ScanTradeHintCell({ stock, compact, className }: ScanTradeHintCellProps) {
   const { t } = useTranslation();
   const hint = getScanTradeHint(stock);
+  const stateLabels: Record<string, string> = {
+    rejected: t.scan.stateRejected,
+    high_risk: t.scan.stateHighRisk,
+    normal: t.scan.stateNormal,
+    stable: t.scan.stateStable,
+    acceptable: t.scan.stateAcceptable,
+    wait: t.scan.stateWait,
+    extended: t.scan.stateExtended,
+    no_chase: t.scan.stateNoChase,
+  };
 
   return (
     <div
@@ -35,6 +45,34 @@ export function ScanTradeHintCell({ stock, compact, className }: ScanTradeHintCe
           {fmt(t.scan.tradeHintWaitPct, { pct: hint.waitPct.toFixed(0) })}
         </span>
       </p>
+      {(hint.stability || hint.entryRisk) && (
+        <p className="scan-trade-hint__layers finance-value">
+          {hint.stability && (
+            <span>
+              {fmt(t.scan.stabilityShort, {
+                score: hint.stability.score.toFixed(0),
+                state:
+                  stateLabels[hint.stability.classification] ??
+                  hint.stability.classification.replaceAll("_", " "),
+              })}
+            </span>
+          )}
+          {hint.entryRisk && (
+            <span>
+              {fmt(t.scan.entryRiskShort, {
+                score: hint.entryRisk.score.toFixed(0),
+                state:
+                  stateLabels[hint.entryRisk.classification] ??
+                  hint.entryRisk.classification.replaceAll("_", " "),
+                source:
+                  hint.entryRisk.source === "daily_ohlcv_proxy"
+                    ? t.scan.dailyProxyShort
+                    : hint.entryRisk.source ?? t.scan.unknownSourceShort,
+              })}
+            </span>
+          )}
+        </p>
+      )}
     </div>
   );
 }

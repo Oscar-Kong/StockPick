@@ -117,18 +117,15 @@ SCAN_RANKING_WEIGHTS: dict[str, dict[str, float]] = {
         "tradability": float(os.getenv("SCAN_RANK_TRADABILITY_WEIGHT_COMPOUNDER", "0.15")),
     },
 }
-SCAN_MAX_PER_SECTOR = int(os.getenv("SCAN_MAX_PER_SECTOR", "3"))
-SCAN_MAX_PER_CORRELATION_CLUSTER = int(os.getenv("SCAN_MAX_PER_CORRELATION_CLUSTER", "2"))
+SCAN_MAX_PER_SECTOR = int(os.getenv("SCAN_MAX_PER_SECTOR", "5"))
+SCAN_MAX_PER_CORRELATION_CLUSTER = int(os.getenv("SCAN_MAX_PER_CORRELATION_CLUSTER", "3"))
 SCAN_CORRELATION_CLUSTER_THRESHOLD = float(os.getenv("SCAN_CORRELATION_CLUSTER_THRESHOLD", "0.75"))
 SCAN_PERSISTENCE_DELTA = float(os.getenv("SCAN_PERSISTENCE_DELTA", "3.0"))
 SCAN_MIN_RESULTS_AFTER_DIVERSIFICATION = int(os.getenv("SCAN_MIN_RESULTS_AFTER_DIVERSIFICATION", "3"))
 SCAN_PENNY_LOW_CONFIDENCE_MAX = int(os.getenv("SCAN_PENNY_LOW_CONFIDENCE_MAX", "2"))
 SCAN_PENNY_LOW_CONFIDENCE_THRESHOLD = float(os.getenv("SCAN_PENNY_LOW_CONFIDENCE_THRESHOLD", "45.0"))
 PERSIST_SCORE_ATTRIBUTION = _env_bool("PERSIST_SCORE_ATTRIBUTION", "true")
-_default_model_version = (
-    "quant-v2-round2" if os.getenv("SLEEVE_FACTORS_V3_ENABLED", "false").lower() in ("1", "true", "yes")
-    else "quant-v2-round2"
-)
+_default_model_version = "quant-v2-round2-stability-shadow-v1"
 FACTOR_MODEL_VERSION = os.getenv("FACTOR_MODEL_VERSION", _default_model_version)
 DYNAMIC_WEIGHTS_ENABLED = _env_bool("DYNAMIC_WEIGHTS_ENABLED", "true")
 RISK_ENGINE_V2 = _env_bool("RISK_ENGINE_V2", "true")
@@ -307,7 +304,9 @@ RECONCILE_RATIO_TOLERANCE = float(os.getenv("RECONCILE_RATIO_TOLERANCE", "0.12")
 STRATEGY_VERSION = os.getenv("STRATEGY_VERSION", "2026-07-sleeve-weights-v1")
 
 # --- Scheduler (America/New_York, post-close batch Mon–Fri) ---
-SCHEDULER_ENABLED = _env_bool("SCHEDULER_ENABLED", "true")
+# Default off: opt in explicitly. Avoids burning free-tier FMP/Finnhub on every
+# local restart; morning scan email can still run via SCAN_EMAIL_ENABLED alone.
+SCHEDULER_ENABLED = _env_bool("SCHEDULER_ENABLED", "false")
 SCHEDULER_TZ = os.getenv("SCHEDULER_TZ", "America/New_York")
 SCHEDULER_CRON = os.getenv("SCHEDULER_CRON", "15 20 * * 1-5")
 SCHEDULER_MARKET_CALENDAR = os.getenv("SCHEDULER_MARKET_CALENDAR", "XNYS")
@@ -315,7 +314,7 @@ SCHEDULER_MARKET_CALENDAR = os.getenv("SCHEDULER_MARKET_CALENDAR", "XNYS")
 SCHEDULER_HOUR_UTC = int(os.getenv("SCHEDULER_HOUR_UTC", "6"))
 
 # --- Daily portfolio decision (pre-market NY) ---
-PORTFOLIO_DECISION_ENABLED = _env_bool("PORTFOLIO_DECISION_ENABLED", "true")
+PORTFOLIO_DECISION_ENABLED = _env_bool("PORTFOLIO_DECISION_ENABLED", "false")
 PORTFOLIO_DECISION_CRON = os.getenv("PORTFOLIO_DECISION_CRON", "0 9 * * 1-5")
 PORTFOLIO_DECISION_TZ = os.getenv("PORTFOLIO_DECISION_TZ", "America/New_York")
 
@@ -349,7 +348,8 @@ SMTP_FALLBACK_USE_TLS = _env_bool("SMTP_FALLBACK_USE_TLS", "true")
 SCAN_EMAIL_FROM_FALLBACK = os.getenv("SCAN_EMAIL_FROM_FALLBACK", "").strip()
 
 # --- Market data refresh during trading hours ---
-MARKET_DATA_REFRESH_ENABLED = _env_bool("MARKET_DATA_REFRESH_ENABLED", "true")
+# Default off with SCHEDULER_ENABLED — enable both for intraday loops.
+MARKET_DATA_REFRESH_ENABLED = _env_bool("MARKET_DATA_REFRESH_ENABLED", "false")
 MARKET_DATA_REFRESH_CRON = os.getenv("MARKET_DATA_REFRESH_CRON", "*/15 9-16 * * 1-5")
 MARKET_DATA_REFRESH_TZ = os.getenv("MARKET_DATA_REFRESH_TZ", "America/New_York")
 PENNY_SCAN_REFRESH_CRON = os.getenv("PENNY_SCAN_REFRESH_CRON", "*/30 9-16 * * 1-5")
@@ -433,10 +433,10 @@ COMPOUNDER_MARKET_CAP_MIN = float(os.getenv("COMPOUNDER_MARKET_CAP_MIN", "100000
 COMPOUNDER_MIN_REVENUE_GROWTH = float(os.getenv("COMPOUNDER_MIN_REVENUE_GROWTH", "0.08"))
 
 # --- Scan limits ---
-MAX_CANDIDATES_PER_BUCKET = int(os.getenv("MAX_CANDIDATES_PER_BUCKET", "25"))
-UNIVERSE_SCAN_BATCH_SIZE = int(os.getenv("UNIVERSE_SCAN_BATCH_SIZE", "100"))
-SCAN_STAGE_B_TOP_N = int(os.getenv("SCAN_STAGE_B_TOP_N", "50"))
-SCAN_STAGE_B_TOP_N_FAST = int(os.getenv("SCAN_STAGE_B_TOP_N_FAST", "15"))
+MAX_CANDIDATES_PER_BUCKET = int(os.getenv("MAX_CANDIDATES_PER_BUCKET", "15"))
+UNIVERSE_SCAN_BATCH_SIZE = int(os.getenv("UNIVERSE_SCAN_BATCH_SIZE", "300"))
+SCAN_STAGE_B_TOP_N = int(os.getenv("SCAN_STAGE_B_TOP_N", "20"))
+SCAN_STAGE_B_TOP_N_FAST = int(os.getenv("SCAN_STAGE_B_TOP_N_FAST", "10"))
 SCAN_PRICE_DOWNLOAD_MAX_SECONDS = float(os.getenv("SCAN_PRICE_DOWNLOAD_MAX_SECONDS", "45"))
 # Minimum fraction of universe OHLC required before publishing a scan as "latest".
 # Below this, the job may complete with diagnostics but must not overwrite the prior complete latest.

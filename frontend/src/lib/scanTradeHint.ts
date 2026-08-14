@@ -5,7 +5,31 @@ export type ScanTradeHint = {
   buyPct: number;
   waitPct: number;
   reason: string;
+  stability?: { score: number; classification: string };
+  entryRisk?: { score: number; classification: string; source?: string };
 };
+
+function decisionLayers(metrics: Record<string, unknown>): Pick<ScanTradeHint, "stability" | "entryRisk"> {
+  const stabilityScore = metrics.stability_score;
+  const stabilityClassification = metrics.stability_classification;
+  const entryRiskScore = metrics.entry_risk_score;
+  const entryRiskClassification = metrics.entry_risk_classification;
+  const entryRiskSource = metrics.entry_risk_source;
+  return {
+    stability:
+      typeof stabilityScore === "number" && typeof stabilityClassification === "string"
+        ? { score: stabilityScore, classification: stabilityClassification }
+        : undefined,
+    entryRisk:
+      typeof entryRiskScore === "number" && typeof entryRiskClassification === "string"
+        ? {
+            score: entryRiskScore,
+            classification: entryRiskClassification,
+            source: typeof entryRiskSource === "string" ? entryRiskSource : undefined,
+          }
+        : undefined,
+  };
+}
 
 function riskWaitBonus(level: string): number {
   if (level === "low") return 0;
@@ -67,6 +91,14 @@ export function deriveScanTradeHint(stock: StockResult): ScanTradeHint {
       waitRaw += 10;
     }
     if (risk === "high") buyRaw *= 0.65;
+    if (metrics.stability_classification === "rejected") {
+      buyRaw *= 0.2;
+      waitRaw += 40;
+    }
+    if (["wait", "extended", "no_chase"].includes(String(metrics.entry_risk_classification ?? ""))) {
+      buyRaw *= 0.35;
+      waitRaw += 35;
+    }
   } else if (sleeve === "compounder" && score < 62) {
     buyRaw *= 0.45;
     waitRaw += 8;
@@ -101,7 +133,18 @@ export function deriveScanTradeHint(stock: StockResult): ScanTradeHint {
     reason = "Weak score — skip for now";
   }
 
-  return { recommendation, buyPct, waitPct, reason };
+  if (sleeve === "penny" && metrics.stability_classification === "rejected") {
+    recommendation = "avoid";
+    reason = "Strong stock or not, stability gate failed";
+  } else if (
+    sleeve === "penny" &&
+    ["wait", "extended", "no_chase"].includes(String(metrics.entry_risk_classification ?? ""))
+  ) {
+    recommendation = "watch";
+    reason = `Good candidate, poor entry (${String(metrics.entry_risk_classification).replaceAll("_", " ")})`;
+  }
+
+  return { recommendation, buyPct, waitPct, reason, ...decisionLayers(metrics) };
 }
 
 export function getScanTradeHint(stock: StockResult): ScanTradeHint {
@@ -117,7 +160,7 @@ export function getScanTradeHint(stock: StockResult): ScanTradeHint {
     recommendation &&
     typeof reason === "string"
   ) {
-    return { recommendation, buyPct, waitPct, reason };
+    return { recommendation, buyPct, waitPct, reason, ...decisionLayers(metrics) };
   }
   return deriveScanTradeHint(stock);
 }

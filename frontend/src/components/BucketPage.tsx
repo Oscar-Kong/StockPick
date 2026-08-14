@@ -58,7 +58,7 @@ export function BucketPage({ bucket, title, description, embedded, onMetaChange 
   const displayDescription = description ?? meta.description;
 
   const searchParams = useSearchParams();
-  const defaultOptions: ScanOptions = { max_results: 50, mode: "fast" };
+  const defaultOptions: ScanOptions = { max_results: 50, mode: "deep" };
   const [options, setOptions] = useState<ScanOptions>(defaultOptions);
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -158,7 +158,7 @@ export function BucketPage({ bucket, title, description, embedded, onMetaChange 
   }, [loadSavedScans]);
 
   useEffect(() => {
-    void getDailyDashboard({ skipAutoRefresh: true })
+    void getDailyDashboard()
       .then((data) => {
         const map = new Map<string, HeldPositionSummary>();
         for (const h of data.holdings) {

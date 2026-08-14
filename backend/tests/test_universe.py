@@ -23,6 +23,7 @@ from data.universe import (
     get_universe,
     get_universe_revision,
     normalize_symbol,
+    select_scan_universe,
 )
 
 NASDAQ_FIXTURE = """Symbol|Security Name|Market Category|Test Issue|Financial Status|Round Lot Size|ETF|NextShares
@@ -244,6 +245,53 @@ def test_cap_universe_for_scan_passthrough_when_unlimited():
     symbols = ["ZZZ", "AAA", "MMM"]
     assert cap_universe_for_scan(symbols, 0) == symbols
     assert cap_universe_for_scan(symbols, 10) == symbols
+
+
+def test_scan_universe_rotates_non_anchors_but_preserves_incumbents():
+    symbols = [f"S{i:03d}" for i in range(20)]
+    anchors = ["S018", "S019"]
+
+    first = select_scan_universe(
+        symbols,
+        limit=6,
+        revision="rev-a",
+        rotation_key="2026-08-12",
+        anchors=anchors,
+    )
+    repeat = select_scan_universe(
+        symbols,
+        limit=6,
+        revision="rev-a",
+        rotation_key="2026-08-12",
+        anchors=anchors,
+    )
+    next_day = select_scan_universe(
+        symbols,
+        limit=6,
+        revision="rev-a",
+        rotation_key="2026-08-13",
+        anchors=anchors,
+    )
+
+    assert first.symbols == repeat.symbols
+    assert len(first.symbols) == 6
+    assert set(anchors).issubset(first.symbols)
+    assert set(first.symbols) - set(anchors) != set(next_day.symbols) - set(anchors)
+    assert first.full_universe_size == 20
+    assert first.anchor_count == 2
+    assert first.to_dict()["selection_coverage"] == 0.3
+
+
+def test_scan_universe_preserves_anchor_rank_order_when_anchors_exceed_limit():
+    selected = select_scan_universe(
+        ["AAA", "MMM", "ZZZ"],
+        limit=2,
+        revision="rev-a",
+        rotation_key="2026-08-12",
+        anchors=["ZZZ", "MMM", "AAA"],
+    )
+
+    assert selected.symbols == ["ZZZ", "MMM"]
 
 
 def test_penny_seeds_exclude_known_stale_and_are_normalized():

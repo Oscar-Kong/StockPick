@@ -147,6 +147,7 @@ def _run_scan_with_mocks(
     stage_b_top_n: int = 50,
     stage_b_top_n_fast: int = 15,
     download_side_effect=None,
+    previous_saved_results: list[dict] | None = None,
 ):
     manager = ScanManager()
     job = manager.create_job(bucket)
@@ -205,6 +206,13 @@ def _run_scan_with_mocks(
         stack.enter_context(
             patch("services.scan_pipeline.cache_module.save_scan_results", side_effect=_capture_save)
         )
+        stack.enter_context(patch("services.scan_pipeline.cache_module.get_latest_scan", return_value=None))
+        saved_scans = (
+            [{"results": previous_saved_results, "completed_at": "2026-08-11T20:00:00Z"}]
+            if previous_saved_results is not None
+            else []
+        )
+        stack.enter_context(patch("data.cache.list_saved_scans", return_value=saved_scans))
         stack.enter_context(patch("services.scan_pipeline.cache_module.save_scan_snapshot"))
         attempt_marker: dict = {}
 
@@ -323,6 +331,24 @@ def test_stage_b_ranking_and_max_results_truncation():
     assert "parity_summary" not in metadata
     assert "timings" in metadata
     assert metadata["timings"]["stage_b_candidates"] == 3.0
+    assert metadata["universe_selection"]["full_universe_size"] == 3
+    assert metadata["universe_selection"]["selected_size"] == 3
+    assert metadata["universe_selection"]["anchor_count"] == 0
+    assert metadata["universe_selection"]["rotation_key"]
+    assert metadata["universe_selection"]["revision"]
+
+
+def test_expired_latest_cache_uses_saved_scan_as_universe_anchor():
+    job, _screener, saved = _run_scan_with_mocks(
+        bucket=Bucket.penny,
+        universe=["OLD", "NEW", "ALT"],
+        stage_a_symbols=["OLD", "NEW"],
+        score_map={"OLD": 70.0, "NEW": 75.0},
+        previous_saved_results=[{"symbol": "OLD", "score": 70.0}],
+    )
+
+    assert job.status == ScanStatus.completed
+    assert saved["metadata"]["universe_selection"]["anchor_count"] == 1
 
 
 def test_cache_metadata_and_parity_summary_when_engine_enabled():
@@ -445,7 +471,7 @@ def test_failed_scan_records_attempt_marker_without_touching_latest():
     we MUST stamp a `scan:last_attempt:{bucket}` marker so the route can
     show "last attempt failed" alongside the prior successful results."""
 
-    def _boom(symbols, period, max_runtime_seconds):
+    def _boom(symbols, period, max_runtime_seconds, **_kwargs):
         raise RuntimeError("synthetic provider failure")
 
     job, _screener, saved = _run_scan_with_mocks(

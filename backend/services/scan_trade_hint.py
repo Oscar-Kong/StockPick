@@ -89,6 +89,12 @@ def _short_reason(
     sleeve: str = "",
     metrics: dict[str, Any] | None = None,
 ) -> str:
+    entry_classification = str((metrics or {}).get("entry_risk_classification") or "")
+    stability_classification = str((metrics or {}).get("stability_classification") or "")
+    if stability_classification == "rejected":
+        return "Strong stock or not, stability gate failed"
+    if entry_classification in ("wait", "extended", "no_chase"):
+        return f"Good candidate, poor entry ({entry_classification.replace('_', ' ')})"
     penny_ctx = _format_penny_context(metrics) if sleeve == "penny" else None
     if gates:
         base = gates[0]
@@ -165,6 +171,14 @@ def compute_scan_trade_hint(
                 wait_raw += 10.0
             if "extreme_gap" in liq_warn or "very_high_atr" in liq_warn:
                 wait_raw += 8.0
+        stability_classification = str(m.get("stability_classification") or "")
+        entry_classification = str(m.get("entry_risk_classification") or "")
+        if stability_classification == "rejected":
+            buy_raw *= 0.2
+            wait_raw += 40.0
+        if entry_classification in ("wait", "extended", "no_chase"):
+            buy_raw *= 0.35
+            wait_raw += 35.0
     elif sleeve == "compounder":
         if score < 62:
             buy_raw *= 0.45
@@ -179,6 +193,14 @@ def compute_scan_trade_hint(
         earnings_soon=earnings_soon,
         risk_level=risk_level,
     )
+    if sleeve == "penny" and str(m.get("stability_classification") or "") == "rejected":
+        label = "avoid"
+    elif sleeve == "penny" and str(m.get("entry_risk_classification") or "") in (
+        "wait",
+        "extended",
+        "no_chase",
+    ):
+        label = "watch"
 
     return {
         "recommendation": label,

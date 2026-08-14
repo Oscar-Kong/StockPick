@@ -9,6 +9,8 @@ from __future__ import annotations
 import hashlib
 import logging
 from collections import defaultdict
+from dataclasses import dataclass
+from datetime import date
 from functools import lru_cache
 from typing import Iterable
 
@@ -476,6 +478,81 @@ def cap_universe_for_scan(
 
     selected = sorted(symbols, key=_rank)[:limit]
     return sorted(selected)
+
+
+@dataclass(frozen=True)
+class ScanUniverseSelection:
+    """Deterministic Stage A cohort plus coverage diagnostics."""
+
+    symbols: list[str]
+    full_universe_size: int
+    selected_size: int
+    anchor_count: int
+    rotation_key: str
+    revision: str
+
+    def to_dict(self) -> dict[str, float | int | str]:
+        return {
+            "full_universe_size": self.full_universe_size,
+            "selected_size": self.selected_size,
+            "anchor_count": self.anchor_count,
+            "selection_coverage": round(
+                self.selected_size / self.full_universe_size
+                if self.full_universe_size
+                else 1.0,
+                4,
+            ),
+            "rotation_key": self.rotation_key,
+            "revision": self.revision,
+        }
+
+
+def select_scan_universe(
+    symbols: list[str],
+    *,
+    limit: int,
+    revision: str,
+    rotation_key: str,
+    anchors: Iterable[str] = (),
+) -> ScanUniverseSelection:
+    """Select a reproducible rotating Stage A cohort while retaining incumbents.
+
+    ``rotation_key`` is normally the New York calendar date. Callers that need
+    historical reproducibility pass their point-in-time date explicitly.
+    """
+    normalized = _filter_curated_symbols(symbols)
+    eligible = set(normalized)
+    protected: list[str] = []
+    seen_anchors: set[str] = set()
+    for raw in anchors:
+        sym = normalize_symbol(raw)
+        if sym and sym in eligible and sym not in seen_anchors:
+            protected.append(sym)
+            seen_anchors.add(sym)
+    target = len(normalized) if limit <= 0 else min(limit, len(normalized))
+    protected = protected[:target]
+    protected_set = set(protected)
+
+    stable = sorted(
+        (s for s in normalized if s not in protected_set),
+        key=lambda sym: hashlib.sha256(f"{revision}:{sym}".encode()).hexdigest(),
+    )
+    slots = max(0, target - len(protected))
+    try:
+        cohort_index = date.fromisoformat(rotation_key).toordinal()
+    except ValueError:
+        cohort_index = int(hashlib.sha256(rotation_key.encode()).hexdigest()[:8], 16)
+    offset = (cohort_index * max(1, slots)) % len(stable) if stable else 0
+    rotating = (stable[offset:] + stable[:offset])[:slots]
+    selected = protected + rotating
+    return ScanUniverseSelection(
+        symbols=selected,
+        full_universe_size=len(normalized),
+        selected_size=len(selected),
+        anchor_count=len(protected),
+        rotation_key=rotation_key,
+        revision=revision,
+    )
 
 
 def get_universe(bucket: str) -> list[str]:

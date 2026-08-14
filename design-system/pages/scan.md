@@ -86,6 +86,14 @@ ui-ux-pro-max: **Real-Time / Operations** — show live status where possible; g
 - Keep `ScanScoreBreakdown` in drawer — progressive disclosure
 - Do not expand all breakdown rows in main table
 
+### Penny decision layers
+- Keep Alpha/ranking SCORE independent from Stability and Entry Risk.
+- The Action cell may show compact `Stability {score} · {state}` and
+  `Entry risk {score} · {state}` lines beneath Buy/Wait.
+- `daily_ohlcv_proxy` must be described as a proxy, never as a live quoted spread.
+- A strong Alpha with an extended entry remains `WATCH`; use the reason text to
+  explain “good candidate, poor entry.”
+
 ---
 
 ## Status & trust signals

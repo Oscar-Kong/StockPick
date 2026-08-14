@@ -5,6 +5,7 @@ import logging
 import time
 from datetime import datetime
 from typing import TYPE_CHECKING
+from zoneinfo import ZoneInfo
 
 from config import (
     MAX_CANDIDATES_PER_BUCKET,
@@ -30,7 +31,7 @@ from data.history_normalize import validate_preloaded_history
 from data.historical_store import HistoricalStore
 from data.price_service import PriceService
 from data.strategy_registry import StrategyRegistry
-from data.universe import cap_universe_for_scan, get_universe, get_universe_revision
+from data.universe import get_universe, get_universe_revision, select_scan_universe
 from models.schemas import Bucket, RiskLevel, ScanOptions, ScanStatus, StockResult
 from screeners.base import BaseScreener, CandidateContext
 from services.scan_context import set_bulk_scan
@@ -68,6 +69,20 @@ if TYPE_CHECKING:
     from services.scan_service import ScanJob, ScanService
 
 logger = logging.getLogger(__name__)
+
+_NEW_YORK = ZoneInfo("America/New_York")
+
+
+def _previous_scan_symbols(previous_scan: dict | None) -> list[str]:
+    symbols: list[str] = []
+    for row in (previous_scan or {}).get("results") or []:
+        if isinstance(row, dict):
+            symbol = row.get("symbol")
+        else:
+            symbol = getattr(row, "symbol", None)
+        if symbol:
+            symbols.append(str(symbol).upper())
+    return symbols
 
 
 def _apply_canonical_scores(
@@ -311,13 +326,20 @@ def run_scan_pipeline(manager: "ScanService", job_id: str, options: ScanOptions 
     # Share price service with screener when supported
     if hasattr(screener, "ps"):
         screener.ps = ps
-    universe = get_universe(job.bucket.value)
-    if UNIVERSE_SCAN_BATCH_SIZE > 0:
-        universe = cap_universe_for_scan(
-            universe,
-            UNIVERSE_SCAN_BATCH_SIZE,
-            revision=get_universe_revision(),
-        )
+    full_universe = get_universe(job.bucket.value)
+    # ScanService falls back to the durable saved snapshot after the short-lived
+    # latest cache expires, so incumbents remain anchors across daily cohorts.
+    previous_scan = manager.get_latest(job.bucket)
+    universe_revision = get_universe_revision()
+    rotation_key = datetime.now(_NEW_YORK).date().isoformat()
+    universe_selection = select_scan_universe(
+        full_universe,
+        limit=UNIVERSE_SCAN_BATCH_SIZE,
+        revision=universe_revision,
+        rotation_key=rotation_key,
+        anchors=_previous_scan_symbols(previous_scan),
+    )
+    universe = universe_selection.symbols
     max_results = min(options.max_results, MAX_CANDIDATES_PER_BUCKET)
     stage_b_cap = _stage_b_cap(getattr(options, "mode", "deep"))
     candidates: list[StockResult] = []
@@ -532,6 +554,14 @@ def run_scan_pipeline(manager: "ScanService", job_id: str, options: ScanOptions 
                 )
                 metrics.update(decomposed.to_metrics_dict())
                 metrics["_issuer_key"] = issuer_key(symbol, ctx.info)
+                if job.bucket == Bucket.penny:
+                    from scoring.penny_stability import assess_penny_stability
+
+                    stability_decision = assess_penny_stability(
+                        ctx.history,
+                        alpha_score=decomposed.alpha_score,
+                    )
+                    metrics.update(stability_decision.to_metrics_dict())
                 metrics = attach_trade_hint_to_metrics(
                     metrics,
                     score=round(decomposed.ranking_score, 1),
@@ -590,7 +620,6 @@ def run_scan_pipeline(manager: "ScanService", job_id: str, options: ScanOptions 
             job.parity_summary = parity_summary_obj.to_dict()
             log_scan_parity_summary(parity_summary_obj, bucket=job.bucket.value)
 
-        previous_scan = cache_module.get_latest_scan(job.bucket.value)
         previous_rows = (previous_scan or {}).get("results") or []
 
         ranking_out = apply_final_scan_ranking(
@@ -686,6 +715,7 @@ def run_scan_pipeline(manager: "ScanService", job_id: str, options: ScanOptions 
 
         scan_metadata: dict = {"timings": dict(job.timings)}
         scan_metadata["scan_schema_version"] = 2
+        scan_metadata["universe_selection"] = universe_selection.to_dict()
         scan_metadata["stage_a_diagnostics"] = stage_a_result.to_diagnostics(advanced_count=total)
         scan_metadata["data_flow"] = flow_metrics.to_dict()
         scan_metadata["universe_coverage"] = {

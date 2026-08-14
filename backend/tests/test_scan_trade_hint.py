@@ -69,3 +69,33 @@ def test_penny_trade_hint_uses_raw_volume_ratio_in_reason():
     assert "100/100" in reason or "100" in reason
     assert "7.4%" in reason
     assert "4.8M" in reason
+
+
+def test_strong_alpha_with_poor_entry_is_watch():
+    hint = compute_scan_trade_hint(
+        score=91.0,
+        sleeve="penny",
+        risk_level=RiskLevel.high,
+        data_quality_score=80.0,
+        metrics={
+            "stability_classification": "stable",
+            "entry_risk_score": 84.0,
+            "entry_risk_classification": "no_chase",
+            "entry_risk_reasons": ["extreme_latest_gap"],
+        },
+    )
+
+    assert hint["recommendation"] == "watch"
+    assert hint["wait_pct"] > hint["buy_pct"]
+    assert "poor entry" in hint["trade_hint_reason"].lower()
+
+
+def test_rejected_stability_is_no_trade_not_watch():
+    hint = compute_scan_trade_hint(
+        score=91.0,
+        sleeve="penny",
+        risk_level=RiskLevel.high,
+        metrics={"stability_classification": "rejected", "decision_state": "no_trade"},
+    )
+
+    assert hint["recommendation"] == "avoid"
