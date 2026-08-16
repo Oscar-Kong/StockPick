@@ -34,6 +34,9 @@ class DecomposedScanScore:
             "ranking_score": round(self.ranking_score, 1),
             "ranking_warnings": list(self.warnings),
             "missing_data": list(self.missing_data),
+            "data_confidence": (
+                "limited" if "data_quality_score" in self.missing_data else "measured"
+            ),
             "factor_contributions": list(self.factor_contributions),
             "ranking_weights": dict(self.ranking_weights),
         }
@@ -105,10 +108,12 @@ def compute_confidence_score(
     warnings: list[str] = []
 
     dq = quality_score
+    missing_data_quality = False
     if dq is None:
         dq = metrics.get("data_quality_score")
     if dq is None:
         missing.append("data_quality_score")
+        missing_data_quality = True
         dq = 50.0
     else:
         dq = float(dq)
@@ -165,6 +170,8 @@ def compute_confidence_score(
             parts.append(_clamp(70.0 - min(30.0, len(liq_warn) * 6.0)))
 
     score = sum(parts) / len(parts)
+    if missing_data_quality:
+        score = min(score, 60.0)
     return round(_clamp(score), 1), warnings, missing
 
 

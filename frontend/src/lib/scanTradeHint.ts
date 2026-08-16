@@ -160,7 +160,24 @@ export function getScanTradeHint(stock: StockResult): ScanTradeHint {
     recommendation &&
     typeof reason === "string"
   ) {
-    return { recommendation, buyPct, waitPct, reason, ...decisionLayers(metrics) };
+    const decisionState = typeof metrics.decision_state === "string" ? metrics.decision_state : "";
+    const stabilityRejected = metrics.stability_classification === "rejected";
+    const poorEntry = ["wait", "extended", "no_chase"].includes(
+      String(metrics.entry_risk_classification ?? "")
+    );
+    const finalRecommendation =
+      decisionState === "no_trade" || stabilityRejected
+        ? "avoid"
+        : decisionState === "watch" || poorEntry
+          ? "watch"
+          : recommendation;
+    return {
+      recommendation: finalRecommendation,
+      buyPct,
+      waitPct,
+      reason,
+      ...decisionLayers(metrics),
+    };
   }
   return deriveScanTradeHint(stock);
 }

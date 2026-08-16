@@ -99,3 +99,21 @@ def test_rejected_stability_is_no_trade_not_watch():
     )
 
     assert hint["recommendation"] == "avoid"
+
+
+def test_alpha_bias_is_separate_from_final_watch_decision():
+    hint = compute_scan_trade_hint(
+        score=82.0,
+        sleeve="penny",
+        risk_level=RiskLevel.medium,
+        data_quality_score=80.0,
+        metrics={
+            "stability_classification": "stable",
+            "entry_risk_classification": "normal",
+            "decision_state": "watch",
+        },
+    )
+
+    assert hint["alpha_bias"] == "bullish"
+    assert hint["decision_state"] == "watch"
+    assert hint["recommendation"] == "watch"

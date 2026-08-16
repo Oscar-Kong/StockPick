@@ -36,7 +36,7 @@ describe("scanTradeHint", () => {
       })
     );
     expect(hint.buyPct).toBe(62);
-    expect(hint.recommendation).toBe("buy");
+    expect(hint.recommendation).toBe("watch");
     expect(hint.stability).toEqual({ score: 78, classification: "normal" });
     expect(hint.entryRisk).toEqual({
       score: 64,
@@ -67,5 +67,23 @@ describe("scanTradeHint", () => {
 
     expect(hint.recommendation).toBe("watch");
     expect(hint.waitPct).toBeGreaterThan(hint.buyPct);
+  });
+
+  it("treats decision_state as the final user-facing decision", () => {
+    const hint = getScanTradeHint(
+      stock({
+        score: 88,
+        metrics: {
+          recommendation: "buy",
+          decision_state: "no_trade",
+          stability_classification: "rejected",
+          buy_pct: 70,
+          wait_pct: 30,
+          trade_hint_reason: "legacy conflicting hint",
+        },
+      })
+    );
+
+    expect(hint.recommendation).toBe("avoid");
   });
 });

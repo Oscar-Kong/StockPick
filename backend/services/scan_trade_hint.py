@@ -13,6 +13,14 @@ _RISK_WAIT_BONUS: dict[RiskLevel, float] = {
 }
 
 
+def _alpha_bias(label: str) -> str:
+    if label in ("strong_buy", "buy"):
+        return "bullish"
+    if label in ("avoid", "sell"):
+        return "bearish"
+    return "neutral"
+
+
 def _normalize_pair(buy_raw: float, wait_raw: float) -> tuple[float, float]:
     buy_raw = max(0.0, buy_raw)
     wait_raw = max(0.0, wait_raw)
@@ -185,7 +193,8 @@ def compute_scan_trade_hint(
             wait_raw += 8.0
 
     buy_pct, wait_pct = _normalize_pair(buy_raw, wait_raw)
-    label = recommendation_label_from_score(score)
+    raw_label = recommendation_label_from_score(score)
+    label = raw_label
     label, gates = _gate_label(
         label,
         data_quality_score=data_quality_score,
@@ -202,7 +211,17 @@ def compute_scan_trade_hint(
     ):
         label = "watch"
 
+    decision_state = str(m.get("decision_state") or "").strip()
+    if sleeve == "penny" and decision_state == "no_trade":
+        label = "avoid"
+    elif sleeve == "penny" and decision_state == "watch":
+        label = "watch"
+    elif not decision_state:
+        decision_state = "no_trade" if label in ("avoid", "high_risk_no_decision") else label
+
     return {
+        "alpha_bias": _alpha_bias(raw_label),
+        "decision_state": decision_state,
         "recommendation": label,
         "buy_pct": buy_pct,
         "wait_pct": wait_pct,

@@ -27,6 +27,7 @@ EXCLUDED_BY_SECTOR_LIMIT = "excluded_by_sector_limit"
 EXCLUDED_BY_CORRELATION_LIMIT = "excluded_by_correlation_limit"
 EXCLUDED_BY_SHARE_CLASS = "excluded_by_share_class"
 EXCLUDED_BY_LOW_CONFIDENCE_PENNY_CAP = "excluded_by_low_confidence_penny_cap"
+EXCLUDED_BY_STABILITY_GATE = "stability_gate"
 REPLACED_BY_HIGHER_CONFIDENCE = "replaced_by_higher_confidence_candidate"
 RETAINED_BY_PERSISTENCE = "retained_by_persistence_rule"
 
@@ -349,6 +350,35 @@ def apply_final_scan_ranking(
         return FinalRankingResult(results=[])
 
     ranked = to_ranked_candidates(results, bulk_hist)
+    alpha_order = sorted(ranked, key=lambda candidate: (-candidate.alpha_score, candidate.symbol))
+    alpha_rank_by_symbol = {
+        candidate.symbol: idx for idx, candidate in enumerate(alpha_order, start=1)
+    }
+    for candidate in ranked:
+        metrics = dict(candidate.result.metrics or {})
+        metrics["alpha_rank"] = alpha_rank_by_symbol[candidate.symbol]
+        metrics.pop("final_rank", None)
+        candidate.result.metrics = metrics
+
+    safety_exclusions: list[RankingExclusion] = []
+    if bucket == Bucket.penny:
+        eligible: list[RankedCandidate] = []
+        for candidate in ranked:
+            metrics = candidate.result.metrics or {}
+            if str(metrics.get("stability_classification") or "") == "rejected":
+                safety_exclusions.append(
+                    RankingExclusion(
+                        symbol=candidate.symbol,
+                        reason=EXCLUDED_BY_STABILITY_GATE,
+                        detail="stability_classification=rejected",
+                    )
+                )
+                continue
+            eligible.append(candidate)
+        ranked = eligible
+
+    if not ranked:
+        return FinalRankingResult(results=[], exclusions=safety_exclusions)
     selected, div_exclusions = _select_diversified(ranked, bucket=bucket, max_results=max_results)
     selected, persist_exclusions, retained = apply_persistence(
         selected,
@@ -373,6 +403,6 @@ def apply_final_scan_ranking(
 
     return FinalRankingResult(
         results=final_results,
-        exclusions=div_exclusions + persist_exclusions,
+        exclusions=safety_exclusions + div_exclusions + persist_exclusions,
         persistence_applied=retained,
     )

@@ -90,6 +90,24 @@ def test_high_alpha_low_confidence_ranking_below_alpha():
     assert dec.ranking_score < dec.alpha_score
 
 
+def test_missing_data_quality_caps_confidence_and_is_explicit():
+    dec = build_decomposed_scores(
+        raw_score=92.0,
+        signals=[WeightedSignal("Momentum", 92.0, 1.0, "")],
+        metrics={"raw_score": 92.0},
+        bucket=Bucket.penny,
+        price=2.0,
+        history=_history(bars=180),
+        quality_score=None,
+        hist_len=180,
+    )
+
+    metrics = dec.to_metrics_dict()
+    assert dec.confidence_score <= 60.0
+    assert metrics["data_confidence"] == "limited"
+    assert "data_quality_score" in metrics["missing_data"]
+
+
 def test_high_alpha_low_tradability():
     signals = [WeightedSignal("Vol spike", 85.0, 1.0, "")]
     metrics = {
@@ -256,3 +274,52 @@ def test_insufficient_candidates_after_diversification():
     out = apply_final_scan_ranking(results, bucket=Bucket.penny, max_results=4, bulk_hist=bulk)
     assert len(out.results) == 2
     assert len(out.results) < 4
+
+
+def test_rejected_stability_is_excluded_from_final_rank_but_keeps_alpha_rank():
+    rejected = _stock(
+        "UNSAFE",
+        ranking=95,
+        alpha=96,
+        metrics={"stability_classification": "rejected", "decision_state": "no_trade"},
+    )
+    eligible = _stock(
+        "SAFE",
+        ranking=80,
+        alpha=81,
+        metrics={"stability_classification": "stable", "decision_state": "watch"},
+    )
+
+    out = apply_final_scan_ranking([rejected, eligible], bucket=Bucket.penny, max_results=10)
+
+    assert [row.symbol for row in out.results] == ["SAFE"]
+    assert out.results[0].metrics["alpha_rank"] == 2
+    assert out.results[0].metrics["final_rank"] == 1
+    assert rejected.metrics["alpha_rank"] == 1
+    assert "final_rank" not in rejected.metrics
+    assert any(exc.symbol == "UNSAFE" and exc.reason == "stability_gate" for exc in out.exclusions)
+
+
+def test_alpha_rank_is_independent_from_composite_final_rank():
+    higher_alpha = _stock(
+        "ALPHA",
+        ranking=70,
+        alpha=95,
+        metrics={"stability_classification": "stable"},
+    )
+    higher_composite = _stock(
+        "RANK",
+        ranking=90,
+        alpha=80,
+        metrics={"stability_classification": "stable"},
+    )
+
+    out = apply_final_scan_ranking(
+        [higher_composite, higher_alpha], bucket=Bucket.penny, max_results=10
+    )
+    by_symbol = {row.symbol: row.metrics for row in out.results}
+
+    assert by_symbol["ALPHA"]["alpha_rank"] == 1
+    assert by_symbol["ALPHA"]["final_rank"] == 2
+    assert by_symbol["RANK"]["alpha_rank"] == 2
+    assert by_symbol["RANK"]["final_rank"] == 1
