@@ -11,6 +11,7 @@ import { EmptyPortfolioState, PennyOpportunitiesPanel } from "@/components/dashb
 import { RiskAlertsPanel } from "@/components/dashboard/daily-decision/RiskAlertsPanel";
 import { PortfolioPerformancePanel } from "@/components/portfolio/PortfolioPerformancePanel";
 import { RobinhoodMcpStatusCard } from "@/components/portfolio/RobinhoodMcpStatusCard";
+import { ActivePositionMonitorPanel } from "@/components/portfolio/ActivePositionMonitorPanel";
 import { useState } from "react";
 
 export interface PortfolioTodayProps {
@@ -71,6 +72,8 @@ export function PortfolioToday({
         portfolioValue={data.portfolio_value}
         refreshKey={performanceRefreshKey}
       />
+
+      {hasHoldings && <ActivePositionMonitorPanel />}
 
       {cashOnlySynced && (
         <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/40 px-4 py-3 text-sm text-secondary">

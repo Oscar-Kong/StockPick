@@ -154,6 +154,8 @@ export {
 
 export {
   getPortfolioSummary,
+  getActivePositionMonitor,
+  runActivePositionMonitor,
   getPortfolioRebalancePreview,
   optimizePortfolio,
   runPortfolioPolicyBacktest,

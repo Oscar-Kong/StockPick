@@ -1,4 +1,5 @@
 import type {
+  ActivePositionMonitorResponse,
   BrokerageCsvImportResponse,
   CsvApproveRequest,
   CsvPreviewResponse,
@@ -28,6 +29,17 @@ export function getPortfolioSummary(): Promise<PortfolioSummaryResponse> {
 
 export function getPortfolioPerformance(): Promise<PortfolioPerformanceResponse> {
   return request("/portfolio/performance", { timeoutMs: 90_000 });
+}
+
+export function getActivePositionMonitor(): Promise<ActivePositionMonitorResponse> {
+  return request("/portfolio/active-monitor");
+}
+
+export function runActivePositionMonitor(refreshQuotes = true): Promise<ActivePositionMonitorResponse> {
+  return request(`/portfolio/active-monitor/run?refresh_quotes=${refreshQuotes ? "true" : "false"}`, {
+    method: "POST",
+    timeoutMs: 45_000,
+  });
 }
 
 export function getPortfolioRebalancePreview(

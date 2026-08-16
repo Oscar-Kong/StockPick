@@ -1137,6 +1137,55 @@ export interface PortfolioPerformanceResponse {
   disclaimer: string;
 }
 
+export type ActivePositionState =
+  | "HOLD"
+  | "ADD_SETUP"
+  | "ADD_CONFIRMED"
+  | "TRIM"
+  | "EXIT_WARNING"
+  | "EXIT"
+  | "DATA_STALE";
+
+export interface ActivePositionStatus {
+  symbol: string;
+  bucket: string;
+  state: ActivePositionState;
+  actionable: boolean;
+  price?: number | null;
+  quote_as_of?: string | null;
+  quote_age_seconds?: number | null;
+  data_status: string;
+  shares: number;
+  avg_cost: number;
+  unrealized_pl_pct?: number | null;
+  stop_price?: number | null;
+  target_price?: number | null;
+  distance_to_stop_pct?: number | null;
+  distance_to_target_pct?: number | null;
+  evidence: string[];
+  updated_at?: string | null;
+}
+
+export interface ActivePositionTransition {
+  id?: number | null;
+  symbol: string;
+  from_state?: string | null;
+  to_state: ActivePositionState;
+  actionable: boolean;
+  evidence: string[];
+  changed_at?: string | null;
+}
+
+export interface ActivePositionMonitorResponse {
+  as_of?: string | null;
+  quote_as_of?: string | null;
+  statuses: ActivePositionStatus[];
+  transitions: ActivePositionTransition[];
+  notifications: ActivePositionTransition[];
+  quote_only: boolean;
+  execution_enabled: false;
+}
+
 export interface RebalanceHoldingInput {
   symbol: string;
   shares: number;
@@ -2508,4 +2557,3 @@ export interface JobRetryResponse {
   duplicate_blocked: boolean;
   message: string;
 }
-
