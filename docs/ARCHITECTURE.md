@@ -6,6 +6,11 @@ StockPick is organized around product domains. Shared infrastructure lives under
 
 Active sleeves: **penny**, **compounder**. Legacy API/database values may still contain `medium`; `core.sleeve.normalize_sleeve()` maps `medium` → `penny` at boundaries.
 
+Planned active-position monitoring is documented in
+[`ACTIVE_POSITION_MONITORING.md`](ACTIVE_POSITION_MONITORING.md). It separates
+frequent lightweight quote ingestion from slower research refreshes and
+event-driven position-state decisions.
+
 ## Backend layout
 
 | Area | Location | Notes |

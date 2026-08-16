@@ -174,6 +174,39 @@ class PortfolioRefresh:
             return {"skipped": True, "reason": "no_prices_refreshed"}
         return {"refreshed": refreshed, "errors": errors[:5]}
 
+    def refresh_active_quotes(self) -> dict:
+        """Quote-only refresh for frequent active-position monitoring."""
+        holdings = get_current_holdings()
+        if not holdings:
+            return {"skipped": True, "reason": "no_holdings", "quotes": {}}
+
+        symbols = list(dict.fromkeys(str(h["symbol"]).upper() for h in holdings if h.get("symbol")))
+        quotes: dict[str, float] = {}
+        errors: list[str] = []
+
+        def _fetch(sym: str) -> tuple[str, float | None, str | None]:
+            try:
+                return sym, PriceService().refresh_latest_quote(sym), None
+            except Exception as exc:
+                return sym, None, str(exc)
+
+        with ThreadPoolExecutor(max_workers=min(8, max(1, len(symbols)))) as pool:
+            futures = [pool.submit(_fetch, sym) for sym in symbols]
+            for future in as_completed(futures):
+                sym, price, error = future.result()
+                if error:
+                    errors.append(f"{sym}: {error}")
+                elif price is not None:
+                    quotes[sym] = price
+
+        return {
+            "refreshed": len(quotes),
+            "requested": len(symbols),
+            "quotes": quotes,
+            "errors": errors[:5],
+            "quote_only": True,
+        }
+
     def refresh_penny_scan_if_needed(self, *, force: bool = False, blocking: bool = False) -> dict:
         status = assess_freshness("penny_scan")
         if not force and not status.is_stale and not status.is_missing:
@@ -427,6 +460,10 @@ def get_refresh_job(job_id: str) -> dict | None:
 
 def refresh_prices_for_holdings(*, force: bool = False) -> dict:
     return portfolio_refresh.refresh_prices_for_holdings(force=force)
+
+
+def refresh_active_quotes() -> dict:
+    return portfolio_refresh.refresh_active_quotes()
 
 
 def refresh_penny_scan_if_needed(*, force: bool = False, blocking: bool = False) -> dict:
