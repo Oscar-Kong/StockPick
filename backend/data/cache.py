@@ -318,17 +318,30 @@ def get_scan_job(job_id: str) -> dict | None:
 
 
 def save_active_quote_snapshot(
-    quotes: dict[str, float], *, as_of: str, ttl_seconds: float = 600.0
+    quotes: dict[str, float],
+    *,
+    as_of: str,
+    active_symbols: list[str] | None = None,
+    ttl_seconds: float = 600.0,
 ) -> None:
-    payload = {
-        "as_of": as_of,
-        "quotes": {
+    cache = Cache()
+    existing = cache.get("portfolio:active_quotes") or {}
+    merged = dict(existing.get("quotes") or {}) if isinstance(existing, dict) else {}
+    if active_symbols is not None:
+        allowed = {str(symbol).upper() for symbol in active_symbols}
+        merged = {symbol: value for symbol, value in merged.items() if symbol in allowed}
+    merged.update(
+        {
             str(symbol).upper(): {"price": float(price), "as_of": as_of}
             for symbol, price in quotes.items()
             if price is not None and float(price) > 0
-        },
+        }
+    )
+    payload = {
+        "as_of": as_of,
+        "quotes": merged,
     }
-    Cache().set("portfolio:active_quotes", payload, ttl_seconds)
+    cache.set("portfolio:active_quotes", payload, ttl_seconds)
 
 
 def get_active_quote_snapshot() -> dict:

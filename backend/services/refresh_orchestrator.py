@@ -237,6 +237,7 @@ class PortfolioRefresh:
             "refreshed": len(quotes),
             "requested": len(symbols),
             "deferred": [symbol for symbol in all_symbols if symbol not in selected],
+            "active_symbols": all_symbols,
             "provider_requests": len(symbols),
             "daily_budget_used": budget_used,
             "daily_budget_remaining": max(

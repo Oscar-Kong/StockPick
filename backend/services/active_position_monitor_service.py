@@ -91,8 +91,12 @@ def refresh_and_store_active_quotes() -> dict[str, Any]:
     result = refresh_active_quotes()
     as_of = _utcnow().isoformat()
     quotes = result.get("quotes") or {}
-    if isinstance(quotes, dict) and quotes:
-        save_active_quote_snapshot(quotes, as_of=as_of)
+    if isinstance(quotes, dict):
+        save_active_quote_snapshot(
+            quotes,
+            as_of=as_of,
+            active_symbols=list(result.get("active_symbols") or quotes.keys()),
+        )
     payload = {**result, "as_of": as_of}
     save_active_quote_refresh_status(payload)
     return payload

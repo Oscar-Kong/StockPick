@@ -25,6 +25,7 @@ def test_quote_refresh_persists_timestamped_quote_snapshot():
     save.assert_called_once()
     assert save.call_args.args[0] == {"TEST": 10.25}
     assert save.call_args.kwargs["as_of"]
+    assert save.call_args.kwargs["active_symbols"] == ["TEST"]
     assert save_status.call_args.args[0]["as_of"]
 
 
