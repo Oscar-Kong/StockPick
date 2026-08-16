@@ -1204,9 +1204,17 @@ def save_active_position_monitor_result(
             if row is None:
                 row = ActivePositionStateRow(account_id=account_id, symbol=symbol)
                 session.add(row)
+                previous_payload: dict = {}
+            else:
+                previous_payload = json.loads(row.status_json or "{}")
             payload = dict(status)
             payload["symbol"] = symbol
             payload["updated_at"] = utc_iso_z(timestamp)
+            payload["state_changed_at"] = (
+                previous_payload.get("state_changed_at")
+                if row.state == state and previous_payload.get("state_changed_at")
+                else utc_iso_z(timestamp)
+            )
             row.state = state
             row.status_json = json.dumps(payload)
             row.updated_at = timestamp

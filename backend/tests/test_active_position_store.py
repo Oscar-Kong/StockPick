@@ -34,6 +34,7 @@ def test_active_position_store_upserts_status_and_appends_only_supplied_transiti
     transitions = list_active_position_transitions(limit=10)
     assert states[0]["price"] == 10.3
     assert states[0]["updated_at"] == "2026-08-16T14:35:00Z"
+    assert states[0]["state_changed_at"] == "2026-08-16T14:30:00Z"
     assert len(transitions) == 1
     assert transitions[0]["to_state"] == "HOLD"
 

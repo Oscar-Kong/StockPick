@@ -108,7 +108,9 @@ def run_active_position_monitor(
             if row.get("symbol")
         }
         prior_times = {
-            str(row.get("symbol") or "").upper(): str(row.get("updated_at") or "")
+            str(row.get("symbol") or "").upper(): str(
+                row.get("state_changed_at") or row.get("updated_at") or ""
+            )
             for row in prior_rows
             if row.get("symbol")
         }
