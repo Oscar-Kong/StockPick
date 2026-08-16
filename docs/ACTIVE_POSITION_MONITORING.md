@@ -1,7 +1,8 @@
 # Active Position Monitoring
 
-Status: foundation implemented; scheduling, minute-bar ingestion and UI state
-history remain follow-up work.
+Status: quote-only monitoring loop, persistence, scheduler, HTTP API and Portfolio
+Today UI implemented. Minute-bar/trade-stream ingestion and external push delivery
+remain follow-up work.
 
 ## Objective
 
@@ -75,13 +76,22 @@ reduced-confidence non-actionable state, never fabricated confirmation.
 ## Implementation seams
 
 - `refresh_active_quotes()`: implemented quote-only ingestion for active symbols.
+- `refresh_and_store_active_quotes()`: timestamps and caches one shared quote
+  snapshot. The opt-in scheduler runs this path every minute during trading sessions.
 - `evaluate_intraday_position(snapshot)`: implemented pure, deterministic state
   evaluation using local data. Current confirmation is represented by completed-bar
   count; an actionable add additionally requires explicit volume and quoted-spread
-  confirmation. Persistence/cooldown orchestration remains to be wired.
-- A state-transition ledger containing timestamp, old/new state, evidence and data
-  freshness.
-- Notifications emitted only for confirmed state changes.
+  confirmation. The quote-only loop therefore cannot fabricate `ADD_CONFIRMED`.
+- `run_active_position_monitor()`: evaluates cached quotes every five minutes,
+  persists the current state, and appends change-only transitions.
+- The transition ledger records timestamp, old/new state, evidence and actionability.
+- The API notification feed emits actionable state changes only. A 15-minute
+  cooldown suppresses churn, while a more severe state bypasses the cooldown.
+- Portfolio Today polls the stored result every minute. This GET does not contact a
+  market-data provider; manual **Refresh quotes now** performs one bounded quote pass.
+
+Enable the in-process jobs with `ACTIVE_POSITION_MONITOR_ENABLED=true`. The backend
+must remain running for APScheduler to fire. This feature never places orders.
 
 The existing full portfolio decision path remains unchanged and must not be used
 as the minute scheduler target.

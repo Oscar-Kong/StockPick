@@ -276,6 +276,13 @@ Decision support only — no order execution.
 |--------|------|-------------|
 | GET | `/portfolio/performance` | P/L summary and mark-to-market equity curves for current holdings |
 | GET | `/portfolio/summary` | Canonical portfolio summary (value, cash, freshness) from the same ledger as Home |
+| GET | `/portfolio/active-monitor` | Read stored active-position states and recent change-only transitions; no provider call |
+| POST | `/portfolio/active-monitor/run?refresh_quotes=true` | Run one read-only evaluation; optional quote-only refresh first (non-demo mode) |
+
+**`ActivePositionMonitorResponse`:** `as_of`, `quote_as_of`, `statuses`,
+`transitions`, cooldown-filtered `notifications`, `quote_only=true`, and
+`execution_enabled=false`. Each status includes state, quote freshness, price,
+unrealized P/L, stop/target distances and evidence. This is decision support only.
 
 **`PortfolioPerformanceResponse`:** `total_value`, `today_pl`, `today_pl_pct`, `unrealized_pl`, `unrealized_pl_pct`, `realized_pl`, optional `realized_pl_equity`, `realized_pl_events`, `realized_pl_source` (`robinhood_mcp` \| `ledger`), `curves`, `period_change_pct`, `disclaimer`. When Robinhood MCP is authenticated, **realized P/L (YTD)** comes from `get_pnl_trade_history` **only if that history has trades** (empty payloads from the wrong/agentic account fall back to YTD closed lots in the ledger). MCP results with `trade_count > 0` are cached after sync. Unrealized = open-position cost basis. Chart replays the equity ledger (sell cash is capped to shares actually held). Response cached **120s** (`PORTFOLIO_PERFORMANCE_CACHE_TTL`); chart builds one 1y price series and slices ranges (avoids 5× redundant fetches).
 

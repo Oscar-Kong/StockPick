@@ -6,7 +6,7 @@ StockPick is organized around product domains. Shared infrastructure lives under
 
 Active sleeves: **penny**, **compounder**. Legacy API/database values may still contain `medium`; `core.sleeve.normalize_sleeve()` maps `medium` → `penny` at boundaries.
 
-Planned active-position monitoring is documented in
+Active-position monitoring is documented in
 [`ACTIVE_POSITION_MONITORING.md`](ACTIVE_POSITION_MONITORING.md). It separates
 frequent lightweight quote ingestion from slower research refreshes and
 event-driven position-state decisions.
@@ -29,6 +29,7 @@ The current production Scan decision policy is versioned as
 | Scan public API | `backend/services/scan_service.py` | `start_async`, `get_latest`, `get_status`; `scan_manager` is a backwards-compat alias |
 | Scan job shim | `backend/services/scan_manager.py` | Re-exports `scan_service` / `ScanService` |
 | Portfolio refresh | `backend/services/refresh_orchestrator.py` | `PortfolioRefresh` deep module: holdings → prices → decision (+ penny scan on home); re-prices when holdings change so TTL cannot skip new symbols |
+| Active-position monitor | `backend/services/active_position_monitor.py`, `active_position_monitor_service.py` | Quote-only cached snapshots → deterministic five-minute state evaluation → current-state upsert + change-only transition ledger; notification cooldown never enables execution |
 | Robinhood MCP sync | `backend/services/portfolio_snapshot_service.py` | Live positions SoT; always force-refreshes marks; UI passes `run_decision=true` so Today matches when holdings exist (cash-only skips decision); MCP status card is diagnostics-only (collapsed unless auth issue / Troubleshoot) |
 | Candidate gate | `backend/data/candidate_gate.py` | Unified Stage B DQ + filter seam |
 | PIT history | `backend/data/pit_history.py` | Shared `truncate_history` for walk-forward and scan-eval |
@@ -48,6 +49,7 @@ The current production Scan decision policy is versioned as
 | Feature UI | `frontend/src/components/` | Moving toward `features/` |
 | API client | `frontend/src/lib/api.ts`, `frontend/src/lib/api/` | Transport in `client.ts`; domain modules `scan.ts`, `portfolio.ts`, `research/runs.ts` |
 | Portfolio hook | `frontend/src/hooks/useDailyDashboard.ts` | Shared Today dashboard load/poll/refresh (`PortfolioWorkspace`) |
+| Active monitor UI | `frontend/src/components/portfolio/ActivePositionMonitorPanel.tsx` | Polls stored monitor state every minute; manual refresh invokes one quote-only monitoring pass |
 | Research runs hook | `frontend/src/hooks/useResearchRuns.ts` | Results tab list/detail/compare read path |
 
 Legacy URL aliases (`/penny`, `/medium`, `/watchlist`, etc.) redirect via `frontend/next.config.ts`.

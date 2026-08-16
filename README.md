@@ -14,7 +14,7 @@ It combines rule-based screening, data reconciliation, optional OpenBB governanc
 From one UI, you can:
 
 1. **Portfolio** (`/`) — unified workspace with three tabs:
-   - **Today** — daily buy/keep/sell decisions, holdings table, risk alerts, penny opportunities
+   - **Today** — daily decisions plus read-only Active holding states, quote freshness, stop/target distance, risk alerts, and penny opportunities
    - **Research** — optimize, backtest, factor exposure, allocation (what-if basket from holdings)
    - **Activity** — Robinhood CSV import (review & approve), editable transaction ledger, buying power, closed positions
 2. **Scan** a bucket and rank candidates (`/scan`)

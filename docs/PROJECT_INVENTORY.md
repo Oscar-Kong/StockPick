@@ -6,7 +6,7 @@ Canonical map of StockPick product surfaces, routes, and API-only features. See 
 
 | Route | Surface | Affects live scan rankings? |
 |-------|---------|----------------------------|
-| `/` | Portfolio (Today · Research · Activity) | No |
+| `/` | Portfolio (Today · Daily Plan · Research · Activity); Today includes the read-only active-position monitor | No |
 | `/scan` | Scan | **Yes** (on new scan) |
 | `/workspace` | Workspace (watchlist + analyze) | No |
 | `/quant-lab` | Quant Lab | No |
@@ -24,6 +24,10 @@ Legacy redirects: `/portfolio` → `/?tab=research`; `/trades` → `/?tab=activi
 | LEAN export / import-summary | Scaffold | [API_REFERENCE.md](API_REFERENCE.md) |
 | Alpha ingest UI | API-only | [OPENALPHA_INTEGRATION.md](OPENALPHA_INTEGRATION.md) |
 | Scheduler jobs | Ops | [RUNBOOK.md](RUNBOOK.md) |
+
+The active-position monitor is a shipped Portfolio Today surface backed by
+`GET/POST /portfolio/active-monitor`; external push notifications and minute-bar
+volume/spread ingestion remain follow-up work.
 
 ## Active sleeves
 

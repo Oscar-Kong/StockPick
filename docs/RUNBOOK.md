@@ -138,6 +138,7 @@ Important for local dev:
 | ------------------- | --------------------------------- |
 | `SCHEDULER_ENABLED` | `false` (code default) — no post-close `daily_pipeline` / universe FMP burn |
 | `MARKET_DATA_REFRESH_ENABLED` | `false` (code default) — no intraday holdings/scan loops |
+| `ACTIVE_POSITION_MONITOR_ENABLED` | `false` — opt in to quote-only active-position monitoring |
 | `SCAN_EMAIL_ENABLED` | `false` locally unless you want 9:20 ET morning email (that **does** run scans → FMP) |
 | `SCAN_EMAIL_TO` | fallback recipient(s) when Settings mailing list is empty; comma-separated |
 | `SMTP_USER` / `SMTP_PASSWORD` | Gmail + App Password when using SMTP |
@@ -160,6 +161,15 @@ Primary data roles default to **finnhub** for quotes and **FMP** for fundamental
 **Analyze OHLC freshness:** `PriceService.get_history()` now checks the **last bar date**, not only row count. Stale SQLite history triggers a provider fetch, merge, and persist. `GET /analyze/{symbol}?refresh=true` bypasses the analysis cache **and** forces a price-history refresh. The response includes `price_history_last_date`, `price_history_is_stale`, `price_history_refreshed_at`, and `price_history_bar_count`.
 
 **Portfolio live marks:** During regular and extended market hours, `PriceService.get_latest_price()`, **Sync Robinhood** (re-prices holdings), and **Run daily decision** use Finnhub/AkShare live quotes (not only the last stored daily close). `refresh_prices_for_holdings` persists today's session bar from the live quote when available. Outside market hours, holdings still use the latest completed daily bar.
+
+**Active-position monitor:** set `ACTIVE_POSITION_MONITOR_ENABLED=true` to schedule
+quote-only refreshes every minute and cached state evaluation every five minutes
+(New York time, trading sessions only). Configure the schedules with
+`ACTIVE_POSITION_QUOTE_CRON`, `ACTIVE_POSITION_EVALUATION_CRON`, and
+`ACTIVE_POSITION_MONITOR_TZ`; notification churn is controlled by
+`ACTIVE_POSITION_NOTIFICATION_COOLDOWN_SECONDS` (default 900). Leave the flag off
+when the backend is not continuously running. Portfolio Today's one-minute UI poll
+reads local state and does not consume provider quota.
 
 **Mark alignment:** Today’s holdings table and hero value read the last **daily decision snapshot**. **Sync Robinhood** updates live positions + marks; run **Daily decision** separately to refresh the action queue. The hero invested value is always `current_shares × mark` (never a frozen `market_value` from an older decision). If prices still disagree with the Robinhood app, check Finnhub/FMP keys and whether the session is outside regular/extended hours (StockPick then shows last daily close).
 
