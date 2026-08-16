@@ -43,6 +43,7 @@ class PortfolioRefresh:
         self._last_price_refresh_at: datetime | None = None
         self._active_quote_budget_date: str | None = None
         self._active_quote_requests = 0
+        self._active_quote_cursor = 0
 
     def is_running(self, scope: RefreshScope = "home") -> bool:
         if scope != "home":
@@ -202,9 +203,18 @@ class PortfolioRefresh:
             request_limit = min(
                 max(0, ACTIVE_POSITION_MAX_SYMBOLS_PER_REFRESH), remaining_budget
             )
-            symbols = all_symbols[:request_limit]
+            if all_symbols and request_limit:
+                start = self._active_quote_cursor % len(all_symbols)
+                symbols = [
+                    all_symbols[(start + offset) % len(all_symbols)]
+                    for offset in range(min(request_limit, len(all_symbols)))
+                ]
+                self._active_quote_cursor = (start + len(symbols)) % len(all_symbols)
+            else:
+                symbols = []
             self._active_quote_requests += len(symbols)
             budget_used = self._active_quote_requests
+        selected = set(symbols)
         quotes: dict[str, float] = {}
         errors: list[str] = []
 
@@ -226,7 +236,7 @@ class PortfolioRefresh:
         return {
             "refreshed": len(quotes),
             "requested": len(symbols),
-            "deferred": all_symbols[len(symbols) :],
+            "deferred": [symbol for symbol in all_symbols if symbol not in selected],
             "provider_requests": len(symbols),
             "daily_budget_used": budget_used,
             "daily_budget_remaining": max(

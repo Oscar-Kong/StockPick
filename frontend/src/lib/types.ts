@@ -1184,6 +1184,7 @@ export interface ActivePositionMonitorResponse {
   notifications: ActivePositionTransition[];
   quote_only: boolean;
   execution_enabled: false;
+  provider_usage: Record<string, unknown>;
 }
 
 export interface RebalanceHoldingInput {

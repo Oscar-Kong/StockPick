@@ -336,6 +336,15 @@ def get_active_quote_snapshot() -> dict:
     return payload if isinstance(payload, dict) else {"as_of": None, "quotes": {}}
 
 
+def save_active_quote_refresh_status(payload: dict, *, ttl_seconds: float = 172800.0) -> None:
+    Cache().set("portfolio:active_quote_refresh_status", json_safe(payload), ttl_seconds)
+
+
+def get_active_quote_refresh_status() -> dict:
+    payload = Cache().get("portfolio:active_quote_refresh_status")
+    return payload if isinstance(payload, dict) else {}
+
+
 def get_latest_scan_cache_age_seconds(bucket: str) -> float | None:
     """Return seconds since the latest-scan cache row was written (ignoring TTL).
 

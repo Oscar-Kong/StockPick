@@ -17,6 +17,7 @@ def test_quote_refresh_persists_timestamped_quote_snapshot():
             return_value={"quotes": {"TEST": 10.25}, "quote_only": True},
         ),
         patch("services.active_position_monitor_service.save_active_quote_snapshot") as save,
+        patch("services.active_position_monitor_service.save_active_quote_refresh_status") as save_status,
     ):
         result = refresh_and_store_active_quotes()
 
@@ -24,6 +25,7 @@ def test_quote_refresh_persists_timestamped_quote_snapshot():
     save.assert_called_once()
     assert save.call_args.args[0] == {"TEST": 10.25}
     assert save.call_args.kwargs["as_of"]
+    assert save_status.call_args.args[0]["as_of"]
 
 
 def test_monitor_uses_cached_quotes_and_persists_only_changed_states():
@@ -68,6 +70,10 @@ def test_read_path_marks_persisted_fresh_state_stale_when_quote_ages_out():
             return_value={"as_of": "2020-01-01T14:30:00Z", "quotes": {}},
         ),
         patch(
+            "services.active_position_monitor_service.get_active_quote_refresh_status",
+            return_value={"daily_budget_used": 42},
+        ),
+        patch(
             "services.active_position_monitor_service.list_active_position_transitions",
             return_value=[],
         ),
@@ -77,6 +83,7 @@ def test_read_path_marks_persisted_fresh_state_stale_when_quote_ages_out():
     assert result["statuses"][0]["state"] == "DATA_STALE"
     assert result["statuses"][0]["actionable"] is False
     assert result["quote_as_of"] == "2020-01-01T14:30:00Z"
+    assert result["provider_usage"]["daily_budget_used"] == 42
 
 
 def test_notification_cooldown_suppresses_repeat_but_not_severity_escalation():

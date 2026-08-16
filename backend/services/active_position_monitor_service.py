@@ -6,7 +6,12 @@ from datetime import datetime, timezone
 import threading
 from typing import Any
 
-from data.cache import get_active_quote_snapshot, save_active_quote_snapshot
+from data.cache import (
+    get_active_quote_refresh_status,
+    get_active_quote_snapshot,
+    save_active_quote_refresh_status,
+    save_active_quote_snapshot,
+)
 from data.portfolio_store import (
     get_active_position_states,
     get_current_holdings,
@@ -88,7 +93,9 @@ def refresh_and_store_active_quotes() -> dict[str, Any]:
     quotes = result.get("quotes") or {}
     if isinstance(quotes, dict) and quotes:
         save_active_quote_snapshot(quotes, as_of=as_of)
-    return {**result, "as_of": as_of}
+    payload = {**result, "as_of": as_of}
+    save_active_quote_refresh_status(payload)
+    return payload
 
 
 def run_active_position_monitor(
@@ -142,6 +149,7 @@ def run_active_position_monitor(
             "notifications": notifications,
             "quote_only": True,
             "execution_enabled": False,
+            "provider_usage": get_active_quote_refresh_status(),
         }
 
 
@@ -164,7 +172,9 @@ def get_active_position_monitor_status(*, transition_limit: int = 30) -> dict[st
     )
     return {
         "as_of": latest_as_of,
-        "quote_as_of": quote_snapshot.get("as_of"),
+        "quote_as_of": quote_snapshot.get("as_of")
+        or max((str(row.get("quote_as_of")) for row in states if row.get("quote_as_of")), default=None),
+        "provider_usage": get_active_quote_refresh_status(),
         "statuses": states,
         "transitions": transitions,
         "execution_enabled": False,

@@ -1218,6 +1218,7 @@ class ActivePositionMonitorResponse(BaseModel):
     notifications: list[ActivePositionTransitionResponse] = []
     quote_only: bool = True
     execution_enabled: bool = False
+    provider_usage: dict[str, Any] = {}
 
 
 class ClosedPositionItem(BaseModel):
