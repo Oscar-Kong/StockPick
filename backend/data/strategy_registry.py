@@ -30,9 +30,9 @@ class StrategyVersion(Base):
 
 # Default strategy configs — simple, not over-tuned
 DEFAULT_STRATEGIES: dict[str, dict[str, Any]] = {
-    "penny_v1": {
+    "penny_v2": {
         "bucket": "penny",
-        "version": "penny_v1",
+        "version": "penny_v2",
         "hold_horizon_days": 14,
         "weights": {
             "momentum": 0.25,
@@ -141,7 +141,7 @@ class StrategyRegistry:
                 session.close()
 
         # Fallback to defaults
-        default_key = f"{bucket}_v1"
+        default_key = "penny_v2" if bucket == "penny" else f"{bucket}_v1"
         cfg = DEFAULT_STRATEGIES.get(default_key, {})
         return StrategyConfig(version_id=default_key, bucket=bucket, config=cfg)
 

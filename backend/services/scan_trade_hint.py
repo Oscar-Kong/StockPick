@@ -193,8 +193,11 @@ def compute_scan_trade_hint(
             wait_raw += 8.0
 
     buy_pct, wait_pct = _normalize_pair(buy_raw, wait_raw)
-    raw_label = recommendation_label_from_score(score)
-    label = raw_label
+    alpha_score = m.get("alpha_score")
+    alpha_score = float(alpha_score) if isinstance(alpha_score, (int, float)) else score
+    raw_label = recommendation_label_from_score(alpha_score)
+    score_label = recommendation_label_from_score(score)
+    label = score_label
     label, gates = _gate_label(
         label,
         data_quality_score=data_quality_score,

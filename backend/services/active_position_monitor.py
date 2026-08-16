@@ -28,6 +28,8 @@ class PositionSnapshot:
     target_price: float | None = None
     vwap: float | None = None
     confirmation_bars: int = 0
+    volume_confirmed: bool = False
+    spread_confirmed: bool = False
     max_quote_age_seconds: float = 120.0
 
 
@@ -81,12 +83,17 @@ def evaluate_intraday_position(snapshot: PositionSnapshot) -> PositionEvaluation
             )
 
     if snapshot.vwap is not None and snapshot.vwap > 0:
-        if snapshot.price > snapshot.vwap and snapshot.confirmation_bars >= 2:
+        if (
+            snapshot.price > snapshot.vwap
+            and snapshot.confirmation_bars >= 2
+            and snapshot.volume_confirmed
+            and snapshot.spread_confirmed
+        ):
             return PositionEvaluation(
                 symbol=symbol,
                 state="ADD_CONFIRMED",
                 actionable=True,
-                evidence=["Price held above VWAP for two bars"],
+                evidence=["VWAP, volume and spread confirmation passed for two bars"],
             )
         if snapshot.price > snapshot.vwap:
             return PositionEvaluation(

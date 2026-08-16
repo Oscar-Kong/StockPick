@@ -11,6 +11,9 @@ Planned active-position monitoring is documented in
 frequent lightweight quote ingestion from slower research refreshes and
 event-driven position-state decisions.
 
+The current production Scan decision policy is versioned as
+`2026-08-stability-gate-v2`; the penny strategy registry default is `penny_v2`.
+
 ## Backend layout
 
 | Area | Location | Notes |

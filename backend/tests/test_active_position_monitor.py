@@ -40,3 +40,31 @@ def test_target_reached_trims_without_refetching_research_context():
     )
     assert result.state == "TRIM"
     assert "target" in result.evidence[0].lower()
+
+
+def test_add_confirmation_requires_volume_and_spread_confirmation():
+    unconfirmed = evaluate_intraday_position(
+        PositionSnapshot(
+            symbol="TEST",
+            price=10.5,
+            quote_age_seconds=5,
+            vwap=10.0,
+            confirmation_bars=2,
+        )
+    )
+    confirmed = evaluate_intraday_position(
+        PositionSnapshot(
+            symbol="TEST",
+            price=10.5,
+            quote_age_seconds=5,
+            vwap=10.0,
+            confirmation_bars=2,
+            volume_confirmed=True,
+            spread_confirmed=True,
+        )
+    )
+
+    assert unconfirmed.state == "ADD_SETUP"
+    assert unconfirmed.actionable is False
+    assert confirmed.state == "ADD_CONFIRMED"
+    assert confirmed.actionable is True

@@ -743,6 +743,8 @@ def run_scan_pipeline(manager: "ScanService", job_id: str, options: ScanOptions 
             "database_hits": database_hits,
             "provider_requested": provider_requested,
             "provider_received": provider_received,
+            "provider_missing_total": int(batch_meta.get("provider_missing_total") or 0),
+            "provider_deferred": int(batch_meta.get("provider_deferred") or 0),
             "availability_coverage": float(
                 batch_meta.get("availability_coverage") or flow_metrics.bulk_coverage_ratio
             ),
@@ -767,6 +769,7 @@ def run_scan_pipeline(manager: "ScanService", job_id: str, options: ScanOptions 
         if job.parity_summary is not None:
             scan_metadata["parity_summary"] = job.parity_summary
         scan_metadata["ranking_diagnostics"] = ranking_meta
+        job.diagnostics = scan_metadata
 
         if partial_universe:
             job.scan_completeness = "partial"

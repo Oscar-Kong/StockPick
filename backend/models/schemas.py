@@ -71,6 +71,7 @@ class ScanStatusResponse(BaseModel):
     invalid_result_count: int = 0
     scan_completeness: Literal["complete", "partial"] | None = None
     published_as_latest: bool | None = None
+    diagnostics: dict[str, Any] | None = None
 
 
 class ScanOptions(BaseModel):

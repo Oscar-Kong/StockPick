@@ -117,3 +117,14 @@ def test_alpha_bias_is_separate_from_final_watch_decision():
     assert hint["alpha_bias"] == "bullish"
     assert hint["decision_state"] == "watch"
     assert hint["recommendation"] == "watch"
+
+
+def test_alpha_bias_uses_alpha_score_not_composite_ranking_score():
+    hint = compute_scan_trade_hint(
+        score=88.0,
+        sleeve="penny",
+        risk_level=RiskLevel.medium,
+        metrics={"alpha_score": 45.0},
+    )
+
+    assert hint["alpha_bias"] == "neutral"

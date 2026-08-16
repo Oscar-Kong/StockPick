@@ -301,7 +301,7 @@ RECONCILE_PRICE_TOLERANCE = float(os.getenv("RECONCILE_PRICE_TOLERANCE", "0.01")
 RECONCILE_RATIO_TOLERANCE = float(os.getenv("RECONCILE_RATIO_TOLERANCE", "0.12"))
 
 # --- Strategy versioning ---
-STRATEGY_VERSION = os.getenv("STRATEGY_VERSION", "2026-07-sleeve-weights-v1")
+STRATEGY_VERSION = os.getenv("STRATEGY_VERSION", "2026-08-stability-gate-v2")
 
 # --- Scheduler (America/New_York, post-close batch Mon–Fri) ---
 # Default off: opt in explicitly. Avoids burning free-tier FMP/Finnhub on every

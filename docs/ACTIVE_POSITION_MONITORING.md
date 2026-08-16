@@ -77,7 +77,8 @@ reduced-confidence non-actionable state, never fabricated confirmation.
 - `refresh_active_quotes()`: implemented quote-only ingestion for active symbols.
 - `evaluate_intraday_position(snapshot)`: implemented pure, deterministic state
   evaluation using local data. Current confirmation is represented by completed-bar
-  count; persistence/cooldown orchestration remains to be wired.
+  count; an actionable add additionally requires explicit volume and quoted-spread
+  confirmation. Persistence/cooldown orchestration remains to be wired.
 - A state-transition ledger containing timestamp, old/new state, evidence and data
   freshness.
 - Notifications emitted only for confirmed state changes.

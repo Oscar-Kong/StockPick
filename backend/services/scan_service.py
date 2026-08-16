@@ -38,6 +38,7 @@ class ScanJob:
     scoring_mode: str | None = None
     scan_completeness: str | None = None
     published_as_latest: bool | None = None
+    diagnostics: dict = field(default_factory=dict)
 
 
 class ScanService:
@@ -78,6 +79,7 @@ class ScanService:
                 scoring_mode=payload.get("scoring_mode"),
                 scan_completeness=payload.get("scan_completeness"),
                 published_as_latest=payload.get("published_as_latest"),
+                diagnostics=dict(payload.get("diagnostics") or {}),
             )
         except (KeyError, TypeError, ValueError) as exc:
             logger.warning("Ignoring invalid persisted scan job %s: %s", job_id, exc)
@@ -103,6 +105,7 @@ class ScanService:
                 "scoring_mode": job.scoring_mode,
                 "scan_completeness": job.scan_completeness,
                 "published_as_latest": job.published_as_latest,
+                "diagnostics": job.diagnostics,
             },
         )
 
