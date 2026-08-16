@@ -155,7 +155,7 @@ Primary data roles default to **finnhub** for quotes and **FMP** for fundamental
 
 **Yahoo fundamentals / single-symbol history:** `Ticker.info` and `Ticker.history` also run under process isolation with `YFINANCE_INFO_TIMEOUT_SECONDS` (default `8`). Timeouts return empty and are logged separately from empty data. Fundamentals cache TTL is completeness-aware: empty → 5m; price XOR mcap → 15m; both cores but sparse → 1h; both cores + sector + valuation/growth → 24h.
 
-**Partial universe gate:** when final bulk coverage is below `SCAN_BULK_COVERAGE_MIN`, the job still completes (status `completed`) with a clear message and `universe_coverage` metadata, but **does not overwrite** `/scan/latest/{bucket}` — the prior complete ranking is preserved. Job results for that attempt remain available on `GET /scan/{job_id}`.
+**Partial universe gate:** when final bulk coverage is below `SCAN_BULK_COVERAGE_MIN`, the job still completes (status `completed`) with a clear message and `universe_coverage` metadata, but **does not overwrite** `/scan/latest/{bucket}` — the prior complete ranking is preserved. Job results remain available on `GET /scan/{job_id}` across process restarts for seven days. `SCAN_PROVIDER_SYMBOL_BUDGET` caps missing-history provider fills per interactive run; reruns progressively populate the local store instead of issuing an unbounded burst.
 
 **Analyze OHLC freshness:** `PriceService.get_history()` now checks the **last bar date**, not only row count. Stale SQLite history triggers a provider fetch, merge, and persist. `GET /analyze/{symbol}?refresh=true` bypasses the analysis cache **and** forces a price-history refresh. The response includes `price_history_last_date`, `price_history_is_stale`, `price_history_refreshed_at`, and `price_history_bar_count`.
 
@@ -201,6 +201,7 @@ These were previously hard-coded inside `backend/services/scan_manager.py`. They
 | `SCAN_STAGE_B_TOP_N`              | `20`                             | Max candidates deep-scored per scan (`mode=deep`).                                     |
 | `SCAN_STAGE_B_TOP_N_FAST`         | `10`                             | Candidate cap when `ScanOptions.mode="fast"` — used for low-latency exploratory scans. |
 | `SCAN_PRICE_DOWNLOAD_MAX_SECONDS` | `45`                             | Hard cap (seconds) on the Stage A bulk OHLC provider fetch.                            |
+| `SCAN_PROVIDER_SYMBOL_BUDGET`     | `30`                             | Maximum missing symbols fetched from an external history provider per interactive Scan. |
 | `SCAN_BULK_COVERAGE_MIN`            | `0.70`                           | Minimum OHLC coverage before publishing a scan as latest (partial attempts preserve prior latest). |
 | `YFINANCE_INFO_TIMEOUT_SECONDS`     | `8`                              | Process timeout for single-symbol Yahoo `Ticker.info` / `Ticker.history`. |
 | `SCAN_PENNY_STAGE_A_PERIOD`         | `6mo`                            | Penny Stage A bulk OHLC horizon.                                                       |

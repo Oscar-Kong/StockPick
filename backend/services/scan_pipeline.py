@@ -12,6 +12,7 @@ from config import (
     SCAN_BULK_COVERAGE_MIN,
     SCAN_PARITY_SAMPLE_RATE,
     SCAN_PRICE_DOWNLOAD_MAX_SECONDS,
+    SCAN_PROVIDER_SYMBOL_BUDGET,
     SCAN_RESULT_TTL,
     SCAN_RESULT_TTL_COMPOUNDER,
     SCAN_RESULT_TTL_PENNY,
@@ -361,6 +362,7 @@ def run_scan_pipeline(manager: "ScanService", job_id: str, options: ScanOptions 
             universe,
             period=period_a,
             max_runtime_seconds=SCAN_PRICE_DOWNLOAD_MAX_SECONDS,
+            provider_symbol_budget=SCAN_PROVIDER_SYMBOL_BUDGET,
             min_bars=policy_a.preferred_bars,
             bar_limit=policy_a.returned_bar_limit,
             max_session_lag=policy_a.allowed_session_lag,
@@ -767,6 +769,8 @@ def run_scan_pipeline(manager: "ScanService", job_id: str, options: ScanOptions 
         scan_metadata["ranking_diagnostics"] = ranking_meta
 
         if partial_universe:
+            job.scan_completeness = "partial"
+            job.published_as_latest = False
             logger.warning(
                 "Scan %s coverage %.0f%% below minimum %.0f%% — not overwriting latest complete scan",
                 job.bucket.value,
@@ -774,6 +778,8 @@ def run_scan_pipeline(manager: "ScanService", job_id: str, options: ScanOptions 
                 SCAN_BULK_COVERAGE_MIN * 100.0,
             )
         else:
+            job.scan_completeness = "complete"
+            job.published_as_latest = True
             cache_module.save_scan_results(
                 job.bucket.value,
                 models_to_dicts(job.results),
@@ -799,6 +805,10 @@ def run_scan_pipeline(manager: "ScanService", job_id: str, options: ScanOptions 
                     job.bucket.value,
                     clear_exc,
                 )
+        try:
+            manager.persist_job(job)
+        except Exception as persist_exc:
+            logger.warning("Failed to persist scan job %s: %s", job.job_id, persist_exc)
     except Exception as exc:
         logger.exception("Scan failed: %s", exc)
         job.status = ScanStatus.failed
@@ -815,5 +825,9 @@ def run_scan_pipeline(manager: "ScanService", job_id: str, options: ScanOptions 
                 job.bucket.value,
                 marker_exc,
             )
+        try:
+            manager.persist_job(job)
+        except Exception as persist_exc:
+            logger.warning("Failed to persist failed scan job %s: %s", job.job_id, persist_exc)
     finally:
         set_bulk_scan(False)

@@ -55,3 +55,17 @@ def test_refresh_latest_price_persists_live_bar_and_refreshes_history():
     assert price == 2.07
     ps._persist.assert_called_once()
     ps.get_history.assert_called_with("ALXO", period="5d", force_refresh=True)
+
+
+def test_refresh_latest_quote_does_not_fetch_history():
+    ps = PriceService(store=MagicMock(), market=MagicMock())
+    with (
+        patch.object(ps, "_live_quote_price", return_value=(12.34, {"currentPrice": 12.34})),
+        patch.object(ps, "_upsert_live_quote_bar") as upsert,
+        patch.object(ps, "get_history") as history,
+    ):
+        price = ps.refresh_latest_quote("ALXO")
+
+    assert price == 12.34
+    upsert.assert_called_once()
+    history.assert_not_called()

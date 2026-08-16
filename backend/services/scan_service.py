@@ -36,6 +36,8 @@ class ScanJob:
     timings: dict[str, float] = field(default_factory=dict)
     scoring_engine_used: bool | None = None
     scoring_mode: str | None = None
+    scan_completeness: str | None = None
+    published_as_latest: bool | None = None
 
 
 class ScanService:
@@ -53,9 +55,56 @@ class ScanService:
 
     def get_status(self, job_id: str) -> ScanJob | None:
         with self._lock:
-            return self._jobs.get(job_id)
+            job = self._jobs.get(job_id)
+        if job is not None:
+            return job
+        payload = cache_module.get_scan_job(job_id)
+        if not payload:
+            return None
+        try:
+            completed_at = payload.get("completed_at")
+            return ScanJob(
+                job_id=str(payload["job_id"]),
+                bucket=Bucket(str(payload["bucket"])),
+                status=ScanStatus(str(payload.get("status") or ScanStatus.completed.value)),
+                progress=float(payload.get("progress") or 0.0),
+                message=str(payload.get("message") or ""),
+                results=[StockResult(**row) for row in payload.get("results") or []],
+                completed_at=datetime.fromisoformat(completed_at) if completed_at else None,
+                error=payload.get("error"),
+                parity_summary=payload.get("parity_summary"),
+                timings=dict(payload.get("timings") or {}),
+                scoring_engine_used=payload.get("scoring_engine_used"),
+                scoring_mode=payload.get("scoring_mode"),
+                scan_completeness=payload.get("scan_completeness"),
+                published_as_latest=payload.get("published_as_latest"),
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            logger.warning("Ignoring invalid persisted scan job %s: %s", job_id, exc)
+            return None
 
     get_job = get_status
+
+    def persist_job(self, job: ScanJob) -> None:
+        cache_module.save_scan_job(
+            job.job_id,
+            {
+                "job_id": job.job_id,
+                "bucket": job.bucket.value,
+                "status": job.status.value,
+                "progress": job.progress,
+                "message": job.message,
+                "results": [row.model_dump(mode="json") for row in job.results],
+                "completed_at": job.completed_at.isoformat() if job.completed_at else None,
+                "error": job.error,
+                "parity_summary": job.parity_summary,
+                "timings": job.timings,
+                "scoring_engine_used": job.scoring_engine_used,
+                "scoring_mode": job.scoring_mode,
+                "scan_completeness": job.scan_completeness,
+                "published_as_latest": job.published_as_latest,
+            },
+        )
 
     def get_active_jobs_for_buckets(self, buckets: tuple[str, ...] | list[str]) -> list[ScanJob]:
         allowed = {b.lower() for b in buckets}

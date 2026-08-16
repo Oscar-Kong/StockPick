@@ -438,6 +438,9 @@ UNIVERSE_SCAN_BATCH_SIZE = int(os.getenv("UNIVERSE_SCAN_BATCH_SIZE", "300"))
 SCAN_STAGE_B_TOP_N = int(os.getenv("SCAN_STAGE_B_TOP_N", "20"))
 SCAN_STAGE_B_TOP_N_FAST = int(os.getenv("SCAN_STAGE_B_TOP_N_FAST", "10"))
 SCAN_PRICE_DOWNLOAD_MAX_SECONDS = float(os.getenv("SCAN_PRICE_DOWNLOAD_MAX_SECONDS", "45"))
+# Maximum symbols a user-triggered Scan may fetch from an external history provider.
+# Deferred symbols remain explicit in diagnostics and can be warmed by later runs/jobs.
+SCAN_PROVIDER_SYMBOL_BUDGET = int(os.getenv("SCAN_PROVIDER_SYMBOL_BUDGET", "30"))
 # Minimum fraction of universe OHLC required before publishing a scan as "latest".
 # Below this, the job may complete with diagnostics but must not overwrite the prior complete latest.
 SCAN_BULK_COVERAGE_MIN = float(os.getenv("SCAN_BULK_COVERAGE_MIN", "0.70"))

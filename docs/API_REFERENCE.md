@@ -309,21 +309,21 @@ Base path: `/scan` (not under `/api/v2/research`)
 |--------|------|-------------|
 | POST | `/scan/penny` | Start penny Stage A→B scan (async job) |
 | POST | `/scan/compounder` | Start compounder scan |
-| GET | `/scan/{job_id}` | Job status + attempt results; `invalid_result_count` for skipped schema-drift rows |
+| GET | `/scan/{job_id}` | Job status + attempt results; survives process restart for seven days and exposes `scan_completeness`, `published_as_latest`, and `invalid_result_count` |
 | GET | `/scan/latest/{bucket}` | Last **published** complete ranking; preserves prior latest when a refresh fails the coverage gate |
 
-**Coverage gate:** Stage A bulk OHLC must reach `SCAN_BULK_COVERAGE_MIN` (default `0.70`) before `save_scan_results` overwrites latest. Below that, the job completes with a partial-universe message; `/scan/latest` is unchanged. Cached metadata includes `universe_selection` (`full_universe_size`, `selected_size`, `anchor_count`, `selection_coverage`, `rotation_key`, `revision`), `universe_coverage`, `data_flow.bulk_*`, `history_policy`, `coverage_diagnostics`, `fallback_reason`, `stage_b_minimum_required_bars`, and `history_gate_exclusion_count` when a complete scan is published (`scan_schema_version` ≥ 2). The selected cohort is deterministic for a New York calendar date, advances through a stable revision-specific ordering on the next date, and preserves eligible symbols from the previous durable Scan snapshot.
+**Coverage gate:** Stage A bulk OHLC must reach `SCAN_BULK_COVERAGE_MIN` (default `0.70`) before `save_scan_results` overwrites latest. Below that, the job completes with a partial-universe message; `/scan/latest` is unchanged, while the attempt remains retrievable by job id. Interactive provider history fills are capped by `SCAN_PROVIDER_SYMBOL_BUDGET` (default `30`); deferred symbols are reported in coverage diagnostics and can be populated by later runs or data warmup. Cached metadata includes `universe_selection` (`full_universe_size`, `selected_size`, `anchor_count`, `selection_coverage`, `rotation_key`, `revision`), `universe_coverage`, `data_flow.bulk_*`, `history_policy`, `coverage_diagnostics`, `fallback_reason`, `stage_b_minimum_required_bars`, and `history_gate_exclusion_count` when a complete scan is published (`scan_schema_version` ≥ 2). The selected cohort is deterministic for a New York calendar date, advances through a stable revision-specific ordering on the next date, and preserves eligible symbols from the previous durable Scan snapshot.
 
 **History policy:** Stage B eligibility uses sleeve-aware minima from `resolve_history_policy` (penny **80** bars for default `6mo`; compounder **252**). `MIN_HISTORY_BARS` (default 252) remains the Analyze / non-scan DQ default only. Candidate `metrics.provider_limited_partial_data` is set only for true provider coverage failures — not for internal filter / history-policy rejects.
 
-**Scan SCORE column:** Published `score` / sort key is `ranking_score` (Alpha/Conf/Trade weighted composite). The UI shows a single number; buy/wait lives in Action. Pillar fields remain in metrics for diagnostics.
+**Scan SCORE column:** Published `score` / sort key is `ranking_score` (Alpha/Conf/Trade weighted composite). Penny candidates receive `alpha_rank` before the Safety Gate; Stability `rejected` candidates are excluded from the published final list, and eligible candidates receive a contiguous `final_rank`. The UI shows a single number; buy/wait lives in Action. Pillar fields remain in metrics for diagnostics. Missing `data_quality_score` caps `confidence_score` at 60 and emits `data_confidence=limited`.
 
 **Penny Stability shadow fields:** Penny `StockResult.metrics` includes
 `stability_score`, `stability_classification`, `stability_hard_gates`,
 `stability_factors`, `stability_raw`, `entry_risk_score`,
 `entry_risk_classification`, `entry_risk_reasons`, `entry_risk_source`, and
-`decision_state`. These fields are backward-compatible and do not change
-`alpha_score` or ranking. Rejected Stability produces `decision_state=no_trade`
+`decision_state` and `alpha_bias`. These fields are backward-compatible and do not change
+`alpha_score`. Rejected Stability produces `decision_state=no_trade`
 and Action `avoid`; `wait` / `extended` / `no_chase` Entry Risk caps an otherwise
 strong candidate at `watch`. The initial
 entry assessment is labeled `daily_ohlcv_proxy`; it is not a live premarket

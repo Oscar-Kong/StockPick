@@ -156,6 +156,7 @@ class PriceService:
         min_bars: int | None = None,
         bar_limit: int | None = None,
         max_session_lag: int | None = None,
+        provider_symbol_budget: int | None = None,
     ) -> dict[str, pd.DataFrame]:
         """Load from DB where sufficient; fetch only missing symbols."""
         from config import SCAN_BULK_COVERAGE_MIN
@@ -191,17 +192,28 @@ class PriceService:
                     stale_symbols += 1
 
         source = "db"
-        provider_requested = len(missing)
+        provider_missing_total = len(missing)
+        if provider_symbol_budget is not None and provider_symbol_budget >= 0:
+            provider_symbols = missing[:provider_symbol_budget]
+        else:
+            provider_symbols = missing
+        provider_requested = len(provider_symbols)
+        provider_deferred = max(0, provider_missing_total - provider_requested)
         provider_received = 0
-        if missing:
+        if provider_symbols:
             logger.info(
-                "PriceService: fetching %s/%s symbols from provider fallback (%s)",
-                len(missing),
-                len(unique),
+                "PriceService: fetching %s/%s missing symbols from provider fallback (%s)",
+                len(provider_symbols),
+                provider_missing_total,
                 period,
             )
+            if provider_deferred:
+                logger.warning(
+                    "PriceService: provider budget deferred %s symbols",
+                    provider_deferred,
+                )
             fetched = self.market.download_batch(
-                missing,
+                provider_symbols,
                 period=period,
                 chunk_size=chunk_size,
                 use_alpha_vantage_fallback=False,
@@ -235,6 +247,8 @@ class PriceService:
             "database_hits": database_hits,
             "provider_requested": provider_requested,
             "provider_received": provider_received,
+            "provider_missing_total": provider_missing_total,
+            "provider_deferred": provider_deferred,
             "availability_coverage": round(coverage, 4),
             "live_refresh_coverage": round(live_refresh_coverage, 4),
             "lag_0_symbols": lag_0,
@@ -353,3 +367,15 @@ class PriceService:
         if df is None or df.empty:
             return None
         return float(df["close"].iloc[-1])
+
+    def refresh_latest_quote(self, symbol: str) -> float | None:
+        """Fetch and persist one live quote without refreshing historical bars."""
+        sym = symbol.upper()
+        price, quote = self._live_quote_price(sym)
+        if price is None or price <= 0:
+            return None
+        try:
+            self._upsert_live_quote_bar(sym, quote, price)
+        except Exception as exc:
+            logger.warning("Failed to persist live quote bar for %s: %s", sym, exc)
+        return price

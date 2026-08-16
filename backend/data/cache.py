@@ -306,6 +306,17 @@ def get_latest_scan(bucket: str) -> dict | None:
     return Cache().get(f"scan:latest:{bucket}")
 
 
+def save_scan_job(job_id: str, payload: dict, *, ttl_seconds: float = 7 * 24 * 3600.0) -> None:
+    """Persist a completed/failed Scan attempt independently from latest results."""
+    Cache().set(f"scan:job:{job_id}", json_safe(payload), ttl_seconds)
+
+
+def get_scan_job(job_id: str) -> dict | None:
+    """Load a persisted Scan attempt after an app process restart."""
+    value = Cache().get(f"scan:job:{job_id}")
+    return value if isinstance(value, dict) else None
+
+
 def get_latest_scan_cache_age_seconds(bucket: str) -> float | None:
     """Return seconds since the latest-scan cache row was written (ignoring TTL).
 

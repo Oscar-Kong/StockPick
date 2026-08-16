@@ -69,6 +69,8 @@ class ScanStatusResponse(BaseModel):
     scoring_engine_used: bool | None = None
     timings: dict[str, float] | None = None
     invalid_result_count: int = 0
+    scan_completeness: Literal["complete", "partial"] | None = None
+    published_as_latest: bool | None = None
 
 
 class ScanOptions(BaseModel):

@@ -147,4 +147,6 @@ def get_scan_status(job_id: str):
         scoring_engine_used=job.scoring_engine_used,
         timings=json_safe(dict(job.timings)) if job.timings else None,
         invalid_result_count=invalid_count,
+        scan_completeness=job.scan_completeness,
+        published_as_latest=job.published_as_latest,
     )
