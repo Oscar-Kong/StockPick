@@ -1169,6 +1169,57 @@ class PortfolioDecisionResponse(BaseModel):
     notes: list[str] = []
 
 
+ActivePositionState = Literal[
+    "HOLD",
+    "ADD_SETUP",
+    "ADD_CONFIRMED",
+    "TRIM",
+    "EXIT_WARNING",
+    "EXIT",
+    "DATA_STALE",
+]
+
+
+class ActivePositionStatusResponse(BaseModel):
+    symbol: str
+    bucket: str = "penny"
+    state: ActivePositionState
+    actionable: bool = False
+    price: float | None = None
+    quote_as_of: str | None = None
+    quote_age_seconds: float | None = None
+    data_status: str = "missing_quote"
+    shares: float = 0.0
+    avg_cost: float = 0.0
+    unrealized_pl_pct: float | None = None
+    stop_price: float | None = None
+    target_price: float | None = None
+    distance_to_stop_pct: float | None = None
+    distance_to_target_pct: float | None = None
+    evidence: list[str] = []
+    updated_at: str | None = None
+
+
+class ActivePositionTransitionResponse(BaseModel):
+    id: int | None = None
+    symbol: str
+    from_state: str | None = None
+    to_state: ActivePositionState
+    actionable: bool = False
+    evidence: list[str] = []
+    changed_at: str | None = None
+
+
+class ActivePositionMonitorResponse(BaseModel):
+    as_of: str | None = None
+    quote_as_of: str | None = None
+    statuses: list[ActivePositionStatusResponse] = []
+    transitions: list[ActivePositionTransitionResponse] = []
+    notifications: list[ActivePositionTransitionResponse] = []
+    quote_only: bool = True
+    execution_enabled: bool = False
+
+
 class ClosedPositionItem(BaseModel):
     symbol: str
     total_bought: float = 0.0

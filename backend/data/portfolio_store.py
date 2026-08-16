@@ -134,11 +134,48 @@ class DailyTradingPlanReview(PortfolioBase):
     updated_at = Column(DateTime, nullable=False)
 
 
+class ActivePositionStateRow(PortfolioBase):
+    __tablename__ = "active_position_states"
+    __table_args__ = (UniqueConstraint("account_id", "symbol", name="uq_active_position_state"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    account_id = Column(Integer, nullable=False, index=True)
+    symbol = Column(String, nullable=False, index=True)
+    state = Column(String, nullable=False)
+    status_json = Column(Text, nullable=False, default="{}")
+    updated_at = Column(DateTime, nullable=False, index=True)
+
+
+class ActivePositionTransitionRow(PortfolioBase):
+    __tablename__ = "active_position_transitions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    account_id = Column(Integer, nullable=False, index=True)
+    symbol = Column(String, nullable=False, index=True)
+    from_state = Column(String, nullable=True)
+    to_state = Column(String, nullable=False)
+    actionable = Column(Boolean, nullable=False, default=False)
+    evidence_json = Column(Text, nullable=False, default="[]")
+    created_at = Column(DateTime, nullable=False, index=True)
+
+
 DEFAULT_ACCOUNT_ID = 1
 
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _parse_utc_datetime(value: str | None) -> datetime:
+    if not value:
+        return _utcnow()
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is not None:
+            parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+        return parsed
+    except ValueError:
+        return _utcnow()
 
 
 def _migrate_trade_history_columns() -> None:
@@ -1125,6 +1162,124 @@ def save_decision_snapshot(account_id: int, trigger: str, payload: dict) -> dict
         session.commit()
         session.refresh(row)
         return {"id": row.id, "created_at": utc_iso_z(row.created_at), "trigger": trigger}
+    finally:
+        session.close()
+
+
+def save_active_position_monitor_result(
+    statuses: list[dict],
+    transitions: list[dict],
+    *,
+    as_of: str | None = None,
+    account_id: int = DEFAULT_ACCOUNT_ID,
+) -> dict:
+    """Upsert current monitor statuses and append confirmed state transitions atomically."""
+    session = SessionLocal()
+    try:
+        timestamp = _parse_utc_datetime(as_of)
+        active_symbols = {
+            str(status.get("symbol") or "").upper()
+            for status in statuses
+            if status.get("symbol")
+        }
+        stale_query = session.query(ActivePositionStateRow).filter(
+            ActivePositionStateRow.account_id == account_id
+        )
+        if active_symbols:
+            stale_query = stale_query.filter(~ActivePositionStateRow.symbol.in_(active_symbols))
+        stale_query.delete(synchronize_session=False)
+        for status in statuses:
+            symbol = str(status.get("symbol") or "").upper()
+            state = str(status.get("state") or "DATA_STALE")
+            if not symbol:
+                continue
+            row = (
+                session.query(ActivePositionStateRow)
+                .filter(
+                    ActivePositionStateRow.account_id == account_id,
+                    ActivePositionStateRow.symbol == symbol,
+                )
+                .first()
+            )
+            if row is None:
+                row = ActivePositionStateRow(account_id=account_id, symbol=symbol)
+                session.add(row)
+            payload = dict(status)
+            payload["symbol"] = symbol
+            payload["updated_at"] = utc_iso_z(timestamp)
+            row.state = state
+            row.status_json = json.dumps(payload)
+            row.updated_at = timestamp
+
+        inserted = 0
+        for transition in transitions:
+            symbol = str(transition.get("symbol") or "").upper()
+            to_state = str(transition.get("to_state") or "")
+            if not symbol or not to_state:
+                continue
+            session.add(
+                ActivePositionTransitionRow(
+                    account_id=account_id,
+                    symbol=symbol,
+                    from_state=transition.get("from_state"),
+                    to_state=to_state,
+                    actionable=bool(transition.get("actionable")),
+                    evidence_json=json.dumps(transition.get("evidence") or []),
+                    created_at=timestamp,
+                )
+            )
+            inserted += 1
+        session.commit()
+        return {"statuses": len(statuses), "transitions": inserted, "as_of": utc_iso_z(timestamp)}
+    finally:
+        session.close()
+
+
+def get_active_position_states(account_id: int = DEFAULT_ACCOUNT_ID) -> list[dict]:
+    session = SessionLocal()
+    try:
+        rows = (
+            session.query(ActivePositionStateRow)
+            .filter(ActivePositionStateRow.account_id == account_id)
+            .order_by(ActivePositionStateRow.symbol.asc())
+            .all()
+        )
+        result: list[dict] = []
+        for row in rows:
+            payload = json.loads(row.status_json or "{}")
+            payload["symbol"] = row.symbol
+            payload["state"] = row.state
+            payload["updated_at"] = utc_iso_z(row.updated_at)
+            result.append(payload)
+        return result
+    finally:
+        session.close()
+
+
+def list_active_position_transitions(
+    *, account_id: int = DEFAULT_ACCOUNT_ID, limit: int = 100
+) -> list[dict]:
+    session = SessionLocal()
+    try:
+        rows = (
+            session.query(ActivePositionTransitionRow)
+            .filter(ActivePositionTransitionRow.account_id == account_id)
+            .order_by(ActivePositionTransitionRow.created_at.desc(), ActivePositionTransitionRow.id.desc())
+            .limit(max(1, min(limit, 500)))
+            .all()
+        )
+        return [
+            {
+                "id": row.id,
+                "symbol": row.symbol,
+                "from_state": row.from_state,
+                "to_state": row.to_state,
+                "actionable": bool(row.actionable),
+                "evidence": json.loads(row.evidence_json or "[]"),
+                "changed_at": utc_iso_z(row.created_at),
+            }
+            for row in rows
+        ]
     finally:
         session.close()
 

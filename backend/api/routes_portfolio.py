@@ -4,6 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from models.schemas import (
+    ActivePositionMonitorResponse,
     FactorExposureRequest,
     FactorExposureResponse,
     PortfolioDecisionRequest,
@@ -18,6 +19,10 @@ from models.schemas import (
     RebalancePreviewRequest,
     RebalancePreviewResponse,
 )
+from services.active_position_monitor_service import (
+    get_active_position_monitor_status,
+    run_active_position_monitor,
+)
 from services.portfolio_optimizer import optimize_portfolio
 from services.institutional_backtest_service import run_portfolio_backtest
 from services.factor_exposure_service import build_factor_exposure_report
@@ -30,6 +35,39 @@ from utils.demo_guard import enforce_backtest_symbols, require_non_demo_mode
 from config import DEMO_MODE
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
+
+
+@router.get("/active-monitor", response_model=ActivePositionMonitorResponse)
+def active_position_monitor_status():
+    """Current active-position states and change-only transition history."""
+    try:
+        return ActivePositionMonitorResponse(**get_active_position_monitor_status())
+    except Exception as exc:
+        raise portfolio_error(
+            code="ACTIVE_POSITION_MONITOR_READ_FAILED",
+            message="Could not load active position monitoring status.",
+            status_code=500,
+            retryable=True,
+            log_detail=str(exc),
+        ) from exc
+
+
+@router.post("/active-monitor/run", response_model=ActivePositionMonitorResponse)
+def active_position_monitor_run(refresh_quotes: bool = False):
+    """Run one read-only monitoring pass; optionally refresh quotes first."""
+    require_non_demo_mode()
+    try:
+        return ActivePositionMonitorResponse(
+            **run_active_position_monitor(refresh_quotes=refresh_quotes)
+        )
+    except Exception as exc:
+        raise portfolio_error(
+            code="ACTIVE_POSITION_MONITOR_RUN_FAILED",
+            message="Could not evaluate active positions.",
+            status_code=500,
+            retryable=True,
+            log_detail=str(exc),
+        ) from exc
 
 
 @router.get("/performance", response_model=PortfolioPerformanceResponse)

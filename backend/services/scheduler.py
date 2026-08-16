@@ -185,6 +185,22 @@ def _scheduled_penny_scan_refresh() -> dict:
     return dispatch_job("penny_scan_refresh", {})
 
 
+def _scheduled_active_quote_refresh() -> dict:
+    if not _is_trading_session():
+        return {"skipped": True, "reason": "non_trading_day"}
+    from services.active_position_monitor_service import refresh_and_store_active_quotes
+
+    return refresh_and_store_active_quotes()
+
+
+def _scheduled_active_monitor() -> dict:
+    if not _is_trading_session():
+        return {"skipped": True, "reason": "non_trading_day"}
+    from services.active_position_monitor_service import run_active_position_monitor
+
+    return run_active_position_monitor(refresh_quotes=False)
+
+
 def _scheduled_morning_scan_email() -> dict:
     from config import SCAN_EMAIL_ENABLED
 
@@ -250,6 +266,10 @@ def start_scheduler() -> None:
     """Start APScheduler for daily jobs if SCHEDULER_ENABLED."""
     global _scheduler
     from config import (
+        ACTIVE_POSITION_EVALUATION_CRON,
+        ACTIVE_POSITION_MONITOR_ENABLED,
+        ACTIVE_POSITION_MONITOR_TZ,
+        ACTIVE_POSITION_QUOTE_CRON,
         MARKET_DATA_REFRESH_CRON,
         MARKET_DATA_REFRESH_ENABLED,
         MARKET_DATA_REFRESH_TZ,
@@ -266,8 +286,10 @@ def start_scheduler() -> None:
         SCHEDULER_TZ,
     )
 
-    if not SCHEDULER_ENABLED and not SCAN_EMAIL_ENABLED:
-        logger.info("Scheduler disabled (SCHEDULER_ENABLED=false, SCAN_EMAIL_ENABLED=false)")
+    if not SCHEDULER_ENABLED and not SCAN_EMAIL_ENABLED and not ACTIVE_POSITION_MONITOR_ENABLED:
+        logger.info(
+            "Scheduler disabled (daily, scan email, and active monitor are all disabled)"
+        )
         return
 
     try:
@@ -280,7 +302,13 @@ def start_scheduler() -> None:
     if _scheduler is not None:
         return
 
-    tz = SCHEDULER_TZ if SCHEDULER_ENABLED else SCAN_EMAIL_TIMEZONE
+    tz = (
+        SCHEDULER_TZ
+        if SCHEDULER_ENABLED
+        else ACTIVE_POSITION_MONITOR_TZ
+        if ACTIVE_POSITION_MONITOR_ENABLED
+        else SCAN_EMAIL_TIMEZONE
+    )
     _scheduler = BackgroundScheduler(timezone=tz)
     if SCHEDULER_ENABLED:
         _scheduler.add_job(
@@ -317,6 +345,27 @@ def start_scheduler() -> None:
             CronTrigger.from_crontab(PENNY_SCAN_REFRESH_CRON, timezone=PENNY_SCAN_REFRESH_TZ),
             id="penny_scan_refresh",
             replace_existing=True,
+        )
+    if ACTIVE_POSITION_MONITOR_ENABLED:
+        _scheduler.add_job(
+            _scheduled_active_quote_refresh,
+            CronTrigger.from_crontab(
+                ACTIVE_POSITION_QUOTE_CRON, timezone=ACTIVE_POSITION_MONITOR_TZ
+            ),
+            id="active_position_quote_refresh",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+        _scheduler.add_job(
+            _scheduled_active_monitor,
+            CronTrigger.from_crontab(
+                ACTIVE_POSITION_EVALUATION_CRON, timezone=ACTIVE_POSITION_MONITOR_TZ
+            ),
+            id="active_position_monitor",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
         )
     if SCAN_EMAIL_ENABLED:
         from services.scan_email_config import load_scan_email_settings

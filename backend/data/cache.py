@@ -317,6 +317,25 @@ def get_scan_job(job_id: str) -> dict | None:
     return value if isinstance(value, dict) else None
 
 
+def save_active_quote_snapshot(
+    quotes: dict[str, float], *, as_of: str, ttl_seconds: float = 600.0
+) -> None:
+    payload = {
+        "as_of": as_of,
+        "quotes": {
+            str(symbol).upper(): {"price": float(price), "as_of": as_of}
+            for symbol, price in quotes.items()
+            if price is not None and float(price) > 0
+        },
+    }
+    Cache().set("portfolio:active_quotes", payload, ttl_seconds)
+
+
+def get_active_quote_snapshot() -> dict:
+    payload = Cache().get("portfolio:active_quotes")
+    return payload if isinstance(payload, dict) else {"as_of": None, "quotes": {}}
+
+
 def get_latest_scan_cache_age_seconds(bucket: str) -> float | None:
     """Return seconds since the latest-scan cache row was written (ignoring TTL).
 
