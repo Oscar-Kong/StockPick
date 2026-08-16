@@ -41,6 +41,8 @@ class PortfolioRefresh:
         self._refresh_started_at: datetime | None = None
         self._last_auto_refresh_at: datetime | None = None
         self._last_price_refresh_at: datetime | None = None
+        self._active_quote_budget_date: str | None = None
+        self._active_quote_requests = 0
 
     def is_running(self, scope: RefreshScope = "home") -> bool:
         if scope != "home":
@@ -176,11 +178,33 @@ class PortfolioRefresh:
 
     def refresh_active_quotes(self) -> dict:
         """Quote-only refresh for frequent active-position monitoring."""
+        from config import (
+            ACTIVE_POSITION_DAILY_REQUEST_BUDGET,
+            ACTIVE_POSITION_MAX_SYMBOLS_PER_REFRESH,
+        )
+
         holdings = get_current_holdings()
         if not holdings:
             return {"skipped": True, "reason": "no_holdings", "quotes": {}}
 
-        symbols = list(dict.fromkeys(str(h["symbol"]).upper() for h in holdings if h.get("symbol")))
+        eligible = [h for h in holdings if str(h.get("bucket") or "penny").lower() == "penny"]
+        all_symbols = list(
+            dict.fromkeys(str(h["symbol"]).upper() for h in eligible if h.get("symbol"))
+        )
+        budget_date = datetime.now(timezone.utc).date().isoformat()
+        with self._lock:
+            if self._active_quote_budget_date != budget_date:
+                self._active_quote_budget_date = budget_date
+                self._active_quote_requests = 0
+            remaining_budget = max(
+                0, ACTIVE_POSITION_DAILY_REQUEST_BUDGET - self._active_quote_requests
+            )
+            request_limit = min(
+                max(0, ACTIVE_POSITION_MAX_SYMBOLS_PER_REFRESH), remaining_budget
+            )
+            symbols = all_symbols[:request_limit]
+            self._active_quote_requests += len(symbols)
+            budget_used = self._active_quote_requests
         quotes: dict[str, float] = {}
         errors: list[str] = []
 
@@ -202,6 +226,12 @@ class PortfolioRefresh:
         return {
             "refreshed": len(quotes),
             "requested": len(symbols),
+            "deferred": all_symbols[len(symbols) :],
+            "provider_requests": len(symbols),
+            "daily_budget_used": budget_used,
+            "daily_budget_remaining": max(
+                0, ACTIVE_POSITION_DAILY_REQUEST_BUDGET - budget_used
+            ),
             "quotes": quotes,
             "errors": errors[:5],
             "quote_only": True,

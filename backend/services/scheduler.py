@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from data.historical_store import HistoricalStore
 from data.price_service import PriceService
@@ -140,6 +141,15 @@ def _is_trading_session() -> bool:
         return True
 
 
+def _is_regular_market_time() -> bool:
+    """Bound frequent quote jobs to 09:30–16:00 New York time."""
+    from config import ACTIVE_POSITION_MONITOR_TZ
+
+    local = datetime.now(ZoneInfo(ACTIVE_POSITION_MONITOR_TZ))
+    minutes = local.hour * 60 + local.minute
+    return 9 * 60 + 30 <= minutes <= 16 * 60
+
+
 def _scheduled_pipeline() -> dict:
     if not _is_trading_session():
         logger.info("Skipping daily pipeline — not a trading session")
@@ -186,16 +196,16 @@ def _scheduled_penny_scan_refresh() -> dict:
 
 
 def _scheduled_active_quote_refresh() -> dict:
-    if not _is_trading_session():
-        return {"skipped": True, "reason": "non_trading_day"}
+    if not _is_trading_session() or not _is_regular_market_time():
+        return {"skipped": True, "reason": "outside_regular_session"}
     from services.active_position_monitor_service import refresh_and_store_active_quotes
 
     return refresh_and_store_active_quotes()
 
 
 def _scheduled_active_monitor() -> dict:
-    if not _is_trading_session():
-        return {"skipped": True, "reason": "non_trading_day"}
+    if not _is_trading_session() or not _is_regular_market_time():
+        return {"skipped": True, "reason": "outside_regular_session"}
     from services.active_position_monitor_service import run_active_position_monitor
 
     return run_active_position_monitor(refresh_quotes=False)

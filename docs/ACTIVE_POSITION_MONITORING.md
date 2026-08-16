@@ -39,7 +39,7 @@ intraday evaluator instead.
 - `DATA_STALE`: required data is stale or incomplete; suppress actionable advice.
 
 State transitions must be explainable and evidence-bearing. Apply hysteresis (for
-example, two completed bars or a minimum breach magnitude) and notification
+example, two quote samples at least four minutes apart or a minimum breach magnitude) and notification
 cooldowns so borderline prices do not alternate recommendations every minute.
 
 ## Trigger examples
@@ -89,6 +89,9 @@ reduced-confidence non-actionable state, never fabricated confirmation.
   cooldown suppresses churn, while a more severe state bypasses the cooldown.
 - Portfolio Today polls the stored result every minute. This GET does not contact a
   market-data provider; manual **Refresh quotes now** performs one bounded quote pass.
+- Quote ingestion is restricted to penny holdings, at most 10 symbols per pass and
+  1,000 requests per backend process/day by default. Deferred symbols age into
+  `DATA_STALE`; tune both caps to the provider plan before enabling the scheduler.
 
 Enable the in-process jobs with `ACTIVE_POSITION_MONITOR_ENABLED=true`. The backend
 must remain running for APScheduler to fire. This feature never places orders.

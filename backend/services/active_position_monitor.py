@@ -169,10 +169,12 @@ class ActivePositionMonitor:
         stop_loss_pct: float = 0.05,
         target_gain_pct: float = 0.10,
         max_quote_age_seconds: float = 120.0,
+        min_confirmation_seconds: float = 240.0,
     ) -> None:
         self.stop_loss_pct = stop_loss_pct
         self.target_gain_pct = target_gain_pct
         self.max_quote_age_seconds = max_quote_age_seconds
+        self.min_confirmation_seconds = min_confirmation_seconds
 
     def evaluate(
         self,
@@ -180,6 +182,7 @@ class ActivePositionMonitor:
         holdings: list[dict],
         quotes: dict[str, dict],
         previous_states: dict[str, str],
+        previous_state_times: dict[str, str] | None = None,
         now: datetime | None = None,
     ) -> ActiveMonitorResult:
         now_utc = now or datetime.now(timezone.utc)
@@ -188,6 +191,7 @@ class ActivePositionMonitor:
         now_utc = now_utc.astimezone(timezone.utc)
         statuses: list[ActivePositionStatus] = []
         transitions: list[PositionTransition] = []
+        previous_state_times = previous_state_times or {}
 
         for holding in holdings:
             symbol = str(holding.get("symbol") or "").upper()
@@ -210,14 +214,21 @@ class ActivePositionMonitor:
             else:
                 data_status = "fresh"
 
-            stop_price = avg_cost * (1.0 - self.stop_loss_pct) if avg_cost > 0 else None
-            target_price = avg_cost * (1.0 + self.target_gain_pct) if avg_cost > 0 else None
+            is_penny = bucket.lower() == "penny"
+            stop_price = avg_cost * (1.0 - self.stop_loss_pct) if avg_cost > 0 and is_penny else None
+            target_price = avg_cost * (1.0 + self.target_gain_pct) if avg_cost > 0 and is_penny else None
             previous = previous_states.get(symbol)
+            previous_at = _parse_as_of(previous_state_times.get(symbol))
+            sample_spacing_ok = bool(
+                previous_at
+                and (now_utc - previous_at).total_seconds() >= self.min_confirmation_seconds
+            )
             confirmed_stop_breach = bool(
-                previous == "EXIT_WARNING"
+                previous in {"EXIT_WARNING", "EXIT"}
                 and price is not None
                 and stop_price is not None
                 and price <= stop_price
+                and (previous == "EXIT" or sample_spacing_ok)
             )
             evaluation = evaluate_intraday_position(
                 PositionSnapshot(

@@ -169,7 +169,10 @@ quote-only refreshes every minute and cached state evaluation every five minutes
 `ACTIVE_POSITION_MONITOR_TZ`; notification churn is controlled by
 `ACTIVE_POSITION_NOTIFICATION_COOLDOWN_SECONDS` (default 900). Leave the flag off
 when the backend is not continuously running. Portfolio Today's one-minute UI poll
-reads local state and does not consume provider quota.
+reads local state and does not consume provider quota. The quote job is additionally
+bounded by `ACTIVE_POSITION_MAX_SYMBOLS_PER_REFRESH` (default 10) and
+`ACTIVE_POSITION_DAILY_REQUEST_BUDGET` (default 1000 per backend process/day); set
+these below the actual provider plan. Jobs run only from 09:30 through 16:00 ET.
 
 **Mark alignment:** Today’s holdings table and hero value read the last **daily decision snapshot**. **Sync Robinhood** updates live positions + marks; run **Daily decision** separately to refresh the action queue. The hero invested value is always `current_shares × mark` (never a frozen `market_value` from an older decision). If prices still disagree with the Robinhood app, check Finnhub/FMP keys and whether the session is outside regular/extended hours (StockPick then shows last daily close).
 

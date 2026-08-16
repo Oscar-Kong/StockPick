@@ -8,6 +8,7 @@ from services.scheduler import _scheduled_active_monitor, _scheduled_active_quot
 def test_active_quote_scheduler_uses_quote_only_refresh():
     with (
         patch("services.scheduler._is_trading_session", return_value=True),
+        patch("services.scheduler._is_regular_market_time", return_value=True),
         patch(
             "services.active_position_monitor_service.refresh_and_store_active_quotes",
             return_value={"quote_only": True, "refreshed": 2},
@@ -22,6 +23,7 @@ def test_active_quote_scheduler_uses_quote_only_refresh():
 def test_active_monitor_scheduler_evaluates_cached_quotes_without_refetch():
     with (
         patch("services.scheduler._is_trading_session", return_value=True),
+        patch("services.scheduler._is_regular_market_time", return_value=True),
         patch(
             "services.active_position_monitor_service.run_active_position_monitor",
             return_value={"statuses": [], "quote_only": True},
